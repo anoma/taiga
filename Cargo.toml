@@ -1,0 +1,25 @@
+[package]
+name = "pbc"
+version = "0.1.1"
+edition = "2021"
+license = "GPL-3.0"
+repository = "https://gitlab.com/heliaxdev/pbc"
+readme = "README.md"
+description = "An implementation of a private bartering circuits."
+keywords = ["ZK"]
+categories = ["cryptography"]
+authors = ["Heliax AG <hello@heliax.dev>"]
+
+[dependencies]
+ark-std = "0.3"
+ark-bls12-381 = "0.3"
+ark-ec = "0.3"
+ark-ff = "0.3"
+rand = "0.8"
+
+[profile.release]
+opt-level = 3
+lto = true
+
+[profile.dev]
+opt-level = 3
