@@ -1,0 +1,18 @@
+# Summary
+
+- [Questions](./questions.md)
+- [Taiga by example](./taiga-by-example.md)
+- [Specifications](./spec.md)
+- [Implementation tasks](./implementation-tasks.md)
+- [Validity predicates in the context of transparent Anoma](./transparent-anoma.md)
+    - [Validity predicate definition](./transparent-anoma/vp-def.md)
+    - [Three use-case examples](./transparent-anoma/vp-examples.md)
+    - [PLONK in a nutshell](./transparent-anoma/plonk.md)
+- [Private circuits](./private-circuits.md)
+    - [Universal PLONK](./private-circuits/universal-plonk.md)
+    - [Blinded circuit](./private-circuits/blinded-circuit.md)
+    - [Proof of blinding](./private-circuits/blinding-proof.md)
+- [PBC validity predicates](./pbc.md)
+    - [User VP](./pbc/user-vp.md)
+    - [Token VP](./pbc/token-vp.md)
+    - [Action VP](./pbc/action-vp.md)

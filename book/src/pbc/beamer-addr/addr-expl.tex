@@ -1,0 +1,40 @@
+\documentclass{beamer}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathrsfs}
+\usepackage{xcolor}
+
+\renewcommand<>\cellcolor[1]{\only#2{\beameroriginal\cellcolor{#1}}}
+
+\title{Addresses in PBC}
+
+\begin{document}
+
+\frame{\titlepage}
+
+\begin{frame}\centering
+    \begin{tabular}{|l|l|l|}
+        \hline
+        & \textbf{Old note} & \textbf{New note}\\
+        \hline
+        Owner address & \texttt{0x91a2} & \texttt{0x5e2b} \\
+        \hline
+        Token address & \cellcolor{red}<2>{\texttt{0xca6f}} & \texttt{0x2cd0} \\
+        \hline
+        Value & $12\text{XAN}$ & $1\text{BTC}$ \\
+        \hline
+        Nullifier & $(123,321)$ & -- \\
+        \hline
+    \end{tabular}
+
+    \begin{itemize}
+        \item \texttt{TokenVP} for XAN (\texttt{0xca6f}): "Accept sending maximum 10 XAN". This is a circuit.
+        \item Verifying an XAN VP proof is done with \texttt{XAN.DescTokenVP}.
+        \item The sender produces a proof for the XAN VP.
+        \item $\text{XAN.Adress} = \text{Com}_q(XAN.DescTokenVP, XAN.rcm_addr)$. 
+        \item Different addresses for different tokens: \texttt{rcmAddr}.
+    \end{itemize}
+\end{frame}
+
+\end{document}

@@ -1,25 +1,34 @@
 [package]
 name = "pbc"
-version = "0.1.1"
+version = "0.1.0"
 edition = "2021"
-license = "GPL-3.0"
-repository = "https://gitlab.com/heliaxdev/pbc"
-readme = "README.md"
-description = "An implementation of a private bartering circuits."
-keywords = ["ZK"]
-categories = ["cryptography"]
-authors = ["Heliax AG <hello@heliax.dev>"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ark-std = "0.3"
-ark-bls12-381 = "0.3"
-ark-ec = "0.3"
-ark-ff = "0.3"
-rand = "0.8"
+ark-serialize = { version = "^0.3.0", default-features = false }
+ark-ff = { version = "^0.3.0", default-features = false }
+ark-ec = { version = "^0.3.0", default-features = false }
+ark-poly-commit = "0.3"
+ark-poly = "0.3"
+ark-bls12-377 = "0.3" 
+ark-ed-on-bls12-377 = "0.3"
+ark-bw6-761 = "0.3"
+ark-pallas = "0.3"
+ark-vesta = "0.3"
 
-[profile.release]
-opt-level = 3
-lto = true
+merlin = { version = "3.0", default-features = false }
+rand = "0.8.4"
+sha2 = "0.10.1"
+plonk = { git = "https://github.com/heliaxdev/ark-plonk/", branch="simon/randomized-verifier-key" }
+blake2 = "0.9"
+rs_merkle = { git = "https://github.com/heliaxdev/rs-merkle/" } # "0.2.2"
 
-[profile.dev]
-opt-level = 3
+poseidon377 = { git = "https://github.com/penumbra-zone/poseidon377/" }
+
+[patch.crates-io]
+ark-bls12-377 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
+ark-ed-on-bls12-377 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
+ark-bw6-761 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
+ark-pallas = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
+ark-vesta = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
