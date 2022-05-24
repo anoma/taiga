@@ -1,11 +1,10 @@
 use crate::{
-    add_to_nf_tree,
+    add_to_tree,
     circuit::circuit_parameters::CircuitParameters,
     circuit::{
         blinding_circuit::{blind_gadget, BlindingCircuit},
         validity_predicate::{recv_gadget, send_gadget, ValidityPredicate},
     },
-    com_q,
     el_gamal::{Ciphertext, DecryptionKey, EncryptionKey},
     note::Note,
     prf,
@@ -44,7 +43,7 @@ impl<CP: CircuitParameters> User<CP> {
             CP::CurveScalarField,
             DensePolynomial<CP::CurveScalarField>,
         >>::UniversalParams,
-        outter_curve_setup: &<CP::OuterCurvePC as PolynomialCommitment<
+        outer_curve_setup: &<CP::OuterCurvePC as PolynomialCommitment<
             CP::CurveBaseField,
             DensePolynomial<CP::CurveBaseField>,
         >>::UniversalParams,
@@ -56,13 +55,13 @@ impl<CP: CircuitParameters> User<CP> {
         // Receiving proof
         let recv_vp = ValidityPredicate::<CP>::new(curve_setup, recv_gadget::<CP>, true, rng);
         // blinding proof
-        let blind_vp = BlindingCircuit::<CP>::new(outter_curve_setup, blind_gadget::<CP>);
+        let blind_vp = BlindingCircuit::<CP>::new(outer_curve_setup, blind_gadget::<CP>);
 
         // nullifier key
         let nk: BigInteger256 = rng.gen();
 
         // commitment to the send part com_q(com_p(desc_send_vp, 0) || nk, 0)
-        let com_send_part = com_q::<CP::CurveScalarField>(
+        let com_send_part = CP::com_q(
             &[
                 send_vp.pack().into_repr().to_bytes_le().as_slice(),
                 nk.to_bytes_le().as_slice(),
@@ -126,7 +125,7 @@ impl<CP: CircuitParameters> User<CP> {
         for note in notes {
             //Compute the nullifier of the spent note and put it in the nullifier tree
             let nullifier = self.compute_nullifier(note);
-            add_to_nf_tree::<CP::InnerCurve>(&nullifier, nf_tree);
+            add_to_tree::<CP::InnerCurve>(&nullifier, nf_tree);
         }
 
         let mut new_notes: Vec<_> = vec![];
@@ -152,7 +151,7 @@ impl<CP: CircuitParameters> User<CP> {
         let recv_cm = self.recv_vp.pack();
 
         // address = Com_q(send_part || recv_part, rcm_addr)
-        com_q::<CP::CurveScalarField>(
+        CP::com_q(
             &[
                 self.com_send_part.into_repr().to_bytes_le(),
                 recv_cm.into_repr().to_bytes_le(),
