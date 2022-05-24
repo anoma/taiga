@@ -7,7 +7,7 @@ Currently, we are not able to produce all the proofs needed for Taiga (the main 
 
 ## Warning
 The implementation is probably not secure nor efficient:
-* The `hash-to-field` function in [`src/lib.rs`](https://github.com/heliaxdev/taiga/blob/master/src/lib.rs) is probably not the right way for hashing into a field.
+* The `hash-to-field` function in [`src/lib.rs`](https://github.com/heliaxdev/taiga/blob/main/src/lib.rs) is probably not the right way for hashing into a field.
 * The `hash-to-curve` algorithm used in the `commitment` method in [`src/note.rs`](https://github.com/heliaxdev/taiga/blob/master/src/note.rs) is a naive hash that must not be used in a real-world implementation.
 * The nullifier computed in the `spend` method in [`src/user.rs`](https://github.com/heliaxdev/taiga/blob/master/src/user.rs) should be replaced by an implementation as specified by Zcash.
 * The El Gamal encryption scheme is based on the first option of [this post](https://crypto.stackexchange.com/questions/14955/mapping-of-message-onto-elliptic-curve-and-reverse-it?rq=1).
