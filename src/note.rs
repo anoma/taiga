@@ -48,7 +48,7 @@ impl<CP: CircuitParameters> Note<CP> {
 
         let cm = note.commitment();
         add_to_tree(&cm, nc_tree);
-        note.add_to_nc_en_list(user, rng, &cm, nc_en_list);
+        note.add_to_nc_en_list(user, rng, cm, nc_en_list);
 
         note
     }
@@ -67,7 +67,7 @@ impl<CP: CircuitParameters> Note<CP> {
         &self,
         user: &User<CP>,
         rand: &mut ThreadRng,
-        cm: &TEGroupAffine<CP::InnerCurve>,
+        cm: TEGroupAffine<CP::InnerCurve>,
         nc_en_list: &mut Vec<(
             TEGroupAffine<CP::InnerCurve>,
             Vec<Ciphertext<CP::InnerCurve>>,
@@ -77,7 +77,7 @@ impl<CP: CircuitParameters> Note<CP> {
         let bytes = serializable_to_vec(self);
         let ec = user.enc_key().encrypt(&bytes, rand);
         // update nc_en_list
-        nc_en_list.push((cm.clone(), ec));
+        nc_en_list.push((cm, ec));
     }
 
     // SHOULD BE PRIVATE??
