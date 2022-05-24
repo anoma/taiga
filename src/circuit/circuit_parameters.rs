@@ -6,6 +6,8 @@ use ark_ec::{
 };
 use ark_ff::PrimeField;
 use plonk::commitment::{HomomorphicCommitment, IPA, KZG10};
+use crate::{com};
+use ark_ff::*;
 
 pub trait CircuitParameters {
     //               Inner Curve     Curve    Outer Curve
@@ -34,6 +36,16 @@ pub trait CircuitParameters {
 
     type CurvePC: HomomorphicCommitment<Self::CurveScalarField>;
     type OuterCurvePC: HomomorphicCommitment<Self::CurveBaseField>;
+
+    // F_q is the scalar field of *Curve*
+    fn com_q(x: &[u8], rand: BigInteger256) -> Self::CurveScalarField {
+        com(x, rand)
+    }
+    
+    // F_p is the base field of *Curve*
+    fn com_p(x: &[u8], rand: BigInteger256) -> Self::CurveBaseField {
+        com(x, rand)
+    }
 }
 
 // // We decided to continue with KZG for now.

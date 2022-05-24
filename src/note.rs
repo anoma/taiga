@@ -1,6 +1,6 @@
 use crate::{
     circuit::circuit_parameters::CircuitParameters, el_gamal::Ciphertext, hash_to_curve,
-    serializable_to_vec, user::User,
+    serializable_to_vec, user::User, add_to_tree
 };
 use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
 use ark_ff::BigInteger256;
@@ -46,14 +46,15 @@ impl<CP: CircuitParameters> Note<CP> {
             psi: psi,
         };
 
-        // note.commitment() is computed twice with this code...
-        note.add_to_nc_tree(nc_tree);
-        note.add_to_nc_en_list(user, rng, nc_en_list);
+        let cm = note.commitment();
+        add_to_tree(&cm, nc_tree);
+        note.add_to_nc_en_list(user, rng, cm, nc_en_list);
 
         note
     }
 
     pub fn commitment(&self) -> TEGroupAffine<CP::InnerCurve> {
+        // TODO: Consider Sinsemilla hash for this
         //we just concat all of the note fields and multiply the curve generator by it (bad)
         //the fields of a note we should commit to aren't defined in the pbc spec yet
         //also, note commitment should be implemented with Sinsemilla (according to the pbc spec)
@@ -62,18 +63,11 @@ impl<CP: CircuitParameters> Note<CP> {
         hash_to_curve::<CP>(&bytes, self.rcm)
     }
 
-    pub fn add_to_nc_tree(&self, nc_tree: &mut MerkleTree<Blake2s>) {
-        let cm_bytes = serializable_to_vec(&self.commitment());
-
-        let hash = Blake2s::hash(&cm_bytes);
-        nc_tree.insert(hash);
-        nc_tree.commit();
-    }
-
     pub fn add_to_nc_en_list(
         &self,
         user: &User<CP>,
         rand: &mut ThreadRng,
+        cm: TEGroupAffine<CP::InnerCurve>,
         nc_en_list: &mut Vec<(
             TEGroupAffine<CP::InnerCurve>,
             Vec<Ciphertext<CP::InnerCurve>>,
@@ -83,7 +77,7 @@ impl<CP: CircuitParameters> Note<CP> {
         let bytes = serializable_to_vec(self);
         let ec = user.enc_key().encrypt(&bytes, rand);
         // update nc_en_list
-        nc_en_list.push((self.commitment(), ec));
+        nc_en_list.push((cm, ec));
     }
 
     // SHOULD BE PRIVATE??

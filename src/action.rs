@@ -1,4 +1,4 @@
-use crate::{circuit::circuit_parameters::CircuitParameters, com_q, hash_to_curve, prf};
+use crate::{circuit::circuit_parameters::CircuitParameters, hash_to_curve, prf};
 use ark_ec::ProjectiveCurve;
 use plonk::proof_system::Proof;
 use rand::prelude::ThreadRng;
@@ -29,9 +29,9 @@ impl<CP: CircuitParameters> Action<CP> {
         note_owner_addr: CP::CurveScalarField,
     ) {
         assert_eq!(
-            com_q::<CP::CurveScalarField>(
+            CP::com_q(
                 &[
-                    com_q::<CP::CurveScalarField>(
+                    CP::com_q(
                         &[
                             send_vp_hash.into_repr().to_bytes_le().as_slice(),
                             nk.to_bytes_le().as_slice()
@@ -66,7 +66,7 @@ impl<CP: CircuitParameters> Action<CP> {
         note_owner_addr: CP::CurveScalarField,
     ) {
         assert_eq!(
-            com_q::<CP::CurveScalarField>(
+            CP::com_q(
                 &[
                     send_vp_com.into_repr().to_bytes_le(),
                     recv_vp_hash.into_repr().to_bytes_le()
@@ -92,7 +92,7 @@ impl<CP: CircuitParameters> Action<CP> {
         note_token_addr: CP::CurveScalarField,
     ) {
         assert_eq!(
-            com_q::<CP::CurveScalarField>(&hash_tok_vp.into_repr().to_bytes_le(), token_rcm),
+            CP::com_q(&hash_tok_vp.into_repr().to_bytes_le(), token_rcm),
             note_token_addr
         );
     }
@@ -119,7 +119,7 @@ impl<CP: CircuitParameters> Action<CP> {
         assert_eq!(
             com_vp,
             // TODO: Use Blake2s to be efficient on both Fq and Fp
-            com_q::<CP::CurveScalarField>(&hash_vp.into_repr().to_bytes_le(), com_rcm)
+            CP::com_q(&hash_vp.into_repr().to_bytes_le(), com_rcm)
         );
     }
 
