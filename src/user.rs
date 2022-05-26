@@ -60,8 +60,8 @@ impl<CP: CircuitParameters> User<CP> {
         // nullifier key
         let nk: BigInteger256 = rng.gen();
 
-        // commitment to the send part com_q(com_p(desc_send_vp, 0) || nk, 0)
-        let com_send_part = CP::com_q(
+        // commitment to the send part com_r(com_q(desc_send_vp, 0) || nk, 0)
+        let com_send_part = CP::com_r(
             &[
                 send_vp.pack().into_repr().to_bytes_le().as_slice(),
                 nk.to_bytes_le().as_slice(),
@@ -146,12 +146,12 @@ impl<CP: CircuitParameters> User<CP> {
     }
 
     pub fn address(&self) -> CP::CurveScalarField {
-        // send_cm = Com_q( Com_p(desc_vp_addr_send) || nk ) is a public value
-        // recv_part = Com_p(desc_vp_addr_recv)
+        // send_cm = Com_r( Com_q(desc_vp_addr_send) || nk ) is a public value
+        // recv_part = Com_q(desc_vp_addr_recv)
         let recv_cm = self.recv_vp.pack();
 
-        // address = Com_q(send_part || recv_part, rcm_addr)
-        CP::com_q(
+        // address = Com_r(send_part || recv_part, rcm_addr)
+        CP::com_r(
             &[
                 self.com_send_part.into_repr().to_bytes_le(),
                 recv_cm.into_repr().to_bytes_le(),

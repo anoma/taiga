@@ -15,9 +15,9 @@ In this context, we need *three* curves in order to produce private circuit proo
 
 | Elliptic curve | Base field | Scalar field |
 |-|-|-|
-|InnerCurve|`Fq`|-|
-|Curve|`Fp`|`Fq`|
-|OuterCurve|-|`Fp`|
+|InnerCurve|`Fr`|-|
+|Curve|`Fq`|`Fr`|
+|OuterCurve|-|`Fq`|
 
 
 ## Examples

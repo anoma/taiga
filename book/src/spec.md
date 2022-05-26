@@ -1,21 +1,35 @@
-# PBC Spec Working Draft
+# Taiga Spec Working Draft
 
 To be edited as design changes. Please make changes as necessary. Keep it **concise** and **precise**.
+
+## Notation
+
+$\mathbb{E}_M$ means the main curve under which Action and VP circuits (i.e. user and token validity predicates) are defined.
+
+$\mathbb{E}_O$ means the outer curve. $\mathbb{E}_I$ means the inner curve.
+
+$\mathbb{F}_q$ stands for the base field of $\mathbb{E}_M$. $\mathbb{F}_r$ refers to the scalar field of $\mathbb{E}_M$.
+
+### Side note:
+- ZCash: 
+An action circuit in Orchard is over the Vesta curve. Since an action circuit in Taiga is over $\mathbb{E}_M$, we could say that $\mathbb{E}_M$ is equivalent to $\mathbb{V}$ in Orchard and $q = r_\mathbb{P}$ = $q_{\mathbb{V}}$, $r = r_\mathbb{V} = q_{\mathbb{P}}$. See 5.4.9.6 Pallas and Vesta in the [ZCash docs](https://github.com/zcash/zips/blob/main/protocol/protocol.pdf).
+- Action and vp circuits: arithmetic circuit over $\mathbb{F}_r$.
+- VPBlind and Accumulator circuits: arithmetic circuit over $\mathbb{F}_q$.
 
 ## Proof system (Plonk / plonkup) interfaces 
 
 Main interfaces: Preprocess, Prove, Verify.
 
-- Polynomial commitment scheme for polynomials over $\mathbb F_q$, with base field $\mathbb{F}_p$, fixed SRS and bound $d$.
-- A circuit with interface `C(x; w) ⟶ 0/1` is a circuit with upto `n` fan-in 3 (or 4) addition / multiplication / lookup gates over $\mathbb{F}_q$. (Following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html), `C(x; w)` can be turned into polynomials over $\mathbb{F}_q$.)
-- __Preprocess__: `preproc(C) ⟶ desc_C`. `C` is turned into a *circuit description* which is a sequence of polynomial commitments. (polynomials are computed over $\mathbb{F}_q$ while commitments are generated over $\mathbb{F}_p$)
+- Polynomial commitment scheme for polynomials, where a commitment $Com$ is a point of an elliptic curve $E$ with scalar field $\mathbb F_r$ and base field $\mathbb{F}_q$, and $d$ is the bounded degree of any polynomial in the scheme.
+- A circuit with interface `C(x; w) ⟶ 0/1` is a circuit with upto `n` fan-in 3 (or 4) addition / multiplication / lookup gates over $\mathbb{F}_r$. (Following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html), `C(x; w)` can be turned into polynomials over $\mathbb{F}_r$.)
+- __Preprocess__: `preproc(C) ⟶ desc_C`. `C` is turned into a *circuit description* which is a sequence of polynomial commitments. (polynomials are computed over $\mathbb{F}_r$ while commitments are generated over $\mathbb{F}_q$)
     - In `ark-plonk`, `desc_C` corresponds to `vd: VerifierData`.
-- __Prove__: `P(C, x, w) ⟶ π` (arithmetized over $\mathbb{F}_q$ and $\mathbb{F}_p$)
-- __Verify__: `V(desc_C, x, π) ⟶ 0/1` (arithmetized over $\mathbb{F}_q$ and $\mathbb{F}_p$)
-- **Blind** over $\mathbb F_p$: `Blind(desc_C; r) ⟶ blinded_desc_C`
+- __Prove__: `P(C, x, w) ⟶ π` (arithmetized over $\mathbb{F}_r$ and $\mathbb{F}_q$)
+- __Verify__: `V(desc_C, x, π) ⟶ 0/1` (arithmetized over $\mathbb{F}_r$ and $\mathbb{F}_q$)
+- **Blind** over $\mathbb{F}_q$: `Blind(desc_C; r) ⟶ blinded_desc_C`
     - `Blind(desc_vp, r)`:
-        - `desc_vp` is 8 group elements (base field $\mathbb F_p$) of the form $([q_M(x)], [q_L(x)], [q_R(x)], [q_O(x)], [q_C(x)], [S_{σ_1}(x)], [S_{σ_2}(x)], [S_{σ_3}(x)])$
-        - Blinding randomness is 16 elements from $\mathbb F_q$: $r = \{(r_{1, B}, r_{2, B}) \mid B = 1, 2, 3, M, L, R, O, C\}$
+        - `desc_vp` is 8 group elements (base field $\mathbb{F}_q$) of the form $([q_M(x)], [q_L(x)], [q_R(x)], [q_O(x)], [q_C(x)], [S_{σ_1}(x)], [S_{σ_2}(x)], [S_{σ_3}(x)])$
+        - Blinding randomness is 16 elements from $\mathbb{F}_r$: $r = \{(r_{1, B}, r_{2, B}) \mid B = 1, 2, 3, M, L, R, O, C\}$
         - For each "label" `B ∈ {M, L, R, O, C}`:
             - $[q_B'(x)] = r_{1, B}  [Z_H(x)] + r_{2, B} [x \cdot Z_H(x)] + [q_B(x)]$
             - Rationale given in : [Private trade circuit design](https://hackmd.io/LbvsNZmgSNysROgkjjtTKg)
@@ -25,7 +39,7 @@ Main interfaces: Preprocess, Prove, Verify.
     - `BlindProver((C, r), x, w) ⟶ π`
         - To generate proof for a blinded circuit, prover needs to take input the blinding randomness
 
-Halo 2 recursion: another proof system with $p$ and $q$ swapped.
+Halo 2 recursion: another proof system with $q$ and $r$ swapped.
 
 ### Potential features:
 
@@ -33,19 +47,14 @@ Halo 2 recursion: another proof system with $p$ and $q$ swapped.
 
 Definitions from Section 4.1 of [BCMS20](https://eprint.iacr.org/2020/499.pdf), and specializing to their Definition 4.2 for Plonk verifiers.
 
-- __Accumulation Prover__ over $\mathbb{F}_q$ and $\mathbb{F}_p$: `AccP(acc, desc_C, x, π) ⟶ (acc', aπ)` ??
-- __Accumulation Verify__ over $\mathbb{F}_p$ ?: `AccV(acc, acc', aπ, desc_C, x, π) ⟶ 0/1` ??
-- __Accumulation Decider__ over $\mathbb{F}_p$ ?: `AccD(acc) ⟶ 0/1`
-
-### Side note:
-ZCash: $p = r_p$, $q = r_v$
-Action and vp circuits: arithmetic circuit over $\mathbb{F}_q$.
-VPBlind and Accumulator circuits: arithmetic circuit over $\mathbb{F}_p$.
+- __Accumulation Prover__ over $\mathbb{F}_r$ and $\mathbb{F}_q$: `AccP(acc, desc_C, x, π) ⟶ (acc', aπ)` ??
+- __Accumulation Verify__ over $\mathbb{F}_q$ ?: `AccV(acc, acc', aπ, desc_C, x, π) ⟶ 0/1` ??
+- __Accumulation Decider__ over $\mathbb{F}_q$ ?: `AccD(acc) ⟶ 0/1`
 
 ## Abstractions
 
 ### Data types
-- Input / output of each abstract interface, e.g. `Com, Com_p, rcm_addr`, defines a distinct type.
+- Input / output of each abstract interface, e.g. `Com, Com_q, rcm_addr`, defines a distinct type.
 - Each distinct data field defines a type, e.g. `v, data, asset_type`.
 - Data types are linked via interface definition and usage as required, e.g. `v` is of the same type as the first input to `Com_v`.
 - All data types have **fixed length**.
@@ -54,16 +63,16 @@ VPBlind and Accumulator circuits: arithmetic circuit over $\mathbb{F}_p$.
 
 We blend commitments / hash into a single abstract interface.
 
-- `Com_p(...) ⟶ com` efficient over $\mathbb F_p$
-- `Com_q(...) ⟶ com` efficient over $\mathbb F_q$
-- `Com(...) ⟶ com` efficient over **both** $\mathbb F_p$ and $\mathbb F_q$
+- `Com_q(...) ⟶ com` efficient over $\mathbb{F}_q$
+- `Com_r(...) ⟶ com` efficient over $\mathbb{F}_r$
+- `Com(...) ⟶ com` efficient over **both** $\mathbb{F}_q$ and $\mathbb{F}_r$
 
 Commitments are binding by default (i.e. can be instantiated with hash). If we want blinding (possibly across differnt commitments), we add `rcm` explicitly.
 
 TODO: Fix the exact instantiations / implementations.
 
 Options:
-`Com_p, Com_q`: Pedersen, Sinsemilla, Poseidon, Reinforced Concrete
+`Com_q, Com_r`: Pedersen, Sinsemilla, Poseidon, Reinforced Concrete
 `Com`: Blake2s, SHA256
 
 ### Data related to VP circuits (defined in next section)
@@ -80,28 +89,28 @@ TODO: Should we use `fulldesc_vp` in place of `desc_vp`?
 
 #### VP commitments: `com_vp = VPCom(desc_vp)`:
 
-- `VPCom(desc_vp; rcm_com_vp) := Com( Com_p(desc_vp), rcm_com_vp)`
+- `VPCom(desc_vp; rcm_com_vp) := Com( Com_q(desc_vp), rcm_com_vp)`
 
 ### Token (types)
 
 Encodes: token vp
 
-`token = Com_q(Com_p(desc_vp_token), rcm_token)`
+`token = Com_r(Com_q(desc_vp_token), rcm_token)`
 
 ### Address
 
 Encodes: send vp, nullifier key `nk`, receive (recv) vp
 
 ```
-send_part = Com_q( Com_p(desc_vp_addr_send) || nk )
-recv_part = Com_p(desc_vp_addr_recv)
-address = Com_q(send_part || recv_part, rcm_addr)
+send_part = Com_r( Com_q(desc_vp_addr_send) || nk )
+recv_part = Com_q(desc_vp_addr_recv)
+address = Com_r(send_part || recv_part, rcm_addr)
 ```
 
 - Address commits to both send and recv vp
-- For sending: requires opening of `address` to  `com_p(desc_vp_addr_send)`, which requires additional knowledge of nullifier key `nk` and `rcm_addr`. This opening is efficient over $\mathbb F_q$.
-- For receiving: requires opening of `address` to `com_p(desc_vp_addr_recv)`, which requires additional knowledge of `rcm_addr`. This opening is efficient over $\mathbb F_q$
-- `com_p(desc_vp_addr_{send,recv})` are re-used inside ActionCircuit in deriving `addr_com_vp`.
+- For sending: requires opening of `address` to  `com_q(desc_vp_addr_send)`, which requires additional knowledge of nullifier key `nk` and `rcm_addr`. This opening is efficient over $\mathbb{F}_r$.
+- For receiving: requires opening of `address` to `com_q(desc_vp_addr_recv)`, which requires additional knowledge of `rcm_addr`. This opening is efficient over $\mathbb{F}_r$
+- `com_q(desc_vp_addr_{send,recv})` are re-used inside ActionCircuit in deriving `addr_com_vp`.
 
 
 ### Notes
@@ -123,9 +132,9 @@ For us: knowing the opening of `address` to `desc_vp_addr_send` <=> can derive `
 
 ### Validity Predicate (VP) circuits
 
-Arithmetized over $\mathbb{F}_q$. Represented as a Plonk circuit `vp(x; w) ⟶ 0/1`.
+Arithmetized over $\mathbb{F}_r$. Represented as a Plonk circuit `vp(x; w) ⟶ 0/1`.
 
-- expects `m` notes spent and `n` notes created. `m` and `n` could be different for each vp involved in a PBC transaction.
+- expects `m` notes spent and `n` notes created. `m` and `n` could be different for each vp involved in a Taiga transaction.
 
 Public inputs (`x`):
 - vp parameter: `vp_param` 
@@ -155,7 +164,7 @@ Checks that:
 
 ### Action Circuit
 
-Arithmetized over $\mathbb{F}_q$. Represented as a Plonk circuit, `ActionCircuit(x; w)`.
+Arithmetized over $\mathbb{F}_r$. Represented as a Plonk circuit, `ActionCircuit(x; w)`.
 
 Public inputs (`x`):
 - Merkle root `rt`
@@ -173,24 +182,24 @@ Private inputs (`w`):
 - opening of spent note
     - `note = (address, token, v, data, rho, psi, rcm)`
     - `com_vp_addr` of spent note:
-        - `Com_p(desc_vp_addr_send)`, 
+        - `Com_q(desc_vp_addr_send)`, 
         - `nk`, 
-        - `Com_p(desc_vp_addr_recv)`, 
+        - `Com_q(desc_vp_addr_recv)`, 
         - `rcm_addr`, 
         - `rcm_com_vp_addr`
     - `com_vp_token` of spent note:
-        - `Com_p(desc_vp_token)`, 
+        - `Com_q(desc_vp_token)`, 
         - `rcm_token`, 
         - `rcm_com_vp_token`
 - opening of created note
     - `note = (address, token, v, data, rho, psi, rcm)`
     - `com_vp_addr` of output note:
-        - `Com_q(Com_p(desc_vp_address_send)||nk)`,
-        -  `Com_p(desc_vp_address_recv)`, 
+        - `Com_r(Com_q(desc_vp_address_send)||nk)`,
+        -  `Com_q(desc_vp_address_recv)`, 
         -  `rcm_address`, 
         -  `rcm_com_vp_addr`
     - `com_vp_token` of output note:
-        - `Com_p(desc_vp_token)`, 
+        - `Com_q(desc_vp_token)`, 
         - `rcm_token`, 
         - `rcm_com_vp_token`
 
@@ -199,20 +208,20 @@ Action circuit checks:
     - Note is a valid note in `rt`
         - Same as Orchard, there is a path in Merkle tree with root `rt` to a note commitment `cm` that opens to `note`
     - `address` and `com_vp_addr` opens to the same `desc_vp_addr`
-        - Note address integrity: `address = Com_q(Com_q(Com_p(desc_vp_addr_send)||nk) || Com_p(desc_vp_addr_recv), rcm_addr)`
-        - Address VP integrity for input note: `com_vp_addr = Com(Com_p(desc_vp_addr_send), rcm_com_vp_addr)`
+        - Note address integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv), rcm_addr)`
+        - Address VP integrity for input note: `com_vp_addr = Com(Com_q(desc_vp_addr_send), rcm_com_vp_addr)`
         - Nullifier integrity(input note only): `nf = DeriveNullier_nk(note)`.
     - `token` and `com_vp_token` opens to the same `desc_token_vp`
-        - Token (type) integrity: `token = Com_q(Com_p(desc_vp_token), rcm_token)`
-        - Token VP integrity: `com_vp_token = Com(Com_p(desc_vp_token), rcm_com_vp_token)`
+        - Token (type) integrity: `token = Com_r(Com_q(desc_vp_token), rcm_token)`
+        - Token VP integrity: `com_vp_token = Com(Com_q(desc_vp_token), rcm_com_vp_token)`
 - For output note `note = (address, token, v, data, ρ, ψ, rcm_note)`:
     - `address` and `com_vp_addr` opens to the same `desc_vp_addr`
-        - Note address integrity: `address = Com_q(Com_q(Com_p(desc_vp_addr_send)||nk) || Com_p(desc_vp_addr_recv), rcm_addr)`
-        - Address VP integrity for output note: `com_vp_addr = Com(Com_p(desc_vp_addr_recv), rcm_com_vp_addr)`
+        - Note address integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv), rcm_addr)`
+        - Address VP integrity for output note: `com_vp_addr = Com(Com_q(desc_vp_addr_recv), rcm_com_vp_addr)`
         - Commitment integrity(output note only): `cm = NoteCom(note, rcm_note)`
     - `token` and `com_vp_token` opens to the same `desc_vp_token`
-        - Token (type) integrity: `token = Com_q(Com_p(desc_vp_token), rcm_token)`
-        - Token VP integrity: `com_vp = Com(Com_p(desc_vp_token), rcm_com_vp_token)`
+        - Token (type) integrity: `token = Com_r(Com_q(desc_vp_token), rcm_token)`
+        - Token VP integrity: `com_vp = Com(Com_q(desc_vp_token), rcm_com_vp_token)`
 
 + checks of `EnableSpend` and `EnableOutput` flags?
 
@@ -220,7 +229,7 @@ Changes and justifications:
 - No more `asset_generator`, `cv`, `cdata`, as they are already committed to in `nf` and `cm`.
 
 ### VPBlind Circuit
-Arithmetized over $\mathbb F_p$.
+Arithmetized over $\mathbb{F}_q$.
 
 Public inputs (`x`):
 - `com_vp`
@@ -232,16 +241,16 @@ Private inputs (`w`):
 - `r` blinding randomness
 
 VPBlind checks:
-- `com_vp = Com(Com_p(desc_vp), rcm)`
+- `com_vp = Com(Com_q(desc_vp), rcm)`
 - `blind_desc_vp = Blind(desc_vp, r)`
 
 VPBlind ensures that `blind_desc_vp` matches the VP committed to inside `com_vp` hence making usage of the same vp unlinkable across different invocations. 
 
-## PBC Application
+## Taiga Application
 
-PBC is an application, i.e. an account with VP (in the Anoma sense) and state, on the Anoma ledger. PBC maintains a **state** and needs to process **transactions**.
+Taiga is an application, i.e. an account with VP (in the Anoma sense) and state, on the Anoma ledger. Taiga maintains a **state** and needs to process **transactions**.
     
-### PBC State
+### Taiga State
 
 For each epoch the state consists of:
 - Merkle tree, $MT$, of note commitments with root `rt`
@@ -253,9 +262,9 @@ For each epoch the state consists of:
     
 The state should make past `rt` accessible as well (TODO: can be simplify this?)
 
-### PBC Transaction `tx`
+### Taiga Transaction `tx`
 
-A PBC transaction `tx` contains k actions, upto k spent notes, and upto k created notes:
+A Taiga transaction `tx` contains k actions, upto k spent notes, and upto k created notes:
 - Each $i$-th action specfies:
     - `ActionCircuit` proof `π_action_i`
     - public input `(rt_i, nf_i, enableSpend, cm_i, enableOutput)`, resulting in overall list of `NF_tx` and `CM_tx`:
@@ -285,7 +294,7 @@ A transaction `tx` is valid if:
 **Note** Validity check of `tx` is checked inside an [Anoma VP](https://docs.anoma.network/v0.2.0/explore/design/ledger/vp.html).
     
 #### Processing of `tx`
-A valid PBC transaction `tx` induces a state change as follows:
+A valid Taiga transaction `tx` induces a state change as follows:
 1. For each `nf` ∈ `NF_tx`: $NF.add(nf)$
 1. For each `cm` ∈ `CM_tx` with associated `ce`: $MT.add(cm, ce)$
     - `rt` is not updated for operation
@@ -302,7 +311,7 @@ Why? We can verify a collection of Action and VP proofs efficiently for all proo
 
 Verification `Verify(desc, x, π)` requires both $F_p$ and $F_q$ arithmetics are needed. To make recursive proof verification more efficient, we can decompose the verifer computation into $F_p$ part and $F_q$ part.
 
-Specifically, we need to construct two circuits `V_q(desc_C, x, π, intval), V_p(intval)`, efficient over $\mathbb F_q$ and $\mathbb F_p$ respectively, such that `V(desc_C, x, π) = 1` iff `V_q(desc_C, x, π, intval) = 1` and `V_p(intval) = 1`. Note that `V_p` only take input the intermediate value.
+Specifically, we need to construct two circuits `V_q(desc_C, x, π, intval), V_p(intval)`, efficient over $\mathbb{F}_r$ and $\mathbb{F}_q$ respectively, such that `V(desc_C, x, π) = 1` iff `V_q(desc_C, x, π, intval) = 1` and `V_p(intval) = 1`. Note that `V_p` only take input the intermediate value.
 
 `intval` consists of ?? (TODO: pin-down the exact intermediate value):
 
@@ -321,7 +330,7 @@ Specifically, we need to construct two circuits `V_q(desc_C, x, π, intval), V_p
 
 ### Transaction w/ recursive proof
 
-A (recursive) PBC transaction `tx` contains k actions, upto k spent notes, and upto k created notes:
+A (recursive) Taiga transaction `tx` contains k actions, upto k spent notes, and upto k created notes:
 - Each $i$-th action specfies:
     - public input `(rt_i, nf_i, enableSpend, cm_i, enableOutput)`, resulting in overall list of `NF_tx` and `CM_tx`:
         - If `enableSpend = 1`, then `nf_i` is added to `NF_tx`
@@ -424,15 +433,15 @@ Private inputs (`w`):
 
 Accumulator circuit checks:
 - For each `com_vp`:
-    - VP integrity: `com_vp = Com(Com_p(desc_VP), rcm)`
+    - VP integrity: `com_vp = Com(Com_q(desc_VP), rcm)`
     - Hash integrity: $\beta, \gamma, \alpha, \mathfrak{z}, v,u$ are Poseidon hash of transcript
     - Proof integrity: steps 9-11 of Plonk paper
     - Accumulator integrity
         - Commitment opening is added to `acc'`
 
 Notes:
-- Plonk challenges $\beta, \gamma, \alpha, \mathfrak{z}, v,u \in \mathbb{F}_q$ are computed using the Poseidon hash over $\mathbb{F}_q$. 
-- Plonk challenges are rounded down to $\mathbb{F}_p$ out of circuit, and Plonk intermediate values are computed in $\mathbb{F}_p$ and cast back to $\mathbb{F}_q$ for input to AccumulatorCircuit
+- Plonk challenges $\beta, \gamma, \alpha, \mathfrak{z}, v,u \in \mathbb{F}_r$ are computed using the Poseidon hash over $\mathbb{F}_r$. 
+- Plonk challenges are rounded down to $\mathbb{F}_q$ out of circuit, and Plonk intermediate values are computed in $\mathbb{F}_q$ and cast back to $\mathbb{F}_r$ for input to AccumulatorCircuit
 - Intermediate values can be computed from the first 12 scalars - don't need to be stored on-chain
 - Net cost per Action/VP proof: 12 scalars = 384 bytes
 - Plus Accumulator circuit proof size (3-5 kB)
@@ -445,12 +454,12 @@ TODO:
 
 <!--    - Blinding integrity: - blinded $\bar{a}, \bar{b}, \bar{c}, \bar{s}_{\sigma1}, \bar{s}_{\sigma2}, \bar{z}_{\omega}$ computed 
 - Seems like $r_0$ might leak information about `desc_vp`
-- scalars $\bar{a}, \bar{b}, \bar{c}$ from `desc_vp` are needed in both accumulator circuits. `Com_p(desc_vp)` only openable in one. Further investigation needed.-->
+- scalars $\bar{a}, \bar{b}, \bar{c}$ from `desc_vp` are needed in both accumulator circuits. `Com_q(desc_vp)` only openable in one. Further investigation needed.-->
 
-## PBC transaction with accumulation
+## Taiga transaction with accumulation
 Collections of actions and one big accumulator proof.
 
-A PBC transaction consist of:
+A Taiga transaction consist of:
 - list of 2(m + n) `com_vp`
 - spent note nullifiers, `nf_1, ..., nf_m`
 - created note commitments, `cm_1, ..., cm_n`

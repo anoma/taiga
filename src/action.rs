@@ -12,13 +12,13 @@ pub struct Action<CP: CircuitParameters> {
 }
 
 impl<CP: CircuitParameters> Action<CP> {
-    /// Note address integrity: `address = Com_q(Com_q(Com_p(desc_vp_send_addr)||nk) || Com_p(desc_vp_recv_addr), rcm_address)`
+    /// Note address integrity: `address = Com_r(Com_r(Com_q(desc_vp_send_addr)||nk) || Com_q(desc_vp_recv_addr), rcm_address)`
     ///
     /// # Arguments
     ///
     /// Private inputs:
-    /// * `send_vp_hash` - Com_p(desc_vp_send_addr)
-    /// * `recv_vp_hash` - Com_p(desc_vp_recv_addr)
+    /// * `send_vp_hash` - Com_q(desc_vp_send_addr)
+    /// * `recv_vp_hash` - Com_q(desc_vp_recv_addr)
     /// * `note_rcm` - Commitment randomness for deriving note address
     /// * `note_owner_address` - Spent note owner address
     fn check_spent_note_addr_integrity(
@@ -29,9 +29,9 @@ impl<CP: CircuitParameters> Action<CP> {
         note_owner_addr: CP::CurveScalarField,
     ) {
         assert_eq!(
-            CP::com_q(
+            CP::com_r(
                 &[
-                    CP::com_q(
+                    CP::com_r(
                         &[
                             send_vp_hash.into_repr().to_bytes_le().as_slice(),
                             nk.to_bytes_le().as_slice()
@@ -50,13 +50,13 @@ impl<CP: CircuitParameters> Action<CP> {
         );
     }
 
-    /// Note address integrity: `address = Com_q(Com_q(Com_p(desc_vp_send_addr)||nk) || Com_p(desc_vp_recv_addr), rcm_address)`
+    /// Note address integrity: `address = Com_r(Com_r(Com_q(desc_vp_send_addr)||nk) || Com_q(desc_vp_recv_addr), rcm_address)`
     ///
     /// # Arguments
     ///
     /// Private inputs:
-    /// * `send_vp_com` - Com_q(Com_p(desc_vp_addr_send)||nk)
-    /// * `recv_vp_hash` - Com_p(desc_vp_recv_addr)
+    /// * `send_vp_com` - Com_r(Com_q(desc_vp_addr_send)||nk)
+    /// * `recv_vp_hash` - Com_q(desc_vp_recv_addr)
     /// * `note_rcm` - Randomness for deriving note address
     /// * `note_owner_address` - Spent note owner address
     fn check_output_note_addr_integrity(
@@ -66,7 +66,7 @@ impl<CP: CircuitParameters> Action<CP> {
         note_owner_addr: CP::CurveScalarField,
     ) {
         assert_eq!(
-            CP::com_q(
+            CP::com_r(
                 &[
                     send_vp_com.into_repr().to_bytes_le(),
                     recv_vp_hash.into_repr().to_bytes_le()
@@ -78,26 +78,26 @@ impl<CP: CircuitParameters> Action<CP> {
         );
     }
 
-    /// Token (type) integrity: `token = Com_q(Com_p(desc_token_vp), rcm_token)`
+    /// Token (type) integrity: `token = Com_r(Com_q(desc_token_vp), rcm_token)`
     ///
     /// # Arguments
     ///
     /// Private inputs:
-    /// * `hash_tok_vp` - Com_p(desc_token_vp)
+    /// * `hash_tok_vp` - Com_q(desc_token_vp)
     /// * `token_rcm` - Randomness for deriving note address
     /// * `note_token_addr` - Address of the token in the note
     fn check_token_integrity(
-        hash_tok_vp: CP::CurveBaseField, // Com_p(desc_token_vp)
+        hash_tok_vp: CP::CurveBaseField, // Com_q(desc_token_vp)
         token_rcm: BigInteger256,
         note_token_addr: CP::CurveScalarField,
     ) {
         assert_eq!(
-            CP::com_q(&hash_tok_vp.into_repr().to_bytes_le(), token_rcm),
+            CP::com_r(&hash_tok_vp.into_repr().to_bytes_le(), token_rcm),
             note_token_addr
         );
     }
 
-    /// Address VP integrity: `address_com_vp = Com(Com_p(desc_vp), rcm_address_com_vp)`
+    /// Address VP integrity: `address_com_vp = Com(Com_q(desc_vp), rcm_address_com_vp)`
     ///
     /// # Arguments
     ///
@@ -105,7 +105,7 @@ impl<CP: CircuitParameters> Action<CP> {
     /// * `com_vp` - Commitment of the VP
     /// Private inputs:
     /// * `com_rcm` - Randomness for deriving commitment of the VP
-    /// * `hash_vp` - Com_p(desc_vp)
+    /// * `hash_vp` - Com_q(desc_vp)
     fn check_vp_integrity(
         // public
         com_vp: CP::CurveScalarField,
@@ -118,8 +118,8 @@ impl<CP: CircuitParameters> Action<CP> {
         //  * `CurveScalarField` for binding with the note address.
         assert_eq!(
             com_vp,
-            // TODO: Use Blake2s to be efficient on both Fq and Fp
-            CP::com_q(&hash_vp.into_repr().to_bytes_le(), com_rcm)
+            // TODO: Use Blake2s to be efficient on both Fr and Fq
+            CP::com_r(&hash_vp.into_repr().to_bytes_le(), com_rcm)
         );
     }
 
@@ -252,7 +252,7 @@ fn spent_notes_checks<CP: CircuitParameters>(
     );
 
     // `address` and `address_com_vp` opens to the same `desc_address_vp`
-    // Note address integrity: `address = Com_q(Com_q(Com_p(desc_vp_addr_send)||nk) || Com_p(desc_vp_addr_recv), rcm_address)`
+    // Note address integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv), rcm_address)`
     Action::<CP>::check_spent_note_addr_integrity(
         sender.get_send_vp().pack(),
         sender.get_recv_vp().pack(),
@@ -261,7 +261,7 @@ fn spent_notes_checks<CP: CircuitParameters>(
         spent_note.owner_address,
     );
 
-    // Address VP integrity for input note: `address_com_vp = Com(Com_p(desc_vp_addr_send), rcm_address_com_vp)`
+    // Address VP integrity for input note: `address_com_vp = Com(Com_q(desc_vp_addr_send), rcm_address_com_vp)`
     let (cm_send_alice, rand_alice) = sender.get_send_vp().fresh_commitment(rng);
     Action::<CP>::check_vp_integrity(cm_send_alice, rand_alice, sender.get_send_vp().pack());
 
@@ -273,14 +273,14 @@ fn spent_notes_checks<CP: CircuitParameters>(
     );
 
     // `token` and `token_com_vp` opens to the same `desc_token_vp`
-    // Token (type) integrity: `token = Com_q(Com_p(desc_token_vp), rcm_token)`
+    // Token (type) integrity: `token = Com_r(Com_q(desc_token_vp), rcm_token)`
     Action::<CP>::check_token_integrity(
         token.get_vp().pack(),
         token.rcm_addr,
         spent_note.token_address,
     );
 
-    // Token VP integrity: `com_vp = Com(Com_p(desc_vp_token), rcm_token_com_vp)`
+    // Token VP integrity: `com_vp = Com(Com_q(desc_vp_token), rcm_token_com_vp)`
     let (cm_token, rand_token) = token.get_vp().fresh_commitment(rng);
     Action::<CP>::check_vp_integrity(cm_token, rand_token, token.get_vp().pack());
 }
@@ -295,7 +295,7 @@ fn output_notes_checks<CP: CircuitParameters>(
     rng: &mut ThreadRng,
 ) {
     // `address` and `address_com_vp` opens to the same `desc_address_vp`
-    // Note address integrity: `address = Com_q(Com_q(Com_p(desc_vp_addr_send)||nk) || Com_p(desc_vp_addr_recv), rcm_address)`
+    // Note address integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv), rcm_address)`
     Action::<CP>::check_output_note_addr_integrity(
         receiver.com_send_part,
         receiver.get_recv_vp().pack(),
@@ -303,7 +303,7 @@ fn output_notes_checks<CP: CircuitParameters>(
         output_note.owner_address,
     );
 
-    // Address VP integrity for output note: `address_com_vp = Com(Com_p(desc_vp_addr_recv), rcm_address_com_vp)`
+    // Address VP integrity for output note: `address_com_vp = Com(Com_q(desc_vp_addr_recv), rcm_address_com_vp)`
     let (cm_recv_bob, rand_bob) = receiver.get_recv_vp().fresh_commitment(rng);
     Action::<CP>::check_vp_integrity(cm_recv_bob, rand_bob, receiver.get_send_vp().pack());
 
@@ -315,13 +315,13 @@ fn output_notes_checks<CP: CircuitParameters>(
     );
 
     // `token` and `token_com_vp` opens to the same `desc_token_vp`
-    // Token (type) integrity: `token = Com_q(Com_p(desc_token_vp), rcm_token)`
+    // Token (type) integrity: `token = Com_r(Com_q(desc_token_vp), rcm_token)`
     Action::<CP>::check_token_integrity(
         token.get_vp().pack(),
         token.rcm_addr,
         output_note.token_address,
     );
-    // Token VP integrity: `com_vp = Com(Com_p(desc_vp_token), rcm_token_com_vp)`
+    // Token VP integrity: `com_vp = Com(Com_q(desc_vp_token), rcm_token_com_vp)`
     let (cm_token, rand_token) = token.get_vp().fresh_commitment(rng);
     Action::<CP>::check_vp_integrity(cm_token, rand_token, token.get_vp().pack());
 }
