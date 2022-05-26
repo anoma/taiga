@@ -140,8 +140,7 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
 
         let rcm_com = rng.gen();
         // cannot use `pack()` because it is implemented for a validity predicate and we only have `desc_vp`.
-        let h_desc_vp =
-            CP::com_q(&serializable_to_vec(&desc_vp), BigInteger256::from(0));
+        let h_desc_vp = CP::com_q(&serializable_to_vec(&desc_vp), BigInteger256::from(0));
         let com_vp = CP::com_r(&h_desc_vp.into_repr().to_bytes_le(), rcm_com);
 
         Self {
