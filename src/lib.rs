@@ -38,7 +38,7 @@ impl HashToField for Fr377 {
         // implementation not working for a large input `x`...
 
         let elts: Vec<Fr377> = x
-            .chunks(48)
+            .chunks((Fr377::size_in_bits() - 1) / 8 as usize)
             .map(|elt| Fr377::from_le_bytes_mod_order(elt))
             .collect();
 
