@@ -28,7 +28,8 @@ pub trait HashToField: PrimeField {
 impl HashToField for ark_vesta::Fr {}
 impl HashToField for ark_vesta::Fq {}
 impl HashToField for ark_bls12_377::Fq {}
-impl HashToField for ark_bw6_761::Fq {}
+// impl HashToField for ark_bw6_761::Fq {} // even sha512 is not enough...
+impl HashToField for ark_cp6_782::Fq {} // even sha512 is not enough...
 impl HashToField for ark_ed_on_bls12_377::Fr {}
 
 impl HashToField for Fr377 {
