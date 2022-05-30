@@ -71,8 +71,8 @@ impl CircuitParameters for PairingCircuitParameters {
     type Curve = ark_bls12_377::g1::Parameters;
     type InnerCurveScalarField = ark_ed_on_bls12_377::Fr;
     type InnerCurve = ark_ed_on_bls12_377::EdwardsParameters;
-    type OuterCurveBaseField = ark_cp6_782::Fq;
-    type OuterCurve = ark_cp6_782::g1::Parameters;
+    type OuterCurveBaseField = ark_bw6_761::Fq;
+    type OuterCurve = ark_bw6_761::g1::Parameters;
     type CurvePC = KZG10<ark_bls12_377::Bls12_377>;
-    type OuterCurvePC = KZG10<ark_cp6_782::CP6_782>;
+    type OuterCurvePC = KZG10<ark_bw6_761::BW6_761>;
 }

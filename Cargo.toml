@@ -13,8 +13,7 @@ ark-poly-commit = "0.3"
 ark-poly = "0.3"
 ark-bls12-377 = "0.3" 
 ark-ed-on-bls12-377 = "0.3"
-# ark-bw6-761 = "0.3"
-ark-cp6-782 = "0.3"
+ark-bw6-761 = "0.3"
 ark-pallas = "0.3"
 ark-vesta = "0.3"
 
@@ -30,7 +29,6 @@ poseidon377 = { git = "https://github.com/penumbra-zone/poseidon377/" }
 [patch.crates-io]
 ark-bls12-377 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
 ark-ed-on-bls12-377 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
-# ark-bw6-761 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
-ark-cp6-782 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
+ark-bw6-761 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
 ark-pallas = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
 ark-vesta = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }

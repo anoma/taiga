@@ -1,5 +1,23 @@
 # Taiga by example
 We provide an overview of Taiga illustrated with a simple example where Alice wants to send 1XAN to Bob.
+
+## UTXO
+Diagram
+
+## Validity predicates
+Examples of user and token vps.
+
+## Binding VPs
+Commitments, example of token vp, opening
+
+## Private VPs
+Way of hiding, blinding of the commitment, etc.
+
+-----
+TODO rewrite everything so that it is clearer.
+-----
+
+
 In the following sections, we describe how we structure the different entities involved in a transaction, how we achieve privacy in this context and our choice of implementation.
 
 ----
