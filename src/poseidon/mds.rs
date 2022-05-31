@@ -1,6 +1,5 @@
 // adapted from https://github.com/filecoin-project/neptune/blob/master/src/mds.rs
 use crate::poseidon::matrix::Matrix;
-use ark_ff::vec::*;
 use ark_ff::PrimeField;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -24,8 +23,7 @@ impl<F: PrimeField> MdsMatrices<F> {
     pub(crate) fn derive_mds_matrices(m: Matrix<F>) -> Self {
         let m_inv = m.invert().expect("Derived MDS matrix is not invertible");
         let m_hat = m.minor(0, 0);
-        let m_hat_inv =
-            m_hat.invert().expect("Derived MDS matrix is not correct");
+        let m_hat_inv = m_hat.invert().expect("Derived MDS matrix is not correct");
         let m_prime = Self::make_prime(&m);
         let m_double_prime = Self::make_double_prime(&m, &m_hat_inv);
         MdsMatrices {
@@ -71,12 +69,12 @@ impl<F: PrimeField> MdsMatrices<F> {
                     let mut new_row = vec![F::zero(); row.len()];
                     new_row[0] = F::one();
                     new_row
-                }
+                },
                 _ => {
                     let mut new_row = vec![F::zero(); row.len()];
                     new_row[1..].copy_from_slice(&row[1..]);
                     new_row
-                }
+                },
             })
             .collect()
     }
@@ -95,13 +93,13 @@ impl<F: PrimeField> MdsMatrices<F> {
                     new_row.push(row[0]);
                     new_row.extend(&v);
                     new_row
-                }
+                },
                 _ => {
                     let mut new_row = vec![F::zero(); row.len()];
                     new_row[0] = w_hat[i - 1];
                     new_row[i] = F::one();
                     new_row
-                }
+                },
             })
             .collect()
     }
@@ -120,7 +118,7 @@ impl<F: PrimeField> MdsMatrices<F> {
 /// (minor to the element in both the row and column) is the identity.
 /// We will pluralize this compact structure `sparse_matrixes` to distinguish
 /// from `sparse_matrices` from which they are created.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct SparseMatrix<F: PrimeField> {
     /// `w_hat` is the first column of the M'' matrix. It will be directly
     /// multiplied (scalar product) with a row of state elements.
@@ -179,8 +177,9 @@ pub fn factor_to_sparse_matrixes<F: PrimeField>(
 
 #[cfg(test)]
 mod tests {
-    use crate::poseidon::mds::MdsMatrices;
-    use ark_bls12_381::Fr;
+    use crate::poseidon::{matrix::Matrix, mds::MdsMatrices};
+    use ark_bls12_377::Fr;
+    use ark_ff::field_new;
     use ark_std::{test_rng, UniformRand};
 
     #[test]
@@ -202,11 +201,7 @@ mod tests {
 
         for i in 0..m_hat.num_rows() {
             for j in 0..m_hat.num_columns() {
-                assert_eq!(
-                    m[i + 1][j + 1],
-                    m_hat[i][j],
-                    "MDS minor has wrong value."
-                );
+                assert_eq!(m[i + 1][j + 1], m_hat[i][j], "MDS minor has wrong value.");
             }
         }
 
@@ -245,13 +240,65 @@ mod tests {
         assert_eq!(qx[1..], qy[1..]);
 
         let mx = mds.m.left_apply(&x);
-        let m1_m2_x =
-            mds.m_prime.left_apply(&mds.m_double_prime.left_apply(&x));
+        let m1_m2_x = mds.m_prime.left_apply(&mds.m_double_prime.left_apply(&x));
         assert_eq!(mx, m1_m2_x);
 
         let xm = mds.m.right_apply(&x);
-        let x_m1_m2 =
-            mds.m_double_prime.right_apply(&mds.m_prime.right_apply(&x));
+        let x_m1_m2 = mds.m_double_prime.right_apply(&mds.m_prime.right_apply(&x));
         assert_eq!(xm, x_m1_m2);
+    }
+
+    #[test]
+    fn test_mds_creation_hardcoded() {
+        // value come out from sage script
+        let width = 3;
+
+        let expected_mds = Matrix(vec![
+            vec![
+                field_new!(
+                    Fr,
+                    "5629641166285580282832549959187697687583932890102709218623488970611606159361"
+                ),
+                field_new!(
+                    Fr,
+                    "6333346312071277818186618704086159898531924501365547870951425091938056929281"
+                ),
+                field_new!(
+                    Fr,
+                    "6755569399542696339399059951025237225100719468123251062348186764733927391233"
+                ),
+            ],
+            vec![
+                field_new!(
+                    Fr,
+                    "6333346312071277818186618704086159898531924501365547870951425091938056929281"
+                ),
+                field_new!(
+                    Fr,
+                    "6755569399542696339399059951025237225100719468123251062348186764733927391233"
+                ),
+                field_new!(
+                    Fr,
+                    "7037051457856975353540687448984622109479916112628386523279361213264507699201"
+                ),
+            ],
+            vec![
+                field_new!(
+                    Fr,
+                    "6755569399542696339399059951025237225100719468123251062348186764733927391233"
+                ),
+                field_new!(
+                    Fr,
+                    "7037051457856975353540687448984622109479916112628386523279361213264507699201"
+                ),
+                field_new!(
+                    Fr,
+                    "7238110070938603220784707090384182741179342287274911852515914390786350776321"
+                ),
+            ],
+        ]);
+
+        let mds = MdsMatrices::<Fr>::generate_mds(width);
+        assert_eq!(mds, expected_mds);
     }
 }

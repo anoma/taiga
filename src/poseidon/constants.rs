@@ -2,10 +2,11 @@ use crate::poseidon::{
     matrix::Matrix,
     mds::{factor_to_sparse_matrixes, MdsMatrices, SparseMatrix},
     preprocessing::compress_round_constants,
-    round_constant::generate_constants,
+    round_constant::generate_round_constants,
     round_numbers::calc_round_numbers,
 };
-use ark_ff::PrimeField;
+use ark_ff::{FpParameters, PrimeField};
+use std::convert::TryInto;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PoseidonConstants<F: PrimeField> {
@@ -25,16 +26,13 @@ impl<F: PrimeField> PoseidonConstants<F> {
     /// width.  Note that WIDTH = ARITY + 1
     pub fn generate<const WIDTH: usize>() -> Self {
         let arity = WIDTH - 1;
-        let mds_matrices = MdsMatrices::new(WIDTH);
-        let (num_full_rounds, num_partial_rounds) =
-            calc_round_numbers(WIDTH, true);
+
+        let (num_full_rounds, num_partial_rounds) = calc_round_numbers(WIDTH, true);
 
         debug_assert_eq!(num_full_rounds % 2, 0);
         let num_half_full_rounds = num_full_rounds / 2;
-        let round_constants = generate_constants(
-            1, // prime field
-            1, // sbox
-            F::size_in_bits() as u16,
+        let (round_constants, _) = generate_round_constants(
+            F::Params::MODULUS_BITS as u64,
             WIDTH.try_into().expect("WIDTH is too large"),
             num_full_rounds
                 .try_into()
@@ -45,6 +43,8 @@ impl<F: PrimeField> PoseidonConstants<F> {
         );
         let domain_tag = F::from(((1 << arity) - 1) as u64);
 
+        let mds_matrices = MdsMatrices::new(WIDTH);
+
         let compressed_round_constants = compress_round_constants(
             WIDTH,
             num_full_rounds,
@@ -53,14 +53,11 @@ impl<F: PrimeField> PoseidonConstants<F> {
             &mds_matrices,
         );
 
-        let (pre_sparse_matrix, sparse_matrixes) = factor_to_sparse_matrixes(
-            mds_matrices.m.clone(),
-            num_partial_rounds,
-        );
+        let (pre_sparse_matrix, sparse_matrixes) =
+            factor_to_sparse_matrixes(mds_matrices.m.clone(), num_partial_rounds);
 
         assert!(
-            WIDTH * (num_full_rounds + num_partial_rounds)
-                <= round_constants.len(),
+            WIDTH * (num_full_rounds + num_partial_rounds) <= round_constants.len(),
             "Not enough round constants"
         );
 

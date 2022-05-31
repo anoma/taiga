@@ -1,4 +1,5 @@
 pub mod constants;
+pub mod lfsr;
 pub mod matrix;
 pub mod mds;
 pub mod poseidon;

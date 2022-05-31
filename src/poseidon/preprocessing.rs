@@ -1,7 +1,6 @@
 //! acknowledgement: adapted from FileCoin Project: https://github.com/filecoin-project/neptune/blob/master/src/preprocessing.rs
 
 use super::{matrix::vec_add, mds::MdsMatrices};
-use ark_ff::vec::Vec;
 use ark_ff::PrimeField;
 
 // - Compress constants by pushing them back through linear layers and through
@@ -26,10 +25,10 @@ pub(crate) fn compress_round_constants<F: PrimeField>(
     // First round constants are unchanged.
     res.extend(round_keys(0));
 
-    // Post S-box adds for the first set of full rounds should be 'inverted'
-    // from next round. The final round is skipped when fully preprocessing
-    // because that value must be obtained from the result of preprocessing
-    // the partial rounds.
+    // Post S-box adds for the first set of full rounds should be 'inverted' from
+    // next round. The final round is skipped when fully preprocessing because
+    // that value must be obtained from the result of preprocessing the partial
+    // rounds.
     let end = half_full_rounds - 1;
     for i in 0..end {
         let next_round = round_keys(i + 1);
@@ -44,8 +43,7 @@ pub(crate) fn compress_round_constants<F: PrimeField>(
     // - Add inverted result to previous row.
     // - Repeat until all partial round key rows have been consumed.
     // - Extend the preprocessed result by the final resultant row.
-    // - Move the accumulated list of single round keys to the preprocesed
-    //   result.
+    // - Move the accumulated list of single round keys to the preprocesed result.
     // - (Last produced should be first applied, so either pop until empty, or
     //   reverse and extend, etc.)
 
@@ -56,8 +54,8 @@ pub(crate) fn compress_round_constants<F: PrimeField>(
     let final_round = half_full_rounds + partial_rounds;
     let final_round_key = round_keys(final_round).to_vec();
 
-    // 'round_acc' holds the accumulated result of inverting and adding
-    // subsequent round constants (in reverse).
+    // 'round_acc' holds the accumulated result of inverting and adding subsequent
+    // round constants (in reverse).
     let round_acc = (0..partial_rounds)
         .map(|i| round_keys(final_round - i - 1))
         .fold(final_round_key, |acc, previous_round_keys| {
@@ -75,8 +73,8 @@ pub(crate) fn compress_round_constants<F: PrimeField>(
         res.push(x)
     }
 
-    // Post S-box adds for the first set of full rounds should be 'inverted'
-    // from next round.
+    // Post S-box adds for the first set of full rounds should be 'inverted' from
+    // next round.
     for i in 1..(half_full_rounds) {
         let start = half_full_rounds + partial_rounds;
         let next_round = round_keys(i + start);

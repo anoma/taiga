@@ -28,6 +28,9 @@ poseidon377 = { git = "https://github.com/penumbra-zone/poseidon377/" }
 derivative = "2.2.0"
 thiserror = "1.0.30"
 
+[dev-dependencies]
+ark-std = "0.3"
+
 [patch.crates-io]
 ark-bls12-377 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
 ark-ed-on-bls12-377 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }

@@ -17,7 +17,7 @@ fn n_sboxes(t: usize, rf: usize, rp: usize) -> usize {
 }
 
 /// Returns the round numbers for a given arity `(R_F, R_P)`.
-pub(crate) fn round_numbers_base(arity: usize) -> (usize, usize) {
+pub fn round_numbers_base(arity: usize) -> (usize, usize) {
     let t = arity + 1;
     calc_round_numbers(t, true)
 }
@@ -31,12 +31,11 @@ pub(crate) fn round_numbers_base(arity: usize) -> (usize, usize) {
 /// but even if this happens then the complexity is almost surely above 2^64,
 /// and you will be safe."
 /// - D Khovratovich
-pub(crate) fn round_numbers_strengthened(arity: usize) -> (usize, usize) {
+pub fn round_numbers_strengthened(arity: usize) -> (usize, usize) {
     let (full_round, partial_rounds) = round_numbers_base(arity);
 
     // Increase by 25%, rounding up.
-    let strengthened_partial_rounds =
-        f64::ceil(partial_rounds as f64 * 1.25) as usize;
+    let strengthened_partial_rounds = f64::ceil(partial_rounds as f64 * 1.25) as usize;
 
     (full_round, strengthened_partial_rounds)
 }
@@ -45,10 +44,7 @@ pub(crate) fn round_numbers_strengthened(arity: usize) -> (usize, usize) {
 /// parameter does not indicate that we are calculating `R_F` and `R_P` for the
 /// "strengthened" round numbers, done in the function
 /// `round_numbers_strengthened()`.
-pub(crate) fn calc_round_numbers(
-    t: usize,
-    security_margin: bool,
-) -> (usize, usize) {
+pub(crate) fn calc_round_numbers(t: usize, security_margin: bool) -> (usize, usize) {
     let mut rf = 0;
     let mut rp = 0;
     let mut n_sboxes_min = usize::MAX;
@@ -61,9 +57,7 @@ pub(crate) fn calc_round_numbers(
                     rp_test = (1.075 * rp_test as f32).ceil() as usize;
                 }
                 let n_sboxes = n_sboxes(t, rf_test, rp_test);
-                if n_sboxes < n_sboxes_min
-                    || (n_sboxes == n_sboxes_min && rf_test < rf)
-                {
+                if n_sboxes < n_sboxes_min || (n_sboxes == n_sboxes_min && rf_test < rf) {
                     rf = rf_test;
                     rp = rp_test;
                     n_sboxes_min = n_sboxes;
@@ -103,8 +97,8 @@ mod tests {
 
     #[test]
     fn test_round_numbers_against_known_values() {
-        // Each case contains a `t` (where `t = arity + 1`) and the `R_P`
-        // expected for that `t`.
+        // Each case contains a `t` (where `t = arity + 1`) and the `R_P` expected for
+        // that `t`.
         let cases = [
             (2usize, 55usize),
             (3, 55),
@@ -145,38 +139,29 @@ mod tests {
             size_cost: usize,
         }
 
-        let lines: Vec<Line> = fs::read_to_string(
-            "parameters/round_numbers.txt",
-        )
-        .expect(
-            "failed to read round numbers file: `parameters/round_numbers.txt`",
-        )
-        .lines()
-        .skip_while(|line| line.starts_with('#'))
-        .map(|line| {
-            let nums: Vec<usize> = line
-                .split(' ')
-                .map(|s| {
-                    s.parse().unwrap_or_else(|_| {
-                        panic!("failed to parse line as `usize`s: {}", line)
+        let lines: Vec<Line> = fs::read_to_string("parameters/round_numbers.txt")
+            .expect("failed to read round numbers file: `parameters/round_numbers.txt`")
+            .lines()
+            .skip_while(|line| line.starts_with('#'))
+            .map(|line| {
+                let nums: Vec<usize> = line
+                    .split(' ')
+                    .map(|s| {
+                        s.parse().unwrap_or_else(|_| {
+                            panic!("failed to parse line as `usize`s: {}", line)
+                        })
                     })
-                })
-                .collect();
-            assert_eq!(
-                nums.len(),
-                5,
-                "line in does not contain 5 values: {}",
-                line
-            );
-            Line {
-                t: nums[0],
-                rf: nums[1],
-                rp: nums[2],
-                sbox_cost: nums[3],
-                size_cost: nums[4],
-            }
-        })
-        .collect();
+                    .collect();
+                assert_eq!(nums.len(), 5, "line in does not contain 5 values: {}", line);
+                Line {
+                    t: nums[0],
+                    rf: nums[1],
+                    rp: nums[2],
+                    sbox_cost: nums[3],
+                    size_cost: nums[4],
+                }
+            })
+            .collect();
 
         assert!(
             !lines.is_empty(),
@@ -191,10 +176,7 @@ mod tests {
             assert_eq!(rf, line.rf, "full rounds differ from script");
             assert_eq!(rp, line.rp, "partial rounds differ from script");
             assert_eq!(sbox_cost, line.sbox_cost, "cost differs from script");
-            assert_eq!(
-                size_cost, line.size_cost,
-                "size-cost differs from script"
-            );
+            assert_eq!(size_cost, line.size_cost, "size-cost differs from script");
         }
     }
 }

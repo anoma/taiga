@@ -1,7 +1,10 @@
 //! acknowledgement: adapted from FileCoin Project: https://github.com/filecoin-project/neptune/blob/master/src/matrix.rs
+use std::{
+    iter::FromIterator,
+    ops::{Index, IndexMut},
+};
 
 use ark_ff::PrimeField;
-use core::ops::{Index, IndexMut};
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Matrix<T: Clone>(pub Vec<Vec<T>>);
@@ -196,9 +199,7 @@ impl<F: PrimeField> Matrix<F> {
             .map(|input_row| {
                 other_t
                     .iter_rows()
-                    .map(|transposed_column| {
-                        inner_product(&input_row, &transposed_column)
-                    })
+                    .map(|transposed_column| inner_product(&input_row, &transposed_column))
                     .collect()
             })
             .collect();
@@ -246,15 +247,13 @@ impl<F: PrimeField> Matrix<F> {
     ///   - `column` is not the first
     pub fn eliminate(&self, column: usize, shadow: &mut Self) -> Option<Self> {
         let zero = F::zero();
-        let pivot_index = (0..self.num_rows()).find(|&i| {
-            self[i][column] != zero && (0..column).all(|j| self[i][j] == zero)
-        })?;
+        let pivot_index = (0..self.num_rows())
+            .find(|&i| self[i][column] != zero && (0..column).all(|j| self[i][j] == zero))?;
 
         let pivot = &self[pivot_index];
         let pivot_val = pivot[column];
 
-        // This should never fail since we have a non-zero `pivot_val` if we got
-        // here.
+        // This should never fail since we have a non-zero `pivot_val` if we got here.
         let inv_pivot = pivot_val.inverse()?;
         let mut result = Vec::with_capacity(self.num_rows());
         result.push(pivot.clone());
@@ -344,8 +343,7 @@ impl<F: PrimeField> Matrix<F> {
                 let result_subtracted = scalar_vec_mul(val, &shadow_result[j]);
 
                 normalized = vec_sub(&normalized, &subtracted);
-                shadow_normalized =
-                    vec_sub(&shadow_normalized, &result_subtracted);
+                shadow_normalized = vec_sub(&shadow_normalized, &result_subtracted);
             }
 
             result.push(normalized);
@@ -414,7 +412,7 @@ mod tests {
     use super::*;
     use ark_ff::Zero;
 
-    type Fr = ark_bls12_381::Fr;
+    type Fr = ark_bls12_377::Fr;
 
     #[test]
     fn test_minor() {
@@ -574,8 +572,7 @@ mod tests {
         let add_after_apply = vec_add(&some_vec, &m.right_apply(&base_vec));
 
         // M(B + M^-1(S))
-        let apply_after_add =
-            m.right_apply(&vec_add(&base_vec, &inverse_applied));
+        let apply_after_add = m.right_apply(&vec_add(&base_vec, &inverse_applied));
 
         // S + M(B) = M(B + M^-1(S))
         assert_eq!(add_after_apply, apply_after_add, "breakin' the law");
