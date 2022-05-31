@@ -4,15 +4,15 @@ To be edited as design changes. Please make changes as necessary. Keep it **conc
 
 ## Notation
 
-$\mathbb{E}_M$ means the main curve under which Action and VP circuits (i.e. user and token validity predicates) are defined.
+$E_M$ means the main curve under which Action and VP circuits (i.e. user and token validity predicates) are defined.
 
-$\mathbb{E}_O$ means the outer curve. $\mathbb{E}_I$ means the inner curve.
+$E_O$ means the outer curve. $E_I$ means the inner curve.
 
-$\mathbb{F}_q$ stands for the base field of $\mathbb{E}_M$. $\mathbb{F}_r$ refers to the scalar field of $\mathbb{E}_M$.
+$\mathbb{F}_q$ stands for the base field of $E_M$. $\mathbb{F}_r$ refers to the scalar field of $E_M$.
 
 ### Side note:
 - ZCash: 
-An action circuit in Orchard is over the Vesta curve. Since an action circuit in Taiga is over $\mathbb{E}_M$, we could say that $\mathbb{E}_M$ is equivalent to $\mathbb{V}$ in Orchard and $q = r_\mathbb{P}$ = $q_{\mathbb{V}}$, $r = r_\mathbb{V} = q_{\mathbb{P}}$. See 5.4.9.6 Pallas and Vesta in the [ZCash docs](https://github.com/zcash/zips/blob/main/protocol/protocol.pdf).
+An action circuit in Orchard is over the Vesta curve. Since an action circuit in Taiga is over $E_M$, we could say that $E_M$ is equivalent to $\mathbb{V}$ in Orchard and $q = r_\mathbb{P}$ = $q_{\mathbb{V}}$, $r = r_\mathbb{V} = q_{\mathbb{P}}$. See 5.4.9.6 Pallas and Vesta in the [ZCash docs](https://github.com/zcash/zips/blob/main/protocol/protocol.pdf).
 - Action and vp circuits: arithmetic circuit over $\mathbb{F}_r$.
 - VPBlind and Accumulator circuits: arithmetic circuit over $\mathbb{F}_q$.
 
