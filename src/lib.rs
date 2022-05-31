@@ -7,6 +7,8 @@ use circuit::circuit_parameters::CircuitParameters;
 use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
 use sha2::{Digest, Sha512};
 
+pub extern crate alloc;
+
 pub mod action;
 pub mod circuit;
 pub mod el_gamal;
@@ -14,6 +16,7 @@ pub mod note;
 pub mod token;
 pub mod transaction;
 pub mod user;
+pub mod poseidon;
 
 pub trait HashToField: PrimeField {
     fn hash_to_field(x: &[u8]) -> Self {
