@@ -27,6 +27,7 @@ rs_merkle = { git = "https://github.com/heliaxdev/rs-merkle/" } # "0.2.2"
 poseidon377 = { git = "https://github.com/penumbra-zone/poseidon377/" }
 derivative = "2.2.0"
 thiserror = "1.0.30"
+lazy_static = "1"
 
 [dev-dependencies]
 ark-std = "0.3"

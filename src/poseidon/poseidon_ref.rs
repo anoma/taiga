@@ -324,6 +324,9 @@ mod tests {
     type E = ark_bls12_377::Bls12_377;
     type P = ark_ed_on_bls12_377::EdwardsParameters;
     type Fr = <E as PairingEngine>::Fr;
+    use crate::poseidon::constants::{
+        POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2, POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY4,
+    };
     use ark_std::{test_rng, UniformRand};
 
     #[test]
@@ -332,7 +335,7 @@ mod tests {
         const ARITY: usize = 2;
         const WIDTH: usize = ARITY + 1;
 
-        let constants = PoseidonConstants::generate::<WIDTH>();
+        let constants = POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2.clone();
 
         let inputs = [field_new!(Fr, "1"), field_new!(Fr, "2")];
 
@@ -370,7 +373,7 @@ mod tests {
         const WIDTH: usize = ARITY + 1;
         let mut rng = test_rng();
 
-        let param = PoseidonConstants::generate::<WIDTH>();
+        let param = POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY4.clone();
         let mut poseidon = PoseidonRef::<(), NativeSpecRef<Fr>, WIDTH>::new(&mut (), param.clone());
         let inputs = (0..ARITY).map(|_| Fr::rand(&mut rng)).collect::<Vec<_>>();
 
@@ -410,7 +413,7 @@ mod tests {
         const WIDTH: usize = ARITY + 1;
         let mut rng = test_rng();
 
-        let param = PoseidonConstants::generate::<WIDTH>();
+        let param = POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY4.clone();
         let mut poseidon = PoseidonRef::<(), NativeSpecRef<Fr>, WIDTH>::new(&mut (), param);
         (0..(ARITY + 1)).for_each(|_| {
             let _ = poseidon.input(Fr::rand(&mut rng)).unwrap();

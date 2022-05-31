@@ -6,7 +6,22 @@ use crate::poseidon::{
     round_numbers::calc_round_numbers,
 };
 use ark_ff::{FpParameters, PrimeField};
+use lazy_static::lazy_static;
 use std::convert::TryInto;
+
+// WIDTH = ARITY + 1
+pub const WIDTH_3: usize = 3;
+pub const WIDTH_5: usize = 5;
+lazy_static! {
+    pub static ref POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2: PoseidonConstants<ark_bls12_377::Fr> =
+        PoseidonConstants::generate::<WIDTH_3>();
+    pub static ref POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY4: PoseidonConstants<ark_bls12_377::Fr> =
+        PoseidonConstants::generate::<WIDTH_5>();
+    pub static ref POSEIDON_HASH_PARAM_BLS12_377_BASE_ARITY2: PoseidonConstants<ark_bls12_377::Fq> =
+        PoseidonConstants::generate::<WIDTH_3>();
+    pub static ref POSEIDON_HASH_PARAM_BLS12_377_BASE_ARITY4: PoseidonConstants<ark_bls12_377::Fq> =
+        PoseidonConstants::generate::<WIDTH_5>();
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PoseidonConstants<F: PrimeField> {

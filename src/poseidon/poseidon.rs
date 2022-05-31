@@ -520,7 +520,10 @@ where
 mod tests {
     use super::*;
     use crate::poseidon::{
-        constants::PoseidonConstants,
+        constants::{
+            POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2,
+            POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY4,
+        },
         poseidon_ref::{NativeSpecRef, PoseidonRef},
     };
 
@@ -539,7 +542,7 @@ mod tests {
         const WIDTH: usize = ARITY + 1;
         let mut rng = test_rng();
 
-        let param = PoseidonConstants::generate::<WIDTH>();
+        let param = POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY4.clone();
         let mut poseidon = PoseidonRef::<(), NativeSpecRef<Fr>, WIDTH>::new(&mut (), param.clone());
         let inputs = (0..ARITY).map(|_| Fr::rand(&mut rng)).collect::<Vec<_>>();
 
@@ -564,7 +567,7 @@ mod tests {
         const WIDTH: usize = ARITY + 1;
         let mut rng = test_rng();
 
-        let param = PoseidonConstants::generate::<WIDTH>();
+        let param = POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY4.clone();
         let inputs = (0..ARITY).map(|_| Fr::rand(&mut rng)).collect::<Vec<_>>();
 
         let mut poseidon_optimized =
@@ -595,7 +598,7 @@ mod tests {
         const WIDTH: usize = ARITY + 1;
         let mut rng = test_rng();
 
-        let param = PoseidonConstants::generate::<WIDTH>();
+        let param = POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2.clone();
         let mut poseidon_native =
             Poseidon::<(), NativeSpec<Fr, WIDTH>, WIDTH>::new(&mut (), &param);
         let inputs = (0..ARITY).map(|_| Fr::rand(&mut rng)).collect::<Vec<_>>();
@@ -636,7 +639,7 @@ mod tests {
         const WIDTH: usize = ARITY + 1;
         let mut rng = test_rng();
 
-        let param = PoseidonConstants::generate::<WIDTH>();
+        let param = POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY4.clone();
         let mut poseidon = Poseidon::<(), NativeSpec<Fr, WIDTH>, WIDTH>::new(&mut (), &param);
         (0..(ARITY + 1)).for_each(|_| {
             let _ = poseidon.input(Fr::rand(&mut rng)).unwrap();
