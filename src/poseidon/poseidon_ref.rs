@@ -6,7 +6,7 @@ use crate::poseidon::constants::PoseidonConstants;
 use ark_ec::TEModelParameters;
 use ark_ff::PrimeField;
 use derivative::Derivative;
-use plonk::{constraint_system::StandardComposer, prelude};
+use plonk_core::{constraint_system::StandardComposer, prelude};
 use std::{fmt::Debug, marker::PhantomData};
 
 /// Trait for unoptimized poseidon hash.
@@ -398,8 +398,7 @@ mod tests {
         println!(
             "circuit size for WIDTH {} poseidon: {}",
             WIDTH,
-            c.circuit_size()
-            // c.circuit_bound()
+            c.circuit_bound()
         )
     }
 

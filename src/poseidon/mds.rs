@@ -69,12 +69,12 @@ impl<F: PrimeField> MdsMatrices<F> {
                     let mut new_row = vec![F::zero(); row.len()];
                     new_row[0] = F::one();
                     new_row
-                },
+                }
                 _ => {
                     let mut new_row = vec![F::zero(); row.len()];
                     new_row[1..].copy_from_slice(&row[1..]);
                     new_row
-                },
+                }
             })
             .collect()
     }
@@ -93,13 +93,13 @@ impl<F: PrimeField> MdsMatrices<F> {
                     new_row.push(row[0]);
                     new_row.extend(&v);
                     new_row
-                },
+                }
                 _ => {
                     let mut new_row = vec![F::zero(); row.len()];
                     new_row[0] = w_hat[i - 1];
                     new_row[i] = F::one();
                     new_row
-                },
+                }
             })
             .collect()
     }

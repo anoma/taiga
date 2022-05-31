@@ -13,10 +13,10 @@ pub mod action;
 pub mod circuit;
 pub mod el_gamal;
 pub mod note;
+pub mod poseidon;
 pub mod token;
 pub mod transaction;
 pub mod user;
-pub mod poseidon;
 
 pub trait HashToField: PrimeField {
     fn hash_to_field(x: &[u8]) -> Self {

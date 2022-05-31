@@ -6,7 +6,7 @@ use crate::poseidon::{
 use ark_ec::TEModelParameters;
 use ark_ff::PrimeField;
 use derivative::Derivative;
-use plonk::{constraint_system::StandardComposer, prelude};
+use plonk_core::{constraint_system::StandardComposer, prelude};
 use std::{fmt::Debug, marker::PhantomData};
 
 // TODO: reduce duplicate code with `poseidon_ref`
@@ -453,12 +453,12 @@ where
             (None, None) => Self::power_of_5(c, &x),
             (Some(_), None) => {
                 unreachable!("currently no one is using this")
-            },
+            }
             (None, Some(post_add)) => {
                 let x_2 = Self::mul(c, &x, &x);
                 let x_4 = Self::mul(c, &x_2, &x_2);
                 c.arithmetic_gate(|g| g.witness(x_4, x, None).mul(F::one()).constant(post_add))
-            },
+            }
             (Some(_), Some(_)) => {
                 /*
                 P = (x + a)^5 + b
@@ -471,7 +471,7 @@ where
                  we can see that the constraints counts are same as naive one...
                 */
                 unreachable!("currently no one is using this")
-            },
+            }
         }
     }
 
@@ -624,8 +624,7 @@ mod tests {
         println!(
             "circuit size for WIDTH {} poseidon: {}",
             WIDTH,
-            c.circuit_size()
-            // c.circuit_bound()
+            c.circuit_bound()
         )
     }
 
