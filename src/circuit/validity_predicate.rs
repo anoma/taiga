@@ -3,10 +3,9 @@ use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use merlin::Transcript;
 use plonk::{
-    circuit::PublicInputBuilder,
     constraint_system::StandardComposer,
     prelude::Proof,
-    proof_system::{Prover, Verifier, VerifierKey},
+    proof_system::{Prover, Verifier, VerifierKey, pi::PublicInputs},
 };
 use rand::{prelude::ThreadRng, Rng};
 use std::marker::PhantomData;
@@ -15,7 +14,7 @@ use crate::{circuit::circuit_parameters::CircuitParameters, serializable_to_vec}
 
 pub struct ValidityPredicate<CP: CircuitParameters> {
     desc_vp: VerifierKey<CP::CurveScalarField, CP::CurvePC>, //preprocessed VP
-    pub public_input: Vec<CP::CurveScalarField>,
+    pub public_input: PublicInputs<CP::CurveScalarField>,
     _blind_rand: [CP::CurveScalarField; 20], //blinding randomness
     pub proof: Proof<CP::CurveScalarField, CP::CurvePC>,
     pub verifier: Verifier<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>,
@@ -44,7 +43,7 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
             CP::CurveScalarField,
             DensePolynomial<CP::CurveScalarField>,
         >>::VerifierKey,
-        Vec<CP::CurveScalarField>,
+        PublicInputs<CP::CurveScalarField>,
         VerifierKey<CP::CurveScalarField, CP::CurvePC>,
     ) {
         // Create a `Prover`
@@ -56,7 +55,7 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
         gadget(prover.mut_cs());
         let (ck, vk) = CP::CurvePC::trim(
             setup,
-            prover.circuit_size().next_power_of_two() + 6,
+            prover.circuit_bound().next_power_of_two() + 6,
             0,
             None,
         )
@@ -65,7 +64,7 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
             .mut_cs()
             .preprocess_verifier(&ck, &mut Transcript::new(b""), PhantomData::<CP::CurvePC>)
             .unwrap();
-        let public_input = PublicInputBuilder::new().finish(); // works only with our dummy circuit!
+        let public_input = PublicInputs::new(4); // works only with our dummy circuit!
 
         (prover, ck, vk, public_input, desc_vp)
     }
