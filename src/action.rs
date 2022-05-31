@@ -287,8 +287,7 @@ fn spent_notes_checks<CP: CircuitParameters>(
 
 /// For output note
 /// `note = (address, token, v, data, ρ, ψ, rcm_note)`:
-fn output_notes_checks<CP: CircuitParameters>(
-    sender: &User<CP>,
+pub fn output_notes_checks<CP: CircuitParameters>(
     receiver: &User<CP>,
     token: &Token<CP>,
     output_note: &Note<CP>,
@@ -395,7 +394,7 @@ fn _action_checks<CP: CircuitParameters>() {
         &mut note_commitments,
         &mut rng,
     );
-    output_notes_checks(&alice, &bob, &xan, &output_note, &mut rng);
+    output_notes_checks(&bob, &xan, &output_note, &mut rng);
 
     // FRESH COMMITS (over `CP::CurveScalarField` and `CP::CurveBaseField`)
 
