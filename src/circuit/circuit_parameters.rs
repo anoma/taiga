@@ -1,3 +1,4 @@
+use crate::com;
 use crate::HashToField;
 use ark_ec::{
     //short_weierstrass_jacobian::GroupAffine as SWGroupAffine,
@@ -5,9 +6,8 @@ use ark_ec::{
     TEModelParameters,
 };
 use ark_ff::PrimeField;
-use plonk::commitment::{HomomorphicCommitment, IPA, KZG10};
-use crate::{com};
 use ark_ff::*;
+use plonk_core::commitment::{HomomorphicCommitment, IPA, KZG10};
 
 pub trait CircuitParameters {
     //               Inner Curve     Curve    Outer Curve
@@ -41,7 +41,7 @@ pub trait CircuitParameters {
     fn com_q(x: &[u8], rand: BigInteger256) -> Self::CurveScalarField {
         com(x, rand)
     }
-    
+
     // F_p is the base field of *Curve*
     fn com_p(x: &[u8], rand: BigInteger256) -> Self::CurveBaseField {
         com(x, rand)

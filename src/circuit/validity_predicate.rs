@@ -2,10 +2,10 @@ use ark_ff::{BigInteger, BigInteger256, One, PrimeField, UniformRand, Zero};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use merlin::Transcript;
-use plonk::{
+use plonk_core::{
     constraint_system::StandardComposer,
     prelude::Proof,
-    proof_system::{Prover, Verifier, VerifierKey, pi::PublicInputs},
+    proof_system::{pi::PublicInputs, Prover, Verifier, VerifierKey},
 };
 use rand::{prelude::ThreadRng, Rng};
 use std::marker::PhantomData;
@@ -139,8 +139,7 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
 
         let rcm_com = rng.gen();
         // cannot use `pack()` because it is implemented for a validity predicate and we only have `desc_vp`.
-        let h_desc_vp =
-            CP::com_p(&serializable_to_vec(&desc_vp), BigInteger256::from(0));
+        let h_desc_vp = CP::com_p(&serializable_to_vec(&desc_vp), BigInteger256::from(0));
         let com_vp = CP::com_q(&h_desc_vp.into_repr().to_bytes_le(), rcm_com);
 
         Self {

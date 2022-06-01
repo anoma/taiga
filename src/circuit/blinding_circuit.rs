@@ -1,10 +1,10 @@
 use ark_ff::One;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
-use plonk::{
+use plonk_core::{
     constraint_system::StandardComposer,
     prelude::Proof,
-    proof_system::{Prover, Verifier, pi::PublicInputs},
+    proof_system::{pi::PublicInputs, Prover, Verifier},
 };
 
 use crate::circuit::circuit_parameters::CircuitParameters;

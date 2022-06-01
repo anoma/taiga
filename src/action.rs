@@ -1,6 +1,6 @@
 use crate::{circuit::circuit_parameters::CircuitParameters, hash_to_curve, prf};
 use ark_ec::ProjectiveCurve;
-use plonk::proof_system::Proof;
+use plonk_core::proof_system::Proof;
 use rand::prelude::ThreadRng;
 use rs_merkle::algorithms::Blake2s;
 use rs_merkle::{Hasher, MerkleProof, MerkleTree};

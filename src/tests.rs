@@ -10,7 +10,7 @@ use crate::{
 use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
 use ark_ff::Zero;
 use ark_poly_commit::PolynomialCommitment;
-use plonk::constraint_system::StandardComposer;
+use plonk_core::constraint_system::StandardComposer;
 
 fn spawn_user<CP: CircuitParameters>(name: &str) -> User<CP> {
     use rand::rngs::ThreadRng;
