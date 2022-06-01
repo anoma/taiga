@@ -182,7 +182,7 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
     }
 }
 
-pub fn send_gadget<CP: CircuitParameters>(
+pub fn trivial_gadget<CP: CircuitParameters>(
     composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
 ) {
     let var_one = composer.add_input(CP::CurveScalarField::one());
@@ -192,9 +192,12 @@ pub fn send_gadget<CP: CircuitParameters>(
     });
 }
 
-pub fn recv_gadget<CP: CircuitParameters>(
+pub fn signature_verification_send_gadget<CP: CircuitParameters>(
     composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
 ) {
+    // todo implement the circuit
+    // this circuit check a signature
+    // it involves scalar multiplication circuits if we use ECDSA
     let var_one = composer.add_input(CP::CurveScalarField::one());
     composer.arithmetic_gate(|gate| {
         gate.witness(var_one, var_one, None)
@@ -202,9 +205,26 @@ pub fn recv_gadget<CP: CircuitParameters>(
     });
 }
 
-pub fn token_gadget<CP: CircuitParameters>(
+pub fn black_list_recv_gadget<CP: CircuitParameters>(
     composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
 ) {
+    // todo implement the circuit
+    // this circuit check that the sent note user address is not in a given list
+    // it actually does not require any hash computation (as the user address is one of the fields of a note)
+    // it is probably similar to a range check (?)
+    let var_one = composer.add_input(CP::CurveScalarField::one());
+    composer.arithmetic_gate(|gate| {
+        gate.witness(var_one, var_one, None)
+            .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
+    });
+}
+
+pub fn upper_bound_token_gadget<CP: CircuitParameters>(
+    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+) {
+    // todo implement the circuit
+    // this circuit check that the transaction involving the token is bounded by a given value
+    // it corresponds to a range check in terms of circuits
     let var_one = composer.add_input(CP::CurveScalarField::one());
     composer.arithmetic_gate(|gate| {
         gate.witness(var_one, var_one, None)
@@ -216,7 +236,12 @@ fn _circuit_proof<CP: CircuitParameters>() {
     let mut rng = ThreadRng::default();
     let pp = <CP as CircuitParameters>::CurvePC::setup(2 * 30, None, &mut rng).unwrap();
 
-    let circuit = ValidityPredicate::<CP>::new(&pp, send_gadget::<CP>, true, &mut rng);
+    let circuit = ValidityPredicate::<CP>::new(
+        &pp,
+        signature_verification_send_gadget::<CP>,
+        true,
+        &mut rng,
+    );
     circuit.verify();
 }
 

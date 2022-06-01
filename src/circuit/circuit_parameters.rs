@@ -7,7 +7,11 @@ use ark_ec::{
 };
 use ark_ff::PrimeField;
 use ark_ff::*;
-use plonk_core::commitment::{HomomorphicCommitment, IPA, KZG10};
+use plonk_core::commitment::{
+    HomomorphicCommitment,
+    // IPA,
+    KZG10,
+};
 
 pub trait CircuitParameters {
     //               Inner Curve     Curve    Outer Curve

@@ -6,7 +6,7 @@ use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
 use ark_ff::BigInteger256;
 use ark_serialize::*;
 use rand::{prelude::ThreadRng, Rng};
-use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
+use rs_merkle::{algorithms::Blake2s, MerkleTree};
 
 #[derive(CanonicalSerialize)]
 pub struct Note<CP: CircuitParameters> {

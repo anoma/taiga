@@ -1,6 +1,5 @@
 use crate::circuit::{
-    circuit_parameters::CircuitParameters,
-    validity_predicate::{token_gadget, ValidityPredicate},
+    circuit_parameters::CircuitParameters, validity_predicate::ValidityPredicate,
 };
 use ark_ff::BigInteger256;
 use ark_poly::univariate::DensePolynomial;
@@ -27,9 +26,15 @@ impl<CP: CircuitParameters> Token<CP> {
             CP::CurveScalarField,
             DensePolynomial<CP::CurveScalarField>,
         >>::UniversalParams,
+        token_gadget: fn(
+            &mut StandardComposer<
+                <CP as CircuitParameters>::CurveScalarField,
+                <CP as CircuitParameters>::InnerCurve,
+            >,
+        ),
         rng: &mut ThreadRng,
     ) -> Self {
-        let token_vp = ValidityPredicate::<CP>::new(setup, token_gadget::<CP>, false, rng);
+        let token_vp = ValidityPredicate::<CP>::new(setup, token_gadget, false, rng);
         Self {
             name: String::from(name),
             token_vp,

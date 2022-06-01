@@ -1,16 +1,12 @@
+use crate::circuit::validity_predicate::trivial_gadget;
 use crate::el_gamal::{Ciphertext, DecryptionKey};
 use crate::{
-    circuit::circuit_parameters::CircuitParameters,
-    circuit::validity_predicate::{recv_gadget, send_gadget, token_gadget},
-    note::Note,
-    serializable_to_vec,
-    token::Token,
+    circuit::circuit_parameters::CircuitParameters, note::Note, serializable_to_vec, token::Token,
     user::User,
 };
 use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
 use ark_ff::Zero;
 use ark_poly_commit::PolynomialCommitment;
-use plonk_core::constraint_system::StandardComposer;
 
 fn spawn_user<CP: CircuitParameters>(name: &str) -> User<CP> {
     use rand::rngs::ThreadRng;
@@ -25,6 +21,8 @@ fn spawn_user<CP: CircuitParameters>(name: &str) -> User<CP> {
         &pp,
         &outer_curve_pp,
         DecryptionKey::<CP::InnerCurve>::new(&mut rng),
+        trivial_gadget::<CP>,
+        trivial_gadget::<CP>,
         &mut rng,
     )
 }
@@ -35,7 +33,7 @@ fn spawn_token<CP: CircuitParameters>(name: &str) -> Token<CP> {
     let mut rng = ThreadRng::default();
     let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
 
-    Token::<CP>::new(name, &pp, &mut rng)
+    Token::<CP>::new(name, &pp, trivial_gadget::<CP>, &mut rng)
 }
 
 fn test_send<CP: CircuitParameters>() {

@@ -3,7 +3,7 @@ use crate::{
     circuit::circuit_parameters::CircuitParameters,
     circuit::{
         blinding_circuit::{blind_gadget, BlindingCircuit},
-        validity_predicate::{recv_gadget, send_gadget, ValidityPredicate},
+        validity_predicate::ValidityPredicate,
     },
     el_gamal::{Ciphertext, DecryptionKey, EncryptionKey},
     note::Note,
@@ -16,6 +16,7 @@ use ark_ff::{BigInteger, PrimeField};
 use ark_ff::{BigInteger256, UniformRand};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
+use plonk_core::constraint_system::StandardComposer;
 use rand::{prelude::ThreadRng, Rng};
 use rs_merkle::{algorithms::Blake2s, MerkleTree};
 
@@ -48,12 +49,25 @@ impl<CP: CircuitParameters> User<CP> {
             DensePolynomial<CP::CurveBaseField>,
         >>::UniversalParams,
         dec_key: DecryptionKey<CP::InnerCurve>,
+        send_gadget: fn(
+            &mut StandardComposer<
+                <CP as CircuitParameters>::CurveScalarField,
+                <CP as CircuitParameters>::InnerCurve,
+            >,
+        ),
+        recv_gadget: fn(
+            &mut StandardComposer<
+                <CP as CircuitParameters>::CurveScalarField,
+                <CP as CircuitParameters>::InnerCurve,
+            >,
+        ),
+
         rng: &mut ThreadRng,
     ) -> User<CP> {
         // sending proof
-        let send_vp = ValidityPredicate::<CP>::new(curve_setup, send_gadget::<CP>, true, rng);
+        let send_vp = ValidityPredicate::<CP>::new(curve_setup, send_gadget, true, rng);
         // Receiving proof
-        let recv_vp = ValidityPredicate::<CP>::new(curve_setup, recv_gadget::<CP>, true, rng);
+        let recv_vp = ValidityPredicate::<CP>::new(curve_setup, recv_gadget, true, rng);
         // blinding proof
         let blind_vp = BlindingCircuit::<CP>::new(outer_curve_setup, blind_gadget::<CP>);
 

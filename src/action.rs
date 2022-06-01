@@ -1,3 +1,4 @@
+use crate::circuit::validity_predicate::trivial_gadget;
 use crate::{circuit::circuit_parameters::CircuitParameters, hash_to_curve, prf};
 use ark_ec::ProjectiveCurve;
 use plonk_core::proof_system::Proof;
@@ -220,7 +221,6 @@ impl<CP: CircuitParameters> Action<CP> {
 //
 // this is not the circuit implementation but what should be hard-coded in the Action Circuit.
 //
-use crate::circuit::validity_predicate::{recv_gadget, send_gadget, token_gadget};
 use crate::el_gamal::{Ciphertext, DecryptionKey};
 use crate::note::Note;
 use crate::serializable_to_vec;
@@ -337,6 +337,8 @@ fn _action_checks<CP: CircuitParameters>() {
         &pp,
         &outer_curve_pp,
         DecryptionKey::<CP::InnerCurve>::new(&mut rng),
+        trivial_gadget::<CP>,
+        trivial_gadget::<CP>,
         &mut rng,
     );
 
@@ -345,10 +347,12 @@ fn _action_checks<CP: CircuitParameters>() {
         &pp,
         &outer_curve_pp,
         DecryptionKey::<CP::InnerCurve>::new(&mut rng),
+        trivial_gadget::<CP>,
+        trivial_gadget::<CP>,
         &mut rng,
     );
 
-    let xan = Token::<CP>::new("xan", &pp, &mut rng);
+    let xan = Token::<CP>::new("xan", &pp, trivial_gadget::<CP>, &mut rng);
 
     // Creation of a nullifiers tree
     let mut nullifier_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
