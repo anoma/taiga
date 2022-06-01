@@ -17,6 +17,9 @@ lazy_static! {
         PoseidonConstants::generate::<WIDTH_3>();
     pub static ref POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY4: PoseidonConstants<ark_bls12_377::Fr> =
         PoseidonConstants::generate::<WIDTH_5>();
+
+    // Hashes of bls12_377::BaseField are generated automatically, not tested yet.
+    // Especially we need to check the round number generation from the paper.
     pub static ref POSEIDON_HASH_PARAM_BLS12_377_BASE_ARITY2: PoseidonConstants<ark_bls12_377::Fq> =
         PoseidonConstants::generate::<WIDTH_3>();
     pub static ref POSEIDON_HASH_PARAM_BLS12_377_BASE_ARITY4: PoseidonConstants<ark_bls12_377::Fq> =

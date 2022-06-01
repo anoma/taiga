@@ -7,7 +7,6 @@ pub mod poseidon_ref;
 pub mod preprocessing;
 pub mod round_constant;
 pub mod round_numbers;
-// pub mod constraints;
 
 use thiserror::Error;
 

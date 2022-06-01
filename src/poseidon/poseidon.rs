@@ -616,14 +616,12 @@ mod tests {
         });
         let plonk_hash = poseidon_circuit.output_hash(&mut c);
 
-        // TODO: update plonk and add the test
-        // c.check_circuit_satisfied();
+        c.check_circuit_satisfied();
 
         let expected = c.add_input(native_hash);
         c.assert_equal(expected, plonk_hash);
 
-        // TODO: update plonk and add the test
-        // c.check_circuit_satisfied();
+        c.check_circuit_satisfied();
         println!(
             "circuit size for WIDTH {} poseidon: {}",
             WIDTH,
