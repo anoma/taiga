@@ -64,7 +64,7 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
             .mut_cs()
             .preprocess_verifier(&ck, &mut Transcript::new(b""), PhantomData::<CP::CurvePC>)
             .unwrap();
-        let public_input = prover.mut_cs().get_pi().clone(); // works only with our dummy circuit!
+        let public_input = prover.mut_cs().get_pi().clone();
 
         (prover, ck, vk, public_input, desc_vp)
     }

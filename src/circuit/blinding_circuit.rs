@@ -56,7 +56,7 @@ impl<CP: CircuitParameters> BlindingCircuit<CP> {
             None,
         )
         .unwrap();
-        let public_input = prover.mut_cs().get_pi().clone(); // works only with our dummy circuit!
+        let public_input = prover.mut_cs().get_pi().clone();
 
         (prover, ck, vk, public_input)
     }
