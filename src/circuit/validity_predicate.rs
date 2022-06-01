@@ -64,7 +64,7 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
             .mut_cs()
             .preprocess_verifier(&ck, &mut Transcript::new(b""), PhantomData::<CP::CurvePC>)
             .unwrap();
-        let public_input = PublicInputs::new(4); // works only with our dummy circuit!
+        let public_input = prover.mut_cs().get_pi().clone(); // works only with our dummy circuit!
 
         (prover, ck, vk, public_input, desc_vp)
     }
@@ -214,7 +214,7 @@ pub fn token_gadget<CP: CircuitParameters>(
 
 fn _circuit_proof<CP: CircuitParameters>() {
     let mut rng = ThreadRng::default();
-    let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
+    let pp = <CP as CircuitParameters>::CurvePC::setup(2 * 30, None, &mut rng).unwrap();
 
     let circuit = ValidityPredicate::<CP>::new(&pp, send_gadget::<CP>, true, &mut rng);
     circuit.verify();
