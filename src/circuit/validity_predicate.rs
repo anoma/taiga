@@ -7,10 +7,16 @@ use plonk_core::{
     prelude::Proof,
     proof_system::{pi::PublicInputs, Prover, Verifier, VerifierKey},
 };
+use plonk_hashing::poseidon::{
+    constants::PoseidonConstants,
+    poseidon::{PlonkSpec, Poseidon},
+};
 use rand::{prelude::ThreadRng, Rng};
 use std::marker::PhantomData;
 
-use crate::{circuit::circuit_parameters::CircuitParameters, serializable_to_vec};
+use crate::{
+    circuit::circuit_parameters::CircuitParameters, poseidon::WIDTH_3, serializable_to_vec,
+};
 
 pub struct ValidityPredicate<CP: CircuitParameters> {
     desc_vp: VerifierKey<CP::CurveScalarField, CP::CurvePC>, //preprocessed VP
@@ -190,6 +196,36 @@ pub fn trivial_gadget<CP: CircuitParameters>(
         gate.witness(var_one, var_one, None)
             .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
     });
+}
+
+pub fn poseidon_hash_curve_scalar_field_gadget<CP: CircuitParameters>(
+    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+    inputs: Vec<CP::CurveScalarField>,
+    output: CP::CurveScalarField,
+) {
+    let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
+
+    // inputs in the circuit
+    let inputs_var = inputs
+        .iter()
+        .map(|x| composer.add_input(*x))
+        .collect::<Vec<_>>();
+    // hash circuit
+    let mut poseidon_circuit = Poseidon::<_, PlonkSpec<WIDTH_3>, WIDTH_3>::new(
+        composer,
+        &poseidon_hash_param_bls12_377_scalar_arity2,
+    );
+    inputs_var.iter().for_each(|x| {
+        poseidon_circuit.input(*x).unwrap();
+    });
+    let plonk_hash = poseidon_circuit.output_hash(composer);
+
+    composer.check_circuit_satisfied();
+
+    let expected = composer.add_input(output);
+    composer.assert_equal(expected, plonk_hash);
+
+    composer.check_circuit_satisfied();
 }
 
 pub fn signature_verification_send_gadget<CP: CircuitParameters>(
