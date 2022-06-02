@@ -9,7 +9,7 @@ use plonk_core::{
 };
 use plonk_hashing::poseidon::{
     constants::PoseidonConstants,
-    poseidon::{PlonkSpec, Poseidon},
+    poseidon::{NativeSpec, PlonkSpec, Poseidon},
 };
 use rand::{prelude::ThreadRng, Rng};
 use std::marker::PhantomData;
@@ -200,7 +200,7 @@ pub fn trivial_gadget<CP: CircuitParameters>(
 
 pub fn poseidon_hash_curve_scalar_field_gadget<CP: CircuitParameters>(
     composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-    inputs: Vec<CP::CurveScalarField>,
+    inputs: &Vec<CP::CurveScalarField>,
     output: CP::CurveScalarField,
 ) {
     let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
@@ -226,6 +226,56 @@ pub fn poseidon_hash_curve_scalar_field_gadget<CP: CircuitParameters>(
     composer.assert_equal(expected, plonk_hash);
 
     composer.check_circuit_satisfied();
+}
+
+#[test]
+fn test_poseidon_hash_curve_scalar_field_gadget() {
+    use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
+    // we try to compute a circuit and proof+verify.
+    let mut rng = ThreadRng::default();
+    let pp = <CP as CircuitParameters>::CurvePC::setup(2 * 300, None, &mut rng).unwrap();
+
+    let mut prover: Prover<
+        <CP as CircuitParameters>::CurveScalarField,
+        <CP as CircuitParameters>::InnerCurve,
+        <CP as CircuitParameters>::CurvePC,
+    > = Prover::new(b"demo");
+
+    let inputs = (0..(WIDTH_3 - 1))
+        .map(|_| <CP as CircuitParameters>::CurveScalarField::rand(&mut rng))
+        .collect::<Vec<_>>();
+    let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
+
+    let mut poseidon = Poseidon::<
+        (),
+        NativeSpec<<CP as CircuitParameters>::CurveScalarField, WIDTH_3>,
+        WIDTH_3,
+    >::new(&mut (), &poseidon_hash_param_bls12_377_scalar_arity2);
+
+    inputs.iter().for_each(|x| {
+        poseidon.input(*x).unwrap();
+    });
+    let output = poseidon.output_hash(&mut ());
+
+    poseidon_hash_curve_scalar_field_gadget::<CP>(prover.mut_cs(), &inputs, output);
+    let (ck, vk) = <CP as CircuitParameters>::CurvePC::trim(&pp, 2 * 300, 0, None).unwrap();
+    let mut rng = ark_std::test_rng();
+    let blinding_values = [<CP as CircuitParameters>::CurveScalarField::rand(&mut rng); 20];
+    prover
+        .preprocess_with_blinding(&ck, blinding_values)
+        .unwrap();
+    let public_inputs = prover.mut_cs().get_pi().clone();
+    let proof = prover.prove(&ck).unwrap();
+    let mut verifier = Verifier::<
+        <CP as CircuitParameters>::CurveScalarField,
+        <CP as CircuitParameters>::InnerCurve,
+        <CP as CircuitParameters>::CurvePC,
+    >::new(b"demo");
+    poseidon_hash_curve_scalar_field_gadget::<CP>(verifier.mut_cs(), &inputs, output);
+    verifier
+        .preprocess_with_blinding(&ck, blinding_values)
+        .unwrap();
+    assert!(verifier.verify(&proof, &vk, &public_inputs).is_ok());
 }
 
 pub fn signature_verification_send_gadget<CP: CircuitParameters>(
