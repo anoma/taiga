@@ -13,24 +13,25 @@ ark-poly-commit = "0.3"
 ark-poly = "0.3"
 ark-bls12-377 = "0.3" 
 ark-ed-on-bls12-377 = "0.3"
-# ark-bw6-761 = "0.3"
-ark-cp6-782 = "0.3"
+ark-bw6-761 = "0.3"
 ark-pallas = "0.3"
 ark-vesta = "0.3"
 
 merlin = { version = "3.0", default-features = false }
 rand = "0.8.4"
 sha2 = "0.10.1"
-plonk = { git = "https://github.com/heliaxdev/ark-plonk/", branch="simon/randomized-verifier-key" }
+plonk-core = { git = "https://github.com/heliaxdev/ark-plonk/", features = ["trace"], branch="taiga/randomized-circuits" }
+plonk-hashing = { git = "https://github.com/heliaxdev/ark-plonk/", branch="taiga/randomized-circuits" }
 blake2 = "0.9"
 rs_merkle = { git = "https://github.com/heliaxdev/rs-merkle/" } # "0.2.2"
+lazy_static = "1"
 
-poseidon377 = { git = "https://github.com/penumbra-zone/poseidon377/" }
+[dev-dependencies]
+ark-std = "0.3"
 
 [patch.crates-io]
 ark-bls12-377 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
 ark-ed-on-bls12-377 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
-# ark-bw6-761 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
-ark-cp6-782 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
+ark-bw6-761 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
 ark-pallas = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
 ark-vesta = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }

@@ -1,3 +1,4 @@
+use crate::com;
 use crate::HashToField;
 use ark_ec::{
     //short_weierstrass_jacobian::GroupAffine as SWGroupAffine,
@@ -5,9 +6,8 @@ use ark_ec::{
     TEModelParameters,
 };
 use ark_ff::PrimeField;
-use plonk::commitment::{HomomorphicCommitment, IPA, KZG10};
-use crate::{com};
 use ark_ff::*;
+use plonk_core::commitment::{HomomorphicCommitment, IPA, KZG10};
 
 pub trait CircuitParameters {
     //               Inner Curve     Curve    Outer Curve
@@ -41,7 +41,7 @@ pub trait CircuitParameters {
     fn com_q(x: &[u8], rand: BigInteger256) -> Self::CurveScalarField {
         com(x, rand)
     }
-    
+
     // F_p is the base field of *Curve*
     fn com_p(x: &[u8], rand: BigInteger256) -> Self::CurveBaseField {
         com(x, rand)
@@ -71,8 +71,8 @@ impl CircuitParameters for PairingCircuitParameters {
     type Curve = ark_bls12_377::g1::Parameters;
     type InnerCurveScalarField = ark_ed_on_bls12_377::Fr;
     type InnerCurve = ark_ed_on_bls12_377::EdwardsParameters;
-    type OuterCurveBaseField = ark_cp6_782::Fq;
-    type OuterCurve = ark_cp6_782::g1::Parameters;
+    type OuterCurveBaseField = ark_bw6_761::Fq;
+    type OuterCurve = ark_bw6_761::g1::Parameters;
     type CurvePC = KZG10<ark_bls12_377::Bls12_377>;
-    type OuterCurvePC = KZG10<ark_cp6_782::CP6_782>;
+    type OuterCurvePC = KZG10<ark_bw6_761::BW6_761>;
 }

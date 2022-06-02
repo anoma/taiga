@@ -2,9 +2,9 @@ use ark_serialize::{CanonicalSerialize, CanonicalSerializeHashExt};
 use crate::{action::Action, note::Note, CircuitParameters};
 use blake2::crypto_mac::Mac;
 use crate::action;
-use plonk::proof_system::Verifier;
 use rs_merkle::{MerkleTree, Hasher, algorithms::Sha256};
 use crate::circuit::validity_predicate::ValidityPredicate;
+use plonk_core::proof_system::Verifier;
 
 pub struct Transaction<CP: CircuitParameters> {
     _max: usize, // the maximum number of actions/notes for a transaction

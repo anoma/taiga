@@ -1,6 +1,6 @@
 use crate::{
-    circuit::circuit_parameters::CircuitParameters, el_gamal::Ciphertext, hash_to_curve,
-    serializable_to_vec, user::User, add_to_tree
+    add_to_tree, circuit::circuit_parameters::CircuitParameters, el_gamal::Ciphertext,
+    hash_to_curve, serializable_to_vec, user::User,
 };
 use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
 use ark_ff::BigInteger256;
