@@ -46,8 +46,11 @@ impl<CP: CircuitParameters> Note<CP> {
             psi: psi,
         };
 
+        //should be moved to transaction creation?
+        //add encryption to the note structure
+        let ec = note.encrypt(rng, user);
         add_to_tree(&note.commitment(), nc_tree);
-        note.add_to_nc_en_list(user, rng, nc_en_list);
+        note.add_to_nc_en_list(ec, nc_en_list);
 
         note
     }
@@ -70,14 +73,13 @@ impl<CP: CircuitParameters> Note<CP> {
 
     pub fn add_to_nc_en_list(
         &self,
-        user: &User<CP>,
-        rand: &mut ThreadRng,
+        ec: Vec<Ciphertext<<CP as CircuitParameters>::InnerCurve>>,
         nc_en_list: &mut Vec<(
             TEGroupAffine<CP::InnerCurve>,
             Vec<Ciphertext<CP::InnerCurve>>,
         )>,
     ) {
-        nc_en_list.push((self.commitment(), self.encrypt(rand, user)));
+        nc_en_list.push((self.commitment(), ec));
     }
 
     // SHOULD BE PRIVATE??
