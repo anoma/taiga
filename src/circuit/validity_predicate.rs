@@ -210,8 +210,17 @@ pub fn black_list_recv_gadget<CP: CircuitParameters>(
 ) {
     // todo implement the circuit
     // this circuit check that the sent note user address is not in a given list
-    // it actually does not require any hash computation (as the user address is one of the fields of a note)
-    // it is probably similar to a range check (?)
+    //
+    // public input:
+    // * a commitment `c` to the sent note
+    // * a list `blacklist` of unauthorized people
+    // private input:
+    // * the entire note `n`
+    // * the random value `r` used for the note commitment
+    //
+    // circuit:
+    // check that `Com(n, r) == c` and that `n.owner_address not in blacklist`.
+
     let var_one = composer.add_input(CP::CurveScalarField::one());
     composer.arithmetic_gate(|gate| {
         gate.witness(var_one, var_one, None)
