@@ -15,7 +15,9 @@ use rand::{prelude::ThreadRng, Rng};
 use std::marker::PhantomData;
 
 use crate::{
-    circuit::circuit_parameters::CircuitParameters, poseidon::WIDTH_3, serializable_to_vec,
+    circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters as CP},
+    poseidon::WIDTH_3,
+    serializable_to_vec,
 };
 
 pub struct ValidityPredicate<CP: CircuitParameters> {
@@ -228,6 +230,86 @@ pub fn poseidon_hash_curve_scalar_field_gadget<CP: CircuitParameters>(
     composer.check_circuit_satisfied();
 }
 
+pub fn signature_verification_send_gadget<CP: CircuitParameters>(
+    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+) {
+    // todo implement the circuit
+    // this circuit check a signature
+    // it involves scalar multiplication circuits if we use ECDSA
+    let var_one = composer.add_input(CP::CurveScalarField::one());
+    composer.arithmetic_gate(|gate| {
+        gate.witness(var_one, var_one, None)
+            .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
+    });
+}
+
+pub fn black_list_recv_gadget<CP: CircuitParameters>(
+    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+) {
+    // todo implement the circuit
+    // this circuit check that the sent note user address is not in a given list
+    //
+    // public input:
+    // * a commitment `c` to the sent note
+    // * a list `blacklist` of unauthorized people
+    // private input:
+    // * the entire note `n`
+    // * the random value `r` used for the note commitment
+    //
+    // circuit:
+    // check that `Com(n, r) == c` and that `n.owner_address not in blacklist`.
+
+    let var_one = composer.add_input(CP::CurveScalarField::one());
+    composer.arithmetic_gate(|gate| {
+        gate.witness(var_one, var_one, None)
+            .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
+    });
+}
+
+pub fn upper_bound_token_gadget<CP: CircuitParameters>(
+    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+) {
+    // todo implement the circuit
+    // this circuit check that the transaction involving the token is bounded by a given value
+    // it corresponds to a range check in terms of circuits
+    let var_one = composer.add_input(CP::CurveScalarField::one());
+    composer.arithmetic_gate(|gate| {
+        gate.witness(var_one, var_one, None)
+            .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
+    });
+}
+
+fn vp_proof_verify<CP: CircuitParameters>(
+    gadget: fn(
+        &mut StandardComposer<
+            <CP as CircuitParameters>::CurveScalarField,
+            <CP as CircuitParameters>::InnerCurve,
+        >,
+    ),
+) {
+    let mut rng = ThreadRng::default();
+    let pp = <CP as CircuitParameters>::CurvePC::setup(2 * 30, None, &mut rng).unwrap();
+
+    let circuit = ValidityPredicate::<CP>::new(
+        &pp,
+        signature_verification_send_gadget::<CP>,
+        true,
+        &mut rng,
+    );
+    circuit.verify();
+}
+
+#[test]
+fn test_trivial_gadget() {
+    vp_proof_verify::<CP>(trivial_gadget::<CP>);
+}
+
+#[test]
+fn test_signature_verification_send_gadget() {
+    vp_proof_verify::<CP>(signature_verification_send_gadget::<CP>);
+}
+
+// todo we need to add some private and public inputs for the gadget adding in the VP !
 #[test]
 fn test_poseidon_hash_curve_scalar_field_gadget() {
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
@@ -278,69 +360,12 @@ fn test_poseidon_hash_curve_scalar_field_gadget() {
     assert!(verifier.verify(&proof, &vk, &public_inputs).is_ok());
 }
 
-pub fn signature_verification_send_gadget<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-) {
-    // todo implement the circuit
-    // this circuit check a signature
-    // it involves scalar multiplication circuits if we use ECDSA
-    let var_one = composer.add_input(CP::CurveScalarField::one());
-    composer.arithmetic_gate(|gate| {
-        gate.witness(var_one, var_one, None)
-            .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
-    });
-}
-
-pub fn black_list_recv_gadget<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-) {
-    // todo implement the circuit
-    // this circuit check that the sent note user address is not in a given list
-    //
-    // public input:
-    // * a commitment `c` to the sent note
-    // * a list `blacklist` of unauthorized people
-    // private input:
-    // * the entire note `n`
-    // * the random value `r` used for the note commitment
-    //
-    // circuit:
-    // check that `Com(n, r) == c` and that `n.owner_address not in blacklist`.
-
-    let var_one = composer.add_input(CP::CurveScalarField::one());
-    composer.arithmetic_gate(|gate| {
-        gate.witness(var_one, var_one, None)
-            .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
-    });
-}
-
-pub fn upper_bound_token_gadget<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-) {
-    // todo implement the circuit
-    // this circuit check that the transaction involving the token is bounded by a given value
-    // it corresponds to a range check in terms of circuits
-    let var_one = composer.add_input(CP::CurveScalarField::one());
-    composer.arithmetic_gate(|gate| {
-        gate.witness(var_one, var_one, None)
-            .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
-    });
-}
-
-fn _circuit_proof<CP: CircuitParameters>() {
-    let mut rng = ThreadRng::default();
-    let pp = <CP as CircuitParameters>::CurvePC::setup(2 * 30, None, &mut rng).unwrap();
-
-    let circuit = ValidityPredicate::<CP>::new(
-        &pp,
-        signature_verification_send_gadget::<CP>,
-        true,
-        &mut rng,
-    );
-    circuit.verify();
+#[test]
+fn test_black_list_recv_gadget() {
+    vp_proof_verify::<CP>(black_list_recv_gadget::<CP>);
 }
 
 #[test]
-fn test_cirucit_proof_kzg() {
-    _circuit_proof::<crate::circuit::circuit_parameters::PairingCircuitParameters>()
+fn test_upper_bound_token_gadget() {
+    vp_proof_verify::<CP>(upper_bound_token_gadget::<CP>);
 }
