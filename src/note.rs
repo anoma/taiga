@@ -46,9 +46,8 @@ impl<CP: CircuitParameters> Note<CP> {
             psi: psi,
         };
 
-        let cm = note.commitment();
-        add_to_tree(&cm, nc_tree);
-        note.add_to_nc_en_list(user, rng, cm, nc_en_list);
+        add_to_tree(&note.commitment(), nc_tree);
+        note.add_to_nc_en_list(user, rng, nc_en_list);
 
         note
     }
@@ -63,21 +62,22 @@ impl<CP: CircuitParameters> Note<CP> {
         hash_to_curve::<CP>(&bytes, self.rcm)
     }
 
+    pub fn encrypt(&self, rand: &mut ThreadRng, user: &User<CP>) -> Vec<Ciphertext<<CP as CircuitParameters>::InnerCurve>>{
+        // El Gamal encryption
+        let bytes = serializable_to_vec(self);
+        user.enc_key().encrypt(&bytes, rand)
+    }
+
     pub fn add_to_nc_en_list(
         &self,
         user: &User<CP>,
         rand: &mut ThreadRng,
-        cm: TEGroupAffine<CP::InnerCurve>,
         nc_en_list: &mut Vec<(
             TEGroupAffine<CP::InnerCurve>,
             Vec<Ciphertext<CP::InnerCurve>>,
         )>,
     ) {
-        // El Gamal encryption
-        let bytes = serializable_to_vec(self);
-        let ec = user.enc_key().encrypt(&bytes, rand);
-        // update nc_en_list
-        nc_en_list.push((cm, ec));
+        nc_en_list.push((self.commitment(), self.encrypt(rand, user)));
     }
 
     // SHOULD BE PRIVATE??

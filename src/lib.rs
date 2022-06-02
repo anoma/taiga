@@ -113,6 +113,15 @@ fn serializable_to_vec<F: CanonicalSerialize>(elem: &F) -> Vec<u8> {
     bytes_prep_send
 }
 
+fn serializable_to_array<F: CanonicalSerialize>(elem: &F) -> [u8;32] {
+    let v = serializable_to_vec(elem);
+    let array: [u8; 32] = match v.as_slice().try_into() {
+        Ok(a) => a,
+        Err(_) => panic!("Length mismatch"),
+    };
+    array
+}
+
 // A really bad hash-to-curve
 // TODO: the implementation is a bit weird: it does not really depends on CP and could be written with a curve as a parameter (`fn hash_to_curve<E:Curve>`).
 fn hash_to_curve<CP: CircuitParameters>(
