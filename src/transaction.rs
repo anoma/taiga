@@ -1,5 +1,5 @@
 use ark_serialize::{CanonicalSerialize, CanonicalSerializeHashExt};
-use crate::{action::Action, note::Note, CircuitParameters};
+use crate::{action::Action, note::Note, CircuitParameters, add_to_tree, serializable_to_vec, serializable_to_array};
 use blake2::crypto_mac::Mac;
 use crate::action;
 use rs_merkle::{MerkleTree, Hasher, algorithms::Sha256};
@@ -17,28 +17,36 @@ pub struct Transaction<CP: CircuitParameters> {
 impl<CP: CircuitParameters> Transaction<CP> {
     fn _process(&self, nftree: &mut MerkleTree<Sha256>, mttree: &mut MerkleTree<Sha256>) {
         //todo: extract the check?
-        //todo: add action check
+        //1. action check
 
-        //verify validity predicates;
-        //todo: update to verification of blinded vps
-        //todo: add blinding circuit check
+        //2. verify validity predicates;
+        //2.1 todo: update to verification of blinded vps
+        //2.2 todo: add blinding circuit check
         for vp in &self.vps {
             vp.verify()
         }
 
         for i in &self._created_notes {
-            //add nullifiers to the nullifier tree
-            let mut nf_hash = vec![];
-            i.spent_note_nf.serialize_unchecked(&mut nf_hash).unwrap();
-            let hash = Sha256::hash(nf_hash.as_slice());
-            nftree.insert(hash);
+            //3. add nf to the nullifier tree
+            let nf_hash = serializable_to_array(&i.spent_note_nf);
+            nftree.insert(nf_hash);
             nftree.commit();
 
-            //todo: add commitments to the commitment tree
+            //4. add commitments to the note commitment tree
+            //todo: do i need to hash a commitment?
+            //todo: add ce to the tree
+            let cm_hash = serializable_to_array(&i.commitment());
+            mttree.insert(cm_hash);
+            mttree.commit();
+
         }
 
-        // check that a transaction is valid, and add new notes to the trees
-        // todo
+        //5. recompute rt
+        // commit() method recomputes the root. as we only need to recompute it once,
+        // should we commit just once after all leaves are added to the tree?
+        // or we want to "save" every leaf in case of emergency situation?
+        //mttree.commit();
+
         assert!(self._actions.len() < self._max);
         assert!(self._spent_notes.len() < self._max);
     }
