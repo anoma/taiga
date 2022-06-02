@@ -1,9 +1,6 @@
 use crate::poseidon::{
-    constants::{
-        POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2, POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY4,
-        WIDTH_3, WIDTH_5,
-    },
-    poseidon::{NativeSpec, Poseidon},
+    POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2, POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY4,
+    WIDTH_3, WIDTH_5,
 };
 use ark_bls12_377::Fr as Fr377;
 use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
@@ -11,6 +8,7 @@ use ark_ec::{AffineCurve, TEModelParameters};
 use ark_ff::*;
 use ark_serialize::CanonicalSerialize;
 use circuit::circuit_parameters::CircuitParameters;
+use plonk_hashing::poseidon::poseidon::{NativeSpec, Poseidon};
 use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
 use sha2::{Digest, Sha512};
 
