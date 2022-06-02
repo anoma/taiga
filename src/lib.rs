@@ -12,8 +12,6 @@ use plonk_hashing::poseidon::poseidon::{NativeSpec, Poseidon};
 use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
 use sha2::{Digest, Sha512};
 
-pub extern crate alloc;
-
 pub mod action;
 pub mod circuit;
 pub mod el_gamal;
