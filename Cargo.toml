@@ -21,10 +21,13 @@ merlin = { version = "3.0", default-features = false }
 rand = "0.8.4"
 sha2 = "0.10.1"
 plonk-core = { git = "https://github.com/heliaxdev/ark-plonk/", features = ["trace"], branch="taiga/randomized-circuits" }
+plonk-hashing = { git = "https://github.com/heliaxdev/ark-plonk/", branch="taiga/randomized-circuits" }
 blake2 = "0.9"
 rs_merkle = { git = "https://github.com/heliaxdev/rs-merkle/" } # "0.2.2"
+lazy_static = "1"
 
-poseidon377 = { git = "https://github.com/penumbra-zone/poseidon377/" }
+[dev-dependencies]
+ark-std = "0.3"
 
 [patch.crates-io]
 ark-bls12-377 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
