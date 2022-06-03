@@ -22,7 +22,11 @@ fn spawn_user<CP: CircuitParameters>(name: &str) -> User<CP> {
         &outer_curve_pp,
         DecryptionKey::<CP::InnerCurve>::new(&mut rng),
         trivial_gadget::<CP>,
+        &vec![],
+        &vec![],
         trivial_gadget::<CP>,
+        &vec![],
+        &vec![],
         &mut rng,
     )
 }

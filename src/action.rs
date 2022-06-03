@@ -338,7 +338,11 @@ fn _action_checks<CP: CircuitParameters>() {
         &outer_curve_pp,
         DecryptionKey::<CP::InnerCurve>::new(&mut rng),
         trivial_gadget::<CP>,
+        &vec![],
+        &vec![],
         trivial_gadget::<CP>,
+        &vec![],
+        &vec![],
         &mut rng,
     );
 
@@ -348,7 +352,11 @@ fn _action_checks<CP: CircuitParameters>() {
         &outer_curve_pp,
         DecryptionKey::<CP::InnerCurve>::new(&mut rng),
         trivial_gadget::<CP>,
+        &vec![],
+        &vec![],
         trivial_gadget::<CP>,
+        &vec![],
+        &vec![],
         &mut rng,
     );
 

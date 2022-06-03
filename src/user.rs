@@ -54,20 +54,41 @@ impl<CP: CircuitParameters> User<CP> {
                 <CP as CircuitParameters>::CurveScalarField,
                 <CP as CircuitParameters>::InnerCurve,
             >,
+            &Vec<CP::CurveScalarField>,
+            &Vec<CP::CurveScalarField>,
         ),
+        send_private_inputs: &Vec<CP::CurveScalarField>,
+        send_public_inputs: &Vec<CP::CurveScalarField>,
         recv_gadget: fn(
             &mut StandardComposer<
                 <CP as CircuitParameters>::CurveScalarField,
                 <CP as CircuitParameters>::InnerCurve,
             >,
+            &Vec<CP::CurveScalarField>,
+            &Vec<CP::CurveScalarField>,
         ),
-
+        recv_private_inputs: &Vec<CP::CurveScalarField>,
+        recv_public_inputs: &Vec<CP::CurveScalarField>,
         rng: &mut ThreadRng,
     ) -> User<CP> {
         // sending proof
-        let send_vp = ValidityPredicate::<CP>::new(curve_setup, send_gadget, true, rng);
+        let send_vp = ValidityPredicate::<CP>::new(
+            curve_setup,
+            send_gadget,
+            send_private_inputs,
+            send_public_inputs,
+            true,
+            rng,
+        );
         // Receiving proof
-        let recv_vp = ValidityPredicate::<CP>::new(curve_setup, recv_gadget, true, rng);
+        let recv_vp = ValidityPredicate::<CP>::new(
+            curve_setup,
+            recv_gadget,
+            recv_private_inputs,
+            recv_public_inputs,
+            true,
+            rng,
+        );
         // blinding proof
         let blind_vp = BlindingCircuit::<CP>::new(outer_curve_setup, blind_gadget::<CP>);
 

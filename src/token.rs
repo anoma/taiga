@@ -31,10 +31,13 @@ impl<CP: CircuitParameters> Token<CP> {
                 <CP as CircuitParameters>::CurveScalarField,
                 <CP as CircuitParameters>::InnerCurve,
             >,
+            private_inputs: &Vec<CP::CurveScalarField>,
+            public_inputs: &Vec<CP::CurveScalarField>,
         ),
         rng: &mut ThreadRng,
     ) -> Self {
-        let token_vp = ValidityPredicate::<CP>::new(setup, token_gadget, false, rng);
+        let token_vp =
+            ValidityPredicate::<CP>::new(setup, token_gadget, &vec![], &vec![], false, rng);
         Self {
             name: String::from(name),
             token_vp,
