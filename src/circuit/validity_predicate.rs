@@ -332,12 +332,12 @@ pub fn another_gadget<CP: CircuitParameters>(
     // Make first constraint a + b = c (as public input)
     composer.arithmetic_gate(|gate| {
         gate.witness(var_a, var_b, Some(var_zero))
-            .add(<CP as CircuitParameters>::CurveScalarField::one(), one)
+            .add(one, one)
             .pi(-c)
     });
 
-    let var_one = composer.add_input(CP::CurveScalarField::one());
-    composer.arithmetic_gate(|gate| gate.witness(var_one, var_one, None).add(one, one));
+    // let var_one = composer.add_input(CP::CurveScalarField::one());
+    // composer.arithmetic_gate(|gate| gate.witness(var_one, var_one, None).add(one, one));
 }
 
 fn vp_proof_verify<CP: CircuitParameters>(
