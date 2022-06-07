@@ -1,20 +1,37 @@
 use ark_serialize::{CanonicalSerialize, CanonicalSerializeHashExt};
 use crate::{action::Action, note::Note, CircuitParameters, add_to_tree, serializable_to_vec, serializable_to_array};
-use blake2::crypto_mac::Mac;
 use crate::action;
-use rs_merkle::{MerkleTree, Hasher, algorithms::Sha256};
+use rs_merkle::{MerkleTree, Hasher, algorithms::Blake2s};
 use crate::circuit::validity_predicate::ValidityPredicate;
 use plonk_core::proof_system::Verifier;
 
 pub struct Transaction<CP: CircuitParameters> {
-    _max: usize, // the maximum number of actions/notes for a transaction
-    _actions: Vec<Action<CP>>,
-    _spent_notes: Vec<Note<CP>>,
-    _created_notes: Vec<Note<CP>>,
+    //max: usize, // the maximum number of actions/notes for a transaction
+    actions: Vec<Action<CP>>,
+    spent_notes: Vec<Note<CP>>,
+    created_notes: Vec<Note<CP>>,
     vps: Vec<ValidityPredicate<CP>>
 }
 
 impl<CP: CircuitParameters> Transaction<CP> {
+
+    pub fn new(
+        //max: usize,
+        actions: Vec<Action<CP>>,
+        spent_notes: Vec<Note<CP>>,
+        created_notes: Vec<Note<CP>>,
+        vps: Vec<ValidityPredicate<CP>>)
+        -> Self {
+
+        Self {
+            //max,
+            actions,
+            spent_notes,
+            created_notes,
+            vps,
+        }
+    }
+
     fn check(&self) {
         //1. action check
 
@@ -26,19 +43,15 @@ impl<CP: CircuitParameters> Transaction<CP> {
         }
     }
 
-    fn _process(&self, nftree: &mut MerkleTree<Sha256>, mttree: &mut MerkleTree<Sha256>) {
+    pub fn process(&self, NFtree: &mut MerkleTree<Blake2s>, MTtree: &mut MerkleTree<Blake2s>) {
         self.check();
-        for i in &self._created_notes {
+        for i in &self.created_notes {
             //1. add nf to the nullifier tree
-            let nf_hash = serializable_to_array(&i.spent_note_nf);
-            nftree.insert(nf_hash);
-            nftree.commit();
+            add_to_tree(&i.spent_note_nf, NFtree);
 
             //2. add commitments to the note commitment tree
             //todo: add ce to the tree
-            let cm_hash = serializable_to_array(&i.commitment());
-            mttree.insert(cm_hash);
-            mttree.commit();
+            add_to_tree(&i.commitment(), MTtree);
         }
 
         //3. recompute rt
@@ -46,7 +59,7 @@ impl<CP: CircuitParameters> Transaction<CP> {
         // should we commit just once after all leaves are added to the tree?
         // or we want to "save" every leaf in case of emergency situation?
         //mttree.commit();
-        assert!(self._actions.len() < self._max);
-        assert!(self._spent_notes.len() < self._max);
+        //assert!(self.actions.len() < self._max);
+        //assert!(self.spent_notes.len() < self._max);
     }
 }

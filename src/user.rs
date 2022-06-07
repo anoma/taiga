@@ -111,10 +111,10 @@ impl<CP: CircuitParameters> User<CP> {
 
         //todo: should be done in tx
         //Compute the nullifier of the spent note and put it in the nullifier tree
-        for note in spent_notes {
-            let nullifier = self.compute_nullifier(note);
-            add_to_tree::<CP::InnerCurve>(&nullifier, NFtree);
-        }
+        //for note in spent_notes {
+        //    let nullifier = self.compute_nullifier(note);
+        //    add_to_tree::<CP::InnerCurve>(&nullifier, NFtree);
+        //}
 
         let mut new_notes: Vec<_> = vec![];
         for (recipient_address, value) in token_distribution {

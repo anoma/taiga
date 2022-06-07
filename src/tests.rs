@@ -4,6 +4,8 @@ use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve
 use ark_ff::Zero;
 use ark_poly_commit::PolynomialCommitment;
 use plonk_core::constraint_system::StandardComposer;
+use crate::action::Action;
+use crate::transaction::Transaction;
 
 fn spawn_user<CP: CircuitParameters>(name: &str) -> User<CP> {
     use rand::rngs::ThreadRng;
@@ -37,7 +39,6 @@ fn test_send<CP: CircuitParameters>() {
     let mut rng = rand::thread_rng();
 
     let xan = spawn_token::<CP>("XAN");
-    let _usdt = spawn_token::<CP>("USDT");
 
     let alice = spawn_user::<CP>("alice");
     let bob = spawn_user::<CP>("bob");
@@ -59,43 +60,41 @@ fn test_send<CP: CircuitParameters>() {
         &mut rng,
     );
 
-    //tx level processing
     let note_a1xan_ec = alice.encrypt(&mut rng, &note_a1xan);
     add_to_tree(&note_a1xan.commitment(), &mut MTtree);
     CM_CE_list.push((note_a1xan.commitment(), note_a1xan_ec));
 
-    // The note is spent, and a new note is created for Bob
-    let note_b1xan = alice
+    let mut bytes = serializable_to_vec(&note_a1xan.commitment());
+    let hash_nc_alice = Blake2s::hash(&bytes);
+
+    //SEND PHASE
+
+    let created_notes = alice
         .send(
             &mut vec![&note_a1xan],
             vec![(bob.address(), 1_u32)],
             &mut rng,
             &mut NFtree,
-        )
-        .swap_remove(0);
+        );
+    //CM_CE_list.push((note_b1xan.commitment(), note_b1xan_ec));
 
-    add_to_tree(&note_b1xan.commitment(), &mut MTtree);
+    let hash_nc_bob = Blake2s::hash(&serializable_to_vec(&created_notes[0].commitment()));
 
     // TODO: Replace with a more efficient implementation
     // nullifier proof
+
+    let nullifier = alice.compute_nullifier(&note_a1xan);
+    let hash_nf = Blake2s::hash(&serializable_to_vec(&nullifier));
+
+    let tx: Transaction<CP> = Transaction::new(vec![], vec![note_a1xan], created_notes, vec![]);
+    tx.process(&mut NFtree, &mut MTtree);
+
     let proof_nf = NFtree.proof(&[0]);
     let root_nf = NFtree.root().unwrap();
-    let nullifier = alice.compute_nullifier(&note_a1xan);
-
-    let mut bytes = serializable_to_vec(&nullifier);
-    let hash_nf = Blake2s::hash(&bytes);
     assert!(proof_nf.verify(root_nf, &[0], &[hash_nf], 1));
 
-    // note commitment proof
     let proof_nc = MTtree.proof(&[0, 1]);
     let root_nc = MTtree.root().unwrap();
-
-    bytes = serializable_to_vec(&note_a1xan.commitment());
-    let hash_nc_alice = Blake2s::hash(&bytes);
-
-    bytes = serializable_to_vec(&note_b1xan.commitment());
-    let hash_nc_bob = Blake2s::hash(&bytes);
-
     assert!(proof_nc.verify(root_nc, &[0, 1], &[hash_nc_alice, hash_nc_bob], 2));
 }
 

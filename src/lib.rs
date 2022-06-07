@@ -115,10 +115,10 @@ fn serializable_to_vec<F: CanonicalSerialize>(elem: &F) -> Vec<u8> {
 
 fn serializable_to_array<F: CanonicalSerialize>(elem: &F) -> [u8;32] {
     let v = serializable_to_vec(elem);
-    let array: [u8; 32] = match v.as_slice().try_into() {
-        Ok(a) => a,
-        Err(_) => panic!("Length mismatch"),
-    };
+    let mut array = [0_u8; 32];
+    for i in 0..32 {
+        array[i] = v[i];
+    }
     array
 }
 
