@@ -1,14 +1,17 @@
-use crate::poseidon::{POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2, WIDTH_3};
-use ark_bls12_377::Fr;
-use ark_ed_on_bls12_377::EdwardsParameters as Curv;
-use ark_ff::{One, Zero};
+use crate::circuit::hash_gadget::BinaryHasherGadget;
+use ark_ec::TEModelParameters;
+use ark_ff::PrimeField;
 use plonk_core::{constraint_system::StandardComposer, error::Error, prelude::Variable};
-use plonk_hashing::poseidon::poseidon::{PlonkSpec, Poseidon};
 
-pub fn merkle_tree_gadget(
-    composer: &mut StandardComposer<Fr, Curv>,
+pub fn merkle_tree_gadget<
+    F: PrimeField,
+    P: TEModelParameters<BaseField = F>,
+    BHG: BinaryHasherGadget<F, P>,
+>(
+    composer: &mut StandardComposer<F, P>,
     cur_leaf: &Variable,
-    auth_path: &Vec<(Fr, bool)>, // hash_gadget
+    auth_path: &Vec<(F, bool)>,
+    hash_gadget: &BHG,
 ) -> Result<Variable, Error> {
     let mut cur = *cur_leaf;
 
@@ -17,8 +20,8 @@ pub fn merkle_tree_gadget(
         // Determines if the current subtree is the "right" leaf at this
         // depth of the tree.
         let cur_is_right = match e.1 {
-            false => composer.add_input(Fr::zero()),
-            true => composer.add_input(Fr::one()),
+            false => composer.add_input(F::zero()),
+            true => composer.add_input(F::one()),
         };
 
         // Witness the authentication path element adjacent
@@ -30,15 +33,7 @@ pub fn merkle_tree_gadget(
         let ur = composer.conditional_select(cur_is_right, cur, path_element);
 
         // Compute the new subtree value
-        // cur = hash_gadget.hash_two(composer, ul, ur)?;
-        let mut poseidon_circuit = Poseidon::<_, PlonkSpec<WIDTH_3>, WIDTH_3>::new(
-            composer,
-            &POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2,
-        );
-        poseidon_circuit.input(ul).unwrap();
-        poseidon_circuit.input(ur).unwrap();
-
-        cur = poseidon_circuit.output_hash(composer);
+        cur = hash_gadget.hash_two(composer, &ul, &ur).unwrap();
     }
 
     Ok(cur)
@@ -47,6 +42,9 @@ pub fn merkle_tree_gadget(
 #[test]
 fn test_merkle_circuit() {
     use crate::merkle_tree::{MerklePath, Node};
+    use crate::poseidon::POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2;
+    use ark_bls12_377::Fr;
+    use ark_ed_on_bls12_377::EdwardsParameters as Curv;
     use ark_std::test_rng;
     use plonk_hashing::poseidon::constants::PoseidonConstants;
 
@@ -61,7 +59,13 @@ fn test_merkle_circuit() {
 
     let mut composer = StandardComposer::<Fr, Curv>::new();
     let commitment = composer.add_input(cur_leaf.inner());
-    let root = merkle_tree_gadget(&mut composer, &commitment, &merkle_path.get_path()).unwrap();
+    let root = merkle_tree_gadget::<Fr, Curv, PoseidonConstants<Fr>>(
+        &mut composer,
+        &commitment,
+        &merkle_path.get_path(),
+        &POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2,
+    )
+    .unwrap();
     composer.check_circuit_satisfied();
 
     let expected_var = composer.add_input(expected.inner());
