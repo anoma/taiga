@@ -15,8 +15,7 @@ pub struct Transaction<CP: CircuitParameters> {
 }
 
 impl<CP: CircuitParameters> Transaction<CP> {
-    fn _process(&self, nftree: &mut MerkleTree<Sha256>, mttree: &mut MerkleTree<Sha256>) {
-        //todo: extract the check?
+    fn check(&self) {
         //1. action check
 
         //2. verify validity predicates;
@@ -25,28 +24,28 @@ impl<CP: CircuitParameters> Transaction<CP> {
         for vp in &self.vps {
             vp.verify()
         }
+    }
 
+    fn _process(&self, nftree: &mut MerkleTree<Sha256>, mttree: &mut MerkleTree<Sha256>) {
+        self.check();
         for i in &self._created_notes {
-            //3. add nf to the nullifier tree
+            //1. add nf to the nullifier tree
             let nf_hash = serializable_to_array(&i.spent_note_nf);
             nftree.insert(nf_hash);
             nftree.commit();
 
-            //4. add commitments to the note commitment tree
-            //todo: do i need to hash a commitment?
+            //2. add commitments to the note commitment tree
             //todo: add ce to the tree
             let cm_hash = serializable_to_array(&i.commitment());
             mttree.insert(cm_hash);
             mttree.commit();
-
         }
 
-        //5. recompute rt
+        //3. recompute rt
         // commit() method recomputes the root. as we only need to recompute it once,
         // should we commit just once after all leaves are added to the tree?
         // or we want to "save" every leaf in case of emergency situation?
         //mttree.commit();
-
         assert!(self._actions.len() < self._max);
         assert!(self._spent_notes.len() < self._max);
     }

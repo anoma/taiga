@@ -24,35 +24,22 @@ pub struct Note<CP: CircuitParameters> {
 
 impl<CP: CircuitParameters> Note<CP> {
     pub fn new(
-        user: &User<CP>,
+        owner_address: CP::CurveScalarField,
         token_address: CP::CurveScalarField,
         value: u32,
         spent_note_nf: TEGroupAffine<CP::InnerCurve>,
         psi: CP::InnerCurveScalarField,
-        nc_tree: &mut MerkleTree<Blake2s>,
-        nc_en_list: &mut Vec<(
-            TEGroupAffine<CP::InnerCurve>,
-            Vec<Ciphertext<CP::InnerCurve>>,
-        )>,
         rng: &mut ThreadRng,
     ) -> Self {
-        let note = Self {
-            owner_address: user.address(),
+        Self {
+            owner_address: owner_address,
             token_address: token_address,
             value: value,
             rcm: rng.gen(),
             data: 0,
             spent_note_nf: spent_note_nf,
             psi: psi,
-        };
-
-        //should be moved to transaction creation?
-        //add encryption to the note structure
-        let ec = note.encrypt(rng, user);
-        add_to_tree(&note.commitment(), nc_tree);
-        note.add_to_nc_en_list(ec, nc_en_list);
-
-        note
+        }
     }
 
     pub fn commitment(&self) -> TEGroupAffine<CP::InnerCurve> {
@@ -63,23 +50,6 @@ impl<CP: CircuitParameters> Note<CP> {
 
         let bytes = serializable_to_vec(self);
         hash_to_curve::<CP>(&bytes, self.rcm)
-    }
-
-    pub fn encrypt(&self, rand: &mut ThreadRng, user: &User<CP>) -> Vec<Ciphertext<<CP as CircuitParameters>::InnerCurve>>{
-        // El Gamal encryption
-        let bytes = serializable_to_vec(self);
-        user.enc_key().encrypt(&bytes, rand)
-    }
-
-    pub fn add_to_nc_en_list(
-        &self,
-        ec: Vec<Ciphertext<<CP as CircuitParameters>::InnerCurve>>,
-        nc_en_list: &mut Vec<(
-            TEGroupAffine<CP::InnerCurve>,
-            Vec<Ciphertext<CP::InnerCurve>>,
-        )>,
-    ) {
-        nc_en_list.push((self.commitment(), ec));
     }
 
     // SHOULD BE PRIVATE??

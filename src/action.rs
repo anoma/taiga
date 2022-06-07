@@ -1,4 +1,4 @@
-use crate::{circuit::circuit_parameters::CircuitParameters, hash_to_curve, prf};
+use crate::{add_to_tree, circuit::circuit_parameters::CircuitParameters, hash_to_curve, prf};
 use ark_ec::ProjectiveCurve;
 use plonk_core::proof_system::Proof;
 use rand::prelude::ThreadRng;
@@ -350,39 +350,40 @@ fn _action_checks<CP: CircuitParameters>() {
     let xan = Token::<CP>::new("xan", &pp, &mut rng);
 
     // Creation of a nullifiers tree
-    let mut nullifier_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
+    let mut NFtree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
     // Creation of a note commitments tree
-    let mut note_commitments = MerkleTree::<Blake2s>::from_leaves(&vec![]);
+    let mut MTtree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
     // Creation of the {note commitment + encrypted note} list
-    let mut nc_en_list: Vec<(
+    let mut CM_CE_list: Vec<(
         TEGroupAffine<CP::InnerCurve>,
         Vec<Ciphertext<CP::InnerCurve>>,
     )> = vec![];
 
     // Creation of a note of 1XAN for Alice
     let spent_note = Note::<CP>::new(
-        &alice,
+        alice.address(),
         xan.address(),
         1,
         TEGroupAffine::prime_subgroup_generator(),
         <CP as CircuitParameters>::InnerCurveScalarField::zero(),
-        &mut note_commitments,
-        &mut nc_en_list,
         &mut rng,
     );
+
+    let spent_note_ec = alice.encrypt(&mut rng, &spent_note);
+    add_to_tree(&spent_note.commitment(), &mut MTtree);
+    CM_CE_list.push((spent_note.commitment(), spent_note_ec));
 
     // The note is spent, and a new note is created for Bob
     let output_note = alice
         .send(
             &mut vec![&spent_note],
-            vec![(&bob, 1_u32)],
+            vec![(bob.address(), 1_u32)],
             &mut rng,
-            &bob,
-            &mut nullifier_tree,
-            &mut note_commitments,
-            &mut nc_en_list,
+            &mut NFtree,
         )
         .swap_remove(0);
+
+    add_to_tree(&output_note.commitment(), &mut MTtree);
 
     // ACTION CIRCUIT CHECKS //
     // Checks follow: https://hackmd.io/IV6AZgoRQWC91D4Z4AG6jQ?both#Action-Circuit
@@ -391,7 +392,7 @@ fn _action_checks<CP: CircuitParameters>() {
         &xan,
         &spent_note,
         &output_note,
-        &mut note_commitments,
+        &mut MTtree,
         &mut rng,
     );
     output_notes_checks(&bob, &xan, &output_note, &mut rng);

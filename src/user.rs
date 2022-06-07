@@ -1,14 +1,7 @@
-use crate::{
-    add_to_tree,
-    circuit::circuit_parameters::CircuitParameters,
-    circuit::{
-        blinding_circuit::{blind_gadget, BlindingCircuit},
-        validity_predicate::{recv_gadget, send_gadget, ValidityPredicate},
-    },
-    el_gamal::{Ciphertext, DecryptionKey, EncryptionKey},
-    note::Note,
-    prf,
-};
+use crate::{add_to_tree, circuit::circuit_parameters::CircuitParameters, circuit::{
+    blinding_circuit::{blind_gadget, BlindingCircuit},
+    validity_predicate::{recv_gadget, send_gadget, ValidityPredicate},
+}, el_gamal::{Ciphertext, DecryptionKey, EncryptionKey}, note::Note, prf, serializable_to_vec};
 use ark_ec::{
     twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve, ProjectiveCurve,
 };
@@ -105,40 +98,33 @@ impl<CP: CircuitParameters> User<CP> {
 
     pub fn send(
         &self,
-        notes: &mut Vec<&Note<CP>>,
-        token_distribution: Vec<(&User<CP>, u32)>,
+        spent_notes: &mut Vec<&Note<CP>>,
+        token_distribution: Vec<(CP::CurveScalarField, u32)>,
         rand: &mut ThreadRng,
-        _receiver: &User<CP>,
-        nf_tree: &mut MerkleTree<Blake2s>,
-        nc_tree: &mut MerkleTree<Blake2s>,
-        nc_en_list: &mut Vec<(
-            TEGroupAffine<CP::InnerCurve>,
-            Vec<Ciphertext<CP::InnerCurve>>,
-        )>,
+        NFtree: &mut MerkleTree<Blake2s>,
     ) -> Vec<Note<CP>> {
-        let total_sent_value = notes.iter().fold(0, |sum, n| sum + n.value);
+        let total_sent_value = spent_notes.iter().fold(0, |sum, n| sum + n.value);
         let total_dist_value = token_distribution.iter().fold(0, |sum, x| sum + x.1);
         assert!(total_sent_value >= total_dist_value);
-        let the_one_and_only_token_address = notes[0].token_address.clone();
-        let the_one_and_only_nullifier = self.compute_nullifier(notes[0]);
+        let the_one_and_only_token_address = spent_notes[0].token_address.clone();
+        let the_one_and_only_nullifier = self.compute_nullifier(spent_notes[0]);
 
-        for note in notes {
-            //Compute the nullifier of the spent note and put it in the nullifier tree
+        //todo: should be done in tx
+        //Compute the nullifier of the spent note and put it in the nullifier tree
+        for note in spent_notes {
             let nullifier = self.compute_nullifier(note);
-            add_to_tree::<CP::InnerCurve>(&nullifier, nf_tree);
+            add_to_tree::<CP::InnerCurve>(&nullifier, NFtree);
         }
 
         let mut new_notes: Vec<_> = vec![];
-        for (recipient, value) in token_distribution {
+        for (recipient_address, value) in token_distribution {
             let psi = CP::InnerCurveScalarField::rand(rand);
             new_notes.push(Note::<CP>::new(
-                &recipient,
+                recipient_address,
                 the_one_and_only_token_address,
                 value,
-                the_one_and_only_nullifier,
+                the_one_and_only_nullifier.clone(),
                 psi,
-                nc_tree,
-                nc_en_list,
                 &mut ThreadRng::default(),
             ));
         }
@@ -165,6 +151,12 @@ impl<CP: CircuitParameters> User<CP> {
         self.send_vp.verify();
         self.recv_vp.verify();
         self.blind_vp.verify();
+    }
+
+    pub fn encrypt(&self, rand: &mut ThreadRng, note: &Note<CP>) -> Vec<Ciphertext<<CP as CircuitParameters>::InnerCurve>>{
+        // El Gamal encryption
+        let bytes = serializable_to_vec(note);
+        self.enc_key().encrypt(&bytes, rand)
     }
 
     // THESE GETTER SHOULD BE PRIVATE!

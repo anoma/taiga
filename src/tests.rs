@@ -1,12 +1,5 @@
 use crate::el_gamal::{Ciphertext, DecryptionKey};
-use crate::{
-    circuit::circuit_parameters::CircuitParameters,
-    circuit::validity_predicate::{recv_gadget, send_gadget, token_gadget},
-    note::Note,
-    serializable_to_vec,
-    token::Token,
-    user::User,
-};
+use crate::{add_to_tree, circuit::circuit_parameters::CircuitParameters, circuit::validity_predicate::{recv_gadget, send_gadget, token_gadget}, note::Note, serializable_to_vec, token::Token, user::User};
 use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
 use ark_ff::Zero;
 use ark_poly_commit::PolynomialCommitment;
@@ -43,53 +36,50 @@ fn test_send<CP: CircuitParameters>() {
 
     let mut rng = rand::thread_rng();
 
-    // Creation of two tokens (XAN and USDT)
     let xan = spawn_token::<CP>("XAN");
     let _usdt = spawn_token::<CP>("USDT");
 
-    // Creation of two users (Alice and Bob)
     let alice = spawn_user::<CP>("alice");
     let bob = spawn_user::<CP>("bob");
 
-    // Creation of a nullifiers tree
-    let mut nullifier_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
-    // Creation of a note commitments tree
-    let mut note_commitment_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
-    // Creation of the {note commitment + encrypted note} list
-    let mut nc_en_list: Vec<(
+    let mut NFtree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
+    let mut MTtree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
+    let mut CM_CE_list: Vec<(
         TEGroupAffine<CP::InnerCurve>,
         Vec<Ciphertext<CP::InnerCurve>>,
     )> = vec![];
 
     // Creation of a note of 1XAN for Alice
     let note_a1xan = Note::<CP>::new(
-        &alice,
+        alice.address(),
         xan.address(),
         1,
         TEGroupAffine::prime_subgroup_generator(),
         <CP>::InnerCurveScalarField::zero(),
-        &mut note_commitment_tree,
-        &mut nc_en_list,
         &mut rng,
     );
+
+    //tx level processing
+    let note_a1xan_ec = alice.encrypt(&mut rng, &note_a1xan);
+    add_to_tree(&note_a1xan.commitment(), &mut MTtree);
+    CM_CE_list.push((note_a1xan.commitment(), note_a1xan_ec));
 
     // The note is spent, and a new note is created for Bob
     let note_b1xan = alice
         .send(
             &mut vec![&note_a1xan],
-            vec![(&bob, 1_u32)],
+            vec![(bob.address(), 1_u32)],
             &mut rng,
-            &bob,
-            &mut nullifier_tree,
-            &mut note_commitment_tree,
-            &mut nc_en_list,
+            &mut NFtree,
         )
         .swap_remove(0);
 
+    add_to_tree(&note_b1xan.commitment(), &mut MTtree);
+
     // TODO: Replace with a more efficient implementation
     // nullifier proof
-    let proof_nf = nullifier_tree.proof(&[0]);
-    let root_nf = nullifier_tree.root().unwrap();
+    let proof_nf = NFtree.proof(&[0]);
+    let root_nf = NFtree.root().unwrap();
     let nullifier = alice.compute_nullifier(&note_a1xan);
 
     let mut bytes = serializable_to_vec(&nullifier);
@@ -97,8 +87,8 @@ fn test_send<CP: CircuitParameters>() {
     assert!(proof_nf.verify(root_nf, &[0], &[hash_nf], 1));
 
     // note commitment proof
-    let proof_nc = note_commitment_tree.proof(&[0, 1]);
-    let root_nc = note_commitment_tree.root().unwrap();
+    let proof_nc = MTtree.proof(&[0, 1]);
+    let root_nc = MTtree.root().unwrap();
 
     bytes = serializable_to_vec(&note_a1xan.commitment());
     let hash_nc_alice = Blake2s::hash(&bytes);
@@ -151,25 +141,20 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
 
     // airdrop 🪂
     let initial_note = Note::<CP>::new(
-        &yulia,
+        yulia.address(),
         xan.address(),
         4,
         TEGroupAffine::prime_subgroup_generator(),
         <CP as CircuitParameters>::InnerCurveScalarField::rand(&mut rng),
-        &mut nc_tree,
-        &mut nc_en_list,
         &mut rng,
     );
 
     // …and ship it 🛳️
     let new_notes = yulia.send(
         &mut vec![&initial_note],
-        vec![(&yulia, 1), (&yulia, 1), (&simon, 2)],
+        vec![(yulia.address(), 1), (yulia.address(), 1), (simon.address(), 2)],
         &mut rng,
-        &simon,
         &mut nf_tree,
-        &mut nc_tree,
-        &mut nc_en_list,
     );
 
     assert_eq!(new_notes.len(), 3);
@@ -179,12 +164,9 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
 
     let new_notes = yulia.send(
         &mut vec![&new_notes[0], &new_notes[1]],
-        vec![(&yulia, 2)],
+        vec![(yulia.address(), 2)],
         &mut rng,
-        &yulia,
         &mut nf_tree,
-        &mut nc_tree,
-        &mut nc_en_list,
     );
 
     assert_eq!(new_notes.len(), 1);
