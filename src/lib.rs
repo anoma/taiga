@@ -15,6 +15,7 @@ use sha2::{Digest, Sha512};
 pub mod action;
 pub mod circuit;
 pub mod el_gamal;
+pub mod error;
 pub mod merkle_tree;
 pub mod note;
 pub mod poseidon;

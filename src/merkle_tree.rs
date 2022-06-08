@@ -1,6 +1,6 @@
 //! Implementation of a Merkle tree of commitments used to prove the existence of notes.
-//! Use the implementation of MASP
 //!
+use crate::error::TaigaError;
 use crate::poseidon::BinaryHasher;
 use ark_ff::{BigInteger, PrimeField};
 use rand::{Rng, RngCore};
@@ -26,13 +26,15 @@ impl<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> MerklePath<F, BH> {
     }
 
     /// Returns the root of the tree corresponding to this path applied to `leaf`.
-    pub fn root(&self, leaf: Node<F, BH>, hasher: &BH) -> Node<F, BH> {
-        self.auth_path
-            .iter()
-            .fold(leaf, |root, (p, leaf_is_on_right)| match leaf_is_on_right {
-                false => Node::combine(&root, p, hasher),
-                true => Node::combine(p, &root, hasher),
-            })
+    pub fn root(&self, leaf: Node<F, BH>, hasher: &BH) -> Result<Node<F, BH>, TaigaError> {
+        let mut root = leaf;
+        for val in self.auth_path.iter() {
+            root = match val.1 {
+                false => Node::combine(&root, &val.0, hasher)?,
+                true => Node::combine(&val.0, &root, hasher)?,
+            }
+        }
+        Ok(root)
     }
 
     pub fn get_path(&self) -> Vec<(F, bool)> {
@@ -78,7 +80,8 @@ impl<F: PrimeField, BH: BinaryHasher<F>> Node<F, BH> {
         Self::new(F::from_le_bytes_mod_order(bytes))
     }
 
-    fn combine(lhs: &Self, rhs: &Self, hasher: &BH) -> Self {
-        Self::new(hasher.hash_two(&lhs.repr, &rhs.repr).unwrap())
+    fn combine(lhs: &Self, rhs: &Self, hasher: &BH) -> Result<Self, TaigaError> {
+        let hash = hasher.hash_two(&lhs.repr, &rhs.repr)?;
+        Ok(Self::new(hash))
     }
 }

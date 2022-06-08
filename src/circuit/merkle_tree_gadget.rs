@@ -1,7 +1,8 @@
 use crate::circuit::hash_gadget::BinaryHasherGadget;
+use crate::error::TaigaError;
 use ark_ec::TEModelParameters;
 use ark_ff::PrimeField;
-use plonk_core::{constraint_system::StandardComposer, error::Error, prelude::Variable};
+use plonk_core::{constraint_system::StandardComposer, prelude::Variable};
 
 pub fn merkle_tree_gadget<
     F: PrimeField,
@@ -12,7 +13,7 @@ pub fn merkle_tree_gadget<
     cur_leaf: &Variable,
     auth_path: &Vec<(F, bool)>,
     hash_gadget: &BHG,
-) -> Result<Variable, Error> {
+) -> Result<Variable, TaigaError> {
     let mut cur = *cur_leaf;
 
     // Ascend the merkle tree authentication path
@@ -33,7 +34,7 @@ pub fn merkle_tree_gadget<
         let ur = composer.conditional_select(cur_is_right, cur, path_element);
 
         // Compute the new subtree value
-        cur = hash_gadget.hash_two(composer, &ul, &ur).unwrap();
+        cur = hash_gadget.hash_two(composer, &ul, &ur)?;
     }
 
     Ok(cur)
@@ -52,10 +53,12 @@ fn test_merkle_circuit() {
     let merkle_path = MerklePath::<Fr, PoseidonConstants<Fr>>::dummy(&mut rng);
 
     let cur_leaf = Node::rand(&mut rng);
-    let expected = merkle_path.root(
-        cur_leaf.clone(),
-        &POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2,
-    );
+    let expected = merkle_path
+        .root(
+            cur_leaf.clone(),
+            &POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2,
+        )
+        .unwrap();
 
     let mut composer = StandardComposer::<Fr, Curv>::new();
     let commitment = composer.add_input(cur_leaf.inner());

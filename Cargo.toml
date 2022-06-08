@@ -25,6 +25,7 @@ plonk-hashing = { git = "https://github.com/heliaxdev/ark-plonk/", branch="taiga
 blake2 = "0.9"
 rs_merkle = { git = "https://github.com/heliaxdev/rs-merkle/" } # "0.2.2"
 lazy_static = "1"
+thiserror = "1"
 
 [dev-dependencies]
 ark-std = "0.3"

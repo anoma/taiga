@@ -1,8 +1,10 @@
+use crate::error::TaigaError;
 use ark_ff::PrimeField;
 use lazy_static::lazy_static;
-use plonk_hashing::poseidon::constants::PoseidonConstants;
-use plonk_hashing::poseidon::poseidon::{NativeSpec, Poseidon};
-use plonk_hashing::poseidon::PoseidonError;
+use plonk_hashing::poseidon::{
+    constants::PoseidonConstants,
+    poseidon::{NativeSpec, Poseidon},
+};
 
 // ARITY: input number of hash
 // WIDTH_3 = ARITY + 1
@@ -23,11 +25,11 @@ lazy_static! {
 }
 
 pub trait BinaryHasher<F: PrimeField> {
-    fn hash_two(&self, left: &F, right: &F) -> Result<F, PoseidonError>;
+    fn hash_two(&self, left: &F, right: &F) -> Result<F, TaigaError>;
 }
 
 impl<F: PrimeField> BinaryHasher<F> for PoseidonConstants<F> {
-    fn hash_two(&self, left: &F, right: &F) -> Result<F, PoseidonError> {
+    fn hash_two(&self, left: &F, right: &F) -> Result<F, TaigaError> {
         let mut poseidon = Poseidon::<(), NativeSpec<F, WIDTH_3>, WIDTH_3>::new(&mut (), &self);
         poseidon.input(*left)?;
         poseidon.input(*right)?;
