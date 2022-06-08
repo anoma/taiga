@@ -61,11 +61,24 @@ fn prf<F: PrimeField + HashToField>(x: &[u8]) -> F {
     F::hash_to_field(x)
 }
 
+/// Commitment
+/// Binding and hiding
 fn com<F: PrimeField + HashToField>(x: &[u8], rand: BigInteger256) -> F {
     // F is supposed to be CurveBaseField
     let y = rand.to_bytes_le();
     let z = [x, &y].concat();
     F::hash_to_field(&z)
+}
+
+/// Collision-resistant hash
+/// Only binding
+// A really bad hash-to-curve
+// TODO: the implementation is a bit weird: it does not really depends on CP and could be written with a curve as a parameter (`fn hash_to_curve<E:Curve>`).
+fn crh<CP: CircuitParameters>(
+    data: &[u8],
+) -> TEGroupAffine<CP::InnerCurve> {
+    let scalar = <CP::InnerCurveScalarField>::hash_to_field(data);
+    TEGroupAffine::prime_subgroup_generator().mul(scalar).into()
 }
 
 fn serializable_to_vec<F: CanonicalSerialize>(elem: &F) -> Vec<u8> {
@@ -74,15 +87,7 @@ fn serializable_to_vec<F: CanonicalSerialize>(elem: &F) -> Vec<u8> {
     bytes_prep_send
 }
 
-// A really bad hash-to-curve
-// TODO: the implementation is a bit weird: it does not really depends on CP and could be written with a curve as a parameter (`fn hash_to_curve<E:Curve>`).
-fn hash_to_curve<CP: CircuitParameters>(
-    data: &[u8],
-    rand: BigInteger256, // TODO: Rand is not used!
-) -> TEGroupAffine<CP::InnerCurve> {
-    let scalar = <CP::InnerCurveScalarField>::hash_to_field(data);
-    TEGroupAffine::prime_subgroup_generator().mul(scalar).into()
-}
+
 
 fn add_to_tree<P: TEModelParameters>(elem: &TEGroupAffine<P>, tree: &mut MerkleTree<Blake2s>) {
     let bytes = serializable_to_vec(elem);

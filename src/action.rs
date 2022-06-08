@@ -1,4 +1,4 @@
-use crate::{circuit::circuit_parameters::CircuitParameters, hash_to_curve, prf};
+use crate::{circuit::circuit_parameters::CircuitParameters, crh, prf};
 use ark_ec::ProjectiveCurve;
 use plonk_core::proof_system::Proof;
 use rand::prelude::ThreadRng;
@@ -139,7 +139,7 @@ impl<CP: CircuitParameters> Action<CP> {
         note_data: Vec<u8>,
         note_rcm: BigInteger256,
     ) {
-        assert_eq!(hash_to_curve::<CP>(&note_data, note_rcm), note_cm);
+        assert_eq!(crh::<CP>(&note_data), note_cm);
     }
 
     /// Nullifier integrity(input note only): `nf = DeriveNullier_nk(note)`
@@ -201,7 +201,7 @@ impl<CP: CircuitParameters> Action<CP> {
         let hash_nc = Blake2s::hash(&bytes);
         assert!(proof_nc.verify(nc_tree_root, &[index_note_cm], &[hash_nc], 2));
         // commitment corresponds to spent_note_commitment
-        assert_eq!(hash_to_curve::<CP>(&note_data, note_rcm), note_cm);
+        assert_eq!(crh::<CP>(&note_data), note_cm);
     }
 
     fn check_blinding_vp(

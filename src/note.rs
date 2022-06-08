@@ -1,6 +1,6 @@
 use crate::{
     add_to_tree, circuit::circuit_parameters::CircuitParameters, el_gamal::Ciphertext,
-    hash_to_curve, serializable_to_vec, user::User,
+    crh, serializable_to_vec, user::User,
 };
 use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
 use ark_ff::BigInteger256;
@@ -60,7 +60,7 @@ impl<CP: CircuitParameters> Note<CP> {
         //also, note commitment should be implemented with Sinsemilla (according to the pbc spec)
 
         let bytes = serializable_to_vec(self);
-        hash_to_curve::<CP>(&bytes, self.rcm)
+        crh::<CP>(&bytes)
     }
 
     pub fn add_to_nc_en_list(
