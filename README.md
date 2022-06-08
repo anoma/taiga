@@ -40,7 +40,7 @@ As we use PLONK, we are flexible on the choice of the polynomial commitment sche
 * Either a pairing-based polynomial commitment scheme, for example the BLS12-377 curve and an inner curve like `ed_on_bls12_377`,
 * Either a discrete-logarithm polynomial commitment scheme, for example the Vesta curve and its inner curve Pallas.
 
-This trait lets us access to the two curves (called `Curve` and `InnerCurve`), and their corresponding prime fields: `CurveBaseField`, `CurveScalarField` and `InnerCurveScalarField` (recall that the base field of `InnerCurve` is by definition the scalar field of `Curve`).
+This trait lets us access to the two curves (called `MainCurve` and `InnerCurve`), and their corresponding prime fields: `CurveBaseField`, `CurveScalarField` and `InnerCurveScalarField` (recall that the base field of `InnerCurve` is by definition the scalar field of `MainCurve`).
 
 #### Validity predicate
 This corresponds to the circuits defined over `CurveScalarField`, namely the `send`, `recv` and `token` VPs. The Action circuit is also defined over this field but does not require the blinding property.
