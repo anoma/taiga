@@ -21,6 +21,7 @@ impl<CP: CircuitParameters> Action<CP> {
     /// * `recv_vp_hash` - Com_q(desc_vp_recv_addr)
     /// * `note_rcm` - Commitment randomness for deriving note address
     /// * `note_owner_address` - Spent note owner address
+    #[allow(dead_code)]
     fn check_spent_note_addr_integrity(
         send_vp_hash: CP::CurveBaseField,
         recv_vp_hash: CP::CurveBaseField,
@@ -59,6 +60,7 @@ impl<CP: CircuitParameters> Action<CP> {
     /// * `recv_vp_hash` - Com_q(desc_vp_recv_addr)
     /// * `note_rcm` - Randomness for deriving note address
     /// * `note_owner_address` - Spent note owner address
+    #[allow(dead_code)]
     fn check_output_note_addr_integrity(
         send_vp_com: CP::CurveScalarField,
         recv_vp_hash: CP::CurveBaseField,
@@ -86,6 +88,7 @@ impl<CP: CircuitParameters> Action<CP> {
     /// * `hash_tok_vp` - Com_q(desc_token_vp)
     /// * `token_rcm` - Randomness for deriving note address
     /// * `note_token_addr` - Address of the token in the note
+    #[allow(dead_code)]
     fn check_token_integrity(
         hash_tok_vp: CP::CurveBaseField, // Com_q(desc_token_vp)
         token_rcm: BigInteger256,
@@ -105,7 +108,8 @@ impl<CP: CircuitParameters> Action<CP> {
     /// * `com_vp` - Commitment of the VP
     /// Private inputs:
     /// * `com_rcm` - Randomness for deriving commitment of the VP
-    /// * `hash_vp` - Com_q(desc_vp)
+    /// * `hash_vp` - Com_p(desc_vp)
+    #[allow(dead_code)]
     fn check_vp_integrity(
         // public
         com_vp: CP::CurveScalarField,
@@ -132,6 +136,7 @@ impl<CP: CircuitParameters> Action<CP> {
     /// Private inputs:
     /// * `note_data` - Contents of the note
     /// * `note_rcm` - Randomness for deriving the commitment of the note
+    #[allow(dead_code)]
     fn check_note_commitment_integrity(
         // public
         note_cm: TEGroupAffine<CP::InnerCurve>,
@@ -151,6 +156,7 @@ impl<CP: CircuitParameters> Action<CP> {
     /// Private inputs:
     /// * `nk` - Sender nullifier key
     /// * `note` - Spent note
+    #[allow(dead_code)]
     fn check_note_nullifier_integrity(
         // public
         nf: TEGroupAffine<CP::InnerCurve>,
@@ -186,6 +192,7 @@ impl<CP: CircuitParameters> Action<CP> {
     /// * `note_data` - Contents of the note
     /// * `note_rcm` - Randomness for the note commitment
     /// * `index_note_cm` - Index of the note commitment in the Merkle tree
+    #[allow(dead_code)]
     fn check_note_existence(
         // public
         nc_tree_root: [u8; 32],
@@ -204,6 +211,7 @@ impl<CP: CircuitParameters> Action<CP> {
         assert_eq!(crh::<CP>(&note_data), note_cm);
     }
 
+    #[allow(dead_code)]
     fn check_blinding_vp(
         // public
         _com_vp: CP::CurveScalarField,
@@ -220,7 +228,7 @@ impl<CP: CircuitParameters> Action<CP> {
 //
 // this is not the circuit implementation but what should be hard-coded in the Action Circuit.
 //
-use crate::circuit::validity_predicate::{recv_gadget, send_gadget, token_gadget};
+// use crate::circuit::validity_predicate::{recv_gadget, send_gadget, token_gadget};
 use crate::el_gamal::{Ciphertext, DecryptionKey};
 use crate::note::Note;
 use crate::serializable_to_vec;
@@ -232,6 +240,7 @@ use ark_poly_commit::PolynomialCommitment;
 
 /// For spent note
 /// `note = (address, token, v, data, ρ, ψ, rcm_note)`:
+#[allow(dead_code)]
 fn spent_notes_checks<CP: CircuitParameters>(
     sender: &User<CP>,
     token: &Token<CP>,
@@ -287,8 +296,9 @@ fn spent_notes_checks<CP: CircuitParameters>(
 
 /// For output note
 /// `note = (address, token, v, data, ρ, ψ, rcm_note)`:
+#[allow(dead_code)]
 fn output_notes_checks<CP: CircuitParameters>(
-    sender: &User<CP>,
+    _sender: &User<CP>,
     receiver: &User<CP>,
     token: &Token<CP>,
     output_note: &Note<CP>,
