@@ -2,11 +2,10 @@ use ark_ff::{BigInteger, BigInteger256, One, PrimeField, UniformRand, Zero};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use merlin::Transcript;
-use plonk::{
-    circuit::PublicInputBuilder,
+use plonk_core::{
     constraint_system::StandardComposer,
     prelude::Proof,
-    proof_system::{Prover, Verifier, VerifierKey},
+    proof_system::{pi::PublicInputs, Prover, Verifier, VerifierKey},
 };
 use rand::{prelude::ThreadRng, Rng};
 use std::marker::PhantomData;
@@ -15,7 +14,7 @@ use crate::{circuit::circuit_parameters::CircuitParameters, serializable_to_vec}
 
 pub struct ValidityPredicate<CP: CircuitParameters> {
     desc_vp: VerifierKey<CP::CurveScalarField, CP::CurvePC>, //preprocessed VP
-    pub public_input: Vec<CP::CurveScalarField>,
+    pub public_input: PublicInputs<CP::CurveScalarField>,
     _blind_rand: [CP::CurveScalarField; 20], //blinding randomness
     pub proof: Proof<CP::CurveScalarField, CP::CurvePC>,
     pub verifier: Verifier<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>,
@@ -44,7 +43,7 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
             CP::CurveScalarField,
             DensePolynomial<CP::CurveScalarField>,
         >>::VerifierKey,
-        Vec<CP::CurveScalarField>,
+        PublicInputs<CP::CurveScalarField>,
         VerifierKey<CP::CurveScalarField, CP::CurvePC>,
     ) {
         // Create a `Prover`
@@ -56,7 +55,7 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
         gadget(prover.mut_cs());
         let (ck, vk) = CP::CurvePC::trim(
             setup,
-            prover.circuit_size().next_power_of_two() + 6,
+            prover.circuit_bound().next_power_of_two() + 6,
             0,
             None,
         )
@@ -65,7 +64,7 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
             .mut_cs()
             .preprocess_verifier(&ck, &mut Transcript::new(b""), PhantomData::<CP::CurvePC>)
             .unwrap();
-        let public_input = PublicInputBuilder::new().finish(); // works only with our dummy circuit!
+        let public_input = prover.mut_cs().get_pi().clone();
 
         (prover, ck, vk, public_input, desc_vp)
     }
@@ -215,7 +214,7 @@ pub fn token_gadget<CP: CircuitParameters>(
 
 fn _circuit_proof<CP: CircuitParameters>() {
     let mut rng = ThreadRng::default();
-    let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
+    let pp = <CP as CircuitParameters>::CurvePC::setup(2 * 30, None, &mut rng).unwrap();
 
     let circuit = ValidityPredicate::<CP>::new(&pp, send_gadget::<CP>, true, &mut rng);
     circuit.verify();

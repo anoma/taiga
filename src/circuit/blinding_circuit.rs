@@ -1,17 +1,16 @@
 use ark_ff::One;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
-use plonk::{
-    circuit::PublicInputBuilder,
+use plonk_core::{
     constraint_system::StandardComposer,
     prelude::Proof,
-    proof_system::{Prover, Verifier},
+    proof_system::{pi::PublicInputs, Prover, Verifier},
 };
 
 use crate::circuit::circuit_parameters::CircuitParameters;
 
 pub struct BlindingCircuit<CP: CircuitParameters> {
-    pub public_input: Vec<CP::CurveBaseField>,
+    pub public_input: PublicInputs<CP::CurveBaseField>,
     pub proof: Proof<CP::CurveBaseField, CP::OuterCurvePC>,
     pub verifier: Verifier<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC>,
     pub vk: <CP::OuterCurvePC as PolynomialCommitment<
@@ -41,7 +40,7 @@ impl<CP: CircuitParameters> BlindingCircuit<CP> {
             DensePolynomial<CP::CurveBaseField>,
         >>::VerifierKey,
         // PublicInput
-        Vec<CP::CurveBaseField>,
+        PublicInputs<CP::CurveBaseField>,
     ) {
         // Create a `Prover`
         // Set the circuit using `gadget`
@@ -52,12 +51,12 @@ impl<CP: CircuitParameters> BlindingCircuit<CP> {
         gadget(prover.mut_cs());
         let (ck, vk) = CP::OuterCurvePC::trim(
             setup,
-            prover.circuit_size().next_power_of_two() + 6,
+            prover.circuit_bound().next_power_of_two() + 6,
             0,
             None,
         )
         .unwrap();
-        let public_input = PublicInputBuilder::new().finish(); // works only with our dummy circuit!
+        let public_input = prover.mut_cs().get_pi().clone();
 
         (prover, ck, vk, public_input)
     }
