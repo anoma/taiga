@@ -36,6 +36,8 @@ fn spawn_token<CP: CircuitParameters>(name: &str) -> Token<CP> {
 fn test_send<CP: CircuitParameters>() {
     use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
 
+    // --- Preparations ---
+
     let mut rng = rand::thread_rng();
 
     let xan = spawn_token::<CP>("XAN");
@@ -67,35 +69,32 @@ fn test_send<CP: CircuitParameters>() {
     let mut bytes = serializable_to_vec(&note_a1xan.commitment());
     let hash_nc_alice = Blake2s::hash(&bytes);
 
-    //SEND PHASE
+    // --- Preparations end ---
 
-    let created_notes = alice
+    let created_notes_and_ec = alice
         .send(
             &mut vec![&note_a1xan],
-            vec![(bob.address(), 1_u32)],
+            vec![(&bob, 1_u32)],
             &mut rng,
-            &mut NFtree,
         );
-    //CM_CE_list.push((note_b1xan.commitment(), note_b1xan_ec));
 
-    let hash_nc_bob = Blake2s::hash(&serializable_to_vec(&created_notes[0].commitment()));
+    CM_CE_list.push((note_b1xan.commitment(), note_b1xan_ec));
 
-    // TODO: Replace with a more efficient implementation
-    // nullifier proof
+    let hash_nc_bob = Blake2s::hash(&serializable_to_vec(&created_notes_and_ec[0].0.commitment()));
 
     let nullifier = alice.compute_nullifier(&note_a1xan);
     let hash_nf = Blake2s::hash(&serializable_to_vec(&nullifier));
 
-    let tx: Transaction<CP> = Transaction::new(vec![], vec![note_a1xan], created_notes, vec![]);
-    tx.process(&mut NFtree, &mut MTtree);
+    let tx: Transaction<CP> = Transaction::new(vec![], vec![note_a1xan], created_notes_and_ec, vec![]);
+    tx.process(&mut NFtree, &mut MTtree, &mut CM_CE_list, &mut rng);
 
     let proof_nf = NFtree.proof(&[0]);
     let root_nf = NFtree.root().unwrap();
     assert!(proof_nf.verify(root_nf, &[0], &[hash_nf], 1));
 
-    let proof_nc = MTtree.proof(&[0, 1]);
-    let root_nc = MTtree.root().unwrap();
-    assert!(proof_nc.verify(root_nc, &[0, 1], &[hash_nc_alice, hash_nc_bob], 2));
+    let proof_mt = MTtree.proof(&[0, 1]);
+    let root_mt = MTtree.root().unwrap();
+    assert!(proof_mt.verify(root_mt, &[0, 1], &[hash_nc_alice, hash_nc_bob], 2));
 }
 
 // // We decided to continue with KZG for now
@@ -151,25 +150,23 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
     // …and ship it 🛳️
     let new_notes = yulia.send(
         &mut vec![&initial_note],
-        vec![(yulia.address(), 1), (yulia.address(), 1), (simon.address(), 2)],
+        vec![(&yulia, 1), (&yulia, 1), (&simon, 2)],
         &mut rng,
-        &mut nf_tree,
     );
 
     assert_eq!(new_notes.len(), 3);
-    assert_eq!(new_notes[0].value, 1);
-    assert_eq!(new_notes[1].value, 1);
-    assert_eq!(new_notes[2].value, 2);
+    assert_eq!(new_notes[0].0.value, 1);
+    assert_eq!(new_notes[1].0.value, 1);
+    assert_eq!(new_notes[2].0.value, 2);
 
     let new_notes = yulia.send(
-        &mut vec![&new_notes[0], &new_notes[1]],
-        vec![(yulia.address(), 2)],
+        &mut vec![&new_notes[0].0, &new_notes[1].0],
+        vec![(&yulia, 2)],
         &mut rng,
-        &mut nf_tree,
     );
 
     assert_eq!(new_notes.len(), 1);
-    assert_eq!(new_notes[0].value, 2);
+    assert_eq!(new_notes[0].0.value, 2);
 }
 
 // // We decided to continue with KZG for now

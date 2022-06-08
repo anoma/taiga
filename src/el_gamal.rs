@@ -4,7 +4,10 @@ use ark_ff::UniformRand;
 use ark_serialize::CanonicalSerialize;
 use rand::prelude::ThreadRng;
 use sha2::{Digest, Sha256};
+extern crate derivative;
 
+#[derive(derivative::Derivative)]
+#[derivative(Copy(bound = "C: TEModelParameters"), Clone(bound = "C: TEModelParameters"))]
 pub struct Ciphertext<C: TEModelParameters>(pub TEGroupAffine<C>, [u8; 32]);
 
 pub struct DecryptionKey<C: TEModelParameters> {

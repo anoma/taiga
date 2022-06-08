@@ -99,34 +99,29 @@ impl<CP: CircuitParameters> User<CP> {
     pub fn send(
         &self,
         spent_notes: &mut Vec<&Note<CP>>,
-        token_distribution: Vec<(CP::CurveScalarField, u32)>,
+        token_distribution: Vec<(&User<CP>, u32)>,
         rand: &mut ThreadRng,
-        NFtree: &mut MerkleTree<Blake2s>,
-    ) -> Vec<Note<CP>> {
+    ) -> Vec<(Note<CP>, Vec<Ciphertext<CP::InnerCurve>>)> {
         let total_sent_value = spent_notes.iter().fold(0, |sum, n| sum + n.value);
         let total_dist_value = token_distribution.iter().fold(0, |sum, x| sum + x.1);
         assert!(total_sent_value >= total_dist_value);
+
         let the_one_and_only_token_address = spent_notes[0].token_address.clone();
         let the_one_and_only_nullifier = self.compute_nullifier(spent_notes[0]);
 
-        //todo: should be done in tx
-        //Compute the nullifier of the spent note and put it in the nullifier tree
-        //for note in spent_notes {
-        //    let nullifier = self.compute_nullifier(note);
-        //    add_to_tree::<CP::InnerCurve>(&nullifier, NFtree);
-        //}
-
-        let mut new_notes: Vec<_> = vec![];
-        for (recipient_address, value) in token_distribution {
+        let mut new_notes: Vec<(Note<CP>, Vec<Ciphertext<CP::InnerCurve>>)> = vec![];
+        for (recipient, value) in token_distribution {
             let psi = CP::InnerCurveScalarField::rand(rand);
-            new_notes.push(Note::<CP>::new(
-                recipient_address,
-                the_one_and_only_token_address,
-                value,
-                the_one_and_only_nullifier.clone(),
-                psi,
-                &mut ThreadRng::default(),
-            ));
+            let note = Note::<CP>::new(
+                    recipient.address(),
+                    the_one_and_only_token_address,
+                    value,
+                    the_one_and_only_nullifier.clone(),
+                    psi,
+                    &mut ThreadRng::default(),
+                );
+            let ec = recipient.encrypt(rand, &note);
+            new_notes.push((note, ec));
         }
         new_notes
     }

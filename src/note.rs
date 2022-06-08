@@ -7,6 +7,7 @@ use ark_ff::BigInteger256;
 use ark_serialize::*;
 use rand::{prelude::ThreadRng, Rng};
 use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
+use crate::el_gamal::EncryptionKey;
 
 #[derive(CanonicalSerialize)]
 pub struct Note<CP: CircuitParameters> {
@@ -55,5 +56,10 @@ impl<CP: CircuitParameters> Note<CP> {
     // SHOULD BE PRIVATE??
     pub fn get_rcm(&self) -> BigInteger256 {
         self.rcm
+    }
+
+    pub fn encrypt(&self, ek: &EncryptionKey<CP::InnerCurve>, rand: &mut ThreadRng) -> Vec<Ciphertext<CP::InnerCurve>> {
+        let bytes = serializable_to_vec(self);
+        ek.encrypt(&bytes, rand)
     }
 }

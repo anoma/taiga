@@ -377,11 +377,10 @@ fn _action_checks<CP: CircuitParameters>() {
     let output_note = alice
         .send(
             &mut vec![&spent_note],
-            vec![(bob.address(), 1_u32)],
+            vec![(&bob, 1_u32)],
             &mut rng,
-            &mut NFtree,
         )
-        .swap_remove(0);
+        .swap_remove(0).0;
 
     add_to_tree(&output_note.commitment(), &mut MTtree);
 
