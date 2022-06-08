@@ -1,5 +1,5 @@
 use ark_serialize::{CanonicalSerialize, CanonicalSerializeHashExt};
-use crate::{action::Action, note::Note, CircuitParameters, add_to_tree, serializable_to_vec, serializable_to_array};
+use crate::{action::Action, note::Note, CircuitParameters, add_to_tree, serializable_to_vec, serializable_to_array, add_bytes_to_tree};
 use crate::action;
 use rs_merkle::{MerkleTree, Hasher, algorithms::Blake2s};
 use crate::circuit::validity_predicate::ValidityPredicate;
@@ -46,17 +46,21 @@ impl<CP: CircuitParameters> Transaction<CP> {
         }
     }
 
-    pub fn process(&self, NFtree: &mut MerkleTree<Blake2s>, MTtree: &mut MerkleTree<Blake2s>, CM_CE_list: &mut Vec<(TEGroupAffine<CP::InnerCurve>, Vec<Ciphertext<CP::InnerCurve>>)>, rand: &mut ThreadRng ){
+    pub fn process(&self, nf_tree: &mut MerkleTree<Blake2s>, mt_tree: &mut MerkleTree<Blake2s>, cm_ce_list: &mut Vec<(TEGroupAffine<CP::InnerCurve>, Vec<Ciphertext<CP::InnerCurve>>)>){
         self.check();
         for i in &self.created_notes {
             //1. add nf to the nullifier tree
-            add_to_tree(&i.0.spent_note_nf, NFtree);
+            add_to_tree(&i.0.spent_note_nf, nf_tree);
 
             //2. add commitments to the note commitment tree
             //todo: add ce to the tree
-            add_to_tree(&i.0.commitment(), MTtree);
+            add_to_tree(&i.0.commitment(), mt_tree);
 
-            CM_CE_list.push((i.0.commitment(), i.1.clone()));
+            //let mut bytes = i.0.serialize(&i.1);
+            //add_bytes_to_tree(bytes, MTtree);
+
+            //3. add (cm, ce) pair to the list
+            cm_ce_list.push((i.0.commitment(), i.1.clone()));
         }
 
         //3. recompute rt

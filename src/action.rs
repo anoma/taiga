@@ -350,11 +350,11 @@ fn _action_checks<CP: CircuitParameters>() {
     let xan = Token::<CP>::new("xan", &pp, &mut rng);
 
     // Creation of a nullifiers tree
-    let mut NFtree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
+    let mut nf_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
     // Creation of a note commitments tree
-    let mut MTtree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
+    let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
     // Creation of the {note commitment + encrypted note} list
-    let mut CM_CE_list: Vec<(
+    let mut cm_ce_list: Vec<(
         TEGroupAffine<CP::InnerCurve>,
         Vec<Ciphertext<CP::InnerCurve>>,
     )> = vec![];
@@ -370,8 +370,8 @@ fn _action_checks<CP: CircuitParameters>() {
     );
 
     let spent_note_ec = alice.encrypt(&mut rng, &spent_note);
-    add_to_tree(&spent_note.commitment(), &mut MTtree);
-    CM_CE_list.push((spent_note.commitment(), spent_note_ec));
+    add_to_tree(&spent_note.commitment(), &mut mt_tree);
+    cm_ce_list.push((spent_note.commitment(), spent_note_ec));
 
     // The note is spent, and a new note is created for Bob
     let output_note = alice
@@ -382,7 +382,7 @@ fn _action_checks<CP: CircuitParameters>() {
         )
         .swap_remove(0).0;
 
-    add_to_tree(&output_note.commitment(), &mut MTtree);
+    add_to_tree(&output_note.commitment(), &mut mt_tree);
 
     // ACTION CIRCUIT CHECKS //
     // Checks follow: https://hackmd.io/IV6AZgoRQWC91D4Z4AG6jQ?both#Action-Circuit
@@ -391,7 +391,7 @@ fn _action_checks<CP: CircuitParameters>() {
         &xan,
         &spent_note,
         &output_note,
-        &mut MTtree,
+        &mut mt_tree,
         &mut rng,
     );
     output_notes_checks(&bob, &xan, &output_note, &mut rng);

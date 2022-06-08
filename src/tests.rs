@@ -3,8 +3,6 @@ use crate::{add_to_tree, circuit::circuit_parameters::CircuitParameters, circuit
 use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
 use ark_ff::Zero;
 use ark_poly_commit::PolynomialCommitment;
-use plonk_core::constraint_system::StandardComposer;
-use crate::action::Action;
 use crate::transaction::Transaction;
 
 fn spawn_user<CP: CircuitParameters>(name: &str) -> User<CP> {
@@ -45,9 +43,9 @@ fn test_send<CP: CircuitParameters>() {
     let alice = spawn_user::<CP>("alice");
     let bob = spawn_user::<CP>("bob");
 
-    let mut NFtree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
-    let mut MTtree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
-    let mut CM_CE_list: Vec<(
+    let mut nf_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
+    let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
+    let mut cm_ce_list: Vec<(
         TEGroupAffine<CP::InnerCurve>,
         Vec<Ciphertext<CP::InnerCurve>>,
     )> = vec![];
@@ -63,10 +61,10 @@ fn test_send<CP: CircuitParameters>() {
     );
 
     let note_a1xan_ec = alice.encrypt(&mut rng, &note_a1xan);
-    add_to_tree(&note_a1xan.commitment(), &mut MTtree);
-    CM_CE_list.push((note_a1xan.commitment(), note_a1xan_ec));
+    add_to_tree(&note_a1xan.commitment(), &mut mt_tree);
+    cm_ce_list.push((note_a1xan.commitment(), note_a1xan_ec));
 
-    let mut bytes = serializable_to_vec(&note_a1xan.commitment());
+    let bytes = serializable_to_vec(&note_a1xan.commitment());
     let hash_nc_alice = Blake2s::hash(&bytes);
 
     // --- Preparations end ---
@@ -78,22 +76,20 @@ fn test_send<CP: CircuitParameters>() {
             &mut rng,
         );
 
-    CM_CE_list.push((note_b1xan.commitment(), note_b1xan_ec));
-
     let hash_nc_bob = Blake2s::hash(&serializable_to_vec(&created_notes_and_ec[0].0.commitment()));
 
     let nullifier = alice.compute_nullifier(&note_a1xan);
     let hash_nf = Blake2s::hash(&serializable_to_vec(&nullifier));
 
     let tx: Transaction<CP> = Transaction::new(vec![], vec![note_a1xan], created_notes_and_ec, vec![]);
-    tx.process(&mut NFtree, &mut MTtree, &mut CM_CE_list, &mut rng);
+    tx.process(&mut nf_tree, &mut mt_tree, &mut cm_ce_list);
 
-    let proof_nf = NFtree.proof(&[0]);
-    let root_nf = NFtree.root().unwrap();
+    let proof_nf = nf_tree.proof(&[0]);
+    let root_nf = nf_tree.root().unwrap();
     assert!(proof_nf.verify(root_nf, &[0], &[hash_nf], 1));
 
-    let proof_mt = MTtree.proof(&[0, 1]);
-    let root_mt = MTtree.root().unwrap();
+    let proof_mt = mt_tree.proof(&[0, 1]);
+    let root_mt = mt_tree.root().unwrap();
     assert!(proof_mt.verify(root_mt, &[0, 1], &[hash_nc_alice, hash_nc_bob], 2));
 }
 
@@ -120,7 +116,6 @@ fn test_check_proofs_kzg() {
 fn split_and_merge_notes_test<CP: CircuitParameters>() {
     use ark_ff::UniformRand;
     use rand::rngs::ThreadRng;
-    use rs_merkle::{algorithms::Blake2s, MerkleTree};
 
     let mut rng = ThreadRng::default();
 
@@ -130,12 +125,12 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
     let xan = spawn_token::<CP>("xan");
 
     // bookkeeping structures
-    let mut nf_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
-    let mut nc_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
-    let mut nc_en_list: Vec<(
-        TEGroupAffine<CP::InnerCurve>,
-        Vec<Ciphertext<CP::InnerCurve>>,
-    )> = vec![];
+//    let mut nf_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
+//    let mut nc_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
+//    let mut nc_en_list: Vec<(
+//        TEGroupAffine<CP::InnerCurve>,
+//        Vec<Ciphertext<CP::InnerCurve>>,
+//    )> = vec![];
 
     // airdrop 🪂
     let initial_note = Note::<CP>::new(

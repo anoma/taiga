@@ -2,13 +2,29 @@ use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
 use ark_ec::{AffineCurve, ProjectiveCurve, TEModelParameters};
 use ark_ff::UniformRand;
 use ark_serialize::CanonicalSerialize;
+use ark_serialize::Write;
 use rand::prelude::ThreadRng;
 use sha2::{Digest, Sha256};
 extern crate derivative;
 
 #[derive(derivative::Derivative)]
-#[derivative(Copy(bound = "C: TEModelParameters"), Clone(bound = "C: TEModelParameters"))]
+#[derivative(
+    Copy(bound = "C: TEModelParameters"),
+    Clone(bound = "C: TEModelParameters"),
+)]
 pub struct Ciphertext<C: TEModelParameters>(pub TEGroupAffine<C>, [u8; 32]);
+
+impl<C: TEModelParameters> Ciphertext<C> {
+    //bad temporary serialization
+    pub fn serialize(&self) -> Vec<u8> {
+        let mut bytes = vec![];
+        self.0.serialize_unchecked(&mut bytes).unwrap();
+        for block in self.1 {
+            block.serialize_unchecked(&mut bytes).unwrap();
+        }
+        bytes
+    }
+}
 
 pub struct DecryptionKey<C: TEModelParameters> {
     secret: C::ScalarField,
@@ -89,6 +105,7 @@ impl<C: TEModelParameters> EncryptionKey<C> {
         }
         cipher
     }
+
 }
 
 #[test]

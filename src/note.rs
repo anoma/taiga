@@ -62,4 +62,8 @@ impl<CP: CircuitParameters> Note<CP> {
         let bytes = serializable_to_vec(self);
         ek.encrypt(&bytes, rand)
     }
+
+    pub fn serialize(&self, ec: &Vec<Ciphertext<CP::InnerCurve>>) -> Vec<u8> {
+        (0..ec.len()).map(|i| ec[i].serialize()).flatten().collect()
+    }
 }
