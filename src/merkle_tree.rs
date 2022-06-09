@@ -10,16 +10,16 @@ pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
 /// A path from a position in a particular commitment tree to the root of that tree.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MerklePath<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> {
-    pub auth_path: Vec<(Node<F, BH>, bool)>,
-    // TODO: Do we need the position?
-    // pub position: u32,
+    auth_path: Vec<(Node<F, BH>, bool)>,
 }
 
 impl<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> MerklePath<F, BH> {
+    /// Constructs a random dummy merkle path with depth of TAIGA_COMMITMENT_TREE_DEPTH.
     pub fn dummy(rng: &mut impl RngCore) -> Self {
         let auth_path = [(); TAIGA_COMMITMENT_TREE_DEPTH].map(|_| (Node::rand(rng), rng.gen()));
         Self::from_path(auth_path.to_vec())
     }
+
     /// Constructs a Merkle path directly from a path.
     pub fn from_path(auth_path: Vec<(Node<F, BH>, bool)>) -> Self {
         MerklePath { auth_path }
@@ -37,6 +37,7 @@ impl<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> MerklePath<F, BH> {
         Ok(root)
     }
 
+    /// Returns the input parameters for merkle tree gadget.
     pub fn get_path(&self) -> Vec<(F, bool)> {
         self.auth_path
             .iter()
@@ -67,7 +68,6 @@ impl<F: PrimeField, BH: BinaryHasher<F>> Node<F, BH> {
     // TODO: add new from commitment
     // pub fn new_from_cm(note: &Note)-> Self {}
 
-    /// Only used in the circuit.
     pub(crate) fn inner(&self) -> F {
         self.repr
     }
@@ -80,6 +80,7 @@ impl<F: PrimeField, BH: BinaryHasher<F>> Node<F, BH> {
         Self::new(F::from_le_bytes_mod_order(bytes))
     }
 
+    /// Returns the hash result of left node, right node and the hash function.
     fn combine(lhs: &Self, rhs: &Self, hasher: &BH) -> Result<Self, TaigaError> {
         let hash = hasher.hash_two(&lhs.repr, &rhs.repr)?;
         Ok(Self::new(hash))

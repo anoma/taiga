@@ -142,7 +142,7 @@ impl<CP: CircuitParameters> Action<CP> {
         note_cm: TEGroupAffine<CP::InnerCurve>,
         // private
         note_data: Vec<u8>,
-        note_rcm: BigInteger256,
+        _note_rcm: BigInteger256,
     ) {
         assert_eq!(crh::<CP>(&note_data), note_cm);
     }
@@ -164,8 +164,9 @@ impl<CP: CircuitParameters> Action<CP> {
         nk: BigInteger256,
         note: &Note<CP>,
     ) {
-        // this part of the circuit is done over `CurveScalarField` even though it is on `CP::InnerCurveScalarField`.
-        // It is then converted into `InnerCurveScalarField` for the second part of the circuit.
+        // this part of the circuit is done over `CurveScalarField` even though
+        // it is on `CP::InnerCurveScalarField`. It is then converted
+        // into `InnerCurveScalarField` for the second part of the circuit.
         let scalar = prf::<CP::InnerCurveScalarField>(
             &[note.spent_note_nf.to_string().as_bytes(), &nk.to_bytes_le()].concat(),
         ) + note.psi;
@@ -181,7 +182,6 @@ impl<CP: CircuitParameters> Action<CP> {
 
     /// Check that note exists in the merkle tree, i.e. note is valid in `rt`
     /// Same as Orchard, there is a path in Merkle tree with root `rt` to a note commitment `cm` that opens to `note`
-    ///     
     /// # Arguments
     ///
     /// Public inputs:
@@ -200,7 +200,7 @@ impl<CP: CircuitParameters> Action<CP> {
         note_cm: TEGroupAffine<CP::InnerCurve>,
         // private
         note_data: Vec<u8>,
-        note_rcm: BigInteger256,
+        _note_rcm: BigInteger256,
         index_note_cm: usize,
     ) {
         // proof check
@@ -221,7 +221,8 @@ impl<CP: CircuitParameters> Action<CP> {
         _com_rcm: BigInteger256,
         _blind_rand: [CP::CurveScalarField; 20],
     ) {
-        // check that `blind_desc_vp` is the blinding of `desc_vp` with `blind_rand` and that `desc_vp` commits to `com_vp` (this is fresh commit).
+        // check that `blind_desc_vp` is the blinding of `desc_vp` with
+        // `blind_rand` and that `desc_vp` commits to `com_vp` (this is fresh commit).
     }
 }
 

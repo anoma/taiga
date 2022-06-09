@@ -129,8 +129,9 @@ fn serializable_to_vec<F: CanonicalSerialize>(elem: &F) -> Vec<u8> {
 }
 
 // A really bad hash-to-curve
-// TODO: the implementation is a bit weird: it does not really depends on CP and could be written with a curve as a parameter (`fn hash_to_curve<E:Curve>`).
-fn hash_to_curve<CP: CircuitParameters>(
+// TODO: the implementation is a bit weird: it does not really depends on CP and
+// could be written with a curve as a parameter (`fn hash_to_curve<E:Curve>`).
+fn _hash_to_curve<CP: CircuitParameters>(
     data: &[u8],
     _rand: BigInteger256, // TODO: Rand is not used!
 ) -> TEGroupAffine<CP::InnerCurve> {

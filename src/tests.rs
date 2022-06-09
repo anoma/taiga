@@ -1,16 +1,11 @@
 use crate::el_gamal::{Ciphertext, DecryptionKey};
 use crate::{
-    circuit::circuit_parameters::CircuitParameters,
-    circuit::validity_predicate::{recv_gadget, send_gadget, token_gadget},
-    note::Note,
-    serializable_to_vec,
-    token::Token,
+    circuit::circuit_parameters::CircuitParameters, note::Note, serializable_to_vec, token::Token,
     user::User,
 };
 use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
 use ark_ff::Zero;
 use ark_poly_commit::PolynomialCommitment;
-use plonk_core::constraint_system::StandardComposer;
 
 fn spawn_user<CP: CircuitParameters>(name: &str) -> User<CP> {
     use rand::rngs::ThreadRng;

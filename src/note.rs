@@ -10,7 +10,8 @@ use rs_merkle::{algorithms::Blake2s, MerkleTree};
 
 #[derive(CanonicalSerialize)]
 pub struct Note<CP: CircuitParameters> {
-    // For the curves we consider for 128-bit of security, CurveScalarField, InnerCurveScalarField and InnerCurveBaseField are 32 bytes.
+    // For the curves we consider for 128-bit of security, CurveScalarField,
+    // InnerCurveScalarField and InnerCurveBaseField are 32 bytes.
     // Thus, a note is represented in 32 + 32 + 4 + 32 + 4 + 2 * 32 + 32 = 200 bytes???
     pub owner_address: CP::CurveScalarField,
     pub token_address: CP::CurveScalarField,
@@ -55,9 +56,10 @@ impl<CP: CircuitParameters> Note<CP> {
 
     pub fn commitment(&self) -> TEGroupAffine<CP::InnerCurve> {
         // TODO: Consider Sinsemilla hash for this
-        //we just concat all of the note fields and multiply the curve generator by it (bad)
-        //the fields of a note we should commit to aren't defined in the pbc spec yet
-        //also, note commitment should be implemented with Sinsemilla (according to the pbc spec)
+        //we just concat all of the note fields and multiply the curve
+        // generator by it (bad) the fields of a note we should commit
+        // to aren't defined in the pbc spec yet also, note commitment
+        // should be implemented with Sinsemilla (according to the pbc spec)
 
         let bytes = serializable_to_vec(self);
         crh::<CP>(&bytes)

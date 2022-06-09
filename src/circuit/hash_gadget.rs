@@ -8,6 +8,8 @@ use plonk_hashing::poseidon::{
     poseidon::{PlonkSpec, Poseidon},
 };
 
+/// A BinaryHasherGadget takes two variables as input and outputs the hash
+/// result variable.
 pub trait BinaryHasherGadget<F: PrimeField, P: TEModelParameters<BaseField = F>> {
     fn hash_two(
         &self,
@@ -17,6 +19,7 @@ pub trait BinaryHasherGadget<F: PrimeField, P: TEModelParameters<BaseField = F>>
     ) -> Result<Variable, TaigaError>;
 }
 
+/// A BinaryHasherGadget implementation for Poseidon hash.
 impl<F: PrimeField, P: TEModelParameters<BaseField = F>> BinaryHasherGadget<F, P>
     for PoseidonConstants<F>
 {

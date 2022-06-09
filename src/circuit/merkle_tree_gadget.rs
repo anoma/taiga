@@ -4,6 +4,8 @@ use ark_ec::TEModelParameters;
 use ark_ff::PrimeField;
 use plonk_core::{constraint_system::StandardComposer, prelude::Variable};
 
+/// A Merkle Tree Gadget takes leaf node variable, authorization path to the
+/// root and the BinaryHasherGadget, then returns the merkle root variable.
 pub fn merkle_tree_gadget<
     F: PrimeField,
     P: TEModelParameters<BaseField = F>,
