@@ -4,8 +4,8 @@ We detail here how the action circuit works. It corresponds to the verification 
 
 Recall that a note has a field `owner_address` that identifies the owner of the note using `User.address()`, and `token_address` that is computed using `Token.address()`. Moreover,
 ```rust
-User.address(self) = com_q( com_q(com_p(self.desc_send,0) || self.nk ) || com_p(self.desc_recv,0), self.rcm_address)
-Token.address(self) = com_q(com_p(self.desc_vp, 0), 0)
+User.address(self) = com_r( com_r(com_q(self.desc_send,0) || self.nk ) || com_q(self.desc_recv,0), self.rcm_address)
+Token.address(self) = com_r(com_q(self.desc_vp, 0), 0)
 ```
 
 There are different steps involved in the spent and creation of notes.
@@ -14,7 +14,7 @@ There are different steps involved in the spent and creation of notes.
 
 The sender computes some fresh commitments for `Sender.send_vp` and `Receiver.recv_vp`.
 These commitments will be useful for the Action circuit *and* the blinding circuit.
-A fresh commit is of the form `com(com_p(desc_vp, 0), rand)` where `rand` is a fresh random integer.
+A fresh commit is of the form `com(com_q(desc_vp, 0), rand)` where `rand` is a fresh random integer.
 As we will need these fresh commitments for both the Action and the blinding circuits, we need `Com` to be efficient over `CurveScalarField` *and* `CurveBaseField`.
 
 
