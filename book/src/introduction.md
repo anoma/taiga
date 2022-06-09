@@ -1,5 +1,32 @@
 # Introduction
 
+
+## Background
+
+### Private ledgers
+
+
+
+### Decentralised exchanges
+
+A DEX is a ledger-based application that enables users to trade digital assets without giving up custody of these assets to a third party.
+
+An intent-based DEX maintains an index, which is a table where makers publish their intention to
+trade (say, a particular asset pair) without committing any assets. A taker interested in a maker’s intention
+to trade can directly communicate with the maker to agree on terms. They can jointly produce a transaction
+for the trade, to be broadcast for on-chain processing.
+
+### ZEXE
+Decentralised exchanges with privacy guarantees without requiring users to give up custody of their assets were studied on the [Zexe paper](https://eprint.iacr.org/2018/962.pdf).
+
+
+### Orchard
+## Motivation
+
+TODO: What are the limitations of Zexe or Zcash?
+
+
+
 ## What is Taiga?
 
 Taiga is a shielded protocol for bartering on Anoma, following the UTXO model and characterized by the goals:
@@ -18,3 +45,12 @@ A block in the underlying chain contains many shielded transactions. Taiga maint
 
 The address of a token or a user consists of a commitment of the token validity predicate or the user validity predicate, respectively. That is, a token or user address is uniquely identified by the rules of the underlying validity predicate.
 
+## Related work
+
+### Zexe
+
+### Penumbra
+
+### Bilateral swaps (Aztec)
+
+### Orchard
