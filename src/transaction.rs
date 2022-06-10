@@ -4,7 +4,7 @@ use crate::action;
 use rs_merkle::{MerkleTree, Hasher, algorithms::Blake2s};
 use crate::circuit::validity_predicate::ValidityPredicate;
 use plonk_core::proof_system::Verifier;
-use crate::el_gamal::Ciphertext;
+use crate::el_gamal::{Ciphertext, EncryptedNote};
 use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
 use rand::rngs::ThreadRng;
 
@@ -12,7 +12,7 @@ pub struct Transaction<CP: CircuitParameters> {
     //max: usize, // the maximum number of actions/notes for a transaction
     actions: Vec<Action<CP>>,
     spent_notes: Vec<Note<CP>>,
-    created_notes: Vec<(Note<CP>, Vec<Ciphertext<CP::InnerCurve>>)>,
+    created_notes: Vec<(Note<CP>, EncryptedNote<CP::InnerCurve>)>,
     vps: Vec<ValidityPredicate<CP>>
 }
 
@@ -22,7 +22,7 @@ impl<CP: CircuitParameters> Transaction<CP> {
         //max: usize,
         actions: Vec<Action<CP>>,
         spent_notes: Vec<Note<CP>>,
-        created_notes: Vec<(Note<CP>, Vec<Ciphertext<CP::InnerCurve>>)>,
+        created_notes: Vec<(Note<CP>, EncryptedNote<CP::InnerCurve>)>,
         vps: Vec<ValidityPredicate<CP>>)
         -> Self {
 
@@ -46,18 +46,15 @@ impl<CP: CircuitParameters> Transaction<CP> {
         }
     }
 
-    pub fn process(&self, nf_tree: &mut MerkleTree<Blake2s>, mt_tree: &mut MerkleTree<Blake2s>, cm_ce_list: &mut Vec<(TEGroupAffine<CP::InnerCurve>, Vec<Ciphertext<CP::InnerCurve>>)>){
+    pub fn process(&self, nf_tree: &mut MerkleTree<Blake2s>, mt_tree: &mut MerkleTree<Blake2s>, cm_ce_list: &mut Vec<(TEGroupAffine<CP::InnerCurve>, EncryptedNote<CP::InnerCurve>)>){
         self.check();
         for i in &self.created_notes {
             //1. add nf to the nullifier tree
             add_to_tree(&i.0.spent_note_nf, nf_tree);
 
             //2. add commitments to the note commitment tree
-            //todo: add ce to the tree
-            add_to_tree(&i.0.commitment(), mt_tree);
-
-            //let mut bytes = i.0.serialize(&i.1);
-            //add_bytes_to_tree(bytes, MTtree);
+            let mut bytes = serializable_to_vec(&i.0.commitment());
+            add_bytes_to_tree(bytes, mt_tree);
 
             //3. add (cm, ce) pair to the list
             cm_ce_list.push((i.0.commitment(), i.1.clone()));

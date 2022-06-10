@@ -221,7 +221,7 @@ impl<CP: CircuitParameters> Action<CP> {
 // this is not the circuit implementation but what should be hard-coded in the Action Circuit.
 //
 use crate::circuit::validity_predicate::{recv_gadget, send_gadget, token_gadget};
-use crate::el_gamal::{Ciphertext, DecryptionKey};
+use crate::el_gamal::{Ciphertext, DecryptionKey, EncryptedNote};
 use crate::note::Note;
 use crate::serializable_to_vec;
 use crate::token::Token;
@@ -349,14 +349,12 @@ fn _action_checks<CP: CircuitParameters>() {
 
     let xan = Token::<CP>::new("xan", &pp, &mut rng);
 
-    // Creation of a nullifiers tree
-    let mut nf_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
     // Creation of a note commitments tree
     let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
     // Creation of the {note commitment + encrypted note} list
     let mut cm_ce_list: Vec<(
         TEGroupAffine<CP::InnerCurve>,
-        Vec<Ciphertext<CP::InnerCurve>>,
+        EncryptedNote<CP::InnerCurve>,
     )> = vec![];
 
     // Creation of a note of 1XAN for Alice

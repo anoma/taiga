@@ -57,13 +57,4 @@ impl<CP: CircuitParameters> Note<CP> {
     pub fn get_rcm(&self) -> BigInteger256 {
         self.rcm
     }
-
-    pub fn encrypt(&self, ek: &EncryptionKey<CP::InnerCurve>, rand: &mut ThreadRng) -> Vec<Ciphertext<CP::InnerCurve>> {
-        let bytes = serializable_to_vec(self);
-        ek.encrypt(&bytes, rand)
-    }
-
-    pub fn serialize(&self, ec: &Vec<Ciphertext<CP::InnerCurve>>) -> Vec<u8> {
-        (0..ec.len()).map(|i| ec[i].serialize()).flatten().collect()
-    }
 }

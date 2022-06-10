@@ -11,6 +11,7 @@ use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use rand::{prelude::ThreadRng, Rng};
 use rs_merkle::{algorithms::Blake2s, MerkleTree};
+use crate::el_gamal::EncryptedNote;
 
 pub struct User<CP: CircuitParameters> {
     name: String, // probably not useful: a user will be identified with his address / his public key(?)
@@ -101,7 +102,7 @@ impl<CP: CircuitParameters> User<CP> {
         spent_notes: &mut Vec<&Note<CP>>,
         token_distribution: Vec<(&User<CP>, u32)>,
         rand: &mut ThreadRng,
-    ) -> Vec<(Note<CP>, Vec<Ciphertext<CP::InnerCurve>>)> {
+    ) -> Vec<(Note<CP>, EncryptedNote<CP::InnerCurve>)> {
         let total_sent_value = spent_notes.iter().fold(0, |sum, n| sum + n.value);
         let total_dist_value = token_distribution.iter().fold(0, |sum, x| sum + x.1);
         assert!(total_sent_value >= total_dist_value);
@@ -109,7 +110,7 @@ impl<CP: CircuitParameters> User<CP> {
         let the_one_and_only_token_address = spent_notes[0].token_address.clone();
         let the_one_and_only_nullifier = self.compute_nullifier(spent_notes[0]);
 
-        let mut new_notes: Vec<(Note<CP>, Vec<Ciphertext<CP::InnerCurve>>)> = vec![];
+        let mut new_notes: Vec<(Note<CP>, EncryptedNote<CP::InnerCurve>)> = vec![];
         for (recipient, value) in token_distribution {
             let psi = CP::InnerCurveScalarField::rand(rand);
             let note = Note::<CP>::new(
@@ -148,7 +149,7 @@ impl<CP: CircuitParameters> User<CP> {
         self.blind_vp.verify();
     }
 
-    pub fn encrypt(&self, rand: &mut ThreadRng, note: &Note<CP>) -> Vec<Ciphertext<<CP as CircuitParameters>::InnerCurve>>{
+    pub fn encrypt(&self, rand: &mut ThreadRng, note: &Note<CP>) -> EncryptedNote<CP::InnerCurve>{
         // El Gamal encryption
         let bytes = serializable_to_vec(note);
         self.enc_key().encrypt(&bytes, rand)

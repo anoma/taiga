@@ -1,5 +1,5 @@
-use crate::el_gamal::{Ciphertext, DecryptionKey};
-use crate::{add_to_tree, circuit::circuit_parameters::CircuitParameters, circuit::validity_predicate::{recv_gadget, send_gadget, token_gadget}, note::Note, serializable_to_vec, token::Token, user::User};
+use crate::el_gamal::{Ciphertext, DecryptionKey, EncryptedNote};
+use crate::{add_bytes_to_tree, add_to_tree, circuit::circuit_parameters::CircuitParameters, circuit::validity_predicate::{recv_gadget, send_gadget, token_gadget}, note::Note, serializable_to_vec, token::Token, user::User};
 use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
 use ark_ff::Zero;
 use ark_poly_commit::PolynomialCommitment;
@@ -47,7 +47,7 @@ fn test_send<CP: CircuitParameters>() {
     let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
     let mut cm_ce_list: Vec<(
         TEGroupAffine<CP::InnerCurve>,
-        Vec<Ciphertext<CP::InnerCurve>>,
+        EncryptedNote<CP::InnerCurve>,
     )> = vec![];
 
     // Creation of a note of 1XAN for Alice
@@ -60,28 +60,28 @@ fn test_send<CP: CircuitParameters>() {
         &mut rng,
     );
 
+    let mut bytes = serializable_to_vec(&note_a1xan.commitment());
+    add_bytes_to_tree(bytes.clone(), &mut mt_tree);
     let note_a1xan_ec = alice.encrypt(&mut rng, &note_a1xan);
-    add_to_tree(&note_a1xan.commitment(), &mut mt_tree);
     cm_ce_list.push((note_a1xan.commitment(), note_a1xan_ec));
 
-    let bytes = serializable_to_vec(&note_a1xan.commitment());
     let hash_nc_alice = Blake2s::hash(&bytes);
 
     // --- Preparations end ---
 
-    let created_notes_and_ec = alice
+    let output_notes_and_ec = alice
         .send(
             &mut vec![&note_a1xan],
             vec![(&bob, 1_u32)],
             &mut rng,
         );
-
-    let hash_nc_bob = Blake2s::hash(&serializable_to_vec(&created_notes_and_ec[0].0.commitment()));
+    bytes = serializable_to_vec(&output_notes_and_ec[0].0.commitment());
+    let hash_nc_bob = Blake2s::hash(&bytes);
 
     let nullifier = alice.compute_nullifier(&note_a1xan);
     let hash_nf = Blake2s::hash(&serializable_to_vec(&nullifier));
 
-    let tx: Transaction<CP> = Transaction::new(vec![], vec![note_a1xan], created_notes_and_ec, vec![]);
+    let tx: Transaction<CP> = Transaction::new(vec![], vec![note_a1xan], output_notes_and_ec, vec![]);
     tx.process(&mut nf_tree, &mut mt_tree, &mut cm_ce_list);
 
     let proof_nf = nf_tree.proof(&[0]);
