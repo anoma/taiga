@@ -1,6 +1,7 @@
-use crate::circuit::validity_predicate::trivial_gadget;
+use crate::circuit::gadgets::gadget::trivial_gadget;
 use crate::{circuit::circuit_parameters::CircuitParameters, hash_to_curve, prf};
 use ark_ec::ProjectiveCurve;
+use ark_serialize::CanonicalSerialize;
 use plonk_core::proof_system::Proof;
 use rand::prelude::ThreadRng;
 use rs_merkle::algorithms::Blake2s;
@@ -242,15 +243,26 @@ fn spent_notes_checks<CP: CircuitParameters>(
 ) {
     // Note is a valid note in `rt`
     // Same as Orchard, there is a path in Merkle tree with root `rt` to a note commitment `cm` that opens to `note`
+
+    // hack for note data because for now we are restricted to few input for the commitment
+    // TODO change the hash function and put all the note data inside note_data.
+    let mut note_data = vec![];
+    spent_note
+        .owner_address
+        .serialize_unchecked(&mut note_data)
+        .unwrap();
+    spent_note
+        .token_address
+        .serialize_unchecked(&mut note_data)
+        .unwrap();
     Action::<CP>::check_note_existence(
         note_commitments.root().unwrap(),
         note_commitments.proof(&[0]),
         spent_note.commitment(),
-        serializable_to_vec(spent_note),
+        note_data, //serializable_to_vec(spent_note),
         spent_note.get_rcm(),
         0,
     );
-
     // `address` and `address_com_vp` opens to the same `desc_address_vp`
     // Note address integrity: `address = Com_q(Com_q(Com_p(desc_vp_addr_send)||nk) || Com_p(desc_vp_addr_recv), rcm_address)`
     Action::<CP>::check_spent_note_addr_integrity(
@@ -302,15 +314,24 @@ fn output_notes_checks<CP: CircuitParameters>(
         receiver.rcm_addr,
         output_note.owner_address,
     );
-
     // Address VP integrity for output note: `address_com_vp = Com(Com_p(desc_vp_addr_recv), rcm_address_com_vp)`
     let (cm_recv_bob, rand_bob) = receiver.get_recv_vp().fresh_commitment(rng);
     Action::<CP>::check_vp_integrity(cm_recv_bob, rand_bob, receiver.get_send_vp().pack());
-
     // Commitment integrity(output note only): `cm = NoteCom(note, rcm_note)`
+    // hack for note data because for now we are restricted to few input for the commitment
+    // TODO change the hash function and put all the note data inside note_data.
+    let mut output_note_data = vec![];
+    output_note
+        .owner_address
+        .serialize_unchecked(&mut output_note_data)
+        .unwrap();
+    output_note
+        .token_address
+        .serialize_unchecked(&mut output_note_data)
+        .unwrap();
     Action::<CP>::check_note_commitment_integrity(
         output_note.commitment(),
-        serializable_to_vec(output_note),
+        output_note_data,
         output_note.get_rcm(),
     );
 
@@ -398,7 +419,7 @@ fn _action_checks<CP: CircuitParameters>() {
         .swap_remove(0);
 
     // ACTION CIRCUIT CHECKS //
-    // Checks follow: https://hackmd.io/IV6AZgoRQWC91D4Z4AG6jQ?both#Action-Circuit
+    // Checks follow: https://github.com/heliaxdev/taiga/blob/main/book/src/spec.md#action-circuit
     spent_notes_checks(
         &alice,
         &xan,
@@ -408,7 +429,6 @@ fn _action_checks<CP: CircuitParameters>() {
         &mut rng,
     );
     output_notes_checks(&alice, &bob, &xan, &output_note, &mut rng);
-
     // FRESH COMMITS (over `CP::CurveScalarField` and `CP::CurveBaseField`)
 
     // BLINDING CHECK

@@ -59,7 +59,11 @@ impl<CP: CircuitParameters> Note<CP> {
         //the fields of a note we should commit to aren't defined in the pbc spec yet
         //also, note commitment should be implemented with Sinsemilla (according to the pbc spec)
 
-        let bytes = serializable_to_vec(self);
+        let mut bytes = vec![];
+        // TODO use serialize_to_vec but for now, we are restricted to 4 field elements because we use Poseidon for the hash.
+        // In the long term, we will use a hash_to_curve with bytes and not a bounded input size (Pedersen or Blake2?).
+        self.owner_address.serialize_unchecked(&mut bytes).unwrap();
+        self.token_address.serialize_unchecked(&mut bytes).unwrap();
         hash_to_curve::<CP>(&bytes, self.rcm)
     }
 

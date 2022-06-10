@@ -1,7 +1,11 @@
+use ark_ec::AffineCurve;
+use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, TEModelParameters};
 use ark_ff::{BigInteger, BigInteger256, One, PrimeField, UniformRand, Zero};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use merlin::Transcript;
+use plonk_core::prelude::to_embedded_curve_scalar;
+use plonk_core::*;
 use plonk_core::{
     constraint_system::StandardComposer,
     prelude::Proof,
@@ -9,7 +13,7 @@ use plonk_core::{
 };
 use plonk_hashing::poseidon::{
     constants::PoseidonConstants,
-    poseidon::{PlonkSpec, Poseidon},
+    poseidon::{NativeSpec, PlonkSpec, Poseidon},
 };
 use rand::{prelude::ThreadRng, Rng};
 use std::marker::PhantomData;
@@ -202,132 +206,6 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
     }
 }
 
-pub fn trivial_gadget<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-    _private_inputs: &Vec<CP::CurveScalarField>,
-    _public_inputs: &Vec<CP::CurveScalarField>,
-) {
-    // no input in this trivial gadget...
-    let var_one = composer.add_input(CP::CurveScalarField::one());
-    composer.arithmetic_gate(|gate| {
-        gate.witness(var_one, var_one, None)
-            .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
-    });
-}
-
-pub fn poseidon_hash_curve_scalar_field_gadget<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-    private_inputs: &Vec<CP::CurveScalarField>,
-    public_inputs: &Vec<CP::CurveScalarField>,
-) {
-    // public inputs are simply the hash value
-    let public_inputs = public_inputs[0];
-    // private_inputs are the inputs for the Poseidon hash
-    let inputs_var = private_inputs
-        .iter()
-        .map(|x| composer.add_input(*x))
-        .collect::<Vec<_>>();
-
-    // params for poseidon TODO make it const
-    let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
-    let mut poseidon_circuit = Poseidon::<_, PlonkSpec<WIDTH_3>, WIDTH_3>::new(
-        composer,
-        &poseidon_hash_param_bls12_377_scalar_arity2,
-    );
-    inputs_var.iter().for_each(|x| {
-        let _ = poseidon_circuit.input(*x).unwrap();
-    });
-    let plonk_hash = poseidon_circuit.output_hash(composer);
-
-    composer.check_circuit_satisfied();
-
-    let expected = composer.add_input(public_inputs);
-    composer.assert_equal(expected, plonk_hash);
-}
-
-pub fn signature_verification_send_gadget<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-    _private_inputs: &Vec<CP::CurveScalarField>,
-    _public_inputs: &Vec<CP::CurveScalarField>,
-) {
-    // todo implement the circuit
-    // this circuit check a signature
-    // it involves scalar multiplication circuits if we use ECDSA
-    let var_one = composer.add_input(CP::CurveScalarField::one());
-    composer.arithmetic_gate(|gate| {
-        gate.witness(var_one, var_one, None)
-            .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
-    });
-}
-
-pub fn black_list_recv_gadget<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-    _private_inputs: &Vec<CP::CurveScalarField>,
-    _public_inputs: &Vec<CP::CurveScalarField>,
-) {
-    // todo implement the circuit
-    // this circuit check that the sent note user address is not in a given list
-    //
-    // public input:
-    // * a commitment `c` to the sent note
-    // * a list `blacklist` of unauthorized people
-    // private input:
-    // * the entire note `n`
-    // * the random value `r` used for the note commitment
-    //
-    // circuit:
-    // check that `Com(n, r) == c` and that `n.owner_address not in blacklist`.
-
-    let var_one = composer.add_input(CP::CurveScalarField::one());
-    composer.arithmetic_gate(|gate| {
-        gate.witness(var_one, var_one, None)
-            .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
-    });
-}
-
-pub fn upper_bound_token_gadget<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-    _private_inputs: &Vec<CP::CurveScalarField>,
-    _public_inputs: &Vec<CP::CurveScalarField>,
-) {
-    // todo implement the circuit
-    // this circuit check that the transaction involving the token is bounded by a given value
-    // it corresponds to a range check in terms of circuits
-    let var_one = composer.add_input(CP::CurveScalarField::one());
-    composer.arithmetic_gate(|gate| {
-        gate.witness(var_one, var_one, None)
-            .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
-    });
-}
-
-pub fn field_addition_gadget<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-    private_inputs: &Vec<CP::CurveScalarField>,
-    public_inputs: &Vec<CP::CurveScalarField>,
-) {
-    // simple circuit that checks that a + b == c
-    let (a, b) = if private_inputs.len() == 0 {
-        (CP::CurveScalarField::zero(), CP::CurveScalarField::zero())
-    } else {
-        (private_inputs[0], private_inputs[1])
-    };
-    let c = public_inputs[0];
-
-    let one = <CP as CircuitParameters>::CurveScalarField::one();
-
-    let var_a = composer.add_input(a);
-    let var_b = composer.add_input(b);
-    let var_zero = composer.zero_var();
-
-    // Make first constraint a + b = c (as public input)
-    composer.arithmetic_gate(|gate| {
-        gate.witness(var_a, var_b, Some(var_zero))
-            .add(one, one)
-            .pi(-c)
-    });
-    composer.check_circuit_satisfied();
-}
-
 fn vp_proof_verify<CP: CircuitParameters>(
     gadget: fn(
         &mut StandardComposer<
@@ -341,84 +219,9 @@ fn vp_proof_verify<CP: CircuitParameters>(
     public_inputs: &Vec<CP::CurveScalarField>,
 ) {
     let mut rng = ThreadRng::default();
-    let pp = <CP as CircuitParameters>::CurvePC::setup(2 * 300, None, &mut rng).unwrap();
+    let pp = <CP as CircuitParameters>::CurvePC::setup(2 * 3000, None, &mut rng).unwrap();
 
     let circuit =
         ValidityPredicate::<CP>::new(&pp, gadget, private_inputs, public_inputs, true, &mut rng);
     circuit.verify();
-}
-
-pub mod tests {
-    use super::*;
-    use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
-
-    #[test]
-    fn test_trivial_gadget() {
-        vp_proof_verify::<CP>(
-            trivial_gadget::<CP>,
-            &vec![],
-            &vec![<CP as CircuitParameters>::CurveScalarField::zero()],
-        );
-    }
-
-    #[test]
-    fn test_field_addition_gadget() {
-        use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
-        let a = <CP as CircuitParameters>::CurveScalarField::from(2u64);
-        let b = <CP as CircuitParameters>::CurveScalarField::from(1u64);
-        let c = <CP as CircuitParameters>::CurveScalarField::from(3u64);
-        vp_proof_verify::<CP>(field_addition_gadget::<CP>, &vec![a, b], &vec![c]);
-    }
-
-    #[test]
-    fn test_signature_verification_send_gadget() {
-        vp_proof_verify::<CP>(
-            signature_verification_send_gadget::<CP>,
-            &vec![],
-            &vec![<CP as CircuitParameters>::CurveScalarField::zero()],
-        );
-    }
-
-    #[test]
-    fn test_poseidon_gadget() {
-        use plonk_hashing::poseidon::poseidon::NativeSpec;
-
-        let mut rng = rand::thread_rng();
-        let ω = (0..(WIDTH_3 - 1))
-            .map(|_| <CP as CircuitParameters>::CurveScalarField::rand(&mut rng))
-            .collect::<Vec<_>>();
-        let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
-        let mut poseidon = Poseidon::<
-            (),
-            NativeSpec<<CP as CircuitParameters>::CurveScalarField, WIDTH_3>,
-            WIDTH_3,
-        >::new(&mut (), &poseidon_hash_param_bls12_377_scalar_arity2);
-        ω.iter().for_each(|x| {
-            poseidon.input(*x).unwrap();
-        });
-        let hash = poseidon.output_hash(&mut ());
-        vp_proof_verify::<CP>(
-            poseidon_hash_curve_scalar_field_gadget::<CP>,
-            &ω,
-            &vec![hash],
-        );
-    }
-
-    #[test]
-    fn test_black_list_recv_gadget() {
-        vp_proof_verify::<CP>(
-            black_list_recv_gadget::<CP>,
-            &vec![],
-            &vec![<CP as CircuitParameters>::CurveScalarField::zero()],
-        );
-    }
-
-    #[test]
-    fn test_upper_bound_token_gadget() {
-        vp_proof_verify::<CP>(
-            upper_bound_token_gadget::<CP>,
-            &vec![],
-            &vec![<CP as CircuitParameters>::CurveScalarField::zero()],
-        );
-    }
 }

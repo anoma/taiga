@@ -8,6 +8,7 @@ use ark_ec::{AffineCurve, TEModelParameters};
 use ark_ff::*;
 use ark_serialize::CanonicalSerialize;
 use circuit::circuit_parameters::CircuitParameters;
+use plonk_core::prelude::to_embedded_curve_scalar;
 use plonk_hashing::poseidon::poseidon::{NativeSpec, Poseidon};
 use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
 use sha2::{Digest, Sha512};
@@ -119,7 +120,10 @@ fn hash_to_curve<CP: CircuitParameters>(
     data: &[u8],
     _rand: BigInteger256, // TODO: Rand is not used!
 ) -> TEGroupAffine<CP::InnerCurve> {
-    let scalar = <CP::InnerCurveScalarField>::hash_to_field(data);
+    // let scalar = <CP::InnerCurveScalarField>::hash_to_field(data);
+    let _scalar = <CP::CurveScalarField>::hash_to_field(data);
+    let scalar =
+        CP::InnerCurveScalarField::from_le_bytes_mod_order(&_scalar.into_repr().to_bytes_le());
     TEGroupAffine::prime_subgroup_generator().mul(scalar).into()
 }
 

@@ -1,4 +1,4 @@
-use crate::circuit::validity_predicate::trivial_gadget;
+use crate::circuit::gadgets::gadget::trivial_gadget;
 use crate::el_gamal::{Ciphertext, DecryptionKey};
 use crate::{
     circuit::circuit_parameters::CircuitParameters, note::Note, serializable_to_vec, token::Token,
