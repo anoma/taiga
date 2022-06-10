@@ -133,6 +133,15 @@ fn hash_to_curve<CP: CircuitParameters>(
     TEGroupAffine::prime_subgroup_generator().mul(scalar).into()
 }
 
+fn is_in_tree<P: TEModelParameters>(elem: &TEGroupAffine<P>, tree: &mut MerkleTree<Blake2s>) -> bool {
+    if tree.leaves().is_none() {
+        return false
+    }
+    let bytes = serializable_to_vec(elem);
+    let h = Blake2s::hash(&bytes);
+    tree.leaves().unwrap().contains(&h)
+}
+
 fn add_to_tree<P: TEModelParameters>(elem: &TEGroupAffine<P>, tree: &mut MerkleTree<Blake2s>) {
     let bytes = serializable_to_vec(elem);
     let h = Blake2s::hash(&bytes);

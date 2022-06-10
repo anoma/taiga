@@ -107,6 +107,7 @@ impl<CP: CircuitParameters> User<CP> {
         let total_dist_value = token_distribution.iter().fold(0, |sum, x| sum + x.1);
         assert!(total_sent_value >= total_dist_value);
 
+        //todo: fix
         let the_one_and_only_token_address = spent_notes[0].token_address.clone();
         let the_one_and_only_nullifier = self.compute_nullifier(spent_notes[0]);
 

@@ -10,6 +10,11 @@ use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
 use crate::el_gamal::EncryptionKey;
 
 #[derive(CanonicalSerialize)]
+#[derive(derivative::Derivative)]
+#[derivative(
+Copy(bound = "CP: CircuitParameters"),
+Clone(bound = "CP: CircuitParameters"),
+)]
 pub struct Note<CP: CircuitParameters> {
     // For the curves we consider for 128-bit of security, CurveScalarField, InnerCurveScalarField and InnerCurveBaseField are 32 bytes.
     // Thus, a note is represented in 32 + 32 + 4 + 32 + 4 + 2 * 32 + 32 = 200 bytes???
