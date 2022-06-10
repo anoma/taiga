@@ -1,3 +1,6 @@
+// Temporary for annoying warning(unused implementation).
+#![allow(dead_code)]
+
 use crate::poseidon::{
     POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2, POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY4,
     WIDTH_3, WIDTH_5,
@@ -18,6 +21,7 @@ pub mod el_gamal;
 pub mod error;
 pub mod merkle_tree;
 pub mod note;
+pub mod nullifier;
 pub mod poseidon;
 pub mod token;
 pub mod transaction;
@@ -115,9 +119,7 @@ fn com<F: PrimeField + HashToField>(x: &[u8], rand: BigInteger256) -> F {
 /// Only binding
 // A really bad hash-to-curve
 // TODO: the implementation is a bit weird: it does not really depends on CP and could be written with a curve as a parameter (`fn hash_to_curve<E:Curve>`).
-fn crh<CP: CircuitParameters>(
-    data: &[u8],
-) -> TEGroupAffine<CP::InnerCurve> {
+fn crh<CP: CircuitParameters>(data: &[u8]) -> TEGroupAffine<CP::InnerCurve> {
     let scalar = <CP::InnerCurveScalarField>::hash_to_field(data);
     TEGroupAffine::prime_subgroup_generator().mul(scalar).into()
 }
