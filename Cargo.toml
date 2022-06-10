@@ -11,7 +11,7 @@ ark-ff = { version = "^0.3.0", default-features = false }
 ark-ec = { version = "^0.3.0", default-features = false }
 ark-poly-commit = "0.3"
 ark-poly = "0.3"
-ark-bls12-377 = "0.3" 
+ark-bls12-377 = "0.3"
 ark-ed-on-bls12-377 = "0.3"
 ark-bw6-761 = "0.3"
 ark-pallas = "0.3"
@@ -25,6 +25,7 @@ plonk-hashing = { git = "https://github.com/heliaxdev/ark-plonk/", branch="taiga
 blake2 = "0.9"
 rs_merkle = { git = "https://github.com/heliaxdev/rs-merkle/" } # "0.2.2"
 lazy_static = "1"
+thiserror = "1"
 
 [dev-dependencies]
 ark-std = "0.3"
