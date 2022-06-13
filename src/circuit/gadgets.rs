@@ -172,23 +172,16 @@ pub mod tests {
         use crate::circuit::gadgets::gadget::bad_hash_to_curve_gadget;
         use crate::crh;
         use crate::poseidon::WIDTH_3;
-        use ark_ff::PrimeField;
         use ark_std::UniformRand;
         use plonk_core::constraint_system::StandardComposer;
         type F = <CP as CircuitParameters>::CurveScalarField;
 
         let mut rng = rand::thread_rng();
-        let random_bytes = (0..(WIDTH_3 - 1) * 31)
-            .map(|_| u8::rand(&mut rng))
+        let random_inputs = (0..(WIDTH_3 - 1))
+            .map(|_| F::rand(&mut rng))
             .collect::<Vec<_>>();
-        let random_inputs: Vec<F> = random_bytes
-            .chunks((F::size_in_bits() - 1) / 8 as usize)
-            .map(|elt| F::from_le_bytes_mod_order(elt))
-            .collect();
 
-        println!("inputs:{:?}", random_inputs);
-
-        let hash = crh::<CP>(&random_bytes[..]);
+        let hash = crh::<CP>(&random_inputs);
 
         let mut composer = StandardComposer::<
             <CP as CircuitParameters>::CurveScalarField,

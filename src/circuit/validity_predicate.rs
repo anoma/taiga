@@ -1,4 +1,4 @@
-use ark_ff::{BigInteger, PrimeField, UniformRand, Zero};
+use ark_ff::{UniformRand, Zero};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use merlin::Transcript;
@@ -10,7 +10,10 @@ use plonk_core::{
 use rand::prelude::ThreadRng;
 use std::marker::PhantomData;
 
-use crate::{circuit::circuit_parameters::CircuitParameters, serializable_to_vec};
+use crate::{
+    circuit::circuit_parameters::CircuitParameters, serializable_to_vec, to_embedded_field,
+    HashToField,
+};
 pub struct ValidityPredicate<CP: CircuitParameters> {
     desc_vp: VerifierKey<CP::CurveScalarField, CP::CurvePC>, //preprocessed VP
     pub public_input: PublicInputs<CP::CurveScalarField>,
@@ -153,8 +156,11 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
 
         let rcm_com = CP::CurveScalarField::rand(rng);
         // cannot use `pack()` because it is implemented for a validity predicate and we only have `desc_vp`.
-        let h_desc_vp = CP::com_q(&serializable_to_vec(&desc_vp), CP::CurveBaseField::zero());
-        let com_vp = CP::com_r(&h_desc_vp.into_repr().to_bytes_le(), rcm_com);
+        let h_desc_vp = CP::CurveBaseField::hash_to_field(&serializable_to_vec(&desc_vp));
+        let com_vp = CP::com_r(
+            &vec![to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(h_desc_vp)],
+            rcm_com,
+        );
 
         Self {
             desc_vp,
@@ -170,15 +176,15 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
 
     pub fn pack(&self) -> CP::CurveBaseField {
         // bits representing desc_vp
-        CP::com_q(
-            &serializable_to_vec(&self.desc_vp),
-            CP::CurveBaseField::zero(),
-        )
+        CP::CurveBaseField::hash_to_field(&serializable_to_vec(&self.desc_vp))
     }
 
     pub fn commitment(&self, rand: CP::CurveScalarField) -> CP::CurveScalarField {
         // computes a commitment C = com_r(com_q(desc_vp, 0), rand)
-        CP::com_r(&self.pack().into_repr().to_bytes_le(), rand)
+        CP::com_r(
+            &vec![to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(self.pack())],
+            rand,
+        )
     }
 
     pub fn binding_commitment(&self) -> CP::CurveScalarField {

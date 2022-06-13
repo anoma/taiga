@@ -1,19 +1,19 @@
 use crate::{
     add_to_tree,
-    circuit::circuit_parameters::CircuitParameters,
     circuit::{
         blinding_circuit::{blind_gadget, BlindingCircuit},
         validity_predicate::ValidityPredicate,
     },
+    circuit::{circuit_parameters::CircuitParameters, gadgets::gadget::trivial_gadget},
     el_gamal::{Ciphertext, DecryptionKey, EncryptionKey},
     note::Note,
-    prf,
+    prf4, to_embedded_field,
 };
 use ark_ec::{
     twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve, ProjectiveCurve,
 };
 use ark_ff::UniformRand;
-use ark_ff::{BigInteger, PrimeField, Zero};
+use ark_ff::Zero;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use plonk_core::constraint_system::StandardComposer;
@@ -27,7 +27,7 @@ pub struct User<CP: CircuitParameters> {
     recv_vp: ValidityPredicate<CP>,
     blind_vp: BlindingCircuit<CP>,
     pub rcm_addr: CP::CurveScalarField, // Commitment randomness for deriving address
-    nk: CP::CurveScalarField, // the nullifier key
+    nk: CP::CurveScalarField,           // the nullifier key
     pub com_send_part: CP::CurveScalarField,
 }
 
@@ -97,11 +97,10 @@ impl<CP: CircuitParameters> User<CP> {
 
         // commitment to the send part com_r(com_q(desc_send_vp, 0) || nk, 0)
         let com_send_part = CP::com_r(
-            &[
-                send_vp.pack().into_repr().to_bytes_le().as_slice(),
-                nk.into_repr().to_bytes_le().as_slice(),
-            ]
-            .concat(),
+            &vec![
+                to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(send_vp.pack()),
+                nk,
+            ],
             CP::CurveScalarField::zero(),
         );
 
@@ -121,13 +120,14 @@ impl<CP: CircuitParameters> User<CP> {
     }
 
     pub fn compute_nullifier(&self, note: &Note<CP>) -> TEGroupAffine<CP::InnerCurve> {
-        let scalar = prf::<CP::InnerCurveScalarField>(
-            &[
-                note.spent_note_nf.to_string().as_bytes(),
-                &self.nk.into_repr().to_bytes_le(),
-            ]
-            .concat(),
-        ) + note.psi;
+        let scalar = to_embedded_field::<CP::CurveScalarField, CP::InnerCurveScalarField>(prf4::<
+            CP::CurveScalarField,
+        >(
+            note.spent_note_nf.x,
+            note.spent_note_nf.y,
+            self.nk,
+            CP::CurveScalarField::zero(),
+        )) + note.psi;
         TEGroupAffine::prime_subgroup_generator()
             .mul(scalar)
             .into_affine()
@@ -187,13 +187,21 @@ impl<CP: CircuitParameters> User<CP> {
 
         // address = Com_r(send_part || recv_part, rcm_addr)
         CP::com_r(
-            &[
-                self.com_send_part.into_repr().to_bytes_le(),
-                recv_cm.into_repr().to_bytes_le(),
-            ]
-            .concat(),
+            &vec![
+                self.com_send_part,
+                to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(recv_cm),
+            ],
             self.rcm_addr,
         )
+
+        // CP::com_r(
+        //     &[
+        //         self.com_send_part.into_repr().to_bytes_le(),
+        //         recv_cm.into_repr().to_bytes_le(),
+        //     ]
+        //     .concat(),
+        //     self.rcm_addr,
+        // )
     }
 
     pub fn check_proofs(&self) {
@@ -213,4 +221,27 @@ impl<CP: CircuitParameters> User<CP> {
     pub fn get_nk(&self) -> CP::CurveScalarField {
         self.nk
     }
+}
+
+#[test]
+fn test_user_creation() {
+    type CP = crate::circuit::circuit_parameters::PairingCircuitParameters;
+    let mut rng = ThreadRng::default();
+    let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
+    let outer_curve_pp =
+        <CP as CircuitParameters>::OuterCurvePC::setup(1 << 4, None, &mut rng).unwrap();
+
+    let _user = User::<CP>::new(
+        "Simon",
+        &pp,
+        &outer_curve_pp,
+        DecryptionKey::<<CP as CircuitParameters>::InnerCurve>::new(&mut rng),
+        trivial_gadget::<CP>,
+        &vec![],
+        &vec![],
+        trivial_gadget::<CP>,
+        &vec![],
+        &vec![],
+        &mut rng,
+    );
 }

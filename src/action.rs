@@ -1,7 +1,6 @@
 use crate::circuit::gadgets::gadget::trivial_gadget;
-use crate::{circuit::circuit_parameters::CircuitParameters, crh, prf};
+use crate::{circuit::circuit_parameters::CircuitParameters, crh, prf4};
 use ark_ec::ProjectiveCurve;
-use ark_serialize::CanonicalSerialize;
 use plonk_core::proof_system::Proof;
 use rand::prelude::ThreadRng;
 use rs_merkle::algorithms::Blake2s;
@@ -33,20 +32,18 @@ impl<CP: CircuitParameters> Action<CP> {
     ) {
         assert_eq!(
             CP::com_r(
-                &[
+                &vec![
                     CP::com_r(
-                        &[
-                            send_vp_hash.into_repr().to_bytes_le().as_slice(),
-                            nk.into_repr().to_bytes_le().as_slice()
-                        ]
-                        .concat(),
+                        &vec![
+                            to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(
+                                send_vp_hash
+                            ),
+                            nk
+                        ],
                         CP::CurveScalarField::zero()
-                    )
-                    .into_repr()
-                    .to_bytes_le(),
-                    recv_vp_hash.into_repr().to_bytes_le()
-                ]
-                .concat(),
+                    ),
+                    to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(recv_vp_hash)
+                ],
                 note_rcm,
             ),
             note_owner_addr
@@ -71,11 +68,10 @@ impl<CP: CircuitParameters> Action<CP> {
     ) {
         assert_eq!(
             CP::com_r(
-                &[
-                    send_vp_com.into_repr().to_bytes_le(),
-                    recv_vp_hash.into_repr().to_bytes_le()
-                ]
-                .concat(),
+                &vec![
+                    send_vp_com,
+                    to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(recv_vp_hash)
+                ],
                 note_rcm,
             ),
             note_owner_addr
@@ -97,7 +93,10 @@ impl<CP: CircuitParameters> Action<CP> {
         note_token_addr: CP::CurveScalarField,
     ) {
         assert_eq!(
-            CP::com_r(&hash_tok_vp.into_repr().to_bytes_le(), token_rcm),
+            CP::com_r(
+                &vec![to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(hash_tok_vp)],
+                token_rcm
+            ),
             note_token_addr
         );
     }
@@ -125,7 +124,10 @@ impl<CP: CircuitParameters> Action<CP> {
         assert_eq!(
             com_vp,
             // TODO: Use Blake2s to be efficient on both Fr and Fq
-            CP::com_r(&hash_vp.into_repr().to_bytes_le(), com_rcm)
+            CP::com_r(
+                &vec![to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(hash_vp)],
+                com_rcm
+            )
         );
     }
 
@@ -143,7 +145,7 @@ impl<CP: CircuitParameters> Action<CP> {
         // public
         note_cm: TEGroupAffine<CP::InnerCurve>,
         // private
-        note_data: Vec<u8>,
+        note_data: Vec<CP::CurveScalarField>,
         _note_rcm: BigInteger256,
     ) {
         assert_eq!(crh::<CP>(&note_data), note_cm);
@@ -169,13 +171,15 @@ impl<CP: CircuitParameters> Action<CP> {
         // this part of the circuit is done over `CurveScalarField` even though
         // it is on `CP::InnerCurveScalarField`. It is then converted
         // into `InnerCurveScalarField` for the second part of the circuit.
-        let scalar = prf::<CP::InnerCurveScalarField>(
-            &[
-                note.spent_note_nf.to_string().as_bytes(),
-                &nk.into_repr().to_bytes_le(),
-            ]
-            .concat(),
-        ) + note.psi;
+
+        let scalar = to_embedded_field::<CP::CurveScalarField, CP::InnerCurveScalarField>(prf4::<
+            CP::CurveScalarField,
+        >(
+            note.spent_note_nf.x,
+            note.spent_note_nf.y,
+            nk,
+            CP::CurveScalarField::zero(),
+        )) + note.psi;
         // this part of the circuit is over `InnerCurveBaseField == CurveScalarField`
         assert_eq!(
             TEGroupAffine::prime_subgroup_generator()
@@ -205,7 +209,7 @@ impl<CP: CircuitParameters> Action<CP> {
         proof_nc: MerkleProof<Blake2s>,
         note_cm: TEGroupAffine<CP::InnerCurve>,
         // private
-        note_data: Vec<u8>,
+        note_data: Vec<CP::CurveScalarField>,
         _note_rcm: BigInteger256,
         index_note_cm: usize,
     ) {
@@ -237,11 +241,11 @@ impl<CP: CircuitParameters> Action<CP> {
 //
 use crate::el_gamal::{Ciphertext, DecryptionKey};
 use crate::note::Note;
-use crate::serializable_to_vec;
 use crate::token::Token;
 use crate::user::User;
+use crate::{serializable_to_vec, to_embedded_field};
 use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
-use ark_ff::{BigInteger, BigInteger256, PrimeField, Zero};
+use ark_ff::{BigInteger256, Zero};
 use ark_poly_commit::PolynomialCommitment;
 
 /// For spent note
@@ -260,20 +264,12 @@ fn spent_notes_checks<CP: CircuitParameters>(
 
     // hack for note data because for now we are restricted to few input for the commitment
     // TODO change the hash function and put all the note data inside note_data.
-    let mut note_data = vec![];
-    spent_note
-        .owner_address
-        .serialize_unchecked(&mut note_data)
-        .unwrap();
-    spent_note
-        .token_address
-        .serialize_unchecked(&mut note_data)
-        .unwrap();
+    let note_data = vec![spent_note.owner_address, spent_note.token_address];
     Action::<CP>::check_note_existence(
         note_commitments.root().unwrap(),
         note_commitments.proof(&[0]),
         spent_note.commitment(),
-        note_data, //serializable_to_vec(spent_note),
+        note_data,
         spent_note.get_rcm(),
         0,
     );
@@ -336,15 +332,7 @@ fn output_notes_checks<CP: CircuitParameters>(
     // Commitment integrity(output note only): `cm = NoteCom(note, rcm_note)`
     // hack for note data because for now we are restricted to few input for the commitment
     // TODO change the hash function and put all the note data inside note_data.
-    let mut output_note_data = vec![];
-    output_note
-        .owner_address
-        .serialize_unchecked(&mut output_note_data)
-        .unwrap();
-    output_note
-        .token_address
-        .serialize_unchecked(&mut output_note_data)
-        .unwrap();
+    let output_note_data = vec![output_note.owner_address, output_note.token_address];
     Action::<CP>::check_note_commitment_integrity(
         output_note.commitment(),
         output_note_data,
