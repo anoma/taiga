@@ -81,61 +81,6 @@ pub mod gadget {
         composer.check_circuit_satisfied();
     }
 
-    pub fn signature_verification_send_gadget<CP: CircuitParameters>(
-        composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-        _private_inputs: &Vec<CP::CurveScalarField>,
-        _public_inputs: &Vec<CP::CurveScalarField>,
-    ) {
-        // todo implement the circuit
-        // this circuit check a signature
-        // it involves scalar multiplication circuits if we use ECDSA
-        let var_one = composer.add_input(CP::CurveScalarField::one());
-        composer.arithmetic_gate(|gate| {
-            gate.witness(var_one, var_one, None)
-                .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
-        });
-    }
-
-    pub fn black_list_recv_gadget<CP: CircuitParameters>(
-        composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-        _private_inputs: &Vec<CP::CurveScalarField>,
-        _public_inputs: &Vec<CP::CurveScalarField>,
-    ) {
-        // todo implement the circuit
-        // this circuit check that the sent note user address is not in a given list
-        //
-        // public input:
-        // * a commitment `c` to the sent note
-        // * a list `blacklist` of unauthorized people
-        // private input:
-        // * the entire note `n`
-        // * the random value `r` used for the note commitment
-        //
-        // circuit:
-        // check that `Com(n, r) == c` and that `n.owner_address not in blacklist`.
-
-        let var_one = composer.add_input(CP::CurveScalarField::one());
-        composer.arithmetic_gate(|gate| {
-            gate.witness(var_one, var_one, None)
-                .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
-        });
-    }
-
-    pub fn upper_bound_token_gadget<CP: CircuitParameters>(
-        composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-        _private_inputs: &Vec<CP::CurveScalarField>,
-        _public_inputs: &Vec<CP::CurveScalarField>,
-    ) {
-        // todo implement the circuit
-        // this circuit check that the transaction involving the token is bounded by a given value
-        // it corresponds to a range check in terms of circuits
-        let var_one = composer.add_input(CP::CurveScalarField::one());
-        composer.arithmetic_gate(|gate| {
-            gate.witness(var_one, var_one, None)
-                .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
-        });
-    }
-
     pub fn field_addition_gadget<CP: CircuitParameters>(
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
         private_inputs: &Vec<CP::CurveScalarField>,
@@ -227,22 +172,6 @@ pub mod tests {
     }
 
     #[test]
-    fn test_signature_verification_send_gadget() {
-        use crate::circuit::circuit_parameters::{
-            CircuitParameters, PairingCircuitParameters as CP,
-        };
-        use crate::circuit::gadgets::gadget::signature_verification_send_gadget;
-        use plonk_core::constraint_system::StandardComposer;
-
-        let mut composer = StandardComposer::<
-            <CP as CircuitParameters>::CurveScalarField,
-            <CP as CircuitParameters>::InnerCurve,
-        >::new();
-        signature_verification_send_gadget::<CP>(&mut composer, &vec![], &vec![]);
-        composer.check_circuit_satisfied();
-    }
-
-    #[test]
     fn test_poseidon_gadget() {
         use crate::circuit::circuit_parameters::{
             CircuitParameters, PairingCircuitParameters as CP,
@@ -274,38 +203,6 @@ pub mod tests {
             <CP as CircuitParameters>::InnerCurve,
         >::new();
         poseidon_hash_curve_scalar_field_gadget::<CP>(&mut composer, &ω, &vec![hash]);
-        composer.check_circuit_satisfied();
-    }
-
-    #[test]
-    fn test_black_list_recv_gadget() {
-        use crate::circuit::circuit_parameters::{
-            CircuitParameters, PairingCircuitParameters as CP,
-        };
-        use crate::circuit::gadgets::gadget::black_list_recv_gadget;
-        use plonk_core::constraint_system::StandardComposer;
-
-        let mut composer = StandardComposer::<
-            <CP as CircuitParameters>::CurveScalarField,
-            <CP as CircuitParameters>::InnerCurve,
-        >::new();
-        black_list_recv_gadget::<CP>(&mut composer, &vec![], &vec![]);
-        composer.check_circuit_satisfied();
-    }
-
-    #[test]
-    fn test_upper_bound_token_gadget() {
-        use crate::circuit::circuit_parameters::{
-            CircuitParameters, PairingCircuitParameters as CP,
-        };
-        use crate::circuit::gadgets::gadget::upper_bound_token_gadget;
-        use plonk_core::constraint_system::StandardComposer;
-
-        let mut composer = StandardComposer::<
-            <CP as CircuitParameters>::CurveScalarField,
-            <CP as CircuitParameters>::InnerCurve,
-        >::new();
-        upper_bound_token_gadget::<CP>(&mut composer, &vec![], &vec![]);
         composer.check_circuit_satisfied();
     }
 }
