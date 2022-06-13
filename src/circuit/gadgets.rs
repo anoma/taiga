@@ -174,7 +174,7 @@ pub mod tests {
     use crate::circuit::circuit_parameters::CircuitParameters;
     use crate::poseidon::WIDTH_3;
     use crate::HashToField;
-    use crate::{circuit::circuit_parameters::PairingCircuitParameters as CP, hash_to_curve};
+    use crate::{circuit::circuit_parameters::PairingCircuitParameters as CP, crh};
     use ark_ff::{BigInteger256, PrimeField};
     use ark_std::UniformRand;
 
@@ -197,7 +197,9 @@ pub mod tests {
             .map(|elt| F::from_le_bytes_mod_order(elt))
             .collect();
 
-        let hash = hash_to_curve::<CP>(&random_bytes[..], BigInteger256::from(0));
+        println!("inputs:{:?}", random_inputs);
+
+        let hash = crh::<CP>(&random_bytes[..]);
 
         let mut composer = StandardComposer::<
             <CP as CircuitParameters>::CurveScalarField,

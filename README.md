@@ -40,7 +40,7 @@ As we use PLONK, we are flexible on the choice of the polynomial commitment sche
 * Either a pairing-based polynomial commitment scheme, for example the BLS12-377 curve and an inner curve like `ed_on_bls12_377`,
 * Either a discrete-logarithm polynomial commitment scheme, for example the Vesta curve and its inner curve Pallas.
 
-This trait lets us access to the two curves (called `Curve` and `InnerCurve`), and their corresponding prime fields: `CurveBaseField`, `CurveScalarField` and `InnerCurveScalarField` (recall that the base field of `InnerCurve` is by definition the scalar field of `Curve`).
+This trait lets us access to the two curves (called `MainCurve` and `InnerCurve`), and their corresponding prime fields: `CurveBaseField`, `CurveScalarField` and `InnerCurveScalarField` (recall that the base field of `InnerCurve` is by definition the scalar field of `MainCurve`).
 
 #### Validity predicate
 This corresponds to the circuits defined over `CurveScalarField`, namely the `send`, `recv` and `token` VPs. The Action circuit is also defined over this field but does not require the blinding property.
@@ -63,9 +63,10 @@ A token has its proper rules. For example, we can imagine that XAN can be used o
 ### Commands
 * Generating the (wip) book:
 ```
-cd pbc-plonk-book
+cd book
 mdbook serve --open
 ```
+
 * Example of sending 1XAN:
 ```
 cargo test test_send_kzg
@@ -79,6 +80,8 @@ cargo test  test_check_proofs_kzg
 ```
 cargo test test_split_note_for_different_curves
 ```
+
+
 
 ## Tasks
 
@@ -104,7 +107,7 @@ See [here](https://hackmd.io/@yulia/pbc_toy) for tasks we aim.
 
 * [ ] Implement `Display` for the different structures.
 * [ ] Implement a transaction as decribed in the specification.
-* [ ] Implement hash functions for `com_p`, `com_q`, `com` that could fit with circuits.
+* [ ] Implement hash functions for `com_q`, `com_r`, `com` that could fit with circuits.
 * [ ] See if our Merkle tree implementation can lead to proofs easily (if we change the hash function).
 * [ ] Create simple `sending` and `receiving` circuits for tests.
 * [ ] Integrate the blinding commitment `Com((b0+b1*X)Z_H(X))` into the `public_input` (?) of the blinding proof. Not sure if the `Verifier` that we currently use is a good option for the blinding proof...

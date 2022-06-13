@@ -4,7 +4,7 @@ use crate::circuit::{
 use ark_ff::BigInteger256;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
-use plonk_core::prelude::StandardComposer;
+use plonk_core::constraint_system::StandardComposer;
 use rand::{prelude::ThreadRng, Rng};
 
 pub struct Token<CP: CircuitParameters> {

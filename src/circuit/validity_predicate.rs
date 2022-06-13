@@ -163,8 +163,8 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
 
         let rcm_com = rng.gen();
         // cannot use `pack()` because it is implemented for a validity predicate and we only have `desc_vp`.
-        let h_desc_vp = CP::com_p(&serializable_to_vec(&desc_vp), BigInteger256::from(0));
-        let com_vp = CP::com_q(&h_desc_vp.into_repr().to_bytes_le(), rcm_com);
+        let h_desc_vp = CP::com_q(&serializable_to_vec(&desc_vp), BigInteger256::from(0));
+        let com_vp = CP::com_r(&h_desc_vp.into_repr().to_bytes_le(), rcm_com);
 
         Self {
             desc_vp,
@@ -180,12 +180,12 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
 
     pub fn pack(&self) -> CP::CurveBaseField {
         // bits representing desc_vp
-        CP::com_p(&serializable_to_vec(&self.desc_vp), BigInteger256::from(0))
+        CP::com_q(&serializable_to_vec(&self.desc_vp), BigInteger256::from(0))
     }
 
     pub fn commitment(&self, rand: BigInteger256) -> CP::CurveScalarField {
-        // computes a commitment C = com_q(com_p(desc_vp, 0), rand)
-        CP::com_q(&self.pack().into_repr().to_bytes_le(), rand)
+        // computes a commitment C = com_r(com_q(desc_vp, 0), rand)
+        CP::com_r(&self.pack().into_repr().to_bytes_le(), rand)
     }
 
     pub fn binding_commitment(&self) -> CP::CurveScalarField {
@@ -194,7 +194,7 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
     }
 
     pub fn fresh_commitment(&self, rng: &mut ThreadRng) -> (CP::CurveScalarField, BigInteger256) {
-        // computes a fresh commitment C = com_q(com_p(desc_vp, 0), rand) and return (C, rand)
+        // computes a fresh commitment C = com_r(com_q(desc_vp, 0), rand) and return (C, rand)
         let rand: BigInteger256 = rng.gen();
         (self.commitment(rand), rand)
     }

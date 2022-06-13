@@ -16,6 +16,8 @@ use sha2::{Digest, Sha512};
 pub mod action;
 pub mod circuit;
 pub mod el_gamal;
+pub mod error;
+pub mod merkle_tree;
 pub mod note;
 pub mod poseidon;
 pub mod token;
@@ -101,11 +103,25 @@ fn prf<F: PrimeField + HashToField>(x: &[u8]) -> F {
     F::hash_to_field(x)
 }
 
+/// Commitment
+/// Binding and hiding
 fn com<F: PrimeField + HashToField>(x: &[u8], rand: BigInteger256) -> F {
     // F is supposed to be CurveBaseField
     let y = rand.to_bytes_le();
     let z = [x, &y].concat();
     F::hash_to_field(&z)
+}
+
+/// Collision-resistant hash
+/// Only binding
+// A really bad hash-to-curve
+// TODO: the implementation is a bit weird: it does not really depends on CP and could be written with a curve as a parameter (`fn hash_to_curve<E:Curve>`).
+fn crh<CP: CircuitParameters>(data: &[u8]) -> TEGroupAffine<CP::InnerCurve> {
+    // let scalar = <CP::InnerCurveScalarField>::hash_to_field(data);
+    let _scalar = <CP::CurveScalarField>::hash_to_field(data);
+    let scalar =
+        CP::InnerCurveScalarField::from_le_bytes_mod_order(&_scalar.into_repr().to_bytes_le());
+    TEGroupAffine::prime_subgroup_generator().mul(scalar).into()
 }
 
 fn serializable_to_vec<F: CanonicalSerialize>(elem: &F) -> Vec<u8> {
@@ -115,8 +131,9 @@ fn serializable_to_vec<F: CanonicalSerialize>(elem: &F) -> Vec<u8> {
 }
 
 // A really bad hash-to-curve
-// TODO: the implementation is a bit weird: it does not really depends on CP and could be written with a curve as a parameter (`fn hash_to_curve<E:Curve>`).
-fn hash_to_curve<CP: CircuitParameters>(
+// TODO: the implementation is a bit weird: it does not really depends on CP and
+// could be written with a curve as a parameter (`fn hash_to_curve<E:Curve>`).
+fn _hash_to_curve<CP: CircuitParameters>(
     data: &[u8],
     _rand: BigInteger256, // TODO: Rand is not used!
 ) -> TEGroupAffine<CP::InnerCurve> {

@@ -10,7 +10,7 @@ These precomputations are first packed in order to be reduced to a smaller (and 
 What is the argument for all of them for opening into `CurveScalarField` or `CurveBaseField`? For one of them, it is binded to the randomization circuit which is done over `CurveBaseField`.
 
 # Token address
-The address of a token is `Com_q(H(token_vp), rcm_token_addr)`. This commitment is open over `Fq` but we should denote it `CurveScalarField`. The `token_vp` is a circuit defined over `CurveScalarField`, but I don't really understand why we need to define the commitment over the *same* field?
+The address of a token is `Com_r(H(token_vp), rcm_token_addr)`. This commitment is open over `Fr` but we should denote it `CurveScalarField`. The `token_vp` is a circuit defined over `CurveScalarField`, but I don't really understand why we need to define the commitment over the *same* field?
 
 # User address
 The address of a user is computed using a hash into `CurveScalarField`. Same question as for token?
