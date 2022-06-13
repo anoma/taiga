@@ -1,10 +1,10 @@
 use crate::{
     add_to_tree,
+    circuit::circuit_parameters::CircuitParameters,
     circuit::{
         blinding_circuit::{blind_gadget, BlindingCircuit},
         validity_predicate::ValidityPredicate,
     },
-    circuit::{circuit_parameters::CircuitParameters, gadgets::gadget::trivial_gadget},
     el_gamal::{Ciphertext, DecryptionKey, EncryptionKey},
     note::Note,
     prf4, to_embedded_field,
@@ -225,6 +225,7 @@ impl<CP: CircuitParameters> User<CP> {
 
 #[test]
 fn test_user_creation() {
+    use crate::circuit::gadgets::gadget::trivial_gadget;
     type CP = crate::circuit::circuit_parameters::PairingCircuitParameters;
     let mut rng = ThreadRng::default();
     let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
