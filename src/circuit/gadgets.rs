@@ -162,30 +162,19 @@ pub mod gadget {
     }
 }
 
-use crate::circuit::gadgets::gadget::*;
-
 pub mod tests {
-    use plonk_core::circuit::Circuit;
-    use plonk_core::constraint_system::StandardComposer;
-    use plonk_hashing::poseidon::constants::PoseidonConstants;
-    use plonk_hashing::poseidon::poseidon::Poseidon;
-
-    use super::*;
-    use crate::circuit::circuit_parameters::CircuitParameters;
-    use crate::poseidon::WIDTH_3;
-    use crate::HashToField;
-    use crate::{circuit::circuit_parameters::PairingCircuitParameters as CP, crh};
-    use ark_ff::{BigInteger256, PrimeField};
-    use ark_std::UniformRand;
-
-    // fn test_gadget(gadget: fn (&mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>, &Vec<CP::CurveScalarField>, &Vec<CP::CurveScalarField>) {
-    //     let mut composer = StandardComposer::<<CP as CircuitParameters>::CurveScalarField, <CP as CircuitParameters>::InnerCurve>::new();
-    //     // this could be more general?
-    // }
 
     #[test]
     fn test_bad_hash_to_curve_gadget() {
-        use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
+        use crate::circuit::circuit_parameters::{
+            CircuitParameters, PairingCircuitParameters as CP,
+        };
+        use crate::circuit::gadgets::gadget::bad_hash_to_curve_gadget;
+        use crate::crh;
+        use crate::poseidon::WIDTH_3;
+        use ark_ff::PrimeField;
+        use ark_std::UniformRand;
+        use plonk_core::constraint_system::StandardComposer;
         type F = <CP as CircuitParameters>::CurveScalarField;
 
         let mut rng = rand::thread_rng();
@@ -211,6 +200,12 @@ pub mod tests {
 
     #[test]
     fn test_trivial_gadget() {
+        use crate::circuit::circuit_parameters::{
+            CircuitParameters, PairingCircuitParameters as CP,
+        };
+        use crate::circuit::gadgets::gadget::trivial_gadget;
+        use plonk_core::constraint_system::StandardComposer;
+
         let mut composer = StandardComposer::<
             <CP as CircuitParameters>::CurveScalarField,
             <CP as CircuitParameters>::InnerCurve,
@@ -221,7 +216,12 @@ pub mod tests {
 
     #[test]
     fn test_field_addition_gadget() {
-        use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
+        use crate::circuit::circuit_parameters::{
+            CircuitParameters, PairingCircuitParameters as CP,
+        };
+        use crate::circuit::gadgets::gadget::field_addition_gadget;
+        use plonk_core::constraint_system::StandardComposer;
+
         let a = <CP as CircuitParameters>::CurveScalarField::from(2u64);
         let b = <CP as CircuitParameters>::CurveScalarField::from(1u64);
         let c = <CP as CircuitParameters>::CurveScalarField::from(3u64);
@@ -235,6 +235,12 @@ pub mod tests {
 
     #[test]
     fn test_signature_verification_send_gadget() {
+        use crate::circuit::circuit_parameters::{
+            CircuitParameters, PairingCircuitParameters as CP,
+        };
+        use crate::circuit::gadgets::gadget::signature_verification_send_gadget;
+        use plonk_core::constraint_system::StandardComposer;
+
         let mut composer = StandardComposer::<
             <CP as CircuitParameters>::CurveScalarField,
             <CP as CircuitParameters>::InnerCurve,
@@ -245,7 +251,16 @@ pub mod tests {
 
     #[test]
     fn test_poseidon_gadget() {
+        use crate::circuit::circuit_parameters::{
+            CircuitParameters, PairingCircuitParameters as CP,
+        };
+        use crate::circuit::gadgets::gadget::poseidon_hash_curve_scalar_field_gadget;
+        use crate::WIDTH_3;
+        use ark_std::UniformRand;
+        use plonk_core::constraint_system::StandardComposer;
+        use plonk_hashing::poseidon::constants::PoseidonConstants;
         use plonk_hashing::poseidon::poseidon::NativeSpec;
+        use plonk_hashing::poseidon::poseidon::Poseidon;
 
         let mut rng = rand::thread_rng();
         let ω = (0..(WIDTH_3 - 1))
@@ -271,6 +286,12 @@ pub mod tests {
 
     #[test]
     fn test_black_list_recv_gadget() {
+        use crate::circuit::circuit_parameters::{
+            CircuitParameters, PairingCircuitParameters as CP,
+        };
+        use crate::circuit::gadgets::gadget::black_list_recv_gadget;
+        use plonk_core::constraint_system::StandardComposer;
+
         let mut composer = StandardComposer::<
             <CP as CircuitParameters>::CurveScalarField,
             <CP as CircuitParameters>::InnerCurve,
@@ -281,6 +302,12 @@ pub mod tests {
 
     #[test]
     fn test_upper_bound_token_gadget() {
+        use crate::circuit::circuit_parameters::{
+            CircuitParameters, PairingCircuitParameters as CP,
+        };
+        use crate::circuit::gadgets::gadget::upper_bound_token_gadget;
+        use plonk_core::constraint_system::StandardComposer;
+
         let mut composer = StandardComposer::<
             <CP as CircuitParameters>::CurveScalarField,
             <CP as CircuitParameters>::InnerCurve,
