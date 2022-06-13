@@ -6,7 +6,6 @@ use ark_ec::{
     TEModelParameters,
 };
 use ark_ff::PrimeField;
-use ark_ff::*;
 use plonk_core::commitment::{HomomorphicCommitment, KZG10};
 
 pub trait CircuitParameters {
@@ -38,12 +37,12 @@ pub trait CircuitParameters {
     type OuterCurvePC: HomomorphicCommitment<Self::CurveBaseField>;
 
     // F_q is the scalar field of *Curve*
-    fn com_r(x: &[u8], rand: BigInteger256) -> Self::CurveScalarField {
+    fn com_r(x: &[u8], rand: Self::CurveScalarField) -> Self::CurveScalarField {
         com(x, rand)
     }
 
     // F_p is the base field of *Curve*
-    fn com_q(x: &[u8], rand: BigInteger256) -> Self::CurveBaseField {
+    fn com_q(x: &[u8], rand: Self::CurveBaseField) -> Self::CurveBaseField {
         com(x, rand)
     }
 }

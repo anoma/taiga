@@ -27,8 +27,8 @@ impl<CP: CircuitParameters> Action<CP> {
     fn check_spent_note_addr_integrity(
         send_vp_hash: CP::CurveBaseField,
         recv_vp_hash: CP::CurveBaseField,
-        note_rcm: BigInteger256,
-        nk: BigInteger256,
+        note_rcm: CP::CurveScalarField,
+        nk: CP::CurveScalarField,
         note_owner_addr: CP::CurveScalarField,
     ) {
         assert_eq!(
@@ -37,10 +37,10 @@ impl<CP: CircuitParameters> Action<CP> {
                     CP::com_r(
                         &[
                             send_vp_hash.into_repr().to_bytes_le().as_slice(),
-                            nk.to_bytes_le().as_slice()
+                            nk.into_repr().to_bytes_le().as_slice()
                         ]
                         .concat(),
-                        BigInteger256::from(0)
+                        CP::CurveScalarField::zero()
                     )
                     .into_repr()
                     .to_bytes_le(),
@@ -66,7 +66,7 @@ impl<CP: CircuitParameters> Action<CP> {
     fn check_output_note_addr_integrity(
         send_vp_com: CP::CurveScalarField,
         recv_vp_hash: CP::CurveBaseField,
-        note_rcm: BigInteger256,
+        note_rcm: CP::CurveScalarField,
         note_owner_addr: CP::CurveScalarField,
     ) {
         assert_eq!(
@@ -93,7 +93,7 @@ impl<CP: CircuitParameters> Action<CP> {
     #[allow(dead_code)]
     fn check_token_integrity(
         hash_tok_vp: CP::CurveBaseField, // Com_q(desc_token_vp)
-        token_rcm: BigInteger256,
+        token_rcm: CP::CurveScalarField,
         note_token_addr: CP::CurveScalarField,
     ) {
         assert_eq!(
@@ -116,7 +116,7 @@ impl<CP: CircuitParameters> Action<CP> {
         // public
         com_vp: CP::CurveScalarField,
         // private
-        com_rcm: BigInteger256,
+        com_rcm: CP::CurveScalarField,
         hash_vp: CP::CurveBaseField,
     ) {
         // this needs to be implemented over:
@@ -163,14 +163,18 @@ impl<CP: CircuitParameters> Action<CP> {
         // public
         nf: TEGroupAffine<CP::InnerCurve>,
         // private
-        nk: BigInteger256,
+        nk: CP::CurveScalarField,
         note: &Note<CP>,
     ) {
         // this part of the circuit is done over `CurveScalarField` even though
         // it is on `CP::InnerCurveScalarField`. It is then converted
         // into `InnerCurveScalarField` for the second part of the circuit.
         let scalar = prf::<CP::InnerCurveScalarField>(
-            &[note.spent_note_nf.to_string().as_bytes(), &nk.to_bytes_le()].concat(),
+            &[
+                note.spent_note_nf.to_string().as_bytes(),
+                &nk.into_repr().to_bytes_le(),
+            ]
+            .concat(),
         ) + note.psi;
         // this part of the circuit is over `InnerCurveBaseField == CurveScalarField`
         assert_eq!(

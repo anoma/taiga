@@ -1,16 +1,16 @@
 use crate::circuit::{
     circuit_parameters::CircuitParameters, validity_predicate::ValidityPredicate,
 };
-use ark_ff::BigInteger256;
+use ark_ff::UniformRand;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use plonk_core::constraint_system::StandardComposer;
-use rand::{prelude::ThreadRng, Rng};
+use rand::prelude::ThreadRng;
 
 pub struct Token<CP: CircuitParameters> {
     name: String, // not really useful: a token will be identified with its address, defined below.
     token_vp: ValidityPredicate<CP>,
-    pub rcm_addr: BigInteger256,
+    pub rcm_addr: CP::CurveScalarField,
 }
 
 impl<CP: CircuitParameters> std::fmt::Display for Token<CP> {
@@ -41,7 +41,7 @@ impl<CP: CircuitParameters> Token<CP> {
         Self {
             name: String::from(name),
             token_vp,
-            rcm_addr: rng.gen(),
+            rcm_addr: CP::CurveScalarField::rand(rng),
         }
     }
 

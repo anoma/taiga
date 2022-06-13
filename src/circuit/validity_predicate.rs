@@ -1,4 +1,4 @@
-use ark_ff::{BigInteger, BigInteger256, PrimeField, UniformRand, Zero};
+use ark_ff::{BigInteger, PrimeField, UniformRand, Zero};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use merlin::Transcript;
@@ -7,7 +7,7 @@ use plonk_core::{
     prelude::Proof,
     proof_system::{pi::PublicInputs, Prover, Verifier, VerifierKey},
 };
-use rand::{prelude::ThreadRng, Rng};
+use rand::prelude::ThreadRng;
 use std::marker::PhantomData;
 
 use crate::{circuit::circuit_parameters::CircuitParameters, serializable_to_vec};
@@ -21,7 +21,7 @@ pub struct ValidityPredicate<CP: CircuitParameters> {
         CP::CurveScalarField,
         DensePolynomial<CP::CurveScalarField>,
     >>::VerifierKey,
-    pub rcm_com: BigInteger256,
+    pub rcm_com: CP::CurveScalarField,
     pub com_vp: CP::CurveScalarField,
 }
 
@@ -151,9 +151,9 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
         // proof
         let proof = prover.prove(&ck).unwrap();
 
-        let rcm_com = rng.gen();
+        let rcm_com = CP::CurveScalarField::rand(rng);
         // cannot use `pack()` because it is implemented for a validity predicate and we only have `desc_vp`.
-        let h_desc_vp = CP::com_q(&serializable_to_vec(&desc_vp), BigInteger256::from(0));
+        let h_desc_vp = CP::com_q(&serializable_to_vec(&desc_vp), CP::CurveBaseField::zero());
         let com_vp = CP::com_r(&h_desc_vp.into_repr().to_bytes_le(), rcm_com);
 
         Self {
@@ -170,22 +170,28 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
 
     pub fn pack(&self) -> CP::CurveBaseField {
         // bits representing desc_vp
-        CP::com_q(&serializable_to_vec(&self.desc_vp), BigInteger256::from(0))
+        CP::com_q(
+            &serializable_to_vec(&self.desc_vp),
+            CP::CurveBaseField::zero(),
+        )
     }
 
-    pub fn commitment(&self, rand: BigInteger256) -> CP::CurveScalarField {
+    pub fn commitment(&self, rand: CP::CurveScalarField) -> CP::CurveScalarField {
         // computes a commitment C = com_r(com_q(desc_vp, 0), rand)
         CP::com_r(&self.pack().into_repr().to_bytes_le(), rand)
     }
 
     pub fn binding_commitment(&self) -> CP::CurveScalarField {
         // computes a commitment without randomness
-        self.commitment(BigInteger256::from(0))
+        self.commitment(CP::CurveScalarField::zero())
     }
 
-    pub fn fresh_commitment(&self, rng: &mut ThreadRng) -> (CP::CurveScalarField, BigInteger256) {
+    pub fn fresh_commitment(
+        &self,
+        rng: &mut ThreadRng,
+    ) -> (CP::CurveScalarField, CP::CurveScalarField) {
         // computes a fresh commitment C = com_r(com_q(desc_vp, 0), rand) and return (C, rand)
-        let rand: BigInteger256 = rng.gen();
+        let rand = CP::CurveScalarField::rand(rng);
         (self.commitment(rand), rand)
     }
 

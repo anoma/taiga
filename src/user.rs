@@ -12,12 +12,12 @@ use crate::{
 use ark_ec::{
     twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve, ProjectiveCurve,
 };
-use ark_ff::{BigInteger, PrimeField};
-use ark_ff::{BigInteger256, UniformRand};
+use ark_ff::UniformRand;
+use ark_ff::{BigInteger, PrimeField, Zero};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use plonk_core::constraint_system::StandardComposer;
-use rand::{prelude::ThreadRng, Rng};
+use rand::prelude::ThreadRng;
 use rs_merkle::{algorithms::Blake2s, MerkleTree};
 
 pub struct User<CP: CircuitParameters> {
@@ -26,8 +26,8 @@ pub struct User<CP: CircuitParameters> {
     send_vp: ValidityPredicate<CP>,
     recv_vp: ValidityPredicate<CP>,
     blind_vp: BlindingCircuit<CP>,
-    pub rcm_addr: BigInteger256, // Commitment randomness for deriving address
-    nk: BigInteger256,           // the nullifier key
+    pub rcm_addr: CP::CurveScalarField, // Commitment randomness for deriving address
+    nk: CP::CurveScalarField, // the nullifier key
     pub com_send_part: CP::CurveScalarField,
 }
 
@@ -93,16 +93,16 @@ impl<CP: CircuitParameters> User<CP> {
         let blind_vp = BlindingCircuit::<CP>::new(outer_curve_setup, blind_gadget::<CP>);
 
         // nullifier key
-        let nk: BigInteger256 = rng.gen();
+        let nk = CP::CurveScalarField::rand(rng);
 
         // commitment to the send part com_r(com_q(desc_send_vp, 0) || nk, 0)
         let com_send_part = CP::com_r(
             &[
                 send_vp.pack().into_repr().to_bytes_le().as_slice(),
-                nk.to_bytes_le().as_slice(),
+                nk.into_repr().to_bytes_le().as_slice(),
             ]
             .concat(),
-            BigInteger256::from(0),
+            CP::CurveScalarField::zero(),
         );
 
         User {
@@ -114,7 +114,7 @@ impl<CP: CircuitParameters> User<CP> {
             recv_vp,
             blind_vp,
             // random element for address
-            rcm_addr: rng.gen(),
+            rcm_addr: CP::CurveScalarField::rand(rng),
             nk,
             com_send_part,
         }
@@ -124,7 +124,7 @@ impl<CP: CircuitParameters> User<CP> {
         let scalar = prf::<CP::InnerCurveScalarField>(
             &[
                 note.spent_note_nf.to_string().as_bytes(),
-                &self.nk.to_bytes_le(),
+                &self.nk.into_repr().to_bytes_le(),
             ]
             .concat(),
         ) + note.psi;
@@ -210,7 +210,7 @@ impl<CP: CircuitParameters> User<CP> {
     pub fn get_recv_vp(&self) -> &ValidityPredicate<CP> {
         &self.recv_vp
     }
-    pub fn get_nk(&self) -> BigInteger256 {
+    pub fn get_nk(&self) -> CP::CurveScalarField {
         self.nk
     }
 }

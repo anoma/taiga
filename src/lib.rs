@@ -104,9 +104,9 @@ fn prf<F: PrimeField + HashToField>(x: &[u8]) -> F {
 
 /// Commitment
 /// Binding and hiding
-fn com<F: PrimeField + HashToField>(x: &[u8], rand: BigInteger256) -> F {
+fn com<F: PrimeField + HashToField>(x: &[u8], rand: F) -> F {
     // F is supposed to be CurveBaseField
-    let y = rand.to_bytes_le();
+    let y = rand.into_repr().to_bytes_le();
     let z = [x, &y].concat();
     F::hash_to_field(&z)
 }
