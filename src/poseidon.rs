@@ -1,5 +1,10 @@
+use crate::error::TaigaError;
+use ark_ff::PrimeField;
 use lazy_static::lazy_static;
-use plonk_hashing::poseidon::constants::PoseidonConstants;
+use plonk_hashing::poseidon::{
+    constants::PoseidonConstants,
+    poseidon::{NativeSpec, Poseidon},
+};
 
 // ARITY: input number of hash
 // WIDTH_3 = ARITY + 1
@@ -17,6 +22,22 @@ lazy_static! {
         PoseidonConstants::generate::<WIDTH_3>();
     pub static ref POSEIDON_HASH_PARAM_BLS12_377_BASE_ARITY4: PoseidonConstants<ark_bls12_377::Fq> =
         PoseidonConstants::generate::<WIDTH_5>();
+}
+
+/// A BinaryHasher over prime field takes two field elements as input and
+/// outputs one field element.
+pub trait BinaryHasher<F: PrimeField> {
+    fn hash_two(&self, left: &F, right: &F) -> Result<F, TaigaError>;
+}
+
+/// A BinaryHasher implementation for Poseidon Hash.
+impl<F: PrimeField> BinaryHasher<F> for PoseidonConstants<F> {
+    fn hash_two(&self, left: &F, right: &F) -> Result<F, TaigaError> {
+        let mut poseidon = Poseidon::<(), NativeSpec<F, WIDTH_3>, WIDTH_3>::new(&mut (), &self);
+        poseidon.input(*left)?;
+        poseidon.input(*right)?;
+        Ok(poseidon.output_hash(&mut ()))
+    }
 }
 
 #[test]

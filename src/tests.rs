@@ -1,5 +1,6 @@
 use crate::el_gamal::{Ciphertext, DecryptionKey, EncryptedNote};
-use crate::{add_bytes_to_tree, add_to_tree, circuit::circuit_parameters::CircuitParameters, circuit::validity_predicate::{recv_gadget, send_gadget, token_gadget}, note::Note, serializable_to_vec, token::Token, user::User};
+use crate::circuit::{circuit_parameters::CircuitParameters, validity_predicate::{recv_gadget,send_gadget, token_gadget}};
+use crate::{add_bytes_to_tree, add_to_tree, note::Note, serializable_to_vec, token::Token, user::User};
 use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
 use ark_ff::Zero;
 use ark_poly_commit::PolynomialCommitment;
