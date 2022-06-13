@@ -1,26 +1,16 @@
-use ark_ec::AffineCurve;
-use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, TEModelParameters};
-use ark_ff::{BigInteger, BigInteger256, One, PrimeField, UniformRand, Zero};
+use ark_ff::{BigInteger, BigInteger256, PrimeField, UniformRand, Zero};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use merlin::Transcript;
-use plonk_core::prelude::to_embedded_curve_scalar;
-use plonk_core::*;
 use plonk_core::{
     constraint_system::StandardComposer,
     prelude::Proof,
     proof_system::{pi::PublicInputs, Prover, Verifier, VerifierKey},
 };
-use plonk_hashing::poseidon::{
-    constants::PoseidonConstants,
-    poseidon::{NativeSpec, PlonkSpec, Poseidon},
-};
 use rand::{prelude::ThreadRng, Rng};
 use std::marker::PhantomData;
 
-use crate::{
-    circuit::circuit_parameters::CircuitParameters, poseidon::WIDTH_3, serializable_to_vec,
-};
+use crate::{circuit::circuit_parameters::CircuitParameters, serializable_to_vec};
 pub struct ValidityPredicate<CP: CircuitParameters> {
     desc_vp: VerifierKey<CP::CurveScalarField, CP::CurvePC>, //preprocessed VP
     pub public_input: PublicInputs<CP::CurveScalarField>,
@@ -204,24 +194,4 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
         // p_i.update_size(circuit_size);
         self.verifier.verify(&self.proof, &self.vk, &p_i).unwrap();
     }
-}
-
-fn vp_proof_verify<CP: CircuitParameters>(
-    gadget: fn(
-        &mut StandardComposer<
-            <CP as CircuitParameters>::CurveScalarField,
-            <CP as CircuitParameters>::InnerCurve,
-        >,
-        &Vec<CP::CurveScalarField>,
-        &Vec<CP::CurveScalarField>,
-    ),
-    private_inputs: &Vec<CP::CurveScalarField>,
-    public_inputs: &Vec<CP::CurveScalarField>,
-) {
-    let mut rng = ThreadRng::default();
-    let pp = <CP as CircuitParameters>::CurvePC::setup(2 * 3000, None, &mut rng).unwrap();
-
-    let circuit =
-        ValidityPredicate::<CP>::new(&pp, gadget, private_inputs, public_inputs, true, &mut rng);
-    circuit.verify();
 }

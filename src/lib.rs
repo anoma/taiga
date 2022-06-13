@@ -8,7 +8,6 @@ use ark_ec::{AffineCurve, TEModelParameters};
 use ark_ff::*;
 use ark_serialize::CanonicalSerialize;
 use circuit::circuit_parameters::CircuitParameters;
-use plonk_core::prelude::to_embedded_curve_scalar;
 use plonk_hashing::poseidon::poseidon::{NativeSpec, Poseidon};
 use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
 use sha2::{Digest, Sha512};
