@@ -45,9 +45,6 @@ pub mod gadget {
             let _ = poseidon_circuit.input(*x).unwrap();
         });
         let plonk_hash = poseidon_circuit.output_hash(composer);
-
-        composer.check_circuit_satisfied();
-
         let expected = composer.add_input(public_inputs);
         composer.assert_equal(expected, plonk_hash);
     }
@@ -77,8 +74,6 @@ pub mod gadget {
         // 3. Apply the constrain with the point from the public inputs
         let expected = TEGroupAffine::new(public_inputs[0], public_inputs[1]);
         composer.assert_equal_public_point(scalar_mul_result, expected);
-
-        composer.check_circuit_satisfied();
     }
 
     pub fn field_addition_gadget<CP: CircuitParameters>(
@@ -103,7 +98,6 @@ pub mod gadget {
                 .add(one, one)
                 .pi(-c)
         });
-        composer.check_circuit_satisfied();
     }
 }
 
