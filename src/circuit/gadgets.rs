@@ -3,7 +3,7 @@ pub mod gadget {
     use crate::poseidon::WIDTH_3;
     use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
     use ark_ff::{One, Zero};
-    use plonk_core::prelude::StandardComposer;
+    use plonk_core::{prelude::{StandardComposer, Point}, constraint_system::Variable};
     use plonk_hashing::poseidon::{
         constants::PoseidonConstants,
         poseidon::{NativeSpec, PlonkSpec, Poseidon},
@@ -25,10 +25,9 @@ pub mod gadget {
     pub fn poseidon_hash_curve_scalar_field_gadget<CP: CircuitParameters>(
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
         private_inputs: &Vec<CP::CurveScalarField>,
-        public_inputs: &Vec<CP::CurveScalarField>,
-    ) {
-        // public inputs are simply the hash value
-        let public_inputs = public_inputs[0];
+        _public_inputs: &Vec<CP::CurveScalarField>,
+    ) -> Variable {
+        // no public input here
         // private_inputs are the inputs for the Poseidon hash
         let inputs_var = private_inputs
             .iter()
@@ -44,16 +43,14 @@ pub mod gadget {
         inputs_var.iter().for_each(|x| {
             let _ = poseidon_circuit.input(*x).unwrap();
         });
-        let plonk_hash = poseidon_circuit.output_hash(composer);
-        let expected = composer.add_input(public_inputs);
-        composer.assert_equal(expected, plonk_hash);
+        poseidon_circuit.output_hash(composer)
     }
 
     pub fn bad_hash_to_curve_gadget<CP: CircuitParameters>(
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
         private_inputs: &Vec<CP::CurveScalarField>,
-        public_inputs: &Vec<CP::CurveScalarField>,
-    ) {
+        _public_inputs: &Vec<CP::CurveScalarField>,
+    ) -> Point<CP::InnerCurve> {
         // (bad) hash to curve:
         // 1. hash a scalar using poseidon
         let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
@@ -70,10 +67,7 @@ pub mod gadget {
         // 2. multiply by the generator
         let generator = TEGroupAffine::prime_subgroup_generator();
         let scalar_variable = composer.add_input(hash);
-        let scalar_mul_result = composer.fixed_base_scalar_mul(scalar_variable, generator);
-        // 3. Apply the constrain with the point from the public inputs
-        let expected = TEGroupAffine::new(public_inputs[0], public_inputs[1]);
-        composer.assert_equal_public_point(scalar_mul_result, expected);
+        composer.fixed_base_scalar_mul(scalar_variable, generator)
     }
 
     pub fn field_addition_gadget<CP: CircuitParameters>(
@@ -126,7 +120,9 @@ pub mod tests {
             <CP as CircuitParameters>::CurveScalarField,
             <CP as CircuitParameters>::InnerCurve,
         >::new();
-        bad_hash_to_curve_gadget::<CP>(&mut composer, &random_inputs, &vec![hash.x, hash.y]);
+        
+        let gadget_hash_variable = bad_hash_to_curve_gadget::<CP>(&mut composer, &random_inputs, &vec![]);
+        composer.assert_equal_public_point(gadget_hash_variable, hash);
         composer.check_circuit_satisfied();
     }
 
@@ -196,7 +192,9 @@ pub mod tests {
             <CP as CircuitParameters>::CurveScalarField,
             <CP as CircuitParameters>::InnerCurve,
         >::new();
-        poseidon_hash_curve_scalar_field_gadget::<CP>(&mut composer, &ω, &vec![hash]);
+        let native_hash_variable = composer.add_public_input_variable(hash);
+        let gadget_hash_variable = poseidon_hash_curve_scalar_field_gadget::<CP>(&mut composer, &ω, &vec![hash]);
+        composer.assert_equal(native_hash_variable, gadget_hash_variable);
         composer.check_circuit_satisfied();
     }
 }
