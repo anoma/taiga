@@ -16,7 +16,6 @@ ark-ed-on-bls12-377 = "0.3"
 ark-bw6-761 = "0.3"
 ark-pallas = "0.3"
 ark-vesta = "0.3"
-ark-std = "0.3"
 
 merlin = { version = "3.0", default-features = false }
 rand = "0.8.4"
