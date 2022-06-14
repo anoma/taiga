@@ -1,5 +1,6 @@
 use crate::el_gamal::{Ciphertext, DecryptionKey, EncryptedNote};
-use crate::circuit::{circuit_parameters::CircuitParameters, validity_predicate::{recv_gadget,send_gadget, token_gadget}};
+
+use crate::circuit::{circuit_parameters::CircuitParameters, gadgets::gadget::{trivial_gadget}};
 use crate::{add_bytes_to_tree, add_to_tree, note::Note, serializable_to_vec, token::Token, user::User};
 use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
 use ark_ff::Zero;
@@ -21,6 +22,12 @@ fn spawn_user<CP: CircuitParameters>(name: &str) -> User<CP> {
         &pp,
         &outer_curve_pp,
         DecryptionKey::<CP::InnerCurve>::new(&mut rng),
+        trivial_gadget::<CP>,
+        &vec![],
+        &vec![],
+        trivial_gadget::<CP>,
+        &vec![],
+        &vec![],
         &mut rng,
     )
 }
@@ -31,7 +38,7 @@ fn spawn_token<CP: CircuitParameters>(name: &str) -> Token<CP> {
     let mut rng = ThreadRng::default();
     let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
 
-    Token::<CP>::new(name, &pp, &mut rng)
+    Token::<CP>::new(name, &pp, trivial_gadget::<CP>, &mut rng)
 }
 
 fn test_send<CP: CircuitParameters>() {
