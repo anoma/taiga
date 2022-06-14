@@ -1,3 +1,4 @@
+use crate::circuit::gadgets::gadget::trivial_gadget;
 use crate::el_gamal::{Ciphertext, DecryptionKey};
 use crate::{
     circuit::circuit_parameters::CircuitParameters, note::Note, serializable_to_vec, token::Token,
@@ -20,6 +21,12 @@ fn spawn_user<CP: CircuitParameters>(name: &str) -> User<CP> {
         &pp,
         &outer_curve_pp,
         DecryptionKey::<CP::InnerCurve>::new(&mut rng),
+        trivial_gadget::<CP>,
+        &vec![],
+        &vec![],
+        trivial_gadget::<CP>,
+        &vec![],
+        &vec![],
         &mut rng,
     )
 }
@@ -30,7 +37,7 @@ fn spawn_token<CP: CircuitParameters>(name: &str) -> Token<CP> {
     let mut rng = ThreadRng::default();
     let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
 
-    Token::<CP>::new(name, &pp, &mut rng)
+    Token::<CP>::new(name, &pp, trivial_gadget::<CP>, &mut rng)
 }
 
 fn test_send<CP: CircuitParameters>() {
