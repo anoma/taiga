@@ -5,8 +5,10 @@ use crate::{add_bytes_to_tree, add_to_tree, note::Note, serializable_to_vec, tok
 use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
 use ark_ff::Zero;
 use ark_poly_commit::PolynomialCommitment;
+use rand::rngs::ThreadRng;
 use rs_merkle::algorithms::Blake2s;
 use rs_merkle::{Hasher, MerkleTree};
+use crate::circuit::validity_predicate::ValidityPredicate;
 use crate::transaction::Transaction;
 
 fn spawn_user<CP: CircuitParameters>(name: &str) -> User<CP> {
@@ -41,6 +43,11 @@ fn spawn_token<CP: CircuitParameters>(name: &str) -> Token<CP> {
     Token::<CP>::new(name, &pp, trivial_gadget::<CP>, &mut rng)
 }
 
+fn spawn_trivial_vps<CP: CircuitParameters>(i: usize, rng: &mut ThreadRng) -> Vec<ValidityPredicate<CP>> {
+    let pp = <CP as CircuitParameters>::CurvePC::setup(2 * 300, None, rng).unwrap();
+    (0..i).map(|_| ValidityPredicate::<CP>::new(&pp, trivial_gadget::<CP>, &vec![], &vec![], true, rng)).collect()
+}
+
 fn test_send<CP: CircuitParameters>() {
     use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
 
@@ -60,6 +67,8 @@ fn test_send<CP: CircuitParameters>() {
     let alice = spawn_user::<CP>("alice");
     let bob = spawn_user::<CP>("bob");
 
+    //Create VPs for the users and tokens
+    let vps = spawn_trivial_vps(3, &mut rng);
 
     // Create a 1XAN note for Alice
     let note_a1xan = Note::<CP>::new(
@@ -103,7 +112,7 @@ fn test_send<CP: CircuitParameters>() {
     let hash_nf = Blake2s::hash(&serializable_to_vec(&nullifier));
 
     //Create a tx spending Alice's note and creating a note for Bob
-    let tx: Transaction<CP> = Transaction::new(vec![], vec![(note_a1xan, nullifier)], output_notes_and_ec, vec![]);
+    let tx: Transaction<CP> = Transaction::new(vec![], vec![(note_a1xan, nullifier)], output_notes_and_ec, &vps);
     tx.process(&mut nf_tree, &mut mt_tree, &mut cm_ce_list);
 
     //Check that Alice's note has been spent
@@ -158,6 +167,9 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
     let simon = spawn_user::<CP>("simon");
     let xan = spawn_token::<CP>("xan");
 
+    //Create VPs for the users and tokens
+    let vps = spawn_trivial_vps(3, &mut rng);
+
     //Create the initial note
     let initial_note = Note::<CP>::new(
         yulia.address(),
@@ -202,7 +214,7 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
     let hash_nf = Blake2s::hash(&serializable_to_vec(&nullifier));
 
     //Create a tx splitting the initial note
-    let tx: Transaction<CP> = Transaction::new(vec![], vec![(initial_note, nullifier)], split_output_notes.clone(), vec![]);
+    let tx: Transaction<CP> = Transaction::new(vec![], vec![(initial_note, nullifier)], split_output_notes.clone(), &vps);
     tx.process(&mut nf_tree, &mut mt_tree, &mut cm_ce_list);
 
     //Check the amount of output notes and their values
@@ -238,7 +250,7 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
     let hash_nf2 = Blake2s::hash(&serializable_to_vec(&nullifier2));
 
     //Create a tx splitting the initial note
-    let tx: Transaction<CP> = Transaction::new(vec![], vec![(split_output_notes[0].0.clone(), nullifier1), (split_output_notes[1].0.clone(), nullifier2)],merge_output_notes.clone(), vec![]);
+    let tx: Transaction<CP> = Transaction::new(vec![], vec![(split_output_notes[0].0.clone(), nullifier1), (split_output_notes[1].0.clone(), nullifier2)],merge_output_notes.clone(), &vps);
     tx.process(&mut nf_tree, &mut mt_tree, &mut cm_ce_list);
 
     //Check the amount of notes and their values
@@ -246,7 +258,6 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
     assert_eq!(merge_output_notes[0].0.value, 2);
 
     //Check that the notes has been spent
-    println!("{}", nf_tree.leaves_len());
     let proof_nf = nf_tree.proof(&[1,2]);
     let root_nf = nf_tree.root().unwrap();
     assert!(proof_nf.verify(root_nf, &[1,2], &[hash_nf1, hash_nf2], 3));

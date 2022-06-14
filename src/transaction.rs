@@ -1,5 +1,5 @@
 use ark_serialize::{CanonicalSerialize, CanonicalSerializeHashExt};
-use crate::{action::Action, note::Note, CircuitParameters, add_to_tree, serializable_to_vec, serializable_to_array, add_bytes_to_tree, is_in_tree};
+use crate::{action::Action, note::Note, CircuitParameters, add_to_tree, serializable_to_vec, add_bytes_to_tree, is_in_tree};
 use crate::action;
 use rs_merkle::{MerkleTree, Hasher, algorithms::Blake2s};
 use crate::circuit::validity_predicate::ValidityPredicate;
@@ -8,22 +8,22 @@ use crate::el_gamal::{Ciphertext, EncryptedNote};
 use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
 use rand::rngs::ThreadRng;
 
-pub struct Transaction<CP: CircuitParameters> {
+pub struct Transaction<'a, CP: CircuitParameters> {
     //max: usize, // the maximum number of actions/notes for a transaction
     actions: Vec<Action<CP>>,
     spent_notes: Vec<(Note<CP>, TEGroupAffine<CP::InnerCurve>)>,
     created_notes: Vec<(Note<CP>, EncryptedNote<CP::InnerCurve>)>,
-    vps: Vec<ValidityPredicate<CP>>
+    vps: &'a Vec<ValidityPredicate<CP>>
 }
 
-impl<CP: CircuitParameters> Transaction<CP> {
+impl<'a, CP: CircuitParameters> Transaction<'a, CP> {
 
     pub fn new(
         //max: usize,
         actions: Vec<Action<CP>>,
         spent_notes: Vec<(Note<CP>, TEGroupAffine<CP::InnerCurve>)>,
         created_notes: Vec<(Note<CP>, EncryptedNote<CP::InnerCurve>)>,
-        vps: Vec<ValidityPredicate<CP>>)
+        vps: &'a Vec<ValidityPredicate<CP>>)
         -> Self {
 
         Self {
@@ -41,7 +41,7 @@ impl<CP: CircuitParameters> Transaction<CP> {
         //2. verify validity predicates;
         //2.1 todo: update to verification of blinded vps
         //2.2 todo: add blinding circuit check
-        for vp in &self.vps {
+        for vp in self.vps {
             vp.verify()
         }
     }

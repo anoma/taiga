@@ -132,15 +132,6 @@ fn serializable_to_vec<F: CanonicalSerialize>(elem: &F) -> Vec<u8> {
     bytes_prep_send
 }
 
-fn serializable_to_array<F: CanonicalSerialize>(elem: &F) -> [u8;32] {
-    let v = serializable_to_vec(elem);
-    let mut array = [0_u8; 32];
-    for i in 0..32 {
-        array[i] = v[i];
-    }
-    array
-}
-
 fn is_in_tree<P: TEModelParameters>(elem: &TEGroupAffine<P>, tree: &mut MerkleTree<Blake2s>) -> bool {
     if tree.leaves().is_none() {
         return false
