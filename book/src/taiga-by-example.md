@@ -40,7 +40,7 @@ Taiga provides a way to reach customizable and fully private transactions in the
 Different entities are involved in a transaction. Users are entities that can define conditions for a transactions, but we have also seen that a token is another entity which is able to define rules for the transactions.
 > Taiga is built over "unspent notes", meaning that when Alice wants to send 1XAN to Bob, it means that she owns at least 1XAN from latter notes. This can be seen as a note of 1XAN received before, but it could also be two notes of 0.5XAN, or one note of 3XAN. 
 
-<img src="utxo.png" alt="UTXO" width="500"/>
+<img src="img/utxo.png" alt="UTXO" width="500"/>
 
 In our current implementation, we consider different entities:
 * Users. They can define receiving and sending conditions for their transactions.

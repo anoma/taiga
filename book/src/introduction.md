@@ -5,8 +5,6 @@
 
 ### Private ledgers
 
-
-
 ### Decentralised exchanges
 
 A DEX is a ledger-based application that enables users to trade digital assets without giving up custody of these assets to a third party.
@@ -17,19 +15,26 @@ to trade can directly communicate with the maker to agree on terms. They can joi
 for the trade, to be broadcast for on-chain processing.
 
 ### ZEXE
+
 Decentralised exchanges with privacy guarantees without requiring users to give up custody of their assets were studied on the [Zexe paper](https://eprint.iacr.org/2018/962.pdf).
 
+Both privacy and function agnostic.
 
-### Orchard
+It's a framework, not an instance. Not specific in the implementation.
+
 ## Motivation
 
 TODO: What are the limitations of Zexe or Zcash?
+
+TODO: What use cases are not possible in Zexe but they are in Taiga?
+
+TODO: How is programmability in Taiga different from Zexe?
 
 
 
 ## What is Taiga?
 
-Taiga is a shielded protocol for bartering on Anoma, following the UTXO model and characterized by the goals:
+Taiga is a shielded protocol for bartering on Anoma, leveraging the value of validity predicates as a means to avoid race conditions due to decentralised ledgers, extending the functionality of transparent Anoma, and characterized by the goals:
 
 * Native support for a broad range of asset types, including NFTs
 * Transactions are authorized by arbitrary user-defined validity predicate circuits
@@ -45,12 +50,27 @@ A block in the underlying chain contains many shielded transactions. Taiga maint
 
 The address of a token or a user consists of a commitment of the token validity predicate or the user validity predicate, respectively. That is, a token or user address is uniquely identified by the rules of the underlying validity predicate.
 
+
+### Transparent Anoma
+### Validity Predicate Model
+
+No dependencies
+
+
 ## Related work
 
 ### Zexe
+
+In Zexe, the model of how the blockchains are programmed are different. (?)
+
+Their motivation is: "How do you get smart contract based programmability in something like ZCash?"
+
+
 
 ### Penumbra
 
 ### Bilateral swaps (Aztec)
 
 ### Orchard
+
+Privacy but not function agnostic (there is only one function).
