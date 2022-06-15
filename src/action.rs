@@ -1,5 +1,5 @@
+use crate::{add_to_tree, circuit::circuit_parameters::CircuitParameters, crh, prf4};
 use crate::circuit::gadgets::gadget::trivial_gadget;
-use crate::{circuit::circuit_parameters::CircuitParameters, crh, prf4};
 use ark_ec::ProjectiveCurve;
 use plonk_core::proof_system::Proof;
 use rand::prelude::ThreadRng;
@@ -239,7 +239,7 @@ impl<CP: CircuitParameters> Action<CP> {
 //
 // this is not the circuit implementation but what should be hard-coded in the Action Circuit.
 //
-use crate::el_gamal::{Ciphertext, DecryptionKey};
+use crate::el_gamal::{Ciphertext, DecryptionKey, EncryptedNote};
 use crate::note::Note;
 use crate::token::Token;
 use crate::user::User;
@@ -289,7 +289,7 @@ fn spent_notes_checks<CP: CircuitParameters>(
 
     // Nullifier integrity(input note only): `nf = DeriveNullier_nk(note)`
     Action::<CP>::check_note_nullifier_integrity(
-        output_note.spent_note_nf, // nullifier of old note is stored in output_note.spent_note_nf
+        output_note.spent_note_nf.clone(), // nullifier of old note is stored in output_note.spent_note_nf
         sender.get_nk(),
         spent_note,
     );
@@ -311,7 +311,6 @@ fn spent_notes_checks<CP: CircuitParameters>(
 /// `note = (address, token, v, data, ρ, ψ, rcm_note)`:
 #[allow(dead_code)]
 fn output_notes_checks<CP: CircuitParameters>(
-    _sender: &User<CP>,
     receiver: &User<CP>,
     token: &Token<CP>,
     output_note: &Note<CP>,
@@ -387,27 +386,27 @@ fn _action_checks<CP: CircuitParameters>() {
 
     let xan = Token::<CP>::new("xan", &pp, trivial_gadget::<CP>, &mut rng);
 
-    // Creation of a nullifiers tree
-    let mut nullifier_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
     // Creation of a note commitments tree
-    let mut note_commitments = MerkleTree::<Blake2s>::from_leaves(&vec![]);
+    let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
     // Creation of the {note commitment + encrypted note} list
-    let mut nc_en_list: Vec<(
+    let mut cm_ce_list: Vec<(
         TEGroupAffine<CP::InnerCurve>,
-        Vec<Ciphertext<CP::InnerCurve>>,
+        EncryptedNote<CP::InnerCurve>,
     )> = vec![];
 
     // Creation of a note of 1XAN for Alice
     let spent_note = Note::<CP>::new(
-        &alice,
+        alice.address(),
         xan.address(),
         1,
         TEGroupAffine::prime_subgroup_generator(),
         <CP as CircuitParameters>::InnerCurveScalarField::zero(),
-        &mut note_commitments,
-        &mut nc_en_list,
         &mut rng,
     );
+
+    let spent_note_ec = alice.encrypt(&mut rng, &spent_note);
+    add_to_tree(&spent_note.commitment(), &mut mt_tree);
+    cm_ce_list.push((spent_note.commitment(), spent_note_ec));
 
     // The note is spent, and a new note is created for Bob
     let output_note = alice
@@ -415,12 +414,10 @@ fn _action_checks<CP: CircuitParameters>() {
             &mut vec![&spent_note],
             vec![(&bob, 1_u32)],
             &mut rng,
-            &bob,
-            &mut nullifier_tree,
-            &mut note_commitments,
-            &mut nc_en_list,
         )
-        .swap_remove(0);
+        .swap_remove(0).0;
+
+    add_to_tree(&output_note.commitment(), &mut mt_tree);
 
     // ACTION CIRCUIT CHECKS //
     // Checks follow: https://github.com/heliaxdev/taiga/blob/main/book/src/spec.md#action-circuit
@@ -429,10 +426,11 @@ fn _action_checks<CP: CircuitParameters>() {
         &xan,
         &spent_note,
         &output_note,
-        &mut note_commitments,
+        &mut mt_tree,
         &mut rng,
     );
-    output_notes_checks(&alice, &bob, &xan, &output_note, &mut rng);
+    output_notes_checks(&bob, &xan, &output_note, &mut rng);
+
     // FRESH COMMITS (over `CP::CurveScalarField` and `CP::CurveBaseField`)
 
     // BLINDING CHECK
