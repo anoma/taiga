@@ -50,9 +50,10 @@ fn test_merkle_circuit() {
     use ark_ed_on_bls12_377::EdwardsParameters as Curv;
     use ark_std::test_rng;
     use plonk_hashing::poseidon::constants::PoseidonConstants;
+    use crate::merkle_tree::TAIGA_COMMITMENT_TREE_DEPTH;
 
     let mut rng = test_rng();
-    let merkle_path = MerklePath::<Fr, PoseidonConstants<Fr>>::dummy(&mut rng);
+    let merkle_path = MerklePath::<Fr, PoseidonConstants<Fr>>::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
     let cur_leaf = Node::rand(&mut rng);
     let expected = merkle_path

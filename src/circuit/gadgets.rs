@@ -101,6 +101,7 @@ pub mod gadget {
 
     pub fn white_list_gadget<CP: CircuitParameters>(
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+
         private_inputs: &Vec<CP::CurveScalarField>,
         public_inputs: &Vec<CP::CurveScalarField>,
     ) {
@@ -281,7 +282,9 @@ pub mod tests {
 
         // creation of user's addresses white list (requires to be a power of 2?)
         let mut rng = rand::thread_rng();
-        let white_list = [<CP as CircuitParameters>::CurveScalarField::rand(&mut rng); 4];
+        
+        // For a test, we don't need the whole list to construct the merkle tree, only one path is enough.
+        // let white_list = [<CP as CircuitParameters>::CurveScalarField::rand(&mut rng); 4];
 
         // a note owned by one of the white list user
         let note = Note::<CP>::new(
@@ -293,6 +296,31 @@ pub mod tests {
             &mut rng,
         );
         let note_com = note.commitment();
+
+        // Generate random address.
+        let owner_address = <CP as CircuitParameters>::CurveScalarField::rand(&mut rng);
+        let token_address = <CP as CircuitParameters>::CurveScalarField::rand(&mut rng);
+
+        // Generate a dummy white list tree path with depth 2.
+        let merkle_path = MerklePath::<Fr, PoseidonConstants<<CP as CircuitParameters>::CurveScalarField>>::dummy(&mut rng, 2);
+
+        // Get the white list tree root.
+        let expected_root = merkle_path
+        .root(
+            owner_address.clone(),
+            &POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2,
+        )
+        .unwrap();
+
+
+        let owner_address = private_inputs[0];
+        let token_address = private_inputs[1];
+        let path = &private_inputs[2..];
+        // public inputs
+        let com_x = public_inputs[0];
+        let com_y = public_inputs[1];
+        let note_commitment: TEGroupAffine<CP::InnerCurve> = TEGroupAffine::new(com_x, com_y);
+
 
         let todo = <CP as CircuitParameters>::CurveScalarField::from(2u64); // todo merkle tree work here
                                                                             // let merkle_path = MerklePath::from_path(vec![

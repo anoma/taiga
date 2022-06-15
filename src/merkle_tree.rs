@@ -14,10 +14,10 @@ pub struct MerklePath<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> {
 }
 
 impl<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> MerklePath<F, BH> {
-    /// Constructs a random dummy merkle path with depth of TAIGA_COMMITMENT_TREE_DEPTH.
-    pub fn dummy(rng: &mut impl RngCore) -> Self {
-        let auth_path = [(); TAIGA_COMMITMENT_TREE_DEPTH].map(|_| (Node::rand(rng), rng.gen()));
-        Self::from_path(auth_path.to_vec())
+    /// Constructs a random dummy merkle path with depth.
+    pub fn dummy(rng: &mut impl RngCore, depth: usize) -> Self {
+        let auth_path = (0..depth).map(|_| (Node::rand(rng), rng.gen())).collect();
+        Self::from_path(auth_path)
     }
 
     /// Constructs a Merkle path directly from a path.
