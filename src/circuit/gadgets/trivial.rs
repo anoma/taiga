@@ -1,6 +1,6 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
-use plonk_core::prelude::StandardComposer;
 use ark_ff::One;
+use plonk_core::prelude::StandardComposer;
 
 pub fn trivial_gadget<CP: CircuitParameters>(
     composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
@@ -17,9 +17,7 @@ pub fn trivial_gadget<CP: CircuitParameters>(
 
 #[test]
 fn test_trivial_gadget() {
-    use crate::circuit::circuit_parameters::{
-        CircuitParameters, PairingCircuitParameters as CP,
-    };
+    use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters as CP};
     use plonk_core::constraint_system::StandardComposer;
 
     let mut composer = StandardComposer::<

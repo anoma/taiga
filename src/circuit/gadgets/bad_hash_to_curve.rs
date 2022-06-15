@@ -1,14 +1,12 @@
+use crate::circuit::circuit_parameters::CircuitParameters;
+use crate::circuit::gadgets::poseidon_hash_scalar_field::poseidon_hash_curve_scalar_field_gadget;
 use crate::poseidon::WIDTH_3;
-use crate::{circuit::circuit_parameters::CircuitParameters};
 use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
-use plonk_core::{
-    prelude::{Point, StandardComposer},
-};
+use plonk_core::prelude::{Point, StandardComposer};
 use plonk_hashing::poseidon::{
     constants::PoseidonConstants,
     poseidon::{NativeSpec, Poseidon},
 };
-use crate::circuit::gadgets::poseidon_hash_scalar_field::poseidon_hash_curve_scalar_field_gadget;
 
 pub fn bad_hash_to_curve_gadget<CP: CircuitParameters>(
     composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
@@ -36,9 +34,7 @@ pub fn bad_hash_to_curve_gadget<CP: CircuitParameters>(
 
 #[test]
 fn test_bad_hash_to_curve_gadget() {
-    use crate::circuit::circuit_parameters::{
-        CircuitParameters, PairingCircuitParameters as CP,
-    };
+    use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters as CP};
     use crate::crh;
     use crate::poseidon::WIDTH_3;
     use ark_std::UniformRand;

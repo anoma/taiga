@@ -1,9 +1,6 @@
-use crate::poseidon::WIDTH_3;
 use crate::circuit::circuit_parameters::CircuitParameters;
-use plonk_core::{
-    constraint_system::Variable,
-    prelude::StandardComposer,
-};
+use crate::poseidon::WIDTH_3;
+use plonk_core::{constraint_system::Variable, prelude::StandardComposer};
 use plonk_hashing::poseidon::{
     constants::PoseidonConstants,
     poseidon::{PlonkSpec, Poseidon},
@@ -35,9 +32,7 @@ pub fn poseidon_hash_curve_scalar_field_gadget<CP: CircuitParameters>(
 
 #[test]
 fn test_poseidon_gadget() {
-    use crate::circuit::circuit_parameters::{
-        CircuitParameters, PairingCircuitParameters as CP,
-    };
+    use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters as CP};
     use crate::WIDTH_3;
     use ark_std::UniformRand;
     use plonk_core::constraint_system::StandardComposer;
@@ -69,4 +64,3 @@ fn test_poseidon_gadget() {
     composer.assert_equal(native_hash_variable, gadget_hash_variable);
     composer.check_circuit_satisfied();
 }
-
