@@ -1,4 +1,4 @@
-use crate::merkle_tree::Node;
+use crate::merkle_tree::{Node, MerkleTreeLeafs};
 use crate::note::Note;
 use crate::poseidon::WIDTH_3;
 use crate::{circuit::circuit_parameters::CircuitParameters, merkle_tree::MerklePath};
@@ -16,10 +16,7 @@ pub fn white_list_gadget<CP: CircuitParameters>(
         <CP as CircuitParameters>::CurveScalarField,
         PoseidonConstants<<CP as CircuitParameters>::CurveScalarField>,
     >,
-    private_white_list_merkle_tree_root: Node<
-        CP::CurveScalarField,
-        PoseidonConstants<CP::CurveScalarField>,
-    >, // todo: can be replaced with the white list directly?
+    private_white_list_addresses: Vec<<CP as CircuitParameters>::CurveScalarField>,
     public_note_commitment: TEGroupAffine<CP::InnerCurve>,
 ) {
     // opening of the note_commitment
@@ -44,7 +41,12 @@ pub fn white_list_gadget<CP: CircuitParameters>(
     )
     .unwrap();
 
-    let expected_var = composer.add_input(private_white_list_merkle_tree_root.inner());
+    let mk_root =
+    MerkleTreeLeafs::<
+        CP::CurveScalarField,
+        PoseidonConstants<<CP as CircuitParameters>::CurveScalarField>
+    >::new(private_white_list_addresses).root(&poseidon_hash_param_bls12_377_scalar_arity2);
+    let expected_var = composer.add_input(mk_root.inner());
     composer.assert_equal(expected_var, root_var);
 }
 
@@ -56,13 +58,15 @@ fn test_white_list_gadget() {
     use ark_std::UniformRand;
     use plonk_core::constraint_system::StandardComposer;
 
-    let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
+    // let poseidon_hash_param_bls12_377_scalar_arity2: PoseidonConstants<<CP as CircuitParameters>::CurveScalarField> = PoseidonConstants::generate::<WIDTH_3>();
 
+    // white list addresses
     let mut rng = rand::thread_rng();
+    let white_list = (0..4).map(|_| <CP as CircuitParameters>::CurveScalarField::rand(&mut rng)).collect::<Vec<<CP as CircuitParameters>::CurveScalarField>>();
 
     // a note owned by one of the white list user
     let note = Note::<CP>::new(
-        <CP as CircuitParameters>::CurveScalarField::rand(&mut rng),
+        white_list[1],
         <CP as CircuitParameters>::CurveScalarField::rand(&mut rng),
         12,
         TEGroupAffine::<<CP as CircuitParameters>::InnerCurve>::prime_subgroup_generator(),
@@ -77,16 +81,10 @@ fn test_white_list_gadget() {
         PoseidonConstants<<CP as CircuitParameters>::CurveScalarField>,
     >::dummy(&mut rng, 2);
 
-    let cur_leaf = Node::new(note.owner_address);
-    // Get the white list tree root.
-    let expected_root = merkle_path
-        .root(cur_leaf, &poseidon_hash_param_bls12_377_scalar_arity2)
-        .unwrap();
-
     let mut composer = StandardComposer::<
         <CP as CircuitParameters>::CurveScalarField,
         <CP as CircuitParameters>::InnerCurve,
     >::new();
-    white_list_gadget::<CP>(&mut composer, note, merkle_path, expected_root, note_com);
+    white_list_gadget::<CP>(&mut composer, note, merkle_path, white_list, note_com);
     composer.check_circuit_satisfied();
 }

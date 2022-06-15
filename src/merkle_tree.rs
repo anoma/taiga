@@ -7,6 +7,37 @@ use rand::{Rng, RngCore};
 use std::marker::PhantomData;
 pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
 
+#[derive(Clone)]
+pub struct MerkleTreeLeafs<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> {
+    leafs: Vec<Node<F, BH>>,
+}
+
+impl<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> MerkleTreeLeafs<F, BH> {
+
+    pub fn new(values: Vec<F>) -> Self {
+        let nodes_vec = values.iter().map(
+            |x| Node::<F, BH>::new(*x)
+        ).collect::<Vec<_>>();
+        Self {leafs: nodes_vec}
+    }
+
+    pub fn root(&self, hasher: &BH) -> Node<F, BH> {
+        // we suppose self.leafs.len() is a power of 2
+        let list = self.leafs.clone();
+        while list.len() > 1 {
+            let mut new_list:Vec<Node<F, BH>> = vec![];
+            for i in 0..list.len()/2 {
+                let x = list[2*i].repr;
+                let y = list[2*i+1].repr;
+                let h = hasher.hash_two(&x,&y).unwrap();
+                new_list.push(Node::<F, BH>::new(h));
+            }
+            let list = new_list;
+        }
+        list[0].clone()
+    }
+}
+
 /// A path from a position in a particular commitment tree to the root of that tree.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MerklePath<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> {
