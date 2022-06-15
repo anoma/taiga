@@ -1,15 +1,19 @@
-use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::poseidon::WIDTH_3;
-use plonk_core::{constraint_system::Variable, prelude::StandardComposer};
+use crate::TEModelParameters;
+use ark_ff::PrimeField;
+use plonk_core::{circuit::Circuit, constraint_system::Variable, prelude::StandardComposer};
 use plonk_hashing::poseidon::{
     constants::PoseidonConstants,
     poseidon::{PlonkSpec, Poseidon},
 };
 
-pub fn poseidon_hash_curve_scalar_field_gadget<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-    private_inputs: &Vec<CP::CurveScalarField>,
-    _public_inputs: &Vec<CP::CurveScalarField>,
+pub fn poseidon_hash_curve_scalar_field_gadget<
+    F: PrimeField,
+    P: TEModelParameters<BaseField = F>,
+>(
+    composer: &mut StandardComposer<F, P>,
+    private_inputs: &Vec<F>,
+    _public_inputs: &Vec<F>,
 ) -> Variable {
     // no public input here
     // private_inputs are the inputs for the Poseidon hash
@@ -40,27 +44,26 @@ fn test_poseidon_gadget() {
     use plonk_hashing::poseidon::poseidon::NativeSpec;
     use plonk_hashing::poseidon::poseidon::Poseidon;
 
+    type F = <CP as CircuitParameters>::CurveScalarField;
+    type P = <CP as CircuitParameters>::InnerCurve;
+
     let mut rng = rand::thread_rng();
     let ω = (0..(WIDTH_3 - 1))
-        .map(|_| <CP as CircuitParameters>::CurveScalarField::rand(&mut rng))
+        .map(|_| F::rand(&mut rng))
         .collect::<Vec<_>>();
     let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
-    let mut poseidon = Poseidon::<
-        (),
-        NativeSpec<<CP as CircuitParameters>::CurveScalarField, WIDTH_3>,
-        WIDTH_3,
-    >::new(&mut (), &poseidon_hash_param_bls12_377_scalar_arity2);
+    let mut poseidon = Poseidon::<(), NativeSpec<F, WIDTH_3>, WIDTH_3>::new(
+        &mut (),
+        &poseidon_hash_param_bls12_377_scalar_arity2,
+    );
     ω.iter().for_each(|x| {
         poseidon.input(*x).unwrap();
     });
     let hash = poseidon.output_hash(&mut ());
-    let mut composer = StandardComposer::<
-        <CP as CircuitParameters>::CurveScalarField,
-        <CP as CircuitParameters>::InnerCurve,
-    >::new();
+    let mut composer = StandardComposer::<F, P>::new();
     let native_hash_variable = composer.add_public_input_variable(hash);
     let gadget_hash_variable =
-        poseidon_hash_curve_scalar_field_gadget::<CP>(&mut composer, &ω, &vec![hash]);
+        poseidon_hash_curve_scalar_field_gadget::<F, P>(&mut composer, &ω, &vec![hash]);
     composer.assert_equal(native_hash_variable, gadget_hash_variable);
     composer.check_circuit_satisfied();
 }

@@ -13,26 +13,27 @@ pub struct MerkleTreeLeafs<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clon
 }
 
 impl<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> MerkleTreeLeafs<F, BH> {
-
     pub fn new(values: Vec<F>) -> Self {
-        let nodes_vec = values.iter().map(
-            |x| Node::<F, BH>::new(*x)
-        ).collect::<Vec<_>>();
-        Self {leafs: nodes_vec}
+        let nodes_vec = values
+            .iter()
+            .map(|x| Node::<F, BH>::new(*x))
+            .collect::<Vec<_>>();
+        Self { leafs: nodes_vec }
     }
 
+    // todo this is not working yet
     pub fn root(&self, hasher: &BH) -> Node<F, BH> {
         // we suppose self.leafs.len() is a power of 2
-        let list = self.leafs.clone();
-        while list.len() > 1 {
-            let mut new_list:Vec<Node<F, BH>> = vec![];
-            for i in 0..list.len()/2 {
-                let x = list[2*i].repr;
-                let y = list[2*i+1].repr;
-                let h = hasher.hash_two(&x,&y).unwrap();
-                new_list.push(Node::<F, BH>::new(h));
+        let mut list = self.leafs.clone();
+        let mut len = list.len();
+        while len > 1 {
+            for i in 0..len / 2 {
+                let x = list[2 * i].repr;
+                let y = list[2 * i + 1].repr;
+                let h = hasher.hash_two(&x, &y).unwrap();
+                list[i] = Node::<F, BH>::new(h);
             }
-            let list = new_list;
+            len = len / 2;
         }
         list[0].clone()
     }
