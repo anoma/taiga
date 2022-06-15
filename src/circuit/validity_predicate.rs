@@ -14,6 +14,7 @@ use crate::{
     circuit::circuit_parameters::CircuitParameters, serializable_to_vec, to_embedded_field,
     HashToField,
 };
+
 pub struct ValidityPredicate<CP: CircuitParameters> {
     desc_vp: VerifierKey<CP::CurveScalarField, CP::CurvePC>, //preprocessed VP
     pub public_input: PublicInputs<CP::CurveScalarField>,
