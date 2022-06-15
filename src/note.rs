@@ -1,3 +1,4 @@
+use crate::el_gamal::EncryptionKey;
 use crate::{
     add_to_tree, circuit::circuit_parameters::CircuitParameters, crh, el_gamal::Ciphertext,
     serializable_to_vec, user::User,
@@ -7,13 +8,11 @@ use ark_ff::BigInteger256;
 use ark_serialize::*;
 use rand::{prelude::ThreadRng, Rng};
 use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
-use crate::el_gamal::EncryptionKey;
 
-#[derive(CanonicalSerialize)]
-#[derive(derivative::Derivative)]
+#[derive(CanonicalSerialize, derivative::Derivative)]
 #[derivative(
-Copy(bound = "CP: CircuitParameters"),
-Clone(bound = "CP: CircuitParameters"),
+    Copy(bound = "CP: CircuitParameters"),
+    Clone(bound = "CP: CircuitParameters")
 )]
 pub struct Note<CP: CircuitParameters> {
     // For the curves we consider for 128-bit of security, CurveScalarField,

@@ -1,14 +1,15 @@
+use crate::el_gamal::EncryptedNote;
 use crate::{
     add_to_tree,
     circuit::circuit_parameters::CircuitParameters,
     circuit::{
         blinding_circuit::{blind_gadget, BlindingCircuit},
-        validity_predicate::ValidityPredicate,
         gadgets::gadget::trivial_gadget,
+        validity_predicate::ValidityPredicate,
     },
     el_gamal::{Ciphertext, DecryptionKey, EncryptionKey},
     note::Note,
-    prf4, to_embedded_field, serializable_to_vec,
+    prf4, serializable_to_vec, to_embedded_field,
 };
 use ark_ec::{
     twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve, ProjectiveCurve,
@@ -20,7 +21,6 @@ use ark_poly_commit::PolynomialCommitment;
 use plonk_core::constraint_system::StandardComposer;
 use rand::prelude::ThreadRng;
 use rs_merkle::{algorithms::Blake2s, MerkleTree};
-use crate::el_gamal::EncryptedNote;
 
 pub struct User<CP: CircuitParameters> {
     name: String, // probably not useful: a user will be identified with his address / his public key(?)
@@ -158,13 +158,13 @@ impl<CP: CircuitParameters> User<CP> {
         for (recipient, value) in token_distribution {
             let psi = CP::InnerCurveScalarField::rand(rand);
             let note = Note::<CP>::new(
-                    recipient.address(),
-                    the_one_and_only_token_address,
-                    value,
-                    the_one_and_only_nullifier.clone(),
-                    psi,
-                    &mut ThreadRng::default(),
-                );
+                recipient.address(),
+                the_one_and_only_token_address,
+                value,
+                the_one_and_only_nullifier.clone(),
+                psi,
+                &mut ThreadRng::default(),
+            );
             let ec = recipient.encrypt(rand, &note);
             new_notes.push((note, ec));
         }
@@ -201,7 +201,7 @@ impl<CP: CircuitParameters> User<CP> {
         self.blind_vp.verify();
     }
 
-    pub fn encrypt(&self, rand: &mut ThreadRng, note: &Note<CP>) -> EncryptedNote<CP::InnerCurve>{
+    pub fn encrypt(&self, rand: &mut ThreadRng, note: &Note<CP>) -> EncryptedNote<CP::InnerCurve> {
         // El Gamal encryption
         let bytes = serializable_to_vec(note);
         self.enc_key().encrypt(&bytes, rand)

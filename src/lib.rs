@@ -1,4 +1,3 @@
-
 use crate::poseidon::{
     POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2, POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY4,
     WIDTH_3, WIDTH_5,
@@ -132,9 +131,12 @@ fn serializable_to_vec<F: CanonicalSerialize>(elem: &F) -> Vec<u8> {
     bytes_prep_send
 }
 
-fn is_in_tree<P: TEModelParameters>(elem: &TEGroupAffine<P>, tree: &mut MerkleTree<Blake2s>) -> bool {
+fn is_in_tree<P: TEModelParameters>(
+    elem: &TEGroupAffine<P>,
+    tree: &mut MerkleTree<Blake2s>,
+) -> bool {
     if tree.leaves().is_none() {
-        return false
+        return false;
     }
     let bytes = serializable_to_vec(elem);
     let h = Blake2s::hash(&bytes);
@@ -148,7 +150,7 @@ fn add_to_tree<P: TEModelParameters>(elem: &TEGroupAffine<P>, tree: &mut MerkleT
     tree.commit();
 }
 
-fn add_bytes_to_tree (bytes: Vec<u8>, tree: &mut MerkleTree<Blake2s>) {
+fn add_bytes_to_tree(bytes: Vec<u8>, tree: &mut MerkleTree<Blake2s>) {
     let h = Blake2s::hash(&bytes);
     tree.insert(h);
     tree.commit();

@@ -1,31 +1,32 @@
-use ark_serialize::{CanonicalSerialize, CanonicalSerializeHashExt};
-use crate::{action::Action, note::Note, CircuitParameters, add_to_tree, serializable_to_vec, add_bytes_to_tree, is_in_tree};
 use crate::action;
-use rs_merkle::{MerkleTree, Hasher, algorithms::Blake2s};
 use crate::circuit::validity_predicate::ValidityPredicate;
-use plonk_core::proof_system::Verifier;
 use crate::el_gamal::{Ciphertext, EncryptedNote};
+use crate::{
+    action::Action, add_bytes_to_tree, add_to_tree, is_in_tree, note::Note, serializable_to_vec,
+    CircuitParameters,
+};
 use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
+use ark_serialize::{CanonicalSerialize, CanonicalSerializeHashExt};
+use plonk_core::proof_system::Verifier;
 use rand::rngs::ThreadRng;
+use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
 
 pub struct Transaction<'a, CP: CircuitParameters> {
     //max: usize, // the maximum number of actions/notes for a transaction
     actions: Vec<Action<CP>>,
     spent_notes: Vec<(Note<CP>, TEGroupAffine<CP::InnerCurve>)>,
     created_notes: Vec<(Note<CP>, EncryptedNote<CP::InnerCurve>)>,
-    vps: &'a Vec<ValidityPredicate<CP>>
+    vps: &'a Vec<ValidityPredicate<CP>>,
 }
 
 impl<'a, CP: CircuitParameters> Transaction<'a, CP> {
-
     pub fn new(
         //max: usize,
         actions: Vec<Action<CP>>,
         spent_notes: Vec<(Note<CP>, TEGroupAffine<CP::InnerCurve>)>,
         created_notes: Vec<(Note<CP>, EncryptedNote<CP::InnerCurve>)>,
-        vps: &'a Vec<ValidityPredicate<CP>>)
-        -> Self {
-
+        vps: &'a Vec<ValidityPredicate<CP>>,
+    ) -> Self {
         Self {
             //max,
             actions,
@@ -46,7 +47,12 @@ impl<'a, CP: CircuitParameters> Transaction<'a, CP> {
         }
     }
 
-    pub fn process(&self, nf_tree: &mut MerkleTree<Blake2s>, mt_tree: &mut MerkleTree<Blake2s>, cm_ce_list: &mut Vec<(TEGroupAffine<CP::InnerCurve>, EncryptedNote<CP::InnerCurve>)>){
+    pub fn process(
+        &self,
+        nf_tree: &mut MerkleTree<Blake2s>,
+        mt_tree: &mut MerkleTree<Blake2s>,
+        cm_ce_list: &mut Vec<(TEGroupAffine<CP::InnerCurve>, EncryptedNote<CP::InnerCurve>)>,
+    ) {
         self.check();
         for i in &self.spent_notes {
             //1. add nf to the nullifier tree

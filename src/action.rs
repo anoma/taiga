@@ -1,5 +1,5 @@
-use crate::{add_to_tree, circuit::circuit_parameters::CircuitParameters, crh, prf4};
 use crate::circuit::gadgets::gadget::trivial_gadget;
+use crate::{add_to_tree, circuit::circuit_parameters::CircuitParameters, crh, prf4};
 use ark_ec::ProjectiveCurve;
 use plonk_core::proof_system::Proof;
 use rand::prelude::ThreadRng;
@@ -389,10 +389,8 @@ fn _action_checks<CP: CircuitParameters>() {
     // Creation of a note commitments tree
     let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
     // Creation of the {note commitment + encrypted note} list
-    let mut cm_ce_list: Vec<(
-        TEGroupAffine<CP::InnerCurve>,
-        EncryptedNote<CP::InnerCurve>,
-    )> = vec![];
+    let mut cm_ce_list: Vec<(TEGroupAffine<CP::InnerCurve>, EncryptedNote<CP::InnerCurve>)> =
+        vec![];
 
     // Creation of a note of 1XAN for Alice
     let spent_note = Note::<CP>::new(
@@ -410,12 +408,9 @@ fn _action_checks<CP: CircuitParameters>() {
 
     // The note is spent, and a new note is created for Bob
     let output_note = alice
-        .send(
-            &mut vec![&spent_note],
-            vec![(&bob, 1_u32)],
-            &mut rng,
-        )
-        .swap_remove(0).0;
+        .send(&mut vec![&spent_note], vec![(&bob, 1_u32)], &mut rng)
+        .swap_remove(0)
+        .0;
 
     add_to_tree(&output_note.commitment(), &mut mt_tree);
 

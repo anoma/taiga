@@ -1,15 +1,17 @@
 use crate::el_gamal::{Ciphertext, DecryptionKey, EncryptedNote};
 
-use crate::circuit::{circuit_parameters::CircuitParameters, gadgets::gadget::{trivial_gadget}};
-use crate::{add_bytes_to_tree, add_to_tree, note::Note, serializable_to_vec, token::Token, user::User};
+use crate::circuit::validity_predicate::ValidityPredicate;
+use crate::circuit::{circuit_parameters::CircuitParameters, gadgets::gadget::trivial_gadget};
+use crate::transaction::Transaction;
+use crate::{
+    add_bytes_to_tree, add_to_tree, note::Note, serializable_to_vec, token::Token, user::User,
+};
 use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
 use ark_ff::Zero;
 use ark_poly_commit::PolynomialCommitment;
 use rand::rngs::ThreadRng;
 use rs_merkle::algorithms::Blake2s;
 use rs_merkle::{Hasher, MerkleTree};
-use crate::circuit::validity_predicate::ValidityPredicate;
-use crate::transaction::Transaction;
 
 fn spawn_user<CP: CircuitParameters>(name: &str) -> User<CP> {
     use rand::rngs::ThreadRng;
@@ -43,9 +45,16 @@ fn spawn_token<CP: CircuitParameters>(name: &str) -> Token<CP> {
     Token::<CP>::new(name, &pp, trivial_gadget::<CP>, &mut rng)
 }
 
-fn spawn_trivial_vps<CP: CircuitParameters>(i: usize, rng: &mut ThreadRng) -> Vec<ValidityPredicate<CP>> {
+fn spawn_trivial_vps<CP: CircuitParameters>(
+    i: usize,
+    rng: &mut ThreadRng,
+) -> Vec<ValidityPredicate<CP>> {
     let pp = <CP as CircuitParameters>::CurvePC::setup(2 * 300, None, rng).unwrap();
-    (0..i).map(|_| ValidityPredicate::<CP>::new(&pp, trivial_gadget::<CP>, &vec![], &vec![], true, rng)).collect()
+    (0..i)
+        .map(|_| {
+            ValidityPredicate::<CP>::new(&pp, trivial_gadget::<CP>, &vec![], &vec![], true, rng)
+        })
+        .collect()
 }
 
 fn test_send<CP: CircuitParameters>() {
@@ -57,10 +66,8 @@ fn test_send<CP: CircuitParameters>() {
     let mut rng = rand::thread_rng();
     let mut nf_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
     let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
-    let mut cm_ce_list: Vec<(
-        TEGroupAffine<CP::InnerCurve>,
-        EncryptedNote<CP::InnerCurve>,
-    )> = vec![];
+    let mut cm_ce_list: Vec<(TEGroupAffine<CP::InnerCurve>, EncryptedNote<CP::InnerCurve>)> =
+        vec![];
 
     //Create users and tokens to exchange
     let xan = spawn_token::<CP>("XAN");
@@ -96,12 +103,7 @@ fn test_send<CP: CircuitParameters>() {
     // --- SET UP END ---
 
     //Generate the output notes
-    let output_notes_and_ec = alice
-        .send(
-            &mut vec![&note_a1xan],
-            vec![(&bob, 1_u32)],
-            &mut rng,
-        );
+    let output_notes_and_ec = alice.send(&mut vec![&note_a1xan], vec![(&bob, 1_u32)], &mut rng);
 
     //Prepare the hash for future MTtree membership check
     let mut bytes = serializable_to_vec(&output_notes_and_ec[0].0.commitment());
@@ -112,7 +114,12 @@ fn test_send<CP: CircuitParameters>() {
     let hash_nf = Blake2s::hash(&serializable_to_vec(&nullifier));
 
     //Create a tx spending Alice's note and creating a note for Bob
-    let tx: Transaction<CP> = Transaction::new(vec![], vec![(note_a1xan, nullifier)], output_notes_and_ec, &vps);
+    let tx: Transaction<CP> = Transaction::new(
+        vec![],
+        vec![(note_a1xan, nullifier)],
+        output_notes_and_ec,
+        &vps,
+    );
     tx.process(&mut nf_tree, &mut mt_tree, &mut cm_ce_list);
 
     //Check that Alice's note has been spent
@@ -157,10 +164,8 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
 
     let mut nf_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
     let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
-    let mut cm_ce_list: Vec<(
-        TEGroupAffine<CP::InnerCurve>,
-        EncryptedNote<CP::InnerCurve>,
-    )> = vec![];
+    let mut cm_ce_list: Vec<(TEGroupAffine<CP::InnerCurve>, EncryptedNote<CP::InnerCurve>)> =
+        vec![];
 
     //Create users and tokens
     let yulia = spawn_user::<CP>("yulia");
@@ -214,7 +219,12 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
     let hash_nf = Blake2s::hash(&serializable_to_vec(&nullifier));
 
     //Create a tx splitting the initial note
-    let tx: Transaction<CP> = Transaction::new(vec![], vec![(initial_note, nullifier)], split_output_notes.clone(), &vps);
+    let tx: Transaction<CP> = Transaction::new(
+        vec![],
+        vec![(initial_note, nullifier)],
+        split_output_notes.clone(),
+        &vps,
+    );
     tx.process(&mut nf_tree, &mut mt_tree, &mut cm_ce_list);
 
     //Check the amount of output notes and their values
@@ -229,9 +239,9 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
     assert!(proof_nf.verify(root_nf, &[0], &[hash_nf], 1));
 
     //Check that the notes has been added to the tree
-    let proof_mt = mt_tree.proof(&[1,2,3]);
+    let proof_mt = mt_tree.proof(&[1, 2, 3]);
     let root_mt = mt_tree.root().unwrap();
-    assert!(proof_mt.verify(root_mt, &[1,2,3], &[hash1, hash2, hash3], 4));
+    assert!(proof_mt.verify(root_mt, &[1, 2, 3], &[hash1, hash2, hash3], 4));
 
     let merge_output_notes = yulia.send(
         &mut vec![&split_output_notes[0].0, &split_output_notes[1].0],
@@ -250,7 +260,15 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
     let hash_nf2 = Blake2s::hash(&serializable_to_vec(&nullifier2));
 
     //Create a tx splitting the initial note
-    let tx: Transaction<CP> = Transaction::new(vec![], vec![(split_output_notes[0].0.clone(), nullifier1), (split_output_notes[1].0.clone(), nullifier2)],merge_output_notes.clone(), &vps);
+    let tx: Transaction<CP> = Transaction::new(
+        vec![],
+        vec![
+            (split_output_notes[0].0.clone(), nullifier1),
+            (split_output_notes[1].0.clone(), nullifier2),
+        ],
+        merge_output_notes.clone(),
+        &vps,
+    );
     tx.process(&mut nf_tree, &mut mt_tree, &mut cm_ce_list);
 
     //Check the amount of notes and their values
@@ -258,9 +276,9 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
     assert_eq!(merge_output_notes[0].0.value, 2);
 
     //Check that the notes has been spent
-    let proof_nf = nf_tree.proof(&[1,2]);
+    let proof_nf = nf_tree.proof(&[1, 2]);
     let root_nf = nf_tree.root().unwrap();
-    assert!(proof_nf.verify(root_nf, &[1,2], &[hash_nf1, hash_nf2], 3));
+    assert!(proof_nf.verify(root_nf, &[1, 2], &[hash_nf1, hash_nf2], 3));
 
     //Check that the notes has been added to the tree
     let proof_mt = mt_tree.proof(&[4]);
