@@ -1,4 +1,4 @@
-use crate::circuit::gadgets::gadget::trivial_gadget;
+use crate::circuit::gadgets::trivial::trivial_gadget;
 use crate::{add_to_tree, circuit::circuit_parameters::CircuitParameters, crh, prf4};
 use ark_ec::ProjectiveCurve;
 use plonk_core::proof_system::Proof;

@@ -1,6 +1,4 @@
-use crate::{
-    circuit::circuit_parameters::CircuitParameters, crh
-};
+use crate::{circuit::circuit_parameters::CircuitParameters, crh};
 use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
 use ark_ff::BigInteger256;
 use ark_serialize::*;

@@ -1,10 +1,7 @@
 use crate::circuit::validity_predicate::ValidityPredicate;
 use crate::el_gamal::EncryptedNote;
-use crate::{
-    action::Action, add_to_tree, is_in_tree, note::Note,
-    CircuitParameters,
-};
-use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine};
+use crate::{action::Action, add_to_tree, is_in_tree, note::Note, CircuitParameters};
+use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
 use rs_merkle::{algorithms::Blake2s, MerkleTree};
 
 pub struct Transaction<'a, CP: CircuitParameters> {

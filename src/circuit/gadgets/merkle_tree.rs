@@ -1,8 +1,8 @@
-use crate::circuit::hash_gadget::BinaryHasherGadget;
 use crate::error::TaigaError;
 use ark_ec::TEModelParameters;
 use ark_ff::PrimeField;
 use plonk_core::{constraint_system::StandardComposer, prelude::Variable};
+use super::hash::BinaryHasherGadget;
 
 /// A Merkle Tree Gadget takes leaf node variable, authorization path to the
 /// root and the BinaryHasherGadget, then returns the merkle root variable.

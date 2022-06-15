@@ -219,7 +219,7 @@ impl<CP: CircuitParameters> User<CP> {
 
 #[test]
 fn test_user_creation() {
-    use crate::circuit::gadgets::gadget::trivial_gadget;
+    use crate::circuit::gadgets::trivial::trivial_gadget;
     type CP = crate::circuit::circuit_parameters::PairingCircuitParameters;
     let mut rng = ThreadRng::default();
     let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
