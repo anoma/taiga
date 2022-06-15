@@ -2,10 +2,47 @@ use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
 use ark_ec::{AffineCurve, ProjectiveCurve, TEModelParameters};
 use ark_ff::UniformRand;
 use ark_serialize::CanonicalSerialize;
+use ark_serialize::Write;
 use rand::prelude::ThreadRng;
 use sha2::{Digest, Sha256};
+extern crate derivative;
 
+#[derive(derivative::Derivative)]
+#[derivative(
+    Copy(bound = "C: TEModelParameters"),
+    Clone(bound = "C: TEModelParameters"),
+)]
 pub struct Ciphertext<C: TEModelParameters>(pub TEGroupAffine<C>, [u8; 32]);
+
+impl<C: TEModelParameters> Ciphertext<C> {
+    //bad temporary serialization
+    pub fn serialize(&self) -> Vec<u8> {
+        let mut bytes = vec![];
+        self.0.serialize_unchecked(&mut bytes).unwrap();
+        for block in self.1 {
+            block.serialize_unchecked(&mut bytes).unwrap();
+        }
+        bytes
+    }
+}
+
+#[derive(derivative::Derivative)]
+#[derivative(
+Clone(bound = "C: TEModelParameters"),
+)]
+pub struct EncryptedNote<C: TEModelParameters> {
+    pub en: Vec<Ciphertext<C>>
+}
+
+impl<C: TEModelParameters> EncryptedNote<C> {
+    pub fn new(en: Vec<Ciphertext<C>>) -> Self {
+        Self{en}
+    }
+
+    pub fn serialize(&self) -> Vec<u8> {
+        (0..self.en.len()).map(|i| self.en[i].serialize()).flatten().collect()
+    }
+}
 
 pub struct DecryptionKey<C: TEModelParameters> {
     secret: C::ScalarField,
@@ -38,9 +75,9 @@ impl<C: TEModelParameters> DecryptionKey<C> {
         plain
     }
 
-    pub fn decrypt(&self, ct: Vec<Ciphertext<C>>) -> Vec<u8> {
+    pub fn decrypt(&self, ct: EncryptedNote<C>) -> Vec<u8> {
         let mut plain: Vec<u8> = vec![];
-        for cipher in ct {
+        for cipher in ct.en {
             let p = self.decrypt_32_bytes(cipher);
             for pp in p {
                 plain.push(pp);
@@ -75,17 +112,18 @@ impl<C: TEModelParameters> EncryptionKey<C> {
         Ciphertext::<C>(c1, c2)
     }
 
-    pub fn encrypt(&self, m: &[u8], rng: &mut ThreadRng) -> Vec<Ciphertext<C>> {
+    pub fn encrypt(&self, m: &[u8], rng: &mut ThreadRng) -> EncryptedNote<C> {
         let mut m_extend = m.to_vec();
         while m_extend.len() % 32 != 0 {
             m_extend.push(0);
         }
-        let mut cipher: Vec<Ciphertext<C>> = vec![];
+        let mut ciphertexts: Vec<Ciphertext<C>> = vec![];
         for i in 0..m_extend.len() / 32 {
-            cipher.push(self.encrypt_32_bytes(&m_extend[i * 32..(i + 1) * 32], rng));
+            ciphertexts.push(self.encrypt_32_bytes(&m_extend[i * 32..(i + 1) * 32], rng));
         }
-        cipher
+        EncryptedNote::new(ciphertexts)
     }
+
 }
 
 #[test]

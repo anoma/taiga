@@ -1,4 +1,4 @@
-use ark_ff::{BigInteger, BigInteger256, One, PrimeField, UniformRand, Zero};
+use ark_ff::{UniformRand, Zero};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use merlin::Transcript;
@@ -7,10 +7,13 @@ use plonk_core::{
     prelude::Proof,
     proof_system::{pi::PublicInputs, Prover, Verifier, VerifierKey},
 };
-use rand::{prelude::ThreadRng, Rng};
+use rand::prelude::ThreadRng;
 use std::marker::PhantomData;
 
-use crate::{circuit::circuit_parameters::CircuitParameters, serializable_to_vec};
+use crate::{
+    circuit::circuit_parameters::CircuitParameters, serializable_to_vec, to_embedded_field,
+    HashToField,
+};
 
 pub struct ValidityPredicate<CP: CircuitParameters> {
     desc_vp: VerifierKey<CP::CurveScalarField, CP::CurvePC>, //preprocessed VP
@@ -22,7 +25,7 @@ pub struct ValidityPredicate<CP: CircuitParameters> {
         CP::CurveScalarField,
         DensePolynomial<CP::CurveScalarField>,
     >>::VerifierKey,
-    pub rcm_com: BigInteger256,
+    pub rcm_com: CP::CurveScalarField,
     pub com_vp: CP::CurveScalarField,
 }
 
@@ -32,7 +35,13 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
             CP::CurveScalarField,
             DensePolynomial<CP::CurveScalarField>,
         >>::UniversalParams,
-        gadget: fn(&mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>),
+        gadget: fn(
+            &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+            private_inputs: &Vec<CP::CurveScalarField>,
+            public_inputs: &Vec<CP::CurveScalarField>,
+        ),
+        private_inputs: &Vec<CP::CurveScalarField>,
+        public_inputs: &Vec<CP::CurveScalarField>,
     ) -> (
         Prover<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>,
         <CP::CurvePC as PolynomialCommitment<
@@ -52,30 +61,32 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
 
         let mut prover = Prover::<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>::new(b"demo");
         prover.key_transcript(b"key", b"additional seed information");
-        gadget(prover.mut_cs());
-        let (ck, vk) = CP::CurvePC::trim(
-            setup,
-            prover.circuit_bound().next_power_of_two() + 6,
-            0,
-            None,
-        )
-        .unwrap();
+        gadget(prover.mut_cs(), private_inputs, public_inputs);
+        let circuit_size = prover.circuit_bound().next_power_of_two();
+        let (ck, vk) = CP::CurvePC::trim(setup, circuit_size, 0, None).unwrap();
         let desc_vp = prover
             .mut_cs()
             .preprocess_verifier(&ck, &mut Transcript::new(b""), PhantomData::<CP::CurvePC>)
             .unwrap();
-        let public_input = prover.mut_cs().get_pi().clone();
+        prover.cs.public_inputs.update_size(circuit_size);
+        let pub_inp = prover.mut_cs().get_pi().clone();
 
-        (prover, ck, vk, public_input, desc_vp)
+        (prover, ck, vk, pub_inp, desc_vp)
     }
 
     pub fn precompute_verifier(
-        gadget: fn(&mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>),
+        gadget: fn(
+            &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+            private_inputs: &Vec<CP::CurveScalarField>,
+            public_inputs: &Vec<CP::CurveScalarField>,
+        ),
+        private_inputs: &Vec<CP::CurveScalarField>,
+        public_inputs: &Vec<CP::CurveScalarField>,
     ) -> Verifier<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC> {
         let mut verifier: Verifier<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC> =
             Verifier::new(b"demo");
         verifier.key_transcript(b"key", b"additional seed information");
-        gadget(verifier.mut_cs());
+        gadget(verifier.mut_cs(), private_inputs, public_inputs);
         verifier
     }
 
@@ -116,15 +127,22 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
             CP::CurveScalarField,
             DensePolynomial<CP::CurveScalarField>,
         >>::UniversalParams,
-        gadget: fn(&mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>),
+        gadget: fn(
+            &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+            &Vec<CP::CurveScalarField>,
+            &Vec<CP::CurveScalarField>,
+        ),
+        private_inputs: &Vec<CP::CurveScalarField>,
+        public_inputs: &Vec<CP::CurveScalarField>,
         blind: bool,
         rng: &mut ThreadRng,
     ) -> Self {
         // Given a gadget corresponding to a circuit, create all the computations for PBC related to the VP
 
         // Prover desc_vp
-        let (mut prover, ck, vk, public_input, desc_vp) = Self::precompute_prover(setup, gadget);
-        let mut verifier = Self::precompute_verifier(gadget);
+        let (mut prover, ck, vk, public_input, desc_vp) =
+            Self::precompute_prover(setup, gadget, private_inputs, public_inputs);
+        let mut verifier = Self::precompute_verifier(gadget, private_inputs, public_inputs);
         // (blinding or not) preprocessing
         let blinding_values;
         if blind {
@@ -137,10 +155,13 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
         // proof
         let proof = prover.prove(&ck).unwrap();
 
-        let rcm_com = rng.gen();
+        let rcm_com = CP::CurveScalarField::rand(rng);
         // cannot use `pack()` because it is implemented for a validity predicate and we only have `desc_vp`.
-        let h_desc_vp = CP::com_q(&serializable_to_vec(&desc_vp), BigInteger256::from(0));
-        let com_vp = CP::com_r(&h_desc_vp.into_repr().to_bytes_le(), rcm_com);
+        let h_desc_vp = CP::CurveBaseField::hash_to_field(&serializable_to_vec(&desc_vp));
+        let com_vp = CP::com_r(
+            &vec![to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(h_desc_vp)],
+            rcm_com,
+        );
 
         Self {
             desc_vp,
@@ -156,71 +177,34 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
 
     pub fn pack(&self) -> CP::CurveBaseField {
         // bits representing desc_vp
-        CP::com_q(&serializable_to_vec(&self.desc_vp), BigInteger256::from(0))
+        CP::CurveBaseField::hash_to_field(&serializable_to_vec(&self.desc_vp))
     }
 
-    pub fn commitment(&self, rand: BigInteger256) -> CP::CurveScalarField {
+    pub fn commitment(&self, rand: CP::CurveScalarField) -> CP::CurveScalarField {
         // computes a commitment C = com_r(com_q(desc_vp, 0), rand)
-        CP::com_r(&self.pack().into_repr().to_bytes_le(), rand)
+        CP::com_r(
+            &vec![to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(self.pack())],
+            rand,
+        )
     }
 
     pub fn binding_commitment(&self) -> CP::CurveScalarField {
         // computes a commitment without randomness
-        self.commitment(BigInteger256::from(0))
+        self.commitment(CP::CurveScalarField::zero())
     }
 
-    pub fn fresh_commitment(&self, rng: &mut ThreadRng) -> (CP::CurveScalarField, BigInteger256) {
+    pub fn fresh_commitment(
+        &self,
+        rng: &mut ThreadRng,
+    ) -> (CP::CurveScalarField, CP::CurveScalarField) {
         // computes a fresh commitment C = com_r(com_q(desc_vp, 0), rand) and return (C, rand)
-        let rand: BigInteger256 = rng.gen();
+        let rand = CP::CurveScalarField::rand(rng);
         (self.commitment(rand), rand)
     }
 
     pub fn verify(&self) {
-        self.verifier
-            .verify(&self.proof, &self.vk, &self.public_input)
-            .unwrap();
+        let p_i = self.public_input.clone();
+        // p_i.update_size(circuit_size);
+        self.verifier.verify(&self.proof, &self.vk, &p_i).unwrap();
     }
-}
-
-pub fn send_gadget<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-) {
-    let var_one = composer.add_input(CP::CurveScalarField::one());
-    composer.arithmetic_gate(|gate| {
-        gate.witness(var_one, var_one, None)
-            .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
-    });
-}
-
-pub fn recv_gadget<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-) {
-    let var_one = composer.add_input(CP::CurveScalarField::one());
-    composer.arithmetic_gate(|gate| {
-        gate.witness(var_one, var_one, None)
-            .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
-    });
-}
-
-pub fn token_gadget<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-) {
-    let var_one = composer.add_input(CP::CurveScalarField::one());
-    composer.arithmetic_gate(|gate| {
-        gate.witness(var_one, var_one, None)
-            .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
-    });
-}
-
-fn _circuit_proof<CP: CircuitParameters>() {
-    let mut rng = ThreadRng::default();
-    let pp = <CP as CircuitParameters>::CurvePC::setup(2 * 30, None, &mut rng).unwrap();
-
-    let circuit = ValidityPredicate::<CP>::new(&pp, send_gadget::<CP>, true, &mut rng);
-    circuit.verify();
-}
-
-#[test]
-fn test_cirucit_proof_kzg() {
-    _circuit_proof::<crate::circuit::circuit_parameters::PairingCircuitParameters>()
 }

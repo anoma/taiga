@@ -3,21 +3,24 @@ use crate::{
     circuit::circuit_parameters::CircuitParameters,
     circuit::{
         blinding_circuit::{blind_gadget, BlindingCircuit},
-        validity_predicate::{recv_gadget, send_gadget, ValidityPredicate},
+        validity_predicate::ValidityPredicate,
+        gadgets::gadget::trivial_gadget,
     },
     el_gamal::{Ciphertext, DecryptionKey, EncryptionKey},
     note::Note,
-    prf,
+    prf4, to_embedded_field, serializable_to_vec,
 };
 use ark_ec::{
     twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve, ProjectiveCurve,
 };
-use ark_ff::{BigInteger, PrimeField};
-use ark_ff::{BigInteger256, UniformRand};
+use ark_ff::UniformRand;
+use ark_ff::Zero;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
-use rand::{prelude::ThreadRng, Rng};
+use plonk_core::constraint_system::StandardComposer;
+use rand::prelude::ThreadRng;
 use rs_merkle::{algorithms::Blake2s, MerkleTree};
+use crate::el_gamal::EncryptedNote;
 
 pub struct User<CP: CircuitParameters> {
     name: String, // probably not useful: a user will be identified with his address / his public key(?)
@@ -25,8 +28,8 @@ pub struct User<CP: CircuitParameters> {
     send_vp: ValidityPredicate<CP>,
     recv_vp: ValidityPredicate<CP>,
     blind_vp: BlindingCircuit<CP>,
-    pub rcm_addr: BigInteger256, // Commitment randomness for deriving address
-    nk: BigInteger256,           // the nullifier key
+    pub rcm_addr: CP::CurveScalarField, // Commitment randomness for deriving address
+    nk: CP::CurveScalarField,           // the nullifier key
     pub com_send_part: CP::CurveScalarField,
 }
 
@@ -48,26 +51,59 @@ impl<CP: CircuitParameters> User<CP> {
             DensePolynomial<CP::CurveBaseField>,
         >>::UniversalParams,
         dec_key: DecryptionKey<CP::InnerCurve>,
+        send_gadget: fn(
+            &mut StandardComposer<
+                <CP as CircuitParameters>::CurveScalarField,
+                <CP as CircuitParameters>::InnerCurve,
+            >,
+            &Vec<CP::CurveScalarField>,
+            &Vec<CP::CurveScalarField>,
+        ),
+        send_private_inputs: &Vec<CP::CurveScalarField>,
+        send_public_inputs: &Vec<CP::CurveScalarField>,
+        recv_gadget: fn(
+            &mut StandardComposer<
+                <CP as CircuitParameters>::CurveScalarField,
+                <CP as CircuitParameters>::InnerCurve,
+            >,
+            &Vec<CP::CurveScalarField>,
+            &Vec<CP::CurveScalarField>,
+        ),
+        recv_private_inputs: &Vec<CP::CurveScalarField>,
+        recv_public_inputs: &Vec<CP::CurveScalarField>,
         rng: &mut ThreadRng,
     ) -> User<CP> {
         // sending proof
-        let send_vp = ValidityPredicate::<CP>::new(curve_setup, send_gadget::<CP>, true, rng);
+        let send_vp = ValidityPredicate::<CP>::new(
+            curve_setup,
+            send_gadget,
+            send_private_inputs,
+            send_public_inputs,
+            true,
+            rng,
+        );
         // Receiving proof
-        let recv_vp = ValidityPredicate::<CP>::new(curve_setup, recv_gadget::<CP>, true, rng);
+        let recv_vp = ValidityPredicate::<CP>::new(
+            curve_setup,
+            recv_gadget,
+            recv_private_inputs,
+            recv_public_inputs,
+            true,
+            rng,
+        );
         // blinding proof
         let blind_vp = BlindingCircuit::<CP>::new(outer_curve_setup, blind_gadget::<CP>);
 
         // nullifier key
-        let nk: BigInteger256 = rng.gen();
+        let nk = CP::CurveScalarField::rand(rng);
 
         // commitment to the send part com_r(com_q(desc_send_vp, 0) || nk, 0)
         let com_send_part = CP::com_r(
-            &[
-                send_vp.pack().into_repr().to_bytes_le().as_slice(),
-                nk.to_bytes_le().as_slice(),
-            ]
-            .concat(),
-            BigInteger256::from(0),
+            &vec![
+                to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(send_vp.pack()),
+                nk,
+            ],
+            CP::CurveScalarField::zero(),
         );
 
         User {
@@ -79,20 +115,21 @@ impl<CP: CircuitParameters> User<CP> {
             recv_vp,
             blind_vp,
             // random element for address
-            rcm_addr: rng.gen(),
+            rcm_addr: CP::CurveScalarField::rand(rng),
             nk,
             com_send_part,
         }
     }
 
     pub fn compute_nullifier(&self, note: &Note<CP>) -> TEGroupAffine<CP::InnerCurve> {
-        let scalar = prf::<CP::InnerCurveScalarField>(
-            &[
-                note.spent_note_nf.to_string().as_bytes(),
-                &self.nk.to_bytes_le(),
-            ]
-            .concat(),
-        ) + note.psi;
+        let scalar = to_embedded_field::<CP::CurveScalarField, CP::InnerCurveScalarField>(prf4::<
+            CP::CurveScalarField,
+        >(
+            note.spent_note_nf.x,
+            note.spent_note_nf.y,
+            self.nk,
+            CP::CurveScalarField::zero(),
+        )) + note.psi;
         TEGroupAffine::prime_subgroup_generator()
             .mul(scalar)
             .into_affine()
@@ -105,42 +142,31 @@ impl<CP: CircuitParameters> User<CP> {
 
     pub fn send(
         &self,
-        notes: &mut Vec<&Note<CP>>,
+        spent_notes: &mut Vec<&Note<CP>>,
         token_distribution: Vec<(&User<CP>, u32)>,
         rand: &mut ThreadRng,
-        _receiver: &User<CP>,
-        nf_tree: &mut MerkleTree<Blake2s>,
-        nc_tree: &mut MerkleTree<Blake2s>,
-        nc_en_list: &mut Vec<(
-            TEGroupAffine<CP::InnerCurve>,
-            Vec<Ciphertext<CP::InnerCurve>>,
-        )>,
-    ) -> Vec<Note<CP>> {
-        let total_sent_value = notes.iter().fold(0, |sum, n| sum + n.value);
+    ) -> Vec<(Note<CP>, EncryptedNote<CP::InnerCurve>)> {
+        let total_sent_value = spent_notes.iter().fold(0, |sum, n| sum + n.value);
         let total_dist_value = token_distribution.iter().fold(0, |sum, x| sum + x.1);
         assert!(total_sent_value >= total_dist_value);
-        let the_one_and_only_token_address = notes[0].token_address.clone();
-        let the_one_and_only_nullifier = self.compute_nullifier(notes[0]);
 
-        for note in notes {
-            //Compute the nullifier of the spent note and put it in the nullifier tree
-            let nullifier = self.compute_nullifier(note);
-            add_to_tree::<CP::InnerCurve>(&nullifier, nf_tree);
-        }
+        //todo: fix
+        let the_one_and_only_token_address = spent_notes[0].token_address.clone();
+        let the_one_and_only_nullifier = self.compute_nullifier(spent_notes[0]);
 
-        let mut new_notes: Vec<_> = vec![];
+        let mut new_notes: Vec<(Note<CP>, EncryptedNote<CP::InnerCurve>)> = vec![];
         for (recipient, value) in token_distribution {
             let psi = CP::InnerCurveScalarField::rand(rand);
-            new_notes.push(Note::<CP>::new(
-                &recipient,
-                the_one_and_only_token_address,
-                value,
-                the_one_and_only_nullifier,
-                psi,
-                nc_tree,
-                nc_en_list,
-                &mut ThreadRng::default(),
-            ));
+            let note = Note::<CP>::new(
+                    recipient.address(),
+                    the_one_and_only_token_address,
+                    value,
+                    the_one_and_only_nullifier.clone(),
+                    psi,
+                    &mut ThreadRng::default(),
+                );
+            let ec = recipient.encrypt(rand, &note);
+            new_notes.push((note, ec));
         }
         new_notes
     }
@@ -152,19 +178,33 @@ impl<CP: CircuitParameters> User<CP> {
 
         // address = Com_r(send_part || recv_part, rcm_addr)
         CP::com_r(
-            &[
-                self.com_send_part.into_repr().to_bytes_le(),
-                recv_cm.into_repr().to_bytes_le(),
-            ]
-            .concat(),
+            &vec![
+                self.com_send_part,
+                to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(recv_cm),
+            ],
             self.rcm_addr,
         )
+
+        // CP::com_r(
+        //     &[
+        //         self.com_send_part.into_repr().to_bytes_le(),
+        //         recv_cm.into_repr().to_bytes_le(),
+        //     ]
+        //     .concat(),
+        //     self.rcm_addr,
+        // )
     }
 
     pub fn check_proofs(&self) {
         self.send_vp.verify();
         self.recv_vp.verify();
         self.blind_vp.verify();
+    }
+
+    pub fn encrypt(&self, rand: &mut ThreadRng, note: &Note<CP>) -> EncryptedNote<CP::InnerCurve>{
+        // El Gamal encryption
+        let bytes = serializable_to_vec(note);
+        self.enc_key().encrypt(&bytes, rand)
     }
 
     // THESE GETTER SHOULD BE PRIVATE!
@@ -175,7 +215,31 @@ impl<CP: CircuitParameters> User<CP> {
     pub fn get_recv_vp(&self) -> &ValidityPredicate<CP> {
         &self.recv_vp
     }
-    pub fn get_nk(&self) -> BigInteger256 {
+    pub fn get_nk(&self) -> CP::CurveScalarField {
         self.nk
     }
+}
+
+#[test]
+fn test_user_creation() {
+    use crate::circuit::gadgets::gadget::trivial_gadget;
+    type CP = crate::circuit::circuit_parameters::PairingCircuitParameters;
+    let mut rng = ThreadRng::default();
+    let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
+    let outer_curve_pp =
+        <CP as CircuitParameters>::OuterCurvePC::setup(1 << 4, None, &mut rng).unwrap();
+
+    let _user = User::<CP>::new(
+        "Simon",
+        &pp,
+        &outer_curve_pp,
+        DecryptionKey::<<CP as CircuitParameters>::InnerCurve>::new(&mut rng),
+        trivial_gadget::<CP>,
+        &vec![],
+        &vec![],
+        trivial_gadget::<CP>,
+        &vec![],
+        &vec![],
+        &mut rng,
+    );
 }

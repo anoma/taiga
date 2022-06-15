@@ -6,9 +6,15 @@ use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
 use ark_ff::BigInteger256;
 use ark_serialize::*;
 use rand::{prelude::ThreadRng, Rng};
-use rs_merkle::{algorithms::Blake2s, MerkleTree};
+use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
+use crate::el_gamal::EncryptionKey;
 
 #[derive(CanonicalSerialize)]
+#[derive(derivative::Derivative)]
+#[derivative(
+Copy(bound = "CP: CircuitParameters"),
+Clone(bound = "CP: CircuitParameters"),
+)]
 pub struct Note<CP: CircuitParameters> {
     // For the curves we consider for 128-bit of security, CurveScalarField,
     // InnerCurveScalarField and InnerCurveBaseField are 32 bytes.
@@ -25,33 +31,22 @@ pub struct Note<CP: CircuitParameters> {
 
 impl<CP: CircuitParameters> Note<CP> {
     pub fn new(
-        user: &User<CP>,
+        owner_address: CP::CurveScalarField,
         token_address: CP::CurveScalarField,
         value: u32,
         spent_note_nf: TEGroupAffine<CP::InnerCurve>,
         psi: CP::InnerCurveScalarField,
-        nc_tree: &mut MerkleTree<Blake2s>,
-        nc_en_list: &mut Vec<(
-            TEGroupAffine<CP::InnerCurve>,
-            Vec<Ciphertext<CP::InnerCurve>>,
-        )>,
         rng: &mut ThreadRng,
     ) -> Self {
-        let note = Self {
-            owner_address: user.address(),
+        Self {
+            owner_address: owner_address,
             token_address: token_address,
             value: value,
             rcm: rng.gen(),
             data: 0,
             spent_note_nf: spent_note_nf,
             psi: psi,
-        };
-
-        let cm = note.commitment();
-        add_to_tree(&cm, nc_tree);
-        note.add_to_nc_en_list(user, rng, cm, nc_en_list);
-
-        note
+        }
     }
 
     pub fn commitment(&self) -> TEGroupAffine<CP::InnerCurve> {
@@ -60,26 +55,15 @@ impl<CP: CircuitParameters> Note<CP> {
         // generator by it (bad) the fields of a note we should commit
         // to aren't defined in the pbc spec yet also, note commitment
         // should be implemented with Sinsemilla (according to the pbc spec)
+        let vec = vec![self.owner_address, self.token_address];
+        crh::<CP>(&vec)
 
-        let bytes = serializable_to_vec(self);
-        crh::<CP>(&bytes)
-    }
-
-    pub fn add_to_nc_en_list(
-        &self,
-        user: &User<CP>,
-        rand: &mut ThreadRng,
-        cm: TEGroupAffine<CP::InnerCurve>,
-        nc_en_list: &mut Vec<(
-            TEGroupAffine<CP::InnerCurve>,
-            Vec<Ciphertext<CP::InnerCurve>>,
-        )>,
-    ) {
-        // El Gamal encryption
-        let bytes = serializable_to_vec(self);
-        let ec = user.enc_key().encrypt(&bytes, rand);
-        // update nc_en_list
-        nc_en_list.push((cm, ec));
+        // let mut bytes = vec![];
+        // // TODO use serialize_to_vec but for now, we are restricted to 4 field elements because we use Poseidon for the hash.
+        // // In the long term, we will use a hash_to_curve with bytes and not a bounded input size (Pedersen or Blake2?).
+        // self.owner_address.serialize_unchecked(&mut bytes).unwrap();
+        // self.token_address.serialize_unchecked(&mut bytes).unwrap();
+        // crh::<CP>(&bytes)
     }
 
     // SHOULD BE PRIVATE??
