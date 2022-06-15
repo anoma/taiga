@@ -1,13 +1,11 @@
 use crate::el_gamal::EncryptedNote;
 use crate::{
-    add_to_tree,
     circuit::circuit_parameters::CircuitParameters,
     circuit::{
         blinding_circuit::{blind_gadget, BlindingCircuit},
-        gadgets::gadget::trivial_gadget,
         validity_predicate::ValidityPredicate,
     },
-    el_gamal::{Ciphertext, DecryptionKey, EncryptionKey},
+    el_gamal::{DecryptionKey, EncryptionKey},
     note::Note,
     prf4, serializable_to_vec, to_embedded_field,
 };
@@ -20,7 +18,6 @@ use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use plonk_core::constraint_system::StandardComposer;
 use rand::prelude::ThreadRng;
-use rs_merkle::{algorithms::Blake2s, MerkleTree};
 
 pub struct User<CP: CircuitParameters> {
     name: String, // probably not useful: a user will be identified with his address / his public key(?)

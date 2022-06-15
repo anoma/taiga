@@ -1,10 +1,10 @@
-use crate::el_gamal::{Ciphertext, DecryptionKey, EncryptedNote};
+use crate::el_gamal::{DecryptionKey, EncryptedNote};
 
 use crate::circuit::validity_predicate::ValidityPredicate;
 use crate::circuit::{circuit_parameters::CircuitParameters, gadgets::gadget::trivial_gadget};
 use crate::transaction::Transaction;
 use crate::{
-    add_bytes_to_tree, add_to_tree, note::Note, serializable_to_vec, token::Token, user::User,
+    add_to_tree, note::Note, serializable_to_vec, token::Token, user::User,
 };
 use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
 use ark_ff::Zero;
@@ -14,8 +14,6 @@ use rs_merkle::algorithms::Blake2s;
 use rs_merkle::{Hasher, MerkleTree};
 
 fn spawn_user<CP: CircuitParameters>(name: &str) -> User<CP> {
-    use rand::rngs::ThreadRng;
-
     let mut rng = ThreadRng::default();
     let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
     let outer_curve_pp =
@@ -37,8 +35,6 @@ fn spawn_user<CP: CircuitParameters>(name: &str) -> User<CP> {
 }
 
 fn spawn_token<CP: CircuitParameters>(name: &str) -> Token<CP> {
-    use rand::rngs::ThreadRng;
-
     let mut rng = ThreadRng::default();
     let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
 
@@ -58,7 +54,6 @@ fn spawn_trivial_vps<CP: CircuitParameters>(
 }
 
 fn test_send<CP: CircuitParameters>() {
-    use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
 
     // --- SET UP ---
 
@@ -106,7 +101,7 @@ fn test_send<CP: CircuitParameters>() {
     let output_notes_and_ec = alice.send(&mut vec![&note_a1xan], vec![(&bob, 1_u32)], &mut rng);
 
     //Prepare the hash for future MTtree membership check
-    let mut bytes = serializable_to_vec(&output_notes_and_ec[0].0.commitment());
+    let bytes = serializable_to_vec(&output_notes_and_ec[0].0.commitment());
     let hash_nc_bob = Blake2s::hash(&bytes);
 
     //Prepare the nf hash for future spent notes check
@@ -155,7 +150,6 @@ fn test_check_proofs_kzg() {
 
 fn split_and_merge_notes_test<CP: CircuitParameters>() {
     use ark_ff::UniformRand;
-    use rand::rngs::ThreadRng;
 
     // --- SET UP ---
 

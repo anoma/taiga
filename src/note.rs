@@ -1,13 +1,10 @@
-use crate::el_gamal::EncryptionKey;
 use crate::{
-    add_to_tree, circuit::circuit_parameters::CircuitParameters, crh, el_gamal::Ciphertext,
-    serializable_to_vec, user::User,
+    circuit::circuit_parameters::CircuitParameters, crh
 };
 use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
 use ark_ff::BigInteger256;
 use ark_serialize::*;
 use rand::{prelude::ThreadRng, Rng};
-use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
 
 #[derive(CanonicalSerialize, derivative::Derivative)]
 #[derivative(

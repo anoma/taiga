@@ -239,7 +239,7 @@ impl<CP: CircuitParameters> Action<CP> {
 //
 // this is not the circuit implementation but what should be hard-coded in the Action Circuit.
 //
-use crate::el_gamal::{Ciphertext, DecryptionKey, EncryptedNote};
+use crate::el_gamal::{DecryptionKey, EncryptedNote};
 use crate::note::Note;
 use crate::token::Token;
 use crate::user::User;

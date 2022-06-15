@@ -1,7 +1,7 @@
 pub mod gadget {
     use crate::circuit::merkle_tree_gadget::merkle_tree_gadget;
     use crate::merkle_tree::Node;
-    use crate::poseidon::{POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2, WIDTH_3};
+    use crate::poseidon::WIDTH_3;
     use crate::{circuit::circuit_parameters::CircuitParameters, merkle_tree::MerklePath};
     use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
     use ark_ff::{One, Zero};
@@ -107,7 +107,7 @@ pub mod gadget {
         // private inputs
         let owner_address = private_inputs[0];
         let token_address = private_inputs[1];
-        let path = &private_inputs[2..];
+        let _path = &private_inputs[2..]; // todo
         // public inputs
         let com_x = public_inputs[0];
         let com_y = public_inputs[1];
@@ -164,13 +164,6 @@ pub mod gadget {
 }
 
 pub mod tests {
-    use plonk_hashing::poseidon::constants::PoseidonConstants;
-
-    use crate::{
-        circuit::gadgets::gadget::white_list_gadget,
-        merkle_tree::{MerklePath, Node},
-        note::Note,
-    };
 
     #[test]
     fn test_bad_hash_to_curve_gadget() {
@@ -283,6 +276,8 @@ pub mod tests {
         use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
         use ark_std::UniformRand;
         use plonk_core::constraint_system::StandardComposer;
+        use crate::note::Note;
+        use crate::circuit::gadgets::gadget::white_list_gadget;
 
         // creation of user's addresses white list (requires to be a power of 2?)
         let mut rng = rand::thread_rng();

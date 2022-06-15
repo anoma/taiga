@@ -1,19 +1,15 @@
-use crate::action;
 use crate::circuit::validity_predicate::ValidityPredicate;
-use crate::el_gamal::{Ciphertext, EncryptedNote};
+use crate::el_gamal::EncryptedNote;
 use crate::{
-    action::Action, add_bytes_to_tree, add_to_tree, is_in_tree, note::Note, serializable_to_vec,
+    action::Action, add_to_tree, is_in_tree, note::Note,
     CircuitParameters,
 };
-use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
-use ark_serialize::{CanonicalSerialize, CanonicalSerializeHashExt};
-use plonk_core::proof_system::Verifier;
-use rand::rngs::ThreadRng;
-use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
+use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine};
+use rs_merkle::{algorithms::Blake2s, MerkleTree};
 
 pub struct Transaction<'a, CP: CircuitParameters> {
     //max: usize, // the maximum number of actions/notes for a transaction
-    actions: Vec<Action<CP>>,
+    _actions: Vec<Action<CP>>,
     spent_notes: Vec<(Note<CP>, TEGroupAffine<CP::InnerCurve>)>,
     created_notes: Vec<(Note<CP>, EncryptedNote<CP::InnerCurve>)>,
     vps: &'a Vec<ValidityPredicate<CP>>,
@@ -22,14 +18,14 @@ pub struct Transaction<'a, CP: CircuitParameters> {
 impl<'a, CP: CircuitParameters> Transaction<'a, CP> {
     pub fn new(
         //max: usize,
-        actions: Vec<Action<CP>>,
+        _actions: Vec<Action<CP>>,
         spent_notes: Vec<(Note<CP>, TEGroupAffine<CP::InnerCurve>)>,
         created_notes: Vec<(Note<CP>, EncryptedNote<CP::InnerCurve>)>,
         vps: &'a Vec<ValidityPredicate<CP>>,
     ) -> Self {
         Self {
             //max,
-            actions,
+            _actions,
             spent_notes,
             created_notes,
             vps,
