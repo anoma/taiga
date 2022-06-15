@@ -1,6 +1,6 @@
 # Validity predicate definition
 
-A validity predicate can be seen as a set of rules that checks whether a given statement holds, that is, it returns true if the predicate is satisfied or false otherwise. Every predicate can be compiled to an arithmetic circuit. Rules in arithmetic circuits are additions and multiplications of integers. If the output of the circuit is zero, then the predicate is valid. The flavour of the circuit may depend on the proving system we want to use. Some proving systems can only evaluate a two fan-in gates whereas others have other gate constraints.
+A validity predicate consists of a set of rules that checks whether a given statement holds, that is, it returns true if the predicate is satisfied or false otherwise. Every predicate can be compiled to an arithmetic circuit. Rules in arithmetic circuits are additions and multiplications of integers. If the output of the circuit is zero, then the predicate is valid. The flavour of the circuit may depend on the proving system we want to use. Some proving systems can only evaluate a two fan-in gates whereas others have other gate constraints.
 
 ## Example 1. a Pythagorean circuit.
 Suppose that we have a pythagorean triple $(a,b,c)$. We can consider a validity predicate that checks the equation $a^2 + b^2 == c^2$.
