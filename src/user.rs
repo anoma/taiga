@@ -1,5 +1,6 @@
+use crate::circuit::nullifier::Nullifier;
 use crate::el_gamal::EncryptedNote;
-use crate::nullifier::{Nullifier, NullifierDerivingKey};
+use crate::nullifier_key::NullifierDerivingKey;
 use crate::{
     circuit::circuit_parameters::CircuitParameters,
     circuit::{
@@ -147,7 +148,7 @@ impl<CP: CircuitParameters> User<CP> {
 
         //todo: fix
         let the_one_and_only_token_address = spent_notes[0].token_address.clone();
-        let the_one_and_only_nullifier = Nullifier::<CP>::derive(
+        let the_one_and_only_nullifier = Nullifier::<CP>::derive_native(
             &self.get_nk(),
             &spent_notes[0].rho,
             &spent_notes[0].psi,

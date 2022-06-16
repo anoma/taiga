@@ -1,8 +1,8 @@
 use crate::el_gamal::{DecryptionKey, EncryptedNote};
 
+use crate::circuit::nullifier::Nullifier;
 use crate::circuit::validity_predicate::ValidityPredicate;
 use crate::circuit::{circuit_parameters::CircuitParameters, gadgets::gadget::trivial_gadget};
-use crate::nullifier::Nullifier;
 use crate::transaction::Transaction;
 use crate::{add_to_tree, note::Note, serializable_to_vec, token::Token, user::User};
 use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
@@ -103,7 +103,7 @@ fn test_send<CP: CircuitParameters>() {
     let hash_nc_bob = Blake2s::hash(&bytes);
 
     //Prepare the nf hash for future spent notes check
-    let nullifier = Nullifier::derive(
+    let nullifier = Nullifier::derive_native(
         &alice.get_nk(),
         &note_a1xan.rho,
         &note_a1xan.psi,
@@ -210,7 +210,7 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
     let hash3 = Blake2s::hash(&bytes);
 
     //Prepare the nf hash for future spent notes check
-    let nullifier = Nullifier::derive(
+    let nullifier = Nullifier::derive_native(
         &yulia.get_nk(),
         &initial_note.rho,
         &initial_note.psi,
@@ -254,13 +254,13 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
     let hash4 = Blake2s::hash(&bytes);
 
     //Prepare the nf hash for future spent notes check
-    let nullifier1 = Nullifier::derive(
+    let nullifier1 = Nullifier::derive_native(
         &yulia.get_nk(),
         &split_output_notes[0].0.rho,
         &split_output_notes[0].0.psi,
         &split_output_notes[0].0.commitment(),
     );
-    let nullifier2 = Nullifier::derive(
+    let nullifier2 = Nullifier::derive_native(
         &yulia.get_nk(),
         &split_output_notes[1].0.rho,
         &split_output_notes[1].0.psi,

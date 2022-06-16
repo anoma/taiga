@@ -23,7 +23,8 @@ pub mod el_gamal;
 pub mod error;
 pub mod merkle_tree;
 pub mod note;
-pub mod nullifier;
+// TODO: put the nullifier_key in address later.
+pub mod nullifier_key;
 pub mod poseidon;
 pub mod token;
 pub mod transaction;

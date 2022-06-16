@@ -1,6 +1,6 @@
+use crate::circuit::nullifier::Nullifier;
 use crate::circuit::validity_predicate::ValidityPredicate;
 use crate::el_gamal::EncryptedNote;
-use crate::nullifier::Nullifier;
 use crate::{
     action::Action, add_to_tree, is_in_tree, note::Note, serializable_to_vec, CircuitParameters,
 };
