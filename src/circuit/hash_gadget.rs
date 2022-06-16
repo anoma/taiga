@@ -11,7 +11,7 @@ use plonk_hashing::poseidon::{
 /// A BinaryHasherGadget takes two variables as input and outputs the hash
 /// result variable.
 pub trait BinaryHasherGadget<F: PrimeField, P: TEModelParameters<BaseField = F>> {
-    fn hash_two(
+    fn circuit_hash_two(
         &self,
         composer: &mut StandardComposer<F, P>,
         left: &Variable,
@@ -23,7 +23,7 @@ pub trait BinaryHasherGadget<F: PrimeField, P: TEModelParameters<BaseField = F>>
 impl<F: PrimeField, P: TEModelParameters<BaseField = F>> BinaryHasherGadget<F, P>
     for PoseidonConstants<F>
 {
-    fn hash_two(
+    fn circuit_hash_two(
         &self,
         composer: &mut StandardComposer<F, P>,
         left: &Variable,

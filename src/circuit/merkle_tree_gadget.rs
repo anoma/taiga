@@ -36,7 +36,7 @@ pub fn merkle_tree_gadget<
         let ur = composer.conditional_select(cur_is_right, cur, path_element);
 
         // Compute the new subtree value
-        cur = hash_gadget.hash_two(composer, &ul, &ur)?;
+        cur = hash_gadget.circuit_hash_two(composer, &ul, &ur)?;
     }
 
     Ok(cur)
