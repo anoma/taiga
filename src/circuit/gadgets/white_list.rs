@@ -2,7 +2,7 @@ use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::merkle_tree::MerklePath;
 use crate::merkle_tree::MerkleTreeLeafs;
 use crate::note::Note;
-use crate::poseidon::{POSEIDON_HASH_PARAM_BLS12_377_BASE_ARITY2, WIDTH_3};
+use crate::poseidon::WIDTH_3;
 use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, TEModelParameters};
 use ark_ff::PrimeField;
 use plonk_core::prelude::StandardComposer;
@@ -51,11 +51,14 @@ pub fn white_list_gadget<
 #[test]
 fn test_white_list_gadget() {
     use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters as CP};
+    use crate::merkle_tree::Node;
     use crate::note::Note;
     use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
     use ark_std::UniformRand;
     use plonk_core::constraint_system::StandardComposer;
     use plonk_hashing::poseidon::constants::PoseidonConstants;
+    use plonk_hashing::poseidon::poseidon::NativeSpec;
+    use plonk_hashing::poseidon::poseidon::Poseidon;
 
     type F = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;
@@ -75,8 +78,21 @@ fn test_white_list_gadget() {
     );
     let note_com = note.commitment();
 
-    // Generate a dummy white list tree path with depth 2.
-    let merkle_path = MerklePath::<F, PoseidonConstants<F>>::dummy(&mut rng, 2);
+    // I wanted to use hash_two but I was not able...
+    let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
+    let mut poseidon = Poseidon::<(), NativeSpec<F, WIDTH_3>, WIDTH_3>::new(
+        &mut (),
+        &poseidon_hash_param_bls12_377_scalar_arity2,
+    );
+    let _ = poseidon.input(white_list[2]);
+    let _ = poseidon.input(white_list[3]);
+    let hash_2_3 = poseidon.output_hash(&mut ());
+
+    let mut auth_path: Vec<(Node<_, _>, bool)> = vec![];
+    auth_path.push((Node::<F, PoseidonConstants<_>>::new(white_list[0]), true));
+    auth_path.push((Node::<F, PoseidonConstants<_>>::new(hash_2_3), false));
+
+    let merkle_path = MerklePath::from_path(auth_path);
 
     let mut composer = StandardComposer::<F, <CP as CircuitParameters>::InnerCurve>::new();
     white_list_gadget::<F, P, PoseidonConstants<F>, CP>(

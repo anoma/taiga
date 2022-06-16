@@ -28,10 +28,11 @@ impl<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> MerkleTreeLeafs<F, 
         let mut len = list.len();
         while len > 1 {
             for i in 0..len / 2 {
-                let x = list[2 * i].repr;
-                let y = list[2 * i + 1].repr;
-                let h = hasher.hash_two(&x, &y).unwrap();
-                list[i] = Node::<F, BH>::new(h);
+                list[i] = Node::<F, BH>::new(
+                    hasher
+                        .hash_two(&list[2 * i].repr, &list[2 * i + 1].repr)
+                        .unwrap(),
+                );
             }
             len = len / 2;
         }
