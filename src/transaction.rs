@@ -1,15 +1,11 @@
-use crate::action;
 use crate::circuit::validity_predicate::ValidityPredicate;
-use crate::el_gamal::{Ciphertext, EncryptedNote};
+use crate::el_gamal::EncryptedNote;
 use crate::nullifier::Nullifier;
 use crate::{
     action::Action, add_to_tree, is_in_tree, note::Note, serializable_to_vec, CircuitParameters,
 };
-use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
-use ark_serialize::{CanonicalSerialize, CanonicalSerializeHashExt};
-use plonk_core::proof_system::Verifier;
-use rand::rngs::ThreadRng;
-use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
+use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
+use rs_merkle::{algorithms::Blake2s, MerkleTree};
 
 pub struct Transaction<'a, CP: CircuitParameters> {
     //max: usize, // the maximum number of actions/notes for a transaction

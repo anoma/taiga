@@ -1,7 +1,6 @@
 use crate::circuit::gadgets::gadget::trivial_gadget;
-use crate::nullifier::{Nullifier, NullifierDerivingKey};
-use crate::{add_to_tree, circuit::circuit_parameters::CircuitParameters, crh, prf4};
-use ark_ec::ProjectiveCurve;
+use crate::nullifier::NullifierDerivingKey;
+use crate::{add_to_tree, circuit::circuit_parameters::CircuitParameters, crh};
 use ark_ff::One;
 use plonk_core::proof_system::Proof;
 use rand::prelude::ThreadRng;
@@ -202,12 +201,12 @@ impl<CP: CircuitParameters> Action<CP> {
 //
 // this is not the circuit implementation but what should be hard-coded in the Action Circuit.
 //
-use crate::el_gamal::{Ciphertext, DecryptionKey, EncryptedNote};
+use crate::el_gamal::{DecryptionKey, EncryptedNote};
 use crate::note::Note;
 use crate::token::Token;
 use crate::user::User;
 use crate::{serializable_to_vec, to_embedded_field};
-use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
+use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
 use ark_ff::{BigInteger256, Zero};
 use ark_poly_commit::PolynomialCommitment;
 
@@ -218,7 +217,7 @@ fn spent_notes_checks<CP: CircuitParameters>(
     sender: &User<CP>,
     token: &Token<CP>,
     spent_note: &Note<CP>,
-    output_note: &Note<CP>,
+    _output_note: &Note<CP>,
     note_commitments: &mut MerkleTree<Blake2s>,
     rng: &mut ThreadRng,
 ) {

@@ -8,7 +8,7 @@ use crate::poseidon::{
 use ark_bls12_377::Fq as Fq377;
 use ark_bls12_377::Fr as Fr377;
 use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
-use ark_ec::{AffineCurve, TEModelParameters};
+use ark_ec::AffineCurve;
 use ark_ff::*;
 use ark_serialize::CanonicalSerialize;
 use circuit::circuit_parameters::CircuitParameters;

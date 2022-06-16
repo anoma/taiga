@@ -2,7 +2,6 @@ use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
 use ark_ec::{AffineCurve, ProjectiveCurve, TEModelParameters};
 use ark_ff::UniformRand;
 use ark_serialize::CanonicalSerialize;
-use ark_serialize::Write;
 use rand::prelude::ThreadRng;
 use sha2::{Digest, Sha256};
 extern crate derivative;
