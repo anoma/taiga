@@ -137,7 +137,7 @@ For us: knowing the opening of `address` to `desc_vp_addr_send` <=> can derive `
 
 `PERSONALIZATION_{NK}` is a fixed string bytes "Taiga_PRF_NK".
 
-Use blake2b as the PRF, which outputs 32 bytes.
+Use blake2b as the PRF, which outputs 64 bytes.
 
 ### Nullifier(nf)
 Use the same derivation of nullifier with Orchard.
