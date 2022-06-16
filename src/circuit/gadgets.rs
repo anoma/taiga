@@ -3,7 +3,10 @@ pub mod gadget {
     use crate::poseidon::WIDTH_3;
     use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
     use ark_ff::{One, Zero};
-    use plonk_core::{prelude::{StandardComposer, Point}, constraint_system::Variable};
+    use plonk_core::{
+        constraint_system::Variable,
+        prelude::{Point, StandardComposer},
+    };
     use plonk_hashing::poseidon::{
         constants::PoseidonConstants,
         poseidon::{NativeSpec, PlonkSpec, Poseidon},
@@ -120,8 +123,9 @@ pub mod tests {
             <CP as CircuitParameters>::CurveScalarField,
             <CP as CircuitParameters>::InnerCurve,
         >::new();
-        
-        let gadget_hash_variable = bad_hash_to_curve_gadget::<CP>(&mut composer, &random_inputs, &vec![]);
+
+        let gadget_hash_variable =
+            bad_hash_to_curve_gadget::<CP>(&mut composer, &random_inputs, &vec![]);
         composer.assert_equal_public_point(gadget_hash_variable, hash);
         composer.check_circuit_satisfied();
     }
@@ -193,7 +197,8 @@ pub mod tests {
             <CP as CircuitParameters>::InnerCurve,
         >::new();
         let native_hash_variable = composer.add_public_input_variable(hash);
-        let gadget_hash_variable = poseidon_hash_curve_scalar_field_gadget::<CP>(&mut composer, &ω, &vec![hash]);
+        let gadget_hash_variable =
+            poseidon_hash_curve_scalar_field_gadget::<CP>(&mut composer, &ω, &vec![hash]);
         composer.assert_equal(native_hash_variable, gadget_hash_variable);
         composer.check_circuit_satisfied();
     }

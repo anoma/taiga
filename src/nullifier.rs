@@ -14,10 +14,11 @@ use rand::RngCore;
 const PRF_NK_PERSONALIZATION: &[u8; 12] = b"Taiga_PRF_NK";
 
 /// The nullifier key for note spending.
-#[derive(Copy, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Debug, Clone)]
 pub struct NullifierDerivingKey<F: PrimeField>(F);
 
 /// The unique nullifier.
+#[derive(Copy, Debug, Clone)]
 pub struct Nullifier<CP: CircuitParameters>(CP::CurveScalarField);
 
 impl<F: PrimeField> NullifierDerivingKey<F> {
@@ -89,7 +90,7 @@ impl<CP: CircuitParameters> Nullifier<CP> {
         poseidon.output_hash(&mut ())
     }
 
-    pub fn to_bytes(self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> Vec<u8> {
         self.0.into_repr().to_bytes_le()
     }
 

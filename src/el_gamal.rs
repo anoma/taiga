@@ -10,7 +10,7 @@ extern crate derivative;
 #[derive(derivative::Derivative)]
 #[derivative(
     Copy(bound = "C: TEModelParameters"),
-    Clone(bound = "C: TEModelParameters"),
+    Clone(bound = "C: TEModelParameters")
 )]
 pub struct Ciphertext<C: TEModelParameters>(pub TEGroupAffine<C>, [u8; 32]);
 
@@ -27,20 +27,21 @@ impl<C: TEModelParameters> Ciphertext<C> {
 }
 
 #[derive(derivative::Derivative)]
-#[derivative(
-Clone(bound = "C: TEModelParameters"),
-)]
+#[derivative(Clone(bound = "C: TEModelParameters"))]
 pub struct EncryptedNote<C: TEModelParameters> {
-    pub en: Vec<Ciphertext<C>>
+    pub en: Vec<Ciphertext<C>>,
 }
 
 impl<C: TEModelParameters> EncryptedNote<C> {
     pub fn new(en: Vec<Ciphertext<C>>) -> Self {
-        Self{en}
+        Self { en }
     }
 
     pub fn serialize(&self) -> Vec<u8> {
-        (0..self.en.len()).map(|i| self.en[i].serialize()).flatten().collect()
+        (0..self.en.len())
+            .map(|i| self.en[i].serialize())
+            .flatten()
+            .collect()
     }
 }
 
@@ -123,7 +124,6 @@ impl<C: TEModelParameters> EncryptionKey<C> {
         }
         EncryptedNote::new(ciphertexts)
     }
-
 }
 
 #[test]
