@@ -1,6 +1,7 @@
-use crate::{add_to_tree, circuit::circuit_parameters::CircuitParameters, crh, prf4};
 use crate::circuit::gadgets::gadget::trivial_gadget;
-use ark_ec::ProjectiveCurve;
+use crate::nullifier_key::NullifierDerivingKey;
+use crate::{add_to_tree, circuit::circuit_parameters::CircuitParameters, crh};
+use ark_ff::One;
 use plonk_core::proof_system::Proof;
 use rand::prelude::ThreadRng;
 use rs_merkle::algorithms::Blake2s;
@@ -27,7 +28,7 @@ impl<CP: CircuitParameters> Action<CP> {
         send_vp_hash: CP::CurveBaseField,
         recv_vp_hash: CP::CurveBaseField,
         note_rcm: CP::CurveScalarField,
-        nk: CP::CurveScalarField,
+        nk: NullifierDerivingKey<CP::CurveScalarField>,
         note_owner_addr: CP::CurveScalarField,
     ) {
         assert_eq!(
@@ -38,7 +39,7 @@ impl<CP: CircuitParameters> Action<CP> {
                             to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(
                                 send_vp_hash
                             ),
-                            nk
+                            nk.inner()
                         ],
                         CP::CurveScalarField::zero()
                     ),
@@ -151,45 +152,6 @@ impl<CP: CircuitParameters> Action<CP> {
         assert_eq!(crh::<CP>(&note_data), note_cm);
     }
 
-    /// Nullifier integrity(input note only): `nf = DeriveNullier_nk(note)`
-    ///
-    /// # Arguments
-    ///
-    /// Public inputs:
-    /// * `nf` - Spent note nullifier
-    /// Private inputs:
-    /// * `nk` - Sender nullifier key
-    /// * `note` - Spent note
-    #[allow(dead_code)]
-    fn check_note_nullifier_integrity(
-        // public
-        nf: TEGroupAffine<CP::InnerCurve>,
-        // private
-        nk: CP::CurveScalarField,
-        note: &Note<CP>,
-    ) {
-        // this part of the circuit is done over `CurveScalarField` even though
-        // it is on `CP::InnerCurveScalarField`. It is then converted
-        // into `InnerCurveScalarField` for the second part of the circuit.
-
-        let scalar = to_embedded_field::<CP::CurveScalarField, CP::InnerCurveScalarField>(prf4::<
-            CP::CurveScalarField,
-        >(
-            note.spent_note_nf.x,
-            note.spent_note_nf.y,
-            nk,
-            CP::CurveScalarField::zero(),
-        )) + note.psi;
-        // this part of the circuit is over `InnerCurveBaseField == CurveScalarField`
-        assert_eq!(
-            TEGroupAffine::prime_subgroup_generator()
-                .mul(scalar)
-                .into_affine()
-                + note.commitment(),
-            nf
-        );
-    }
-
     /// Check that note exists in the merkle tree, i.e. note is valid in `rt`
     /// Same as Orchard, there is a path in Merkle tree with root `rt` to a note commitment `cm` that opens to `note`
     /// # Arguments
@@ -239,12 +201,12 @@ impl<CP: CircuitParameters> Action<CP> {
 //
 // this is not the circuit implementation but what should be hard-coded in the Action Circuit.
 //
-use crate::el_gamal::{Ciphertext, DecryptionKey, EncryptedNote};
+use crate::el_gamal::{DecryptionKey, EncryptedNote};
 use crate::note::Note;
 use crate::token::Token;
 use crate::user::User;
 use crate::{serializable_to_vec, to_embedded_field};
-use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
+use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
 use ark_ff::{BigInteger256, Zero};
 use ark_poly_commit::PolynomialCommitment;
 
@@ -255,7 +217,7 @@ fn spent_notes_checks<CP: CircuitParameters>(
     sender: &User<CP>,
     token: &Token<CP>,
     spent_note: &Note<CP>,
-    output_note: &Note<CP>,
+    _output_note: &Note<CP>,
     note_commitments: &mut MerkleTree<Blake2s>,
     rng: &mut ThreadRng,
 ) {
@@ -288,11 +250,9 @@ fn spent_notes_checks<CP: CircuitParameters>(
     Action::<CP>::check_vp_integrity(cm_send_alice, rand_alice, sender.get_send_vp().pack());
 
     // Nullifier integrity(input note only): `nf = DeriveNullier_nk(note)`
-    Action::<CP>::check_note_nullifier_integrity(
-        output_note.spent_note_nf.clone(), // nullifier of old note is stored in output_note.spent_note_nf
-        sender.get_nk(),
-        spent_note,
-    );
+    // We don't need the nullifier check here.
+    // TODO: Since there is not a action circuit implementation yet, add nullifier derivation circuit here(already
+    // implemented in nullifier test) when implementing the action circuit.
 
     // `token` and `token_com_vp` opens to the same `desc_token_vp`
     // Token (type) integrity: `token = Com_r(Com_q(desc_token_vp), rcm_token)`
@@ -389,35 +349,30 @@ fn _action_checks<CP: CircuitParameters>() {
     // Creation of a note commitments tree
     let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
     // Creation of the {note commitment + encrypted note} list
-    let mut cm_ce_list: Vec<(
-        TEGroupAffine<CP::InnerCurve>,
-        EncryptedNote<CP::InnerCurve>,
-    )> = vec![];
+    let mut cm_ce_list: Vec<(TEGroupAffine<CP::InnerCurve>, EncryptedNote<CP::InnerCurve>)> =
+        vec![];
 
     // Creation of a note of 1XAN for Alice
     let spent_note = Note::<CP>::new(
         alice.address(),
         xan.address(),
         1,
-        TEGroupAffine::prime_subgroup_generator(),
-        <CP as CircuitParameters>::InnerCurveScalarField::zero(),
+        CP::CurveScalarField::one(),
+        CP::CurveScalarField::one(),
         &mut rng,
     );
 
     let spent_note_ec = alice.encrypt(&mut rng, &spent_note);
-    add_to_tree(&spent_note.commitment(), &mut mt_tree);
+    add_to_tree(&spent_note.get_cm_bytes(), &mut mt_tree);
     cm_ce_list.push((spent_note.commitment(), spent_note_ec));
 
     // The note is spent, and a new note is created for Bob
     let output_note = alice
-        .send(
-            &mut vec![&spent_note],
-            vec![(&bob, 1_u32)],
-            &mut rng,
-        )
-        .swap_remove(0).0;
+        .send(&mut vec![&spent_note], vec![(&bob, 1_u32)], &mut rng)
+        .swap_remove(0)
+        .0;
 
-    add_to_tree(&output_note.commitment(), &mut mt_tree);
+    add_to_tree(&output_note.get_cm_bytes(), &mut mt_tree);
 
     // ACTION CIRCUIT CHECKS //
     // Checks follow: https://github.com/heliaxdev/taiga/blob/main/book/src/spec.md#action-circuit

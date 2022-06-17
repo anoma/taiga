@@ -1,19 +1,13 @@
-use crate::{
-    add_to_tree, circuit::circuit_parameters::CircuitParameters, crh, el_gamal::Ciphertext,
-    serializable_to_vec, user::User,
-};
+use crate::{circuit::circuit_parameters::CircuitParameters, crh, serializable_to_vec};
 use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
 use ark_ff::BigInteger256;
 use ark_serialize::*;
 use rand::{prelude::ThreadRng, Rng};
-use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
-use crate::el_gamal::EncryptionKey;
 
-#[derive(CanonicalSerialize)]
-#[derive(derivative::Derivative)]
+#[derive(CanonicalSerialize, derivative::Derivative)]
 #[derivative(
-Copy(bound = "CP: CircuitParameters"),
-Clone(bound = "CP: CircuitParameters"),
+    Copy(bound = "CP: CircuitParameters"),
+    Clone(bound = "CP: CircuitParameters")
 )]
 pub struct Note<CP: CircuitParameters> {
     // For the curves we consider for 128-bit of security, CurveScalarField,
@@ -24,9 +18,9 @@ pub struct Note<CP: CircuitParameters> {
     pub value: u32,
     rcm: BigInteger256,
     data: u32, // for NFT or whatever, we won't use it in this simple example
-    pub spent_note_nf: TEGroupAffine<CP::InnerCurve>, // rho parameter
+    pub rho: CP::CurveScalarField, // rho parameter
     /// Note value useful for the nullifier
-    pub psi: CP::InnerCurveScalarField, // computed from spent_note_nf using a PRF
+    pub psi: CP::CurveScalarField, // computed from spent_note_nf using a PRF
 }
 
 impl<CP: CircuitParameters> Note<CP> {
@@ -34,8 +28,8 @@ impl<CP: CircuitParameters> Note<CP> {
         owner_address: CP::CurveScalarField,
         token_address: CP::CurveScalarField,
         value: u32,
-        spent_note_nf: TEGroupAffine<CP::InnerCurve>,
-        psi: CP::InnerCurveScalarField,
+        rho: CP::CurveScalarField,
+        psi: CP::CurveScalarField,
         rng: &mut ThreadRng,
     ) -> Self {
         Self {
@@ -44,8 +38,8 @@ impl<CP: CircuitParameters> Note<CP> {
             value: value,
             rcm: rng.gen(),
             data: 0,
-            spent_note_nf: spent_note_nf,
-            psi: psi,
+            rho,
+            psi,
         }
     }
 
@@ -69,5 +63,11 @@ impl<CP: CircuitParameters> Note<CP> {
     // SHOULD BE PRIVATE??
     pub fn get_rcm(&self) -> BigInteger256 {
         self.rcm
+    }
+
+    // temporary interface, remove it after adding the Serialize
+    pub fn get_cm_bytes(&self) -> Vec<u8> {
+        let cm = self.commitment();
+        serializable_to_vec(&cm)
     }
 }

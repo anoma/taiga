@@ -4,4 +4,5 @@ pub mod gadgets;
 pub mod hash_gadget;
 
 pub mod merkle_tree_gadget;
+pub mod nullifier;
 pub mod validity_predicate;
