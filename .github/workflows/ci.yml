@@ -1,0 +1,192 @@
+name: CI checks
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-features --verbose --release --all
+      - name: Run slow tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-features --verbose --release --all -- --ignored
+
+  build:
+    name: Build target ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - wasm32-unknown-unknown
+          - wasm32-wasi
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Add target
+        run: rustup target add ${{ matrix.target }}
+      - name: cargo fetch
+        uses: actions-rs/cargo@v1
+        with:
+          command: fetch
+
+  clippy:
+    name: Lint
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+          override: true
+      - name: Run clippy
+        uses: actions-rs/clippy-check@v1
+        with:
+          name: Clippy
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features --all-targets -- -D warnings
+
+  clippy-beta:
+    name: Nightly lint
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: beta
+          components: clippy
+          override: true
+      - name: Run Clippy (beta)
+        uses: actions-rs/clippy-check@v1
+        continue-on-error: true
+        with:
+          name: Clippy (beta)
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features --all-targets -- -W clippy::all
+
+  book:
+    name: Book tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Setup mdBook
+        uses: peaceiris/actions-mdbook@v1
+        with:
+          mdbook-version: '0.4.5'
+      - name: Test Orchard book
+        run: mdbook test book/
+
+  codecov:
+    name: Code coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      # Use stable for this to ensure that cargo-tarpaulin can be built.
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Install cargo-tarpaulin
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-tarpaulin
+
+      - name: Generate coverage report
+        uses: actions-rs/cargo@v1
+        with:
+          command: tarpaulin
+          args: --all-features --release --timeout 600 --out Xml
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3.0.0
+
+  doc-links:
+    name: Intra-doc links
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: cargo fetch
+        uses: actions-rs/cargo@v1
+        with:
+          command: fetch
+
+      # Ensure intra-documentation links all resolve correctly
+      # Requires #![deny(intra_doc_link_resolution_failure)] in crates.
+      - name: Check intra-doc links
+        uses: actions-rs/cargo@v1
+        with:
+          command: doc
+          args: --all --document-private-items
+
+  fmt:
+    name: Rustfmt
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      # cargo fmt does not build the code, and running it in a fresh clone of
+      # the codebase will fail because the protobuf code has not been generated.
+      - name: cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --all
+
+      # Ensure all code has been formatted with rustfmt
+      - run: rustup component add rustfmt
+      - name: Check formatting
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+  security:
+    name: Security - Cargo Audit
+    runs-on: ubuntu-latest
+    container:
+      image: rustlang/rust:nightly
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+    - name: Cargo Audit
+      run: cargo audit
