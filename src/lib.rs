@@ -86,6 +86,7 @@ impl HashToField for Fq377 {
         poseidon.input(y).unwrap();
         poseidon.input(z).unwrap();
         poseidon.input(t).unwrap();
+        println!("out:{}", poseidon.output_hash(&mut ()));
         poseidon.output_hash(&mut ())
     }
 
@@ -122,7 +123,7 @@ fn com<F: PrimeField + HashToField>(x: &Vec<F>, rand: F) -> F {
 // TODO: the implementation is a bit weird: it does not really depends on CP and could be written with a curve as a parameter (`fn hash_to_curve<E:Curve>`).
 fn crh<CP: CircuitParameters>(data: &Vec<CP::CurveScalarField>) -> TEGroupAffine<CP::InnerCurve> {
     // let scalar = <CP::InnerCurveScalarField>::hash_to_field(data);
-    // TODO: data length is 2 for now but will be larger later
+    // // TODO: data length is 2 for now but will be larger later
     assert_eq!(data.len(), 2);
     let _scalar = <CP::CurveScalarField>::hash2_to_field(data[0], data[1]);
     let scalar =

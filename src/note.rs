@@ -49,7 +49,12 @@ impl<CP: CircuitParameters> Note<CP> {
         // generator by it (bad) the fields of a note we should commit
         // to aren't defined in the pbc spec yet also, note commitment
         // should be implemented with Sinsemilla (according to the pbc spec)
-        let vec = vec![self.owner_address, self.token_address];
+        let vec = vec![
+            self.owner_address,
+            self.token_address,
+            // CP::CurveScalarField::from(self.value),
+            // CP::CurveScalarField::from(self.data)
+        ];
         crh::<CP>(&vec)
 
         // let mut bytes = vec![];
