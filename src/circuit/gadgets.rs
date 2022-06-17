@@ -4,4 +4,5 @@ pub mod hash;
 pub mod merkle_tree;
 pub mod poseidon_hash_scalar_field;
 pub mod trivial;
+pub mod upper_bound;
 pub mod white_list;
