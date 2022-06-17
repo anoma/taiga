@@ -9,10 +9,7 @@ use crate::{
     },
     el_gamal::{DecryptionKey, EncryptionKey},
     note::Note,
-    prf4, serializable_to_vec, to_embedded_field,
-};
-use ark_ec::{
-    twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve, ProjectiveCurve,
+    serializable_to_vec, to_embedded_field,
 };
 use ark_ff::UniformRand;
 use ark_ff::Zero;

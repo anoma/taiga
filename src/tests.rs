@@ -1,11 +1,11 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::gadgets::trivial::trivial_gadget;
+use crate::circuit::nullifier::Nullifier;
 use crate::circuit::validity_predicate::ValidityPredicate;
 use crate::el_gamal::{DecryptionKey, EncryptedNote};
 use crate::transaction::Transaction;
 use crate::{add_to_tree, note::Note, serializable_to_vec, token::Token, user::User};
-use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
-use crate::circuit::nullifier::Nullifier;
+use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
 use ark_ff::{One, Zero};
 use ark_poly_commit::PolynomialCommitment;
 use rand::rngs::ThreadRng;
@@ -152,7 +152,6 @@ fn test_check_proofs_kzg() {
 }
 
 fn split_and_merge_notes_test<CP: CircuitParameters>() {
-    use ark_ff::UniformRand;
     // --- SET UP ---
 
     //Create global structures

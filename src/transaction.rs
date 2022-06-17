@@ -25,7 +25,7 @@ impl<'a, CP: CircuitParameters> Transaction<'a, CP> {
     ) -> Self {
         Self {
             //max,
-            _actions,
+            actions,
             spent_notes,
             created_notes,
             vps,

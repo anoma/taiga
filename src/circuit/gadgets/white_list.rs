@@ -53,7 +53,6 @@ fn test_white_list_gadget() {
     use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters as CP};
     use crate::merkle_tree::Node;
     use crate::note::Note;
-    use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
     use ark_std::UniformRand;
     use plonk_core::constraint_system::StandardComposer;
     use plonk_hashing::poseidon::constants::PoseidonConstants;
@@ -72,8 +71,8 @@ fn test_white_list_gadget() {
         white_list[1],
         F::rand(&mut rng),
         12,
-        TEGroupAffine::<<CP as CircuitParameters>::InnerCurve>::prime_subgroup_generator(),
-        <CP as CircuitParameters>::InnerCurveScalarField::rand(&mut rng),
+        <CP as CircuitParameters>::CurveScalarField::rand(&mut rng),
+        <CP as CircuitParameters>::CurveScalarField::rand(&mut rng),
         &mut rng,
     );
     let note_com = note.commitment();

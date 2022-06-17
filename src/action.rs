@@ -1,7 +1,6 @@
 use crate::circuit::gadgets::trivial::trivial_gadget;
-use crate::{add_to_tree, circuit::circuit_parameters::CircuitParameters, crh, prf4};
-use ark_ec::ProjectiveCurve;
 use crate::nullifier_key::NullifierDerivingKey;
+use crate::{add_to_tree, circuit::circuit_parameters::CircuitParameters, crh};
 use ark_ff::One;
 use plonk_core::proof_system::Proof;
 use rand::prelude::ThreadRng;
@@ -373,7 +372,6 @@ fn _action_checks<CP: CircuitParameters>() {
         .swap_remove(0)
         .0;
 
-    add_to_tree(&output_note.commitment(), &mut mt_tree);
     add_to_tree(&output_note.get_cm_bytes(), &mut mt_tree);
 
     // ACTION CIRCUIT CHECKS //

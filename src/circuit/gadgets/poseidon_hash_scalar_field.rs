@@ -1,5 +1,5 @@
 use crate::poseidon::WIDTH_3;
-use crate::TEModelParameters;
+use ark_ec::TEModelParameters;
 use ark_ff::PrimeField;
 use plonk_core::{constraint_system::Variable, prelude::StandardComposer};
 use plonk_hashing::poseidon::{
