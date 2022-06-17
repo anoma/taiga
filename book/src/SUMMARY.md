@@ -1,7 +1,6 @@
 # Summary
 
 - [Overview](./overview.md)
-- [Questions](./questions.md)
 - [Taiga by example](./taiga-by-example.md)
 - [Specifications](./spec.md)
 - [Keys](./keys.md)
