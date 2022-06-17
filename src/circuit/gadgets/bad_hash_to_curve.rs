@@ -11,8 +11,7 @@ pub fn bad_hash_to_curve_gadget<F: PrimeField, P: TEModelParameters<BaseField = 
 ) -> Point<P> {
     // (bad) hash to curve:
     // 1. hash a scalar using poseidon
-    let scalar_variable =
-        poseidon_hash_curve_scalar_field_gadget::<F, P>(composer, private_inputs, &vec![]);
+    let scalar_variable = poseidon_hash_curve_scalar_field_gadget::<F, P>(composer, private_inputs);
     // 2. multiply by the generator
     let generator = TEGroupAffine::prime_subgroup_generator();
     composer.fixed_base_scalar_mul(scalar_variable, generator)
@@ -22,14 +21,14 @@ pub fn bad_hash_to_curve_gadget<F: PrimeField, P: TEModelParameters<BaseField = 
 fn test_bad_hash_to_curve_gadget() {
     use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters as CP};
     use crate::crh;
-    use crate::poseidon::WIDTH_3;
+    use crate::poseidon::WIDTH_5;
     use ark_std::UniformRand;
     use plonk_core::constraint_system::StandardComposer;
     type F = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;
 
     let mut rng = rand::thread_rng();
-    let random_inputs = (0..(WIDTH_3 - 1))
+    let random_inputs = (0..(WIDTH_5 - 1))
         .map(|_| F::rand(&mut rng))
         .collect::<Vec<_>>();
 

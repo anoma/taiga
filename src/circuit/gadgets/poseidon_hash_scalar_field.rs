@@ -1,4 +1,4 @@
-use crate::poseidon::WIDTH_3;
+use crate::poseidon::WIDTH_5;
 use ark_ec::TEModelParameters;
 use ark_ff::PrimeField;
 use plonk_core::{constraint_system::Variable, prelude::StandardComposer};
@@ -13,7 +13,6 @@ pub fn poseidon_hash_curve_scalar_field_gadget<
 >(
     composer: &mut StandardComposer<F, P>,
     private_inputs: &Vec<F>,
-    _public_inputs: &Vec<F>,
 ) -> Variable {
     // no public input here
     // private_inputs are the inputs for the Poseidon hash
@@ -23,10 +22,10 @@ pub fn poseidon_hash_curve_scalar_field_gadget<
         .collect::<Vec<_>>();
 
     // params for poseidon TODO make it const
-    let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
-    let mut poseidon_circuit = Poseidon::<_, PlonkSpec<WIDTH_3>, WIDTH_3>::new(
+    let poseidon_hash_param_bls12_377_scalar_arity4 = PoseidonConstants::generate::<WIDTH_5>();
+    let mut poseidon_circuit = Poseidon::<_, PlonkSpec<WIDTH_5>, WIDTH_5>::new(
         composer,
-        &poseidon_hash_param_bls12_377_scalar_arity2,
+        &poseidon_hash_param_bls12_377_scalar_arity4,
     );
     inputs_var.iter().for_each(|x| {
         let _ = poseidon_circuit.input(*x).unwrap();
@@ -37,7 +36,7 @@ pub fn poseidon_hash_curve_scalar_field_gadget<
 #[test]
 fn test_poseidon_gadget() {
     use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters as CP};
-    use crate::WIDTH_3;
+    use crate::WIDTH_5;
     use ark_std::UniformRand;
     use plonk_core::constraint_system::StandardComposer;
     use plonk_hashing::poseidon::constants::PoseidonConstants;
@@ -48,13 +47,13 @@ fn test_poseidon_gadget() {
     type P = <CP as CircuitParameters>::InnerCurve;
 
     let mut rng = rand::thread_rng();
-    let ω = (0..(WIDTH_3 - 1))
+    let ω = (0..(WIDTH_5 - 1))
         .map(|_| F::rand(&mut rng))
         .collect::<Vec<_>>();
-    let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
-    let mut poseidon = Poseidon::<(), NativeSpec<F, WIDTH_3>, WIDTH_3>::new(
+    let poseidon_hash_param_bls12_377_scalar_arity4 = PoseidonConstants::generate::<WIDTH_5>();
+    let mut poseidon = Poseidon::<(), NativeSpec<F, WIDTH_5>, WIDTH_5>::new(
         &mut (),
-        &poseidon_hash_param_bls12_377_scalar_arity2,
+        &poseidon_hash_param_bls12_377_scalar_arity4,
     );
     ω.iter().for_each(|x| {
         poseidon.input(*x).unwrap();
@@ -62,8 +61,7 @@ fn test_poseidon_gadget() {
     let hash = poseidon.output_hash(&mut ());
     let mut composer = StandardComposer::<F, P>::new();
     let native_hash_variable = composer.add_public_input_variable(hash);
-    let gadget_hash_variable =
-        poseidon_hash_curve_scalar_field_gadget::<F, P>(&mut composer, &ω, &vec![hash]);
+    let gadget_hash_variable = poseidon_hash_curve_scalar_field_gadget::<F, P>(&mut composer, &ω);
     composer.assert_equal(native_hash_variable, gadget_hash_variable);
     composer.check_circuit_satisfied();
 }

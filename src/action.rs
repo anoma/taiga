@@ -226,7 +226,12 @@ fn spent_notes_checks<CP: CircuitParameters>(
 
     // hack for note data because for now we are restricted to few input for the commitment
     // TODO change the hash function and put all the note data inside note_data.
-    let note_data = vec![spent_note.owner_address, spent_note.token_address];
+    let note_data = vec![
+        spent_note.owner_address,
+        spent_note.token_address,
+        CP::CurveScalarField::from(spent_note.value),
+        CP::CurveScalarField::from(spent_note.data),
+    ];
     Action::<CP>::check_note_existence(
         note_commitments.root().unwrap(),
         note_commitments.proof(&[0]),
@@ -291,7 +296,12 @@ fn output_notes_checks<CP: CircuitParameters>(
     // Commitment integrity(output note only): `cm = NoteCom(note, rcm_note)`
     // hack for note data because for now we are restricted to few input for the commitment
     // TODO change the hash function and put all the note data inside note_data.
-    let output_note_data = vec![output_note.owner_address, output_note.token_address];
+    let output_note_data = vec![
+        output_note.owner_address,
+        output_note.token_address,
+        CP::CurveScalarField::from(output_note.value),
+        CP::CurveScalarField::from(output_note.data),
+    ];
     Action::<CP>::check_note_commitment_integrity(
         output_note.commitment(),
         output_note_data,

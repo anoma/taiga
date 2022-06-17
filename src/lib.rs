@@ -117,15 +117,12 @@ fn com<F: PrimeField + HashToField>(x: &Vec<F>, rand: F) -> F {
     }
 }
 
-/// Collision-resistant hash
-/// Only binding
-// A really bad hash-to-curve
-// TODO: the implementation is a bit weird: it does not really depends on CP and could be written with a curve as a parameter (`fn hash_to_curve<E:Curve>`).
+/// Collision-resistant (only binding) hash
+// A really bad hash-to-curve that will be replaced
 fn crh<CP: CircuitParameters>(data: &Vec<CP::CurveScalarField>) -> TEGroupAffine<CP::InnerCurve> {
-    // let scalar = <CP::InnerCurveScalarField>::hash_to_field(data);
-    // // TODO: data length is 2 for now but will be larger later
-    assert_eq!(data.len(), 2);
-    let _scalar = <CP::CurveScalarField>::hash2_to_field(data[0], data[1]);
+    // TODO: data length is 4 for now but will be larger later
+    assert_eq!(data.len(), 4);
+    let _scalar = <CP::CurveScalarField>::hash4_to_field(data[0], data[1], data[2], data[3]);
     let scalar =
         CP::InnerCurveScalarField::from_le_bytes_mod_order(&_scalar.into_repr().to_bytes_le());
     TEGroupAffine::prime_subgroup_generator().mul(scalar).into()

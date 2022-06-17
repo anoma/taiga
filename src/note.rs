@@ -17,7 +17,7 @@ pub struct Note<CP: CircuitParameters> {
     pub token_address: CP::CurveScalarField,
     pub value: u32,
     rcm: BigInteger256,
-    data: u32, // for NFT or whatever, we won't use it in this simple example
+    pub data: u32, // for NFT or whatever, we won't use it in this simple example
     pub rho: CP::CurveScalarField, // rho parameter
     /// Note value useful for the nullifier
     pub psi: CP::CurveScalarField, // computed from spent_note_nf using a PRF
@@ -52,8 +52,8 @@ impl<CP: CircuitParameters> Note<CP> {
         let vec = vec![
             self.owner_address,
             self.token_address,
-            // CP::CurveScalarField::from(self.value),
-            // CP::CurveScalarField::from(self.data)
+            CP::CurveScalarField::from(self.value),
+            CP::CurveScalarField::from(self.data),
         ];
         crh::<CP>(&vec)
 

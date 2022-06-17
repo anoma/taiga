@@ -27,7 +27,12 @@ pub fn white_list_gadget<
     // opening of the note_commitment
     let crh_point = bad_hash_to_curve_gadget::<F, P>(
         composer,
-        &vec![private_note.owner_address, private_note.token_address],
+        &vec![
+            private_note.owner_address,
+            private_note.token_address,
+            F::from(private_note.value),
+            F::from(private_note.data),
+        ],
     );
     composer.assert_equal_public_point(crh_point, public_note_commitment);
 
