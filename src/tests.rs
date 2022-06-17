@@ -5,7 +5,8 @@ use crate::el_gamal::{DecryptionKey, EncryptedNote};
 use crate::transaction::Transaction;
 use crate::{add_to_tree, note::Note, serializable_to_vec, token::Token, user::User};
 use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve};
-use ark_ff::Zero;
+use crate::circuit::nullifier::Nullifier;
+use ark_ff::{One, Zero};
 use ark_poly_commit::PolynomialCommitment;
 use rand::rngs::ThreadRng;
 use rs_merkle::algorithms::Blake2s;
@@ -74,13 +75,13 @@ fn test_send<CP: CircuitParameters>() {
         alice.address(),
         xan.address(),
         1,
-        TEGroupAffine::prime_subgroup_generator(),
-        <CP>::InnerCurveScalarField::zero(),
+        <CP>::CurveScalarField::one(),
+        <CP>::CurveScalarField::zero(),
         &mut rng,
     );
 
     //Add note to the global structures
-    add_to_tree(&note_a1xan.commitment(), &mut mt_tree);
+    add_to_tree(&note_a1xan.get_cm_bytes(), &mut mt_tree);
     let note_a1xan_ec = alice.encrypt(&mut rng, &note_a1xan);
     cm_ce_list.push((note_a1xan.commitment(), note_a1xan_ec));
 
@@ -102,8 +103,13 @@ fn test_send<CP: CircuitParameters>() {
     let hash_nc_bob = Blake2s::hash(&bytes);
 
     //Prepare the nf hash for future spent notes check
-    let nullifier = alice.compute_nullifier(&note_a1xan);
-    let hash_nf = Blake2s::hash(&serializable_to_vec(&nullifier));
+    let nullifier = Nullifier::derive_native(
+        &alice.get_nk(),
+        &note_a1xan.rho,
+        &note_a1xan.psi,
+        &note_a1xan.commitment(),
+    );
+    let hash_nf = Blake2s::hash(&nullifier.to_bytes());
 
     //Create a tx spending Alice's note and creating a note for Bob
     let tx: Transaction<CP> = Transaction::new(
@@ -147,7 +153,6 @@ fn test_check_proofs_kzg() {
 
 fn split_and_merge_notes_test<CP: CircuitParameters>() {
     use ark_ff::UniformRand;
-
     // --- SET UP ---
 
     //Create global structures
@@ -171,12 +176,12 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
         yulia.address(),
         xan.address(),
         4,
-        TEGroupAffine::prime_subgroup_generator(),
-        <CP as CircuitParameters>::InnerCurveScalarField::rand(&mut rng),
+        <CP>::CurveScalarField::one(),
+        <CP>::CurveScalarField::zero(),
         &mut rng,
     );
 
-    add_to_tree(&initial_note.commitment(), &mut mt_tree);
+    add_to_tree(&initial_note.get_cm_bytes(), &mut mt_tree);
     let initial_note_ec = yulia.encrypt(&mut rng, &initial_note);
     cm_ce_list.push((initial_note.commitment(), initial_note_ec));
 
@@ -206,8 +211,13 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
     let hash3 = Blake2s::hash(&bytes);
 
     //Prepare the nf hash for future spent notes check
-    let nullifier = yulia.compute_nullifier(&initial_note);
-    let hash_nf = Blake2s::hash(&serializable_to_vec(&nullifier));
+    let nullifier = Nullifier::derive_native(
+        &yulia.get_nk(),
+        &initial_note.rho,
+        &initial_note.psi,
+        &initial_note.commitment(),
+    );
+    let hash_nf = Blake2s::hash(&nullifier.to_bytes());
 
     //Create a tx splitting the initial note
     let tx: Transaction<CP> = Transaction::new(
@@ -245,10 +255,20 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
     let hash4 = Blake2s::hash(&bytes);
 
     //Prepare the nf hash for future spent notes check
-    let nullifier1 = yulia.compute_nullifier(&split_output_notes[0].0);
-    let nullifier2 = yulia.compute_nullifier(&split_output_notes[1].0);
-    let hash_nf1 = Blake2s::hash(&serializable_to_vec(&nullifier1));
-    let hash_nf2 = Blake2s::hash(&serializable_to_vec(&nullifier2));
+    let nullifier1 = Nullifier::derive_native(
+        &yulia.get_nk(),
+        &split_output_notes[0].0.rho,
+        &split_output_notes[0].0.psi,
+        &split_output_notes[0].0.commitment(),
+    );
+    let nullifier2 = Nullifier::derive_native(
+        &yulia.get_nk(),
+        &split_output_notes[1].0.rho,
+        &split_output_notes[1].0.psi,
+        &split_output_notes[1].0.commitment(),
+    );
+    let hash_nf1 = Blake2s::hash(&nullifier1.to_bytes());
+    let hash_nf2 = Blake2s::hash(&nullifier2.to_bytes());
 
     //Create a tx splitting the initial note
     let tx: Transaction<CP> = Transaction::new(

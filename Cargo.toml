@@ -27,6 +27,7 @@ rs_merkle = { git = "https://github.com/heliaxdev/rs-merkle/" } # "0.2.2"
 lazy_static = "1"
 derivative = { version = "2", features = ["use_core"] }
 thiserror = "1"
+blake2b_simd = "1"
 
 [dev-dependencies]
 ark-std = "0.3"

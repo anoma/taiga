@@ -1,3 +1,6 @@
+// Temporary for annoying warning(unused implementation).
+#![allow(dead_code)]
+
 use crate::poseidon::{
     POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2, POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY4,
     WIDTH_3, WIDTH_5,
@@ -5,7 +8,7 @@ use crate::poseidon::{
 use ark_bls12_377::Fq as Fq377;
 use ark_bls12_377::Fr as Fr377;
 use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
-use ark_ec::{AffineCurve, TEModelParameters};
+use ark_ec::AffineCurve;
 use ark_ff::*;
 use ark_serialize::CanonicalSerialize;
 use circuit::circuit_parameters::CircuitParameters;
@@ -20,6 +23,8 @@ pub mod el_gamal;
 pub mod error;
 pub mod merkle_tree;
 pub mod note;
+// TODO: put the nullifier_key in address later.
+pub mod nullifier_key;
 pub mod poseidon;
 pub mod token;
 pub mod transaction;
@@ -131,21 +136,16 @@ fn serializable_to_vec<F: CanonicalSerialize>(elem: &F) -> Vec<u8> {
     bytes_prep_send
 }
 
-fn is_in_tree<P: TEModelParameters>(
-    elem: &TEGroupAffine<P>,
-    tree: &mut MerkleTree<Blake2s>,
-) -> bool {
+fn is_in_tree(elem: &Vec<u8>, tree: &mut MerkleTree<Blake2s>) -> bool {
     if tree.leaves().is_none() {
         return false;
     }
-    let bytes = serializable_to_vec(elem);
-    let h = Blake2s::hash(&bytes);
+    let h = Blake2s::hash(elem);
     tree.leaves().unwrap().contains(&h)
 }
 
-fn add_to_tree<P: TEModelParameters>(elem: &TEGroupAffine<P>, tree: &mut MerkleTree<Blake2s>) {
-    let bytes = serializable_to_vec(elem);
-    let h = Blake2s::hash(&bytes);
+fn add_to_tree(elem: &Vec<u8>, tree: &mut MerkleTree<Blake2s>) {
+    let h = Blake2s::hash(elem);
     tree.insert(h);
     tree.commit();
 }
