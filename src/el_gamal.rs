@@ -38,8 +38,7 @@ impl<C: TEModelParameters> EncryptedNote<C> {
 
     pub fn serialize(&self) -> Vec<u8> {
         (0..self.en.len())
-            .map(|i| self.en[i].serialize())
-            .flatten()
+            .flat_map(|i| self.en[i].serialize())
             .collect()
     }
 }

@@ -13,7 +13,7 @@ pub fn merkle_tree_gadget<
 >(
     composer: &mut StandardComposer<F, P>,
     cur_leaf: &Variable,
-    auth_path: &Vec<(F, bool)>,
+    auth_path: &[(F, bool)],
     hash_gadget: &BHG,
 ) -> Result<Variable, TaigaError> {
     let mut cur = *cur_leaf;

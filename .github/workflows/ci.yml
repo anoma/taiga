@@ -66,7 +66,7 @@ jobs:
         with:
           name: Clippy
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --verbose --release --workspace --examples --tests --all-features -- -D warnings
+          args: --release --workspace --examples --tests --all-features -- -D warnings
 
   clippy-beta:
     name: Nightly lint
@@ -86,7 +86,7 @@ jobs:
         with:
           name: Clippy (beta)
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --verbose --release --workspace --examples --tests --all-features -- -W clippy::all
+          args: --release --workspace --examples --tests --all-features -- -W clippy::all
 
   codecov:
     name: Code coverage

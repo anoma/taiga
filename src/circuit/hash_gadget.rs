@@ -29,7 +29,7 @@ impl<F: PrimeField, P: TEModelParameters<BaseField = F>> BinaryHasherGadget<F, P
         left: &Variable,
         right: &Variable,
     ) -> Result<Variable, TaigaError> {
-        let mut poseidon_circuit = Poseidon::<_, PlonkSpec<WIDTH_3>, WIDTH_3>::new(composer, &self);
+        let mut poseidon_circuit = Poseidon::<_, PlonkSpec<WIDTH_3>, WIDTH_3>::new(composer, self);
         poseidon_circuit.input(*left)?;
         poseidon_circuit.input(*right)?;
 
