@@ -34,7 +34,7 @@ impl<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> MerkleTreeLeafs<F, 
                         .unwrap(),
                 );
             }
-            len = len / 2;
+            len /= 2;
         }
         list[0].clone()
     }
