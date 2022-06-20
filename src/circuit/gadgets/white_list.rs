@@ -1,6 +1,5 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::merkle_tree::MerklePath;
-use crate::merkle_tree::MerkleTreeLeafs;
 use crate::merkle_tree::Node;
 use crate::poseidon::WIDTH_3;
 use ark_ec::TEModelParameters;
@@ -51,6 +50,7 @@ pub fn white_list_gadget<
 #[test]
 fn test_white_list_gadget() {
     use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters as CP};
+    use crate::merkle_tree::MerkleTreeLeafs;
     use crate::merkle_tree::Node;
     use crate::note::Note;
     use crate::poseidon::BinaryHasher;
