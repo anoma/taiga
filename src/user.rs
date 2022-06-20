@@ -118,21 +118,6 @@ impl<CP: CircuitParameters> User<CP> {
         }
     }
 
-    // pub fn compute_nullifier(&self, note: &Note<CP>) -> TEGroupAffine<CP::InnerCurve> {
-    //     let scalar = to_embedded_field::<CP::CurveScalarField, CP::InnerCurveScalarField>(prf4::<
-    //         CP::CurveScalarField,
-    //     >(
-    //         note.spent_note_nf.x,
-    //         note.spent_note_nf.y,
-    //         self.nk.inner(),
-    //         CP::CurveScalarField::zero(),
-    //     )) + note.psi;
-    //     TEGroupAffine::prime_subgroup_generator()
-    //         .mul(scalar)
-    //         .into_affine()
-    //         + note.commitment()
-    // }
-
     pub fn enc_key(&self) -> &EncryptionKey<CP::InnerCurve> {
         self._dec_key.encryption_key()
     }

@@ -1,7 +1,7 @@
 use crate::circuit::{circuit_parameters::CircuitParameters, hash_gadget::BinaryHasherGadget};
 use crate::error::TaigaError;
 use crate::nullifier_key::NullifierDerivingKey;
-use crate::poseidon::WIDTH_3;
+use crate::poseidon::{BinaryHasher, WIDTH_3};
 use ark_ec::{
     twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve, ProjectiveCurve,
 };
@@ -10,10 +10,7 @@ use plonk_core::{
     constraint_system::{ecc::Point, StandardComposer},
     prelude::Variable,
 };
-use plonk_hashing::poseidon::{
-    constants::PoseidonConstants,
-    poseidon::{NativeSpec, Poseidon},
-};
+use plonk_hashing::poseidon::constants::PoseidonConstants;
 
 /// The unique nullifier.
 #[derive(Copy, Debug, Clone)]
@@ -27,8 +24,12 @@ impl<CP: CircuitParameters> Nullifier<CP> {
         psi: &CP::CurveScalarField,
         cm: &TEGroupAffine<CP::InnerCurve>,
     ) -> Self {
+        // Init poseidon param.
+        let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+            PoseidonConstants::generate::<WIDTH_3>();
+        let prf_nk_rho = poseidon_param.native_hash_two(&nk.inner(), rho).unwrap();
         // This requires CP::CurveScalarField is smaller than CP::InnerCurveScalarField
-        let scalar_repr = (Self::prf_nf(nk, rho) + psi).into_repr();
+        let scalar_repr = (prf_nk_rho + psi).into_repr();
         let scalar = CP::InnerCurveScalarField::from_le_bytes_mod_order(&scalar_repr.to_bytes_le());
 
         let ret = TEGroupAffine::prime_subgroup_generator()
@@ -49,7 +50,7 @@ impl<CP: CircuitParameters> Nullifier<CP> {
     ) -> Result<Variable, TaigaError> {
         let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
             PoseidonConstants::generate::<WIDTH_3>();
-        let prf_ret = poseidon_param.hash_two(composer, nk, rho)?;
+        let prf_ret = poseidon_param.circuit_hash_two(composer, nk, rho)?;
 
         // scalar = prf_nk(rho) + psi
         let scalar = composer.arithmetic_gate(|gate| {
@@ -70,22 +71,6 @@ impl<CP: CircuitParameters> Nullifier<CP> {
 
         // return the nullifier variable.(if we don't need it, pls get rid of it)
         Ok(*nullifier_variable)
-    }
-
-    // Uses poseidon hash with 2 inputs as prf_nf.
-    fn prf_nf(
-        nk: &NullifierDerivingKey<CP::CurveScalarField>,
-        rho: &CP::CurveScalarField,
-    ) -> CP::CurveScalarField {
-        let param: PoseidonConstants<CP::CurveScalarField> =
-            PoseidonConstants::generate::<WIDTH_3>();
-        let mut poseidon = Poseidon::<(), NativeSpec<CP::CurveScalarField, WIDTH_3>, WIDTH_3>::new(
-            &mut (),
-            &param,
-        );
-        poseidon.input(nk.inner()).unwrap();
-        poseidon.input(*rho).unwrap();
-        poseidon.output_hash(&mut ())
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {

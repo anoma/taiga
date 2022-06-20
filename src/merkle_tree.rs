@@ -82,7 +82,7 @@ impl<F: PrimeField, BH: BinaryHasher<F>> Node<F, BH> {
 
     /// Returns the hash result of left node, right node and the hash function.
     fn combine(lhs: &Self, rhs: &Self, hasher: &BH) -> Result<Self, TaigaError> {
-        let hash = hasher.hash_two(&lhs.repr, &rhs.repr)?;
+        let hash = hasher.native_hash_two(&lhs.repr, &rhs.repr)?;
         Ok(Self::new(hash))
     }
 }
