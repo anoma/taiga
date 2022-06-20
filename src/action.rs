@@ -201,7 +201,7 @@ impl<CP: CircuitParameters> Action<CP> {
 //
 // this is not the circuit implementation but what should be hard-coded in the Action Circuit.
 //
-use crate::el_gamal::{DecryptionKey, EncryptedNote};
+use crate::el_gamal::DecryptionKey;
 use crate::note::Note;
 use crate::token::Token;
 use crate::user::User;
@@ -332,11 +332,11 @@ fn _action_checks<CP: CircuitParameters>() {
         &outer_curve_pp,
         DecryptionKey::<CP::InnerCurve>::new(&mut rng),
         trivial_gadget::<CP>,
-        &vec![],
-        &vec![],
+        &[],
+        &[],
         trivial_gadget::<CP>,
-        &vec![],
-        &vec![],
+        &[],
+        &[],
         &mut rng,
     );
 
@@ -346,21 +346,20 @@ fn _action_checks<CP: CircuitParameters>() {
         &outer_curve_pp,
         DecryptionKey::<CP::InnerCurve>::new(&mut rng),
         trivial_gadget::<CP>,
-        &vec![],
-        &vec![],
+        &[],
+        &[],
         trivial_gadget::<CP>,
-        &vec![],
-        &vec![],
+        &[],
+        &[],
         &mut rng,
     );
 
     let xan = Token::<CP>::new("xan", &pp, trivial_gadget::<CP>, &mut rng);
 
     // Creation of a note commitments tree
-    let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
+    let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&[]);
     // Creation of the {note commitment + encrypted note} list
-    let mut cm_ce_list: Vec<(TEGroupAffine<CP::InnerCurve>, EncryptedNote<CP::InnerCurve>)> =
-        vec![];
+    let mut cm_ce_list = Vec::new();
 
     // Creation of a note of 1XAN for Alice
     let spent_note = Note::<CP>::new(
@@ -378,7 +377,7 @@ fn _action_checks<CP: CircuitParameters>() {
 
     // The note is spent, and a new note is created for Bob
     let output_note = alice
-        .send(&mut vec![&spent_note], vec![(&bob, 1_u32)], &mut rng)
+        .send(&mut [&spent_note], vec![(&bob, 1_u32)], &mut rng)
         .swap_remove(0)
         .0;
 

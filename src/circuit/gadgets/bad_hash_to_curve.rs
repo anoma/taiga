@@ -7,11 +7,13 @@ use plonk_core::prelude::{Point, StandardComposer};
 
 pub fn bad_hash_to_curve_gadget<F: PrimeField, P: TEModelParameters<BaseField = F>>(
     composer: &mut StandardComposer<F, P>,
-    private_inputs: &Vec<F>,
+    private_inputs: &[F],
+    _public_inputs: &[F],
 ) -> Point<P> {
     // (bad) hash to curve:
     // 1. hash a scalar using poseidon
-    let scalar_variable = poseidon_hash_curve_scalar_field_gadget::<F, P>(composer, private_inputs);
+    let scalar_variable =
+        poseidon_hash_curve_scalar_field_gadget::<F, P>(composer, private_inputs, &[]);
     // 2. multiply by the generator
     let generator = TEGroupAffine::prime_subgroup_generator();
     composer.fixed_base_scalar_mul(scalar_variable, generator)
@@ -36,7 +38,7 @@ fn test_bad_hash_to_curve_gadget() {
 
     let mut composer = StandardComposer::<F, P>::new();
 
-    let gadget_hash_variable = bad_hash_to_curve_gadget::<F, P>(&mut composer, &random_inputs);
+    let gadget_hash_variable = bad_hash_to_curve_gadget::<F, P>(&mut composer, &random_inputs, &[]);
     composer.assert_equal_public_point(gadget_hash_variable, hash);
     composer.check_circuit_satisfied();
 }

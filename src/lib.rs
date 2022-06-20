@@ -1,5 +1,6 @@
 // Temporary for annoying warning(unused implementation).
 #![allow(dead_code)]
+#![allow(clippy::type_complexity)]
 
 use crate::poseidon::{
     POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2, POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY4,
@@ -112,8 +113,7 @@ fn com<F: PrimeField + HashToField>(x: &Vec<F>, rand: F) -> F {
         F::hash4_to_field(x[0], x[1], x[2], rand)
     } else {
         // if this case occurs we need to think about the Poseidon parameters again!
-        assert!(false);
-        rand
+        panic!();
     }
 }
 
@@ -134,7 +134,7 @@ fn serializable_to_vec<F: CanonicalSerialize>(elem: &F) -> Vec<u8> {
     bytes_prep_send
 }
 
-fn is_in_tree(elem: &Vec<u8>, tree: &mut MerkleTree<Blake2s>) -> bool {
+fn is_in_tree(elem: &[u8], tree: &mut MerkleTree<Blake2s>) -> bool {
     if tree.leaves().is_none() {
         return false;
     }
@@ -142,7 +142,7 @@ fn is_in_tree(elem: &Vec<u8>, tree: &mut MerkleTree<Blake2s>) -> bool {
     tree.leaves().unwrap().contains(&h)
 }
 
-fn add_to_tree(elem: &Vec<u8>, tree: &mut MerkleTree<Blake2s>) {
+fn add_to_tree(elem: &[u8], tree: &mut MerkleTree<Blake2s>) {
     let h = Blake2s::hash(elem);
     tree.insert(h);
     tree.commit();

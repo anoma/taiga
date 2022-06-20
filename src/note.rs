@@ -33,9 +33,9 @@ impl<CP: CircuitParameters> Note<CP> {
         rng: &mut ThreadRng,
     ) -> Self {
         Self {
-            owner_address: owner_address,
-            token_address: token_address,
-            value: value,
+            owner_address,
+            token_address,
+            value,
             rcm: rng.gen(),
             data: 0,
             rho,

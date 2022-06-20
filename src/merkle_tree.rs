@@ -30,11 +30,11 @@ impl<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> MerkleTreeLeafs<F, 
             for i in 0..len / 2 {
                 list[i] = Node::<F, BH>::new(
                     hasher
-                        .hash_two(&list[2 * i].repr, &list[2 * i + 1].repr)
+                        .native_hash_two(&list[2 * i].repr, &list[2 * i + 1].repr)
                         .unwrap(),
                 );
             }
-            len = len / 2;
+            len /= 2;
         }
         list[0].clone()
     }
@@ -80,7 +80,7 @@ impl<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> MerklePath<F, BH> {
 }
 
 /// A node within the Sapling commitment tree.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Node<F: PrimeField, BH: BinaryHasher<F>> {
     repr: F,
     _hasher: PhantomData<BH>,
@@ -109,13 +109,13 @@ impl<F: PrimeField, BH: BinaryHasher<F>> Node<F, BH> {
         self.repr.into_repr().to_bytes_le()
     }
 
-    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+    pub fn from_bytes(bytes: &[u8]) -> Self {
         Self::new(F::from_le_bytes_mod_order(bytes))
     }
 
     /// Returns the hash result of left node, right node and the hash function.
     fn combine(lhs: &Self, rhs: &Self, hasher: &BH) -> Result<Self, TaigaError> {
-        let hash = hasher.hash_two(&lhs.repr, &rhs.repr)?;
+        let hash = hasher.native_hash_two(&lhs.repr, &rhs.repr)?;
         Ok(Self::new(hash))
     }
 }

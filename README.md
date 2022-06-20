@@ -80,37 +80,3 @@ cargo test  test_check_proofs_kzg
 ```
 cargo test test_split_note_for_different_curves
 ```
-
-
-
-## Tasks
-
-See [here](https://hackmd.io/@yulia/pbc_toy) for tasks we aim.
-
-### DONE
-
-* [x] Creating of a PLONK setup using either KZG or IPA, with their corresponding curves,
-* [x] Creation of a token (a preprocessing on the input token VP is done),
-* [x] Creation of a user (a preprocessing on the input sending and receiving VP is done),
-* [x] Creation of a nullifier Merkle tree, a note commitment (NC) Merkle tree, and a note commitment + encrypted note (NCEN) list,
-* [x] Creation of a note (the NC tree and the NCEN list are updated),
-* [x] Spending of a note (the nullifier tree is updated, and a new note is created),
-* [x] Proofs of membership in the nullifier and the NC tree can be computed and verified.
-* [x] Change the type of the circuit to be `fn(&mut StandardComposer)` instead of `&mut StandardComposer` because that's how we set a circuit in ark-plonk.
-* [x] Check the proofs with the precomputed `desc_..._vp`
-* [x] Implement the blinding of `preprocessing_{sending,receiving}_vp`
-      in the creation of a new `User`. This is done in `plonk` directly.
-* [x] Check the proofs with the blinded `VerifierKey`s.
-* [x] Provide some details on the action circuit with the current implementation (without writting directly the circuit).
-
-### TO DO
-
-* [ ] Implement `Display` for the different structures.
-* [ ] Implement a transaction as decribed in the specification.
-* [ ] Implement hash functions for `com_q`, `com_r`, `com` that could fit with circuits.
-* [ ] See if our Merkle tree implementation can lead to proofs easily (if we change the hash function).
-* [ ] Create simple `sending` and `receiving` circuits for tests.
-* [ ] Integrate the blinding commitment `Com((b0+b1*X)Z_H(X))` into the `public_input` (?) of the blinding proof. Not sure if the `Verifier` that we currently use is a good option for the blinding proof...
-* [ ] Once Blake2 circuits are available (Josh?), create the blinding circuit that might be easy, and check a blinding proof.
-* [ ] The current El Gamal implementation uses a hash function, so we need to choose which one we want to use (as we are going to build circuits on top of that).
-* [ ] Lots of things...

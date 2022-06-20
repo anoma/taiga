@@ -1,7 +1,5 @@
-use super::bad_hash_to_curve::bad_hash_to_curve_gadget;
 use crate::circuit::circuit_parameters::CircuitParameters;
-use crate::note::Note;
-use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, TEModelParameters};
+use ark_ec::TEModelParameters;
 use ark_ff::PrimeField;
 use plonk_core::prelude::StandardComposer;
 
@@ -11,25 +9,19 @@ pub fn upper_bound_gadget<
     CP: CircuitParameters<CurveScalarField = F, InnerCurve = P>,
 >(
     composer: &mut StandardComposer<F, P>,
-    private_note: Note<CP>,
-    private_bound: u32,
-    public_note_commitment: TEGroupAffine<P>,
+    private_inputs: &[F],
+    public_inputs: &[F],
+    // private_note: Note<CP>,
+    // private_bound: u32,
+    // public_note_commitment: TEGroupAffine<P>,
 ) {
-    // opening of the note_commitment
-    let crh_point = bad_hash_to_curve_gadget::<F, P>(
-        composer,
-        &vec![
-            private_note.owner_address,
-            private_note.token_address,
-            F::from(private_note.value),
-            F::from(private_note.data),
-        ],
-    );
-    composer.assert_equal_public_point(crh_point, public_note_commitment);
-
+    // parse the private inputs
+    let note_value = private_inputs[0];
+    let bound = private_inputs[1];
+    // todo prove the ownership of the note somewhere?
     // upper bound check
-    let value_variable = composer.add_input(F::from(private_note.value));
-    composer.range_gate(value_variable, private_bound.try_into().unwrap());
+    let value_variable = composer.add_input(note_value);
+    composer.range_gate(value_variable, bound.try_into().unwrap());
 }
 
 #[test]
@@ -55,9 +47,8 @@ fn test_upper_bound_gadget() {
         <CP as CircuitParameters>::CurveScalarField::rand(&mut rng),
         &mut rng,
     );
-    let note_com = note.commitment();
 
     let mut composer = StandardComposer::<F, <CP as CircuitParameters>::InnerCurve>::new();
-    upper_bound_gadget::<F, P, CP>(&mut composer, note, 14, note_com);
+    upper_bound_gadget::<F, P, CP>(&mut composer, &[F::from(note.value), F::from(14)], &[]);
     composer.check_circuit_satisfied();
 }

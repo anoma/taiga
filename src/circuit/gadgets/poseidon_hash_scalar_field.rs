@@ -12,7 +12,8 @@ pub fn poseidon_hash_curve_scalar_field_gadget<
     P: TEModelParameters<BaseField = F>,
 >(
     composer: &mut StandardComposer<F, P>,
-    private_inputs: &Vec<F>,
+    private_inputs: &[F],
+    _public_inputs: &[F],
 ) -> Variable {
     // no public input here
     // private_inputs are the inputs for the Poseidon hash
@@ -61,7 +62,8 @@ fn test_poseidon_gadget() {
     let hash = poseidon.output_hash(&mut ());
     let mut composer = StandardComposer::<F, P>::new();
     let native_hash_variable = composer.add_public_input_variable(hash);
-    let gadget_hash_variable = poseidon_hash_curve_scalar_field_gadget::<F, P>(&mut composer, &ω);
+    let gadget_hash_variable =
+        poseidon_hash_curve_scalar_field_gadget::<F, P>(&mut composer, &ω, &[hash]);
     composer.assert_equal(native_hash_variable, gadget_hash_variable);
     composer.check_circuit_satisfied();
 }
