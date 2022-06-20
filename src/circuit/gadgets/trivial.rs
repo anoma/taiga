@@ -4,8 +4,8 @@ use plonk_core::prelude::StandardComposer;
 
 pub fn trivial_gadget<CP: CircuitParameters>(
     composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-    _private_inputs: &Vec<CP::CurveScalarField>,
-    _public_inputs: &Vec<CP::CurveScalarField>,
+    _private_inputs: &[CP::CurveScalarField],
+    _public_inputs: &[CP::CurveScalarField],
 ) {
     // no input in this trivial gadget...
     let var_one = composer.add_input(CP::CurveScalarField::one());

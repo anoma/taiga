@@ -12,8 +12,8 @@ pub fn poseidon_hash_curve_scalar_field_gadget<
     P: TEModelParameters<BaseField = F>,
 >(
     composer: &mut StandardComposer<F, P>,
-    private_inputs: &Vec<F>,
-    _public_inputs: &Vec<F>,
+    private_inputs: &[F],
+    _public_inputs: &[F],
 ) -> Variable {
     // no public input here
     // private_inputs are the inputs for the Poseidon hash

@@ -13,7 +13,7 @@ pub fn merkle_tree_gadget<
 >(
     composer: &mut StandardComposer<F, P>,
     cur_leaf: &Variable,
-    auth_path: &Vec<(F, bool)>,
+    auth_path: &[(F, bool)],
     hash_gadget: &BHG,
 ) -> Result<Variable, TaigaError> {
     let mut cur = *cur_leaf;
@@ -36,7 +36,7 @@ pub fn merkle_tree_gadget<
         let ur = composer.conditional_select(cur_is_right, cur, path_element);
 
         // Compute the new subtree value
-        cur = hash_gadget.hash_two(composer, &ul, &ur)?;
+        cur = hash_gadget.circuit_hash_two(composer, &ul, &ur)?;
     }
 
     Ok(cur)

@@ -12,8 +12,8 @@ use plonk_hashing::poseidon::{
 
 pub fn bad_hash_to_curve_gadget<F: PrimeField, P: TEModelParameters<BaseField = F>>(
     composer: &mut StandardComposer<F, P>,
-    private_inputs: &Vec<F>,
-    _public_inputs: &Vec<F>,
+    private_inputs: &[F],
+    _public_inputs: &[F],
 ) -> Point<P> {
     // (bad) hash to curve:
     // 1. hash a scalar using poseidon

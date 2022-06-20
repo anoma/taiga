@@ -4,8 +4,8 @@ use plonk_core::prelude::StandardComposer;
 
 pub fn field_addition_gadget<CP: CircuitParameters>(
     composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-    private_inputs: [CP::CurveScalarField;2],
-    public_input: CP::CurveScalarField,
+    private_inputs: &[CP::CurveScalarField],
+    public_inputs: &[CP::CurveScalarField],
 ) {
     // simple circuit that checks that a + b == c
     let (a, b) = if private_inputs.len() == 0 {
@@ -13,7 +13,7 @@ pub fn field_addition_gadget<CP: CircuitParameters>(
     } else {
         (private_inputs[0], private_inputs[1])
     };
-    let c = public_input;
+    let c = public_inputs[0];
     let one = <CP as CircuitParameters>::CurveScalarField::one();
     let var_a = composer.add_input(a);
     let var_b = composer.add_input(b);
@@ -38,6 +38,6 @@ fn test_field_addition_gadget() {
         <CP as CircuitParameters>::CurveScalarField,
         <CP as CircuitParameters>::InnerCurve,
     >::new();
-    field_addition_gadget::<CP>(&mut composer, [a, b], c);
+    field_addition_gadget::<CP>(&mut composer, &[a, b], &[c]);
     composer.check_circuit_satisfied();
 }

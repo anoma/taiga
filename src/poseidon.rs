@@ -27,13 +27,13 @@ lazy_static! {
 /// A BinaryHasher over prime field takes two field elements as input and
 /// outputs one field element.
 pub trait BinaryHasher<F: PrimeField> {
-    fn hash_two(&self, left: &F, right: &F) -> Result<F, TaigaError>;
+    fn native_hash_two(&self, left: &F, right: &F) -> Result<F, TaigaError>;
 }
 
 /// A BinaryHasher implementation for Poseidon Hash.
 impl<F: PrimeField> BinaryHasher<F> for PoseidonConstants<F> {
-    fn hash_two(&self, left: &F, right: &F) -> Result<F, TaigaError> {
-        let mut poseidon = Poseidon::<(), NativeSpec<F, WIDTH_3>, WIDTH_3>::new(&mut (), &self);
+    fn native_hash_two(&self, left: &F, right: &F) -> Result<F, TaigaError> {
+        let mut poseidon = Poseidon::<(), NativeSpec<F, WIDTH_3>, WIDTH_3>::new(&mut (), self);
         poseidon.input(*left)?;
         poseidon.input(*right)?;
         Ok(poseidon.output_hash(&mut ()))
