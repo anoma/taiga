@@ -1,8 +1,8 @@
-use crate::el_gamal::DecryptionKey;
-
+use crate::circuit::circuit_parameters::CircuitParameters;
+use crate::circuit::gadgets::trivial::trivial_gadget;
 use crate::circuit::nullifier::Nullifier;
 use crate::circuit::validity_predicate::ValidityPredicate;
-use crate::circuit::{circuit_parameters::CircuitParameters, gadgets::gadget::trivial_gadget};
+use crate::el_gamal::DecryptionKey;
 use crate::transaction::Transaction;
 use crate::{add_to_tree, note::Note, serializable_to_vec, token::Token, user::User};
 use ark_ff::{One, Zero};

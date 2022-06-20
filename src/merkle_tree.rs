@@ -7,6 +7,39 @@ use rand::{Rng, RngCore};
 use std::marker::PhantomData;
 pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
 
+#[derive(Clone)]
+pub struct MerkleTreeLeafs<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> {
+    leafs: Vec<Node<F, BH>>,
+}
+
+impl<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> MerkleTreeLeafs<F, BH> {
+    pub fn new(values: Vec<F>) -> Self {
+        let nodes_vec = values
+            .iter()
+            .map(|x| Node::<F, BH>::new(*x))
+            .collect::<Vec<_>>();
+        Self { leafs: nodes_vec }
+    }
+
+    // todo this is not working yet
+    pub fn root(&self, hasher: &BH) -> Node<F, BH> {
+        // we suppose self.leafs.len() is a power of 2
+        let mut list = self.leafs.clone();
+        let mut len = list.len();
+        while len > 1 {
+            for i in 0..len / 2 {
+                list[i] = Node::<F, BH>::new(
+                    hasher
+                        .native_hash_two(&list[2 * i].repr, &list[2 * i + 1].repr)
+                        .unwrap(),
+                );
+            }
+            len /= 2;
+        }
+        list[0].clone()
+    }
+}
+
 /// A path from a position in a particular commitment tree to the root of that tree.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MerklePath<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> {
@@ -14,10 +47,10 @@ pub struct MerklePath<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> {
 }
 
 impl<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> MerklePath<F, BH> {
-    /// Constructs a random dummy merkle path with depth of TAIGA_COMMITMENT_TREE_DEPTH.
-    pub fn dummy(rng: &mut impl RngCore) -> Self {
-        let auth_path = [(); TAIGA_COMMITMENT_TREE_DEPTH].map(|_| (Node::rand(rng), rng.gen()));
-        Self::from_path(auth_path.to_vec())
+    /// Constructs a random dummy merkle path with depth.
+    pub fn dummy(rng: &mut impl RngCore, depth: usize) -> Self {
+        let auth_path = (0..depth).map(|_| (Node::rand(rng), rng.gen())).collect();
+        Self::from_path(auth_path)
     }
 
     /// Constructs a Merkle path directly from a path.
@@ -47,7 +80,7 @@ impl<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> MerklePath<F, BH> {
 }
 
 /// A node within the Sapling commitment tree.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Node<F: PrimeField, BH: BinaryHasher<F>> {
     repr: F,
     _hasher: PhantomData<BH>,

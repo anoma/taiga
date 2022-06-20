@@ -1,4 +1,4 @@
-use crate::circuit::{circuit_parameters::CircuitParameters, hash_gadget::BinaryHasherGadget};
+use crate::circuit::{circuit_parameters::CircuitParameters, gadgets::hash::BinaryHasherGadget};
 use crate::error::TaigaError;
 use crate::nullifier_key::NullifierDerivingKey;
 use crate::poseidon::{BinaryHasher, WIDTH_3};

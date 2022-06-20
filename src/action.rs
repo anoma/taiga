@@ -1,4 +1,4 @@
-use crate::circuit::gadgets::gadget::trivial_gadget;
+use crate::circuit::gadgets::trivial::trivial_gadget;
 use crate::nullifier_key::NullifierDerivingKey;
 use crate::{add_to_tree, circuit::circuit_parameters::CircuitParameters, crh};
 use ark_ff::One;

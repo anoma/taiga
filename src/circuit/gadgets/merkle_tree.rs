@@ -1,4 +1,4 @@
-use crate::circuit::hash_gadget::BinaryHasherGadget;
+use super::hash::BinaryHasherGadget;
 use crate::error::TaigaError;
 use ark_ec::TEModelParameters;
 use ark_ff::PrimeField;
@@ -44,6 +44,7 @@ pub fn merkle_tree_gadget<
 
 #[test]
 fn test_merkle_circuit() {
+    use crate::merkle_tree::TAIGA_COMMITMENT_TREE_DEPTH;
     use crate::merkle_tree::{MerklePath, Node};
     use crate::poseidon::POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2;
     use ark_bls12_377::Fr;
@@ -52,7 +53,8 @@ fn test_merkle_circuit() {
     use plonk_hashing::poseidon::constants::PoseidonConstants;
 
     let mut rng = test_rng();
-    let merkle_path = MerklePath::<Fr, PoseidonConstants<Fr>>::dummy(&mut rng);
+    let merkle_path =
+        MerklePath::<Fr, PoseidonConstants<Fr>>::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
     let cur_leaf = Node::rand(&mut rng);
     let expected = merkle_path
