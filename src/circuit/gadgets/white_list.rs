@@ -86,7 +86,7 @@ fn test_white_list_gadget() {
 
     let auth_path = &[
         (Node::<F, PoseidonConstants<_>>::new(white_list[0]), true),
-        (Node::<F, PoseidonConstants<_>>::new(hash_2_3), false)
+        (Node::<F, PoseidonConstants<_>>::new(hash_2_3), false),
     ];
 
     let merkle_path = MerklePath::from_path(auth_path.to_vec());

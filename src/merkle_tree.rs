@@ -80,7 +80,7 @@ impl<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> MerklePath<F, BH> {
 }
 
 /// A node within the Sapling commitment tree.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Node<F: PrimeField, BH: BinaryHasher<F>> {
     repr: F,
     _hasher: PhantomData<BH>,
