@@ -1,6 +1,8 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use ark_ec::TEModelParameters;
 use ark_ff::PrimeField;
+use num_bigint::BigUint;
+use num_traits::cast::ToPrimitive;
 use plonk_core::prelude::StandardComposer;
 
 pub fn upper_bound_gadget<
@@ -10,18 +12,18 @@ pub fn upper_bound_gadget<
 >(
     composer: &mut StandardComposer<F, P>,
     private_inputs: &[F],
-    public_inputs: &[F],
-    // private_note: Note<CP>,
-    // private_bound: u32,
-    // public_note_commitment: TEGroupAffine<P>,
+    _public_inputs: &[F],
 ) {
     // parse the private inputs
     let note_value = private_inputs[0];
-    let bound = private_inputs[1];
+    let bound_uint: BigUint = private_inputs[1].into();
+    assert!(bound_uint < BigUint::from(u64::MAX));
+    let bound = bound_uint.to_usize().unwrap();
+
     // todo prove the ownership of the note somewhere?
     // upper bound check
     let value_variable = composer.add_input(note_value);
-    composer.range_gate(value_variable, bound.try_into().unwrap());
+    composer.range_gate(value_variable, bound);
 }
 
 #[test]
