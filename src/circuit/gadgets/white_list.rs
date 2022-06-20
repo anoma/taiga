@@ -84,11 +84,12 @@ fn test_white_list_gadget() {
         .native_hash_two(&white_list[2], &white_list[3])
         .unwrap();
 
-    let mut auth_path: Vec<(Node<_, _>, bool)> = vec![];
-    auth_path.push((Node::<F, PoseidonConstants<_>>::new(white_list[0]), true));
-    auth_path.push((Node::<F, PoseidonConstants<_>>::new(hash_2_3), false));
+    let auth_path = &[
+        (Node::<F, PoseidonConstants<_>>::new(white_list[0]), true),
+        (Node::<F, PoseidonConstants<_>>::new(hash_2_3), false)
+    ];
 
-    let merkle_path = MerklePath::from_path(auth_path);
+    let merkle_path = MerklePath::from_path(auth_path.to_vec());
 
     // wrap the private input as slice of F elements
     let mut private_inputs: Vec<F> = vec![note.owner_address];
