@@ -63,7 +63,7 @@ fn test_poseidon_gadget() {
     let mut composer = StandardComposer::<F, P>::new();
     let native_hash_variable = composer.add_public_input_variable(hash);
     let gadget_hash_variable =
-        poseidon_hash_curve_scalar_field_gadget::<F, P>(&mut composer, &ω, &vec![hash]);
+        poseidon_hash_curve_scalar_field_gadget::<F, P>(&mut composer, &ω, &[hash]);
     composer.assert_equal(native_hash_variable, gadget_hash_variable);
     composer.check_circuit_satisfied();
 }

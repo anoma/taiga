@@ -24,6 +24,6 @@ fn test_trivial_gadget() {
         <CP as CircuitParameters>::CurveScalarField,
         <CP as CircuitParameters>::InnerCurve,
     >::new();
-    trivial_gadget::<CP>(&mut composer, &vec![], &vec![]);
+    trivial_gadget::<CP>(&mut composer, &[], &[]);
     composer.check_circuit_satisfied();
 }

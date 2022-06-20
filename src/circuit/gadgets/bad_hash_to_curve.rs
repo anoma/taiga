@@ -26,7 +26,7 @@ pub fn bad_hash_to_curve_gadget<F: PrimeField, P: TEModelParameters<BaseField = 
         poseidon.input(*x).unwrap();
     });
     let hash = poseidon.output_hash(&mut ());
-    poseidon_hash_curve_scalar_field_gadget::<F, P>(composer, private_inputs, &vec![hash]);
+    poseidon_hash_curve_scalar_field_gadget::<F, P>(composer, private_inputs, &[hash]);
     // 2. multiply by the generator
     let generator = TEGroupAffine::prime_subgroup_generator();
     let scalar_variable = composer.add_input(hash);
@@ -52,8 +52,7 @@ fn test_bad_hash_to_curve_gadget() {
 
     let mut composer = StandardComposer::<F, P>::new();
 
-    let gadget_hash_variable =
-        bad_hash_to_curve_gadget::<F, P>(&mut composer, &random_inputs, &vec![]);
+    let gadget_hash_variable = bad_hash_to_curve_gadget::<F, P>(&mut composer, &random_inputs, &[]);
     composer.assert_equal_public_point(gadget_hash_variable, hash);
     composer.check_circuit_satisfied();
 }

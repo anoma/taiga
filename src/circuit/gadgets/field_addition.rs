@@ -8,7 +8,7 @@ pub fn field_addition_gadget<CP: CircuitParameters>(
     public_inputs: &[CP::CurveScalarField],
 ) {
     // simple circuit that checks that a + b == c
-    let (a, b) = if private_inputs.len() == 0 {
+    let (a, b) = if private_inputs.is_empty() {
         (CP::CurveScalarField::zero(), CP::CurveScalarField::zero())
     } else {
         (private_inputs[0], private_inputs[1])
