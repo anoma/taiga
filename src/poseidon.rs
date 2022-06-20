@@ -32,13 +32,8 @@ pub trait BinaryHasher<F: PrimeField> {
 
 /// A BinaryHasher implementation for Poseidon Hash.
 impl<F: PrimeField> BinaryHasher<F> for PoseidonConstants<F> {
-<<<<<<< xuyang/add_ci_checks
-    fn hash_two(&self, left: &F, right: &F) -> Result<F, TaigaError> {
-        let mut poseidon = Poseidon::<(), NativeSpec<F, WIDTH_3>, WIDTH_3>::new(&mut (), self);
-=======
     fn native_hash_two(&self, left: &F, right: &F) -> Result<F, TaigaError> {
-        let mut poseidon = Poseidon::<(), NativeSpec<F, WIDTH_3>, WIDTH_3>::new(&mut (), &self);
->>>>>>> main
+        let mut poseidon = Poseidon::<(), NativeSpec<F, WIDTH_3>, WIDTH_3>::new(&mut (), self);
         poseidon.input(*left)?;
         poseidon.input(*right)?;
         Ok(poseidon.output_hash(&mut ()))
