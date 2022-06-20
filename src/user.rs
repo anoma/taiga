@@ -36,6 +36,7 @@ impl<CP: CircuitParameters> std::fmt::Display for User<CP> {
 }
 
 impl<CP: CircuitParameters> User<CP> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: &str,
         curve_setup: &<CP::CurvePC as PolynomialCommitment<
@@ -52,21 +53,21 @@ impl<CP: CircuitParameters> User<CP> {
                 <CP as CircuitParameters>::CurveScalarField,
                 <CP as CircuitParameters>::InnerCurve,
             >,
-            &Vec<CP::CurveScalarField>,
-            &Vec<CP::CurveScalarField>,
+            &[CP::CurveScalarField],
+            &[CP::CurveScalarField],
         ),
-        send_private_inputs: &Vec<CP::CurveScalarField>,
-        send_public_inputs: &Vec<CP::CurveScalarField>,
+        send_private_inputs: &[CP::CurveScalarField],
+        send_public_inputs: &[CP::CurveScalarField],
         recv_gadget: fn(
             &mut StandardComposer<
                 <CP as CircuitParameters>::CurveScalarField,
                 <CP as CircuitParameters>::InnerCurve,
             >,
-            &Vec<CP::CurveScalarField>,
-            &Vec<CP::CurveScalarField>,
+            &[CP::CurveScalarField],
+            &[CP::CurveScalarField],
         ),
-        recv_private_inputs: &Vec<CP::CurveScalarField>,
-        recv_public_inputs: &Vec<CP::CurveScalarField>,
+        recv_private_inputs: &[CP::CurveScalarField],
+        recv_public_inputs: &[CP::CurveScalarField],
         rng: &mut ThreadRng,
     ) -> User<CP> {
         // sending proof
@@ -123,7 +124,7 @@ impl<CP: CircuitParameters> User<CP> {
 
     pub fn send(
         &self,
-        spent_notes: &mut Vec<&Note<CP>>,
+        spent_notes: &mut [&Note<CP>],
         token_distribution: Vec<(&User<CP>, u32)>,
         rand: &mut ThreadRng,
     ) -> Vec<(Note<CP>, EncryptedNote<CP::InnerCurve>)> {
@@ -132,7 +133,7 @@ impl<CP: CircuitParameters> User<CP> {
         assert!(total_sent_value >= total_dist_value);
 
         //todo: fix
-        let the_one_and_only_token_address = spent_notes[0].token_address.clone();
+        let the_one_and_only_token_address = spent_notes[0].token_address;
         let the_one_and_only_nullifier = Nullifier::<CP>::derive_native(
             &self.get_nk(),
             &spent_notes[0].rho,
@@ -221,11 +222,11 @@ fn test_user_creation() {
         &outer_curve_pp,
         DecryptionKey::<<CP as CircuitParameters>::InnerCurve>::new(&mut rng),
         trivial_gadget::<CP>,
-        &vec![],
-        &vec![],
+        &[],
+        &[],
         trivial_gadget::<CP>,
-        &vec![],
-        &vec![],
+        &[],
+        &[],
         &mut rng,
     );
 }

@@ -14,8 +14,8 @@ pub mod gadget {
 
     pub fn trivial_gadget<CP: CircuitParameters>(
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-        _private_inputs: &Vec<CP::CurveScalarField>,
-        _public_inputs: &Vec<CP::CurveScalarField>,
+        _private_inputs: &[CP::CurveScalarField],
+        _public_inputs: &[CP::CurveScalarField],
     ) {
         // no input in this trivial gadget...
         let var_one = composer.add_input(CP::CurveScalarField::one());
@@ -27,8 +27,8 @@ pub mod gadget {
 
     pub fn poseidon_hash_curve_scalar_field_gadget<CP: CircuitParameters>(
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-        private_inputs: &Vec<CP::CurveScalarField>,
-        _public_inputs: &Vec<CP::CurveScalarField>,
+        private_inputs: &[CP::CurveScalarField],
+        _public_inputs: &[CP::CurveScalarField],
     ) -> Variable {
         // no public input here
         // private_inputs are the inputs for the Poseidon hash
@@ -51,8 +51,8 @@ pub mod gadget {
 
     pub fn bad_hash_to_curve_gadget<CP: CircuitParameters>(
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-        private_inputs: &Vec<CP::CurveScalarField>,
-        _public_inputs: &Vec<CP::CurveScalarField>,
+        private_inputs: &[CP::CurveScalarField],
+        _public_inputs: &[CP::CurveScalarField],
     ) -> Point<CP::InnerCurve> {
         // (bad) hash to curve:
         // 1. hash a scalar using poseidon
@@ -66,7 +66,7 @@ pub mod gadget {
             poseidon.input(*x).unwrap();
         });
         let hash = poseidon.output_hash(&mut ());
-        poseidon_hash_curve_scalar_field_gadget::<CP>(composer, private_inputs, &vec![hash]);
+        poseidon_hash_curve_scalar_field_gadget::<CP>(composer, private_inputs, &[hash]);
         // 2. multiply by the generator
         let generator = TEGroupAffine::prime_subgroup_generator();
         let scalar_variable = composer.add_input(hash);
@@ -75,11 +75,11 @@ pub mod gadget {
 
     pub fn field_addition_gadget<CP: CircuitParameters>(
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-        private_inputs: &Vec<CP::CurveScalarField>,
-        public_inputs: &Vec<CP::CurveScalarField>,
+        private_inputs: &[CP::CurveScalarField],
+        public_inputs: &[CP::CurveScalarField],
     ) {
         // simple circuit that checks that a + b == c
-        let (a, b) = if private_inputs.len() == 0 {
+        let (a, b) = if private_inputs.is_empty() {
             (CP::CurveScalarField::zero(), CP::CurveScalarField::zero())
         } else {
             (private_inputs[0], private_inputs[1])
@@ -125,7 +125,7 @@ pub mod tests {
         >::new();
 
         let gadget_hash_variable =
-            bad_hash_to_curve_gadget::<CP>(&mut composer, &random_inputs, &vec![]);
+            bad_hash_to_curve_gadget::<CP>(&mut composer, &random_inputs, &[]);
         composer.assert_equal_public_point(gadget_hash_variable, hash);
         composer.check_circuit_satisfied();
     }
@@ -142,7 +142,7 @@ pub mod tests {
             <CP as CircuitParameters>::CurveScalarField,
             <CP as CircuitParameters>::InnerCurve,
         >::new();
-        trivial_gadget::<CP>(&mut composer, &vec![], &vec![]);
+        trivial_gadget::<CP>(&mut composer, &[], &[]);
         composer.check_circuit_satisfied();
     }
 
@@ -161,7 +161,7 @@ pub mod tests {
             <CP as CircuitParameters>::CurveScalarField,
             <CP as CircuitParameters>::InnerCurve,
         >::new();
-        field_addition_gadget::<CP>(&mut composer, &vec![a, b], &vec![c]);
+        field_addition_gadget::<CP>(&mut composer, &[a, b], &[c]);
         composer.check_circuit_satisfied();
     }
 
@@ -198,7 +198,7 @@ pub mod tests {
         >::new();
         let native_hash_variable = composer.add_public_input_variable(hash);
         let gadget_hash_variable =
-            poseidon_hash_curve_scalar_field_gadget::<CP>(&mut composer, &ω, &vec![hash]);
+            poseidon_hash_curve_scalar_field_gadget::<CP>(&mut composer, &ω, &[hash]);
         composer.assert_equal(native_hash_variable, gadget_hash_variable);
         composer.check_circuit_satisfied();
     }

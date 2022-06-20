@@ -1,11 +1,10 @@
-use crate::el_gamal::{DecryptionKey, EncryptedNote};
+use crate::el_gamal::DecryptionKey;
 
 use crate::circuit::nullifier::Nullifier;
 use crate::circuit::validity_predicate::ValidityPredicate;
 use crate::circuit::{circuit_parameters::CircuitParameters, gadgets::gadget::trivial_gadget};
 use crate::transaction::Transaction;
 use crate::{add_to_tree, note::Note, serializable_to_vec, token::Token, user::User};
-use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
 use ark_ff::{One, Zero};
 use ark_poly_commit::PolynomialCommitment;
 use rand::rngs::ThreadRng;
@@ -24,11 +23,11 @@ fn spawn_user<CP: CircuitParameters>(name: &str) -> User<CP> {
         &outer_curve_pp,
         DecryptionKey::<CP::InnerCurve>::new(&mut rng),
         trivial_gadget::<CP>,
-        &vec![],
-        &vec![],
+        &[],
+        &[],
         trivial_gadget::<CP>,
-        &vec![],
-        &vec![],
+        &[],
+        &[],
         &mut rng,
     )
 }
@@ -46,9 +45,7 @@ fn spawn_trivial_vps<CP: CircuitParameters>(
 ) -> Vec<ValidityPredicate<CP>> {
     let pp = <CP as CircuitParameters>::CurvePC::setup(2 * 300, None, rng).unwrap();
     (0..i)
-        .map(|_| {
-            ValidityPredicate::<CP>::new(&pp, trivial_gadget::<CP>, &vec![], &vec![], true, rng)
-        })
+        .map(|_| ValidityPredicate::<CP>::new(&pp, trivial_gadget::<CP>, &[], &[], true, rng))
         .collect()
 }
 
@@ -57,10 +54,9 @@ fn test_send<CP: CircuitParameters>() {
 
     //Create global structures
     let mut rng = rand::thread_rng();
-    let mut nf_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
-    let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
-    let mut cm_ce_list: Vec<(TEGroupAffine<CP::InnerCurve>, EncryptedNote<CP::InnerCurve>)> =
-        vec![];
+    let mut nf_tree = MerkleTree::<Blake2s>::from_leaves(&[]);
+    let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&[]);
+    let mut cm_ce_list = Vec::new();
 
     //Create users and tokens to exchange
     let xan = spawn_token::<CP>("XAN");
@@ -96,7 +92,7 @@ fn test_send<CP: CircuitParameters>() {
     // --- SET UP END ---
 
     //Generate the output notes
-    let output_notes_and_ec = alice.send(&mut vec![&note_a1xan], vec![(&bob, 1_u32)], &mut rng);
+    let output_notes_and_ec = alice.send(&mut [&note_a1xan], vec![(&bob, 1_u32)], &mut rng);
 
     //Prepare the hash for future MTtree membership check
     let bytes = serializable_to_vec(&output_notes_and_ec[0].0.commitment());
@@ -157,10 +153,9 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
     //Create global structures
     let mut rng = ThreadRng::default();
 
-    let mut nf_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
-    let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&vec![]);
-    let mut cm_ce_list: Vec<(TEGroupAffine<CP::InnerCurve>, EncryptedNote<CP::InnerCurve>)> =
-        vec![];
+    let mut nf_tree = MerkleTree::<Blake2s>::from_leaves(&[]);
+    let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&[]);
+    let mut cm_ce_list = Vec::new();
 
     //Create users and tokens
     let yulia = spawn_user::<CP>("yulia");
@@ -196,7 +191,7 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
 
     // Split a note between users
     let split_output_notes = yulia.send(
-        &mut vec![&initial_note],
+        &mut [&initial_note],
         vec![(&yulia, 1), (&yulia, 1), (&simon, 2)],
         &mut rng,
     );
@@ -244,7 +239,7 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
     assert!(proof_mt.verify(root_mt, &[1, 2, 3], &[hash1, hash2, hash3], 4));
 
     let merge_output_notes = yulia.send(
-        &mut vec![&split_output_notes[0].0, &split_output_notes[1].0],
+        &mut [&split_output_notes[0].0, &split_output_notes[1].0],
         vec![(&yulia, 2)],
         &mut rng,
     );
@@ -273,8 +268,8 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
     let tx: Transaction<CP> = Transaction::new(
         vec![],
         vec![
-            (split_output_notes[0].0.clone(), nullifier1),
-            (split_output_notes[1].0.clone(), nullifier2),
+            (split_output_notes[0].0, nullifier1),
+            (split_output_notes[1].0, nullifier2),
         ],
         merge_output_notes.clone(),
         &vps,

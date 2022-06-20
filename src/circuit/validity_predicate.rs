@@ -37,11 +37,11 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
         >>::UniversalParams,
         gadget: fn(
             &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-            private_inputs: &Vec<CP::CurveScalarField>,
-            public_inputs: &Vec<CP::CurveScalarField>,
+            private_inputs: &[CP::CurveScalarField],
+            public_inputs: &[CP::CurveScalarField],
         ),
-        private_inputs: &Vec<CP::CurveScalarField>,
-        public_inputs: &Vec<CP::CurveScalarField>,
+        private_inputs: &[CP::CurveScalarField],
+        public_inputs: &[CP::CurveScalarField],
     ) -> (
         Prover<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>,
         <CP::CurvePC as PolynomialCommitment<
@@ -77,11 +77,11 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
     pub fn precompute_verifier(
         gadget: fn(
             &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-            private_inputs: &Vec<CP::CurveScalarField>,
-            public_inputs: &Vec<CP::CurveScalarField>,
+            private_inputs: &[CP::CurveScalarField],
+            public_inputs: &[CP::CurveScalarField],
         ),
-        private_inputs: &Vec<CP::CurveScalarField>,
-        public_inputs: &Vec<CP::CurveScalarField>,
+        private_inputs: &[CP::CurveScalarField],
+        public_inputs: &[CP::CurveScalarField],
     ) -> Verifier<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC> {
         let mut verifier: Verifier<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC> =
             Verifier::new(b"demo");
@@ -129,11 +129,11 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
         >>::UniversalParams,
         gadget: fn(
             &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-            &Vec<CP::CurveScalarField>,
-            &Vec<CP::CurveScalarField>,
+            &[CP::CurveScalarField],
+            &[CP::CurveScalarField],
         ),
-        private_inputs: &Vec<CP::CurveScalarField>,
-        public_inputs: &Vec<CP::CurveScalarField>,
+        private_inputs: &[CP::CurveScalarField],
+        public_inputs: &[CP::CurveScalarField],
         blind: bool,
         rng: &mut ThreadRng,
     ) -> Self {
@@ -144,13 +144,12 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
             Self::precompute_prover(setup, gadget, private_inputs, public_inputs);
         let mut verifier = Self::precompute_verifier(gadget, private_inputs, public_inputs);
         // (blinding or not) preprocessing
-        let blinding_values;
-        if blind {
-            blinding_values = Self::blinded_preprocess(&mut prover, &mut verifier, &ck, rng);
+        let blinding_values = if blind {
+            Self::blinded_preprocess(&mut prover, &mut verifier, &ck, rng)
         } else {
             Self::preprocess(&mut prover, &mut verifier, &ck);
-            blinding_values = [CP::CurveScalarField::zero(); 20];
-        }
+            [CP::CurveScalarField::zero(); 20]
+        };
 
         // proof
         let proof = prover.prove(&ck).unwrap();

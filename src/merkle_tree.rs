@@ -76,7 +76,7 @@ impl<F: PrimeField, BH: BinaryHasher<F>> Node<F, BH> {
         self.repr.into_repr().to_bytes_le()
     }
 
-    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+    pub fn from_bytes(bytes: &[u8]) -> Self {
         Self::new(F::from_le_bytes_mod_order(bytes))
     }
 
