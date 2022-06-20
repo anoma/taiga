@@ -3,12 +3,11 @@ use crate::merkle_tree::MerklePath;
 use crate::merkle_tree::MerkleTreeLeafs;
 use crate::note::Note;
 use crate::poseidon::WIDTH_3;
-use ark_ec::{twisted_edwards_extended::GroupAffine as TEGroupAffine, TEModelParameters};
+use ark_ec::TEModelParameters;
 use ark_ff::PrimeField;
 use plonk_core::prelude::StandardComposer;
 use plonk_hashing::poseidon::constants::PoseidonConstants;
 
-use super::bad_hash_to_curve::bad_hash_to_curve_gadget;
 use super::hash::BinaryHasherGadget;
 use super::merkle_tree::merkle_tree_gadget;
 
@@ -22,16 +21,8 @@ pub fn white_list_gadget<
     private_note: Note<CP>,
     private_white_list_merkle_tree_path: MerklePath<F, PoseidonConstants<F>>,
     private_white_list_addresses: Vec<F>,
-    public_note_commitment: TEGroupAffine<P>,
 ) {
-    // opening of the note_commitment
-    let crh_point = bad_hash_to_curve_gadget::<F, P>(
-        composer,
-        &vec![private_note.owner_address, private_note.token_address],
-        &vec![],
-    );
-    composer.assert_equal_public_point(crh_point, public_note_commitment);
-
+    // TODO prove note ownership
     let commitment = composer.add_input(private_note.owner_address);
     let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
     let root_var = merkle_tree_gadget::<F, P, PoseidonConstants<F>>(
@@ -56,8 +47,7 @@ fn test_white_list_gadget() {
     use ark_std::UniformRand;
     use plonk_core::constraint_system::StandardComposer;
     use plonk_hashing::poseidon::constants::PoseidonConstants;
-    use plonk_hashing::poseidon::poseidon::NativeSpec;
-    use plonk_hashing::poseidon::poseidon::Poseidon;
+    use crate::poseidon::BinaryHasher;
 
     type F = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;
@@ -75,17 +65,11 @@ fn test_white_list_gadget() {
         <CP as CircuitParameters>::CurveScalarField::rand(&mut rng),
         &mut rng,
     );
-    let note_com = note.commitment();
 
     // I wanted to use hash_two but I was not able...
-    let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
-    let mut poseidon = Poseidon::<(), NativeSpec<F, WIDTH_3>, WIDTH_3>::new(
-        &mut (),
-        &poseidon_hash_param_bls12_377_scalar_arity2,
-    );
-    let _ = poseidon.input(white_list[2]);
-    let _ = poseidon.input(white_list[3]);
-    let hash_2_3 = poseidon.output_hash(&mut ());
+    let hash_2_3 = *&PoseidonConstants::generate::<WIDTH_3>()
+        .native_hash_two(&white_list[2], &white_list[3])
+        .unwrap();
 
     let mut auth_path: Vec<(Node<_, _>, bool)> = vec![];
     auth_path.push((Node::<F, PoseidonConstants<_>>::new(white_list[0]), true));
@@ -99,7 +83,6 @@ fn test_white_list_gadget() {
         note,
         merkle_path,
         white_list,
-        note_com,
     );
     composer.check_circuit_satisfied();
 }
