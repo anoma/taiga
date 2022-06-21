@@ -12,11 +12,11 @@ pub fn upper_bound_gadget<
 >(
     composer: &mut StandardComposer<F, P>,
     private_inputs: &[F],
-    _public_inputs: &[F],
+    public_inputs: &[F],
 ) {
     // parse the private inputs
     let note_value = private_inputs[0];
-    let bound_uint: BigUint = private_inputs[1].into();
+    let bound_uint: BigUint = public_inputs[0].into();
     assert!(bound_uint < BigUint::from(u64::MAX));
     let bound = bound_uint.to_usize().unwrap();
 
@@ -51,6 +51,6 @@ fn test_upper_bound_gadget() {
     );
 
     let mut composer = StandardComposer::<F, <CP as CircuitParameters>::InnerCurve>::new();
-    upper_bound_gadget::<F, P, CP>(&mut composer, &[F::from(note.value), F::from(14)], &[]);
+    upper_bound_gadget::<F, P, CP>(&mut composer, &[F::from(note.value)], &[F::from(14)]);
     composer.check_circuit_satisfied();
 }
