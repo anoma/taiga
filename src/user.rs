@@ -1,6 +1,6 @@
+use crate::address::NullifierDerivingKey;
 use crate::circuit::nullifier::Nullifier;
 use crate::el_gamal::EncryptedNote;
-use crate::nullifier_key::NullifierDerivingKey;
 use crate::{
     circuit::circuit_parameters::CircuitParameters,
     circuit::{

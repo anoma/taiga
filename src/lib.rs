@@ -19,17 +19,17 @@ use poseidon::POSEIDON_HASH_PARAM_BLS12_377_BASE_ARITY4;
 use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
 
 pub mod action;
+pub mod address;
 pub mod circuit;
 pub mod el_gamal;
 pub mod error;
 pub mod merkle_tree;
 pub mod note;
-// TODO: put the nullifier_key in address later.
-pub mod nullifier_key;
 pub mod poseidon;
 pub mod token;
 pub mod transaction;
 pub mod user;
+pub mod utils;
 
 pub trait HashToField: PrimeField {
     fn hash2_to_field(x: Self, y: Self) -> Self;

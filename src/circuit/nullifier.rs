@@ -1,7 +1,7 @@
 use crate::circuit::{circuit_parameters::CircuitParameters, gadgets::hash::BinaryHasherGadget};
+use crate::address::NullifierDerivingKey;
 use crate::error::TaigaError;
-use crate::nullifier_key::NullifierDerivingKey;
-use crate::poseidon::{BinaryHasher, WIDTH_3};
+use crate::poseidon::{FieldHasher, WIDTH_3};
 use ark_ec::{
     twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve, ProjectiveCurve,
 };
