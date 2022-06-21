@@ -92,7 +92,7 @@ fn test_send<CP: CircuitParameters>() {
     // --- SET UP END ---
 
     //Generate the output notes
-    let output_notes_and_ec = alice.send(&mut [&note_a1xan], vec![(&bob, 1_u32)], &mut rng);
+    let output_notes_and_ec = alice.send(&mut [&note_a1xan], vec![(&bob, 1_u64)], &mut rng);
 
     //Prepare the hash for future MTtree membership check
     let bytes = serializable_to_vec(&output_notes_and_ec[0].0.commitment());

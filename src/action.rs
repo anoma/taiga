@@ -377,7 +377,7 @@ fn _action_checks<CP: CircuitParameters>() {
 
     // The note is spent, and a new note is created for Bob
     let output_note = alice
-        .send(&mut [&spent_note], vec![(&bob, 1_u32)], &mut rng)
+        .send(&mut [&spent_note], vec![(&bob, 1_u64)], &mut rng)
         .swap_remove(0)
         .0;
 

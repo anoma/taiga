@@ -15,9 +15,9 @@ pub struct Note<CP: CircuitParameters> {
     // Thus, a note is represented in 32 + 32 + 4 + 32 + 4 + 2 * 32 + 32 = 200 bytes???
     pub owner_address: CP::CurveScalarField,
     pub token_address: CP::CurveScalarField,
-    pub value: u32,
+    pub value: u64,
     rcm: BigInteger256,
-    pub data: u32, // for NFT or whatever, we won't use it in this simple example
+    pub data: u64, // for NFT or whatever, we won't use it in this simple example
     pub rho: CP::CurveScalarField, // rho parameter
     /// Note value useful for the nullifier
     pub psi: CP::CurveScalarField, // computed from spent_note_nf using a PRF
@@ -27,7 +27,7 @@ impl<CP: CircuitParameters> Note<CP> {
     pub fn new(
         owner_address: CP::CurveScalarField,
         token_address: CP::CurveScalarField,
-        value: u32,
+        value: u64,
         rho: CP::CurveScalarField,
         psi: CP::CurveScalarField,
         rng: &mut ThreadRng,

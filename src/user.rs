@@ -125,7 +125,7 @@ impl<CP: CircuitParameters> User<CP> {
     pub fn send(
         &self,
         spent_notes: &mut [&Note<CP>],
-        token_distribution: Vec<(&User<CP>, u32)>,
+        token_distribution: Vec<(&User<CP>, u64)>,
         rand: &mut ThreadRng,
     ) -> Vec<(Note<CP>, EncryptedNote<CP::InnerCurve>)> {
         let total_sent_value = spent_notes.iter().fold(0, |sum, n| sum + n.value);
