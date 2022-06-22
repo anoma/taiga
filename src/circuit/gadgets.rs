@@ -5,3 +5,4 @@ pub mod merkle_tree;
 pub mod poseidon_hash_scalar_field;
 pub mod trivial;
 pub mod white_list;
+pub mod blinding;

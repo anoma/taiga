@@ -16,9 +16,9 @@ use crate::{
 };
 
 pub struct ValidityPredicate<CP: CircuitParameters> {
-    desc_vp: VerifierKey<CP::CurveScalarField, CP::CurvePC>, //preprocessed VP
+    pub desc_vp: VerifierKey<CP::CurveScalarField, CP::CurvePC>, //preprocessed VP
     pub public_input: PublicInputs<CP::CurveScalarField>,
-    _blind_rand: [CP::CurveScalarField; 20], //blinding randomness
+    pub blind_rand: [CP::CurveScalarField; 20], //blinding randomness
     pub proof: Proof<CP::CurveScalarField, CP::CurvePC>,
     pub verifier: Verifier<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>,
     pub vk: <CP::CurvePC as PolynomialCommitment<
@@ -165,7 +165,7 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
         Self {
             desc_vp,
             public_input,
-            _blind_rand: blinding_values,
+            blind_rand: blinding_values,
             proof,
             verifier,
             vk,

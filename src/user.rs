@@ -4,7 +4,8 @@ use crate::nullifier_key::NullifierDerivingKey;
 use crate::{
     circuit::circuit_parameters::CircuitParameters,
     circuit::{
-        blinding_circuit::{blind_gadget, BlindingCircuit},
+        blinding_circuit::{BlindingCircuit},
+        gadgets::blinding::blinding_gadget,
         validity_predicate::ValidityPredicate,
     },
     el_gamal::{DecryptionKey, EncryptionKey},
@@ -22,8 +23,9 @@ pub struct User<CP: CircuitParameters> {
     name: String, // probably not useful: a user will be identified with his address / his public key(?)
     _dec_key: DecryptionKey<CP::InnerCurve>,
     send_vp: ValidityPredicate<CP>,
+    send_blind_vp: BlindingCircuit<CP>,
     recv_vp: ValidityPredicate<CP>,
-    blind_vp: BlindingCircuit<CP>,
+    recv_blind_vp: BlindingCircuit<CP>,
     pub rcm_addr: CP::CurveScalarField, // Commitment randomness for deriving address
     nk: NullifierDerivingKey<CP::CurveScalarField>, // the nullifier key
     pub com_send_part: CP::CurveScalarField,
@@ -79,6 +81,16 @@ impl<CP: CircuitParameters> User<CP> {
             true,
             rng,
         );
+        // send blinding proof
+        let a = send_vp.desc_vp.arithmetic.q_l;
+        let priv_in = ["todo"] + send_vp.blind_rand;
+        let send_blind_vp = BlindingCircuit::<CP>::new(
+            outer_curve_setup,
+            blinding_gadget::<CP>,
+            priv_in,
+            &[],
+        );
+
         // Receiving proof
         let recv_vp = ValidityPredicate::<CP>::new(
             curve_setup,
@@ -89,7 +101,12 @@ impl<CP: CircuitParameters> User<CP> {
             rng,
         );
         // blinding proof
-        let blind_vp = BlindingCircuit::<CP>::new(outer_curve_setup, blind_gadget::<CP>);
+        let send_blind_vp = BlindingCircuit::<CP>::new(
+            outer_curve_setup,
+            blinding_gadget::<CP>,
+            send_vp.blind_rand,
+            0, // todo
+        );
 
         // nullifier key
         let nk = NullifierDerivingKey::rand(rng);
@@ -171,15 +188,6 @@ impl<CP: CircuitParameters> User<CP> {
             ],
             self.rcm_addr,
         )
-
-        // CP::com_r(
-        //     &[
-        //         self.com_send_part.into_repr().to_bytes_le(),
-        //         recv_cm.into_repr().to_bytes_le(),
-        //     ]
-        //     .concat(),
-        //     self.rcm_addr,
-        // )
     }
 
     pub fn check_proofs(&self) {

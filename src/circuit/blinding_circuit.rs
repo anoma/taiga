@@ -1,4 +1,3 @@
-use ark_ff::One;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use plonk_core::{
@@ -25,7 +24,13 @@ impl<CP: CircuitParameters> BlindingCircuit<CP> {
             CP::CurveBaseField,
             DensePolynomial<CP::CurveBaseField>,
         >>::UniversalParams,
-        gadget: fn(&mut StandardComposer<CP::CurveBaseField, CP::Curve>),
+        gadget: fn(
+            &mut StandardComposer<CP::CurveBaseField, CP::Curve>,
+            private_inputs: &[CP::CurveBaseField],
+            public_inputs: &[CP::CurveBaseField],
+        ),
+        private_inputs: &[CP::CurveBaseField],
+        public_inputs: &[CP::CurveBaseField],
     ) -> (
         // Prover
         Prover<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC>,
@@ -48,7 +53,7 @@ impl<CP: CircuitParameters> BlindingCircuit<CP> {
 
         let mut prover = Prover::<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC>::new(b"demo");
         prover.key_transcript(b"key", b"additional seed information");
-        gadget(prover.mut_cs());
+        gadget(prover.mut_cs(), private_inputs, public_inputs);
         let (ck, vk) = CP::OuterCurvePC::trim(
             setup,
             prover.circuit_bound().next_power_of_two() + 6,
@@ -62,12 +67,18 @@ impl<CP: CircuitParameters> BlindingCircuit<CP> {
     }
 
     pub fn precompute_verifier(
-        gadget: fn(&mut StandardComposer<CP::CurveBaseField, CP::Curve>),
+        gadget: fn(
+            &mut StandardComposer<CP::CurveBaseField, CP::Curve>,
+            private_inputs: &[CP::CurveBaseField],
+            public_inputs: &[CP::CurveBaseField],
+        ),
+        private_inputs: &[CP::CurveBaseField],
+        public_inputs: &[CP::CurveBaseField],
     ) -> Verifier<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC> {
         let mut verifier: Verifier<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC> =
             Verifier::new(b"demo");
         verifier.key_transcript(b"key", b"additional seed information");
-        gadget(verifier.mut_cs());
+        gadget(verifier.mut_cs(), private_inputs, public_inputs);
         verifier
     }
 
@@ -88,13 +99,19 @@ impl<CP: CircuitParameters> BlindingCircuit<CP> {
             CP::CurveBaseField,
             DensePolynomial<CP::CurveBaseField>,
         >>::UniversalParams,
-        gadget: fn(&mut StandardComposer<CP::CurveBaseField, CP::Curve>),
+        gadget: fn(
+            &mut StandardComposer<CP::CurveBaseField, CP::Curve>,
+            &[CP::CurveBaseField],
+            &[CP::CurveBaseField],
+        ),
+        private_inputs: &[CP::CurveBaseField],
+        public_inputs: &[CP::CurveBaseField],
     ) -> Self {
         // Given a gadget corresponding to a circuit, create all the computations for PBC related to the VP
 
         // Prover desc_vp
-        let (mut prover, ck, vk, public_input) = Self::precompute_prover(setup, gadget);
-        let mut verifier = Self::precompute_verifier(gadget);
+        let (mut prover, ck, vk, public_input) = Self::precompute_prover(setup, gadget, private_inputs, public_inputs);
+        let mut verifier = Self::precompute_verifier(gadget, private_inputs, public_inputs);
         Self::preprocess(&mut prover, &mut verifier, &ck);
 
         // proof
@@ -113,29 +130,4 @@ impl<CP: CircuitParameters> BlindingCircuit<CP> {
             .verify(&self.proof, &self.vk, &self.public_input)
             .unwrap();
     }
-}
-
-pub fn blind_gadget<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveBaseField, CP::Curve>,
-) {
-    // this one could be hard-coded here (not customizable)
-    let var_one = composer.add_input(CP::CurveBaseField::one());
-    composer.arithmetic_gate(|gate| {
-        gate.witness(var_one, var_one, None)
-            .add(CP::CurveBaseField::one(), CP::CurveBaseField::one())
-    });
-}
-
-fn _blinding_circuit_proof<CP: CircuitParameters>() {
-    use rand::rngs::ThreadRng;
-    let mut rng = ThreadRng::default();
-    let pp = <CP as CircuitParameters>::OuterCurvePC::setup(1 << 4, None, &mut rng).unwrap();
-
-    let circuit = BlindingCircuit::<CP>::new(&pp, blind_gadget::<CP>);
-    circuit.verify();
-}
-
-#[test]
-fn test_blinding_cirucit_proof_kzg() {
-    _blinding_circuit_proof::<crate::circuit::circuit_parameters::PairingCircuitParameters>()
 }
