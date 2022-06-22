@@ -1,8 +1,7 @@
-use ark_ff::PrimeField;
+use ark_ff::{BigInteger, PrimeField};
 
-pub fn bytes_to_fields<F: PrimeField>(bytes: Vec<u8>) -> Vec<F> {
-    bytes
-        .chunks((F::size_in_bits() - 1) / 8 as usize)
-        .map(|elt| F::from_le_bytes_mod_order(elt))
+pub fn bits_to_fields<F: PrimeField>(bits: &[bool]) -> Vec<F> {
+    bits.chunks((F::size_in_bits() - 1) as usize)
+        .map(|elt| F::from_repr(<F as PrimeField>::BigInt::from_bits_le(elt)).unwrap())
         .collect()
 }

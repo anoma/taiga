@@ -1,5 +1,5 @@
-use crate::circuit::{circuit_parameters::CircuitParameters, gadgets::hash::BinaryHasherGadget};
 use crate::address::NullifierDerivingKey;
+use crate::circuit::{circuit_parameters::CircuitParameters, gadgets::hash::FieldHasherGadget};
 use crate::error::TaigaError;
 use crate::poseidon::{FieldHasher, WIDTH_3};
 use ark_ec::{
@@ -89,17 +89,15 @@ impl<CP: CircuitParameters> Nullifier<CP> {
 #[test]
 fn nullifier_circuit_test() {
     use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters};
-    use ark_bls12_377::Fr;
-    use ark_ed_on_bls12_377::EdwardsParameters as Curv;
     use ark_std::{test_rng, UniformRand};
     use plonk_core::constraint_system::{ecc::Point, StandardComposer};
+    type Fr = <PairingCircuitParameters as CircuitParameters>::CurveScalarField;
+    type Curv = <PairingCircuitParameters as CircuitParameters>::InnerCurve;
 
     let mut rng = test_rng();
-    let nk = NullifierDerivingKey::<
-        <PairingCircuitParameters as CircuitParameters>::CurveScalarField,
-    >::rand(&mut rng);
-    let rho = <PairingCircuitParameters as CircuitParameters>::CurveScalarField::rand(&mut rng);
-    let psi = <PairingCircuitParameters as CircuitParameters>::CurveScalarField::rand(&mut rng);
+    let nk = NullifierDerivingKey::<Fr>::rand(&mut rng);
+    let rho = Fr::rand(&mut rng);
+    let psi = Fr::rand(&mut rng);
     let cm = TEGroupAffine::prime_subgroup_generator();
     let expect_nf = Nullifier::<PairingCircuitParameters>::derive_native(&nk, &rho, &psi, &cm);
 
@@ -130,7 +128,7 @@ fn nullifier_circuit_test() {
     composer.check_circuit_satisfied();
 
     println!(
-        "circuit size for nf derivation: {}",
+        "circuit size of nf derivation: {}",
         composer.circuit_bound()
     );
 }

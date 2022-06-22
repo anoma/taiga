@@ -1,5 +1,5 @@
-use crate::circuit::gadgets::trivial::trivial_gadget;
 use crate::address::NullifierDerivingKey;
+use crate::circuit::gadgets::trivial::trivial_gadget;
 use crate::{add_to_tree, circuit::circuit_parameters::CircuitParameters, crh};
 use ark_ff::One;
 use plonk_core::proof_system::Proof;

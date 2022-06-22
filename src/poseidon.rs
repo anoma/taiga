@@ -29,7 +29,7 @@ lazy_static! {
 /// `native_hash` takes at most four field elements.
 pub trait FieldHasher<F: PrimeField> {
     fn native_hash_two(&self, left: &F, right: &F) -> Result<F, TaigaError>;
-    fn native_hash(&self, inputs: &Vec<F>) -> Result<F, TaigaError>;
+    fn native_hash(&self, inputs: &[F]) -> Result<F, TaigaError>;
 }
 
 /// A FieldHasher implementation for Poseidon Hash.
@@ -41,13 +41,13 @@ impl<F: PrimeField> FieldHasher<F> for PoseidonConstants<F> {
         Ok(poseidon.output_hash(&mut ()))
     }
 
-    fn native_hash(&self, inputs: &Vec<F>) -> Result<F, TaigaError> {
+    fn native_hash(&self, inputs: &[F]) -> Result<F, TaigaError> {
         assert!(inputs.len() < WIDTH_5);
         let mut poseidon = Poseidon::<(), NativeSpec<F, WIDTH_5>, WIDTH_5>::new(&mut (), self);
+        // Default padding zero
         inputs.iter().for_each(|f| {
             poseidon.input(*f).unwrap();
         });
-        // Default padding zero
         Ok(poseidon.output_hash(&mut ()))
     }
 }

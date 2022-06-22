@@ -1,7 +1,7 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::error::TaigaError;
 use crate::poseidon::{FieldHasher, WIDTH_5};
-use crate::utils::bytes_to_fields;
+use crate::utils::bits_to_fields;
 use ark_ff::{BigInteger, PrimeField, UniformRand};
 use blake2b_simd::Params;
 use plonk_hashing::poseidon::constants::PoseidonConstants;
@@ -16,15 +16,15 @@ pub struct NullifierDerivingKey<F: PrimeField>(F);
 /// The payment address binded with send vp and received vp.
 #[derive(Copy, Debug, Clone)]
 pub struct Address<CP: CircuitParameters> {
-    nk: NullifierDerivingKey<CP::CurveScalarField>,
-    rcm: CP::CurveScalarField,
-    send_vp: MockHashVP<CP>,
-    recv_vp: MockHashVP<CP>,
+    pub nk: NullifierDerivingKey<CP::CurveScalarField>,
+    pub rcm: CP::CurveScalarField,
+    pub send_vp: MockHashVP<CP>,
+    pub recv_vp: MockHashVP<CP>,
 }
 
 // TODO: hash_vp = com_q(desc_vp), get it from vpblind circuit in future.
 // It seems that we only need com_q(desc_vp) integrity constraint in vpblind circuit,
-// and we can use hash_vp as private input in action circuit and vp circuit.
+// and we can use hash_vp as private input in action circuit and vp circuit?
 #[derive(Copy, Debug, Clone)]
 pub struct MockHashVP<CP: CircuitParameters> {
     hash_vp: CP::CurveBaseField,
@@ -64,14 +64,15 @@ impl<F: PrimeField> NullifierDerivingKey<F> {
 }
 
 impl<CP: CircuitParameters> Address<CP> {
-    pub fn new(rng: &mut impl RngCore, send_vp: MockHashVP<CP>, recv_vp: MockHashVP<CP>) -> Self {
+    pub fn new(rng: &mut impl RngCore) -> Self {
         let nk = NullifierDerivingKey::<CP::CurveScalarField>::rand(rng);
         let rcm = CP::CurveScalarField::rand(rng);
         Self {
             nk,
             rcm,
-            send_vp,
-            recv_vp,
+            // TODO: fix this in future.
+            send_vp: MockHashVP::dummy(rng),
+            recv_vp: MockHashVP::dummy(rng),
         }
     }
 
@@ -81,7 +82,7 @@ impl<CP: CircuitParameters> Address<CP> {
             PoseidonConstants::generate::<WIDTH_5>();
 
         // send_part = Com_r( Com_q(desc_vp_addr_send) || nk )
-        let mut send_fields = bytes_to_fields::<CP::CurveScalarField>(self.send_vp.to_bytes());
+        let mut send_fields = bits_to_fields::<CP::CurveScalarField>(&self.send_vp.to_bits());
         send_fields.push(self.nk.inner());
         let send_hash = poseidon_param.native_hash(&send_fields)?;
 
@@ -89,10 +90,20 @@ impl<CP: CircuitParameters> Address<CP> {
         // TODO: if the Com_r from hash doesn't have the hiding property,
         // use PedersenCom(crh(send_fields || recv_fields), rcm) instead.
         let mut address_fields = vec![send_hash];
-        let recv_fields = bytes_to_fields::<CP::CurveScalarField>(self.recv_vp.to_bytes());
+        let recv_fields = bits_to_fields::<CP::CurveScalarField>(&self.recv_vp.to_bits());
         address_fields.extend(recv_fields);
         address_fields.push(self.rcm);
         poseidon_param.native_hash(&address_fields)
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut buf: Vec<u8> = vec![];
+        buf.extend(&self.nk.to_bytes());
+        buf.extend(&self.rcm.into_repr().to_bytes_le());
+        buf.extend(&self.send_vp.to_bytes());
+        buf.extend(&self.recv_vp.to_bytes());
+
+        buf
     }
 }
 
@@ -105,5 +116,9 @@ impl<CP: CircuitParameters> MockHashVP<CP> {
 
     pub fn to_bytes(&self) -> Vec<u8> {
         self.hash_vp.into_repr().to_bytes_le()
+    }
+
+    pub fn to_bits(&self) -> Vec<bool> {
+        self.hash_vp.into_repr().to_bits_le()
     }
 }
