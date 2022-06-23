@@ -86,7 +86,7 @@ impl<CP: CircuitParameters> User<CP> {
         let priv_in = ["todo"] + send_vp.blind_rand;
         let send_blind_vp = BlindingCircuit::<CP>::new(
             outer_curve_setup,
-            blinding_gadget::<CP>,
+            blinding_gadget,
             priv_in,
             &[],
         );
@@ -101,10 +101,10 @@ impl<CP: CircuitParameters> User<CP> {
             rng,
         );
         // blinding proof
-        let send_blind_vp = BlindingCircuit::<CP>::new(
+        let recv_blind_vp = BlindingCircuit::new(
             outer_curve_setup,
-            blinding_gadget::<CP>,
-            send_vp.blind_rand,
+            blinding_gadget,
+            recv_vp.blind_rand,
             0, // todo
         );
 
@@ -127,7 +127,8 @@ impl<CP: CircuitParameters> User<CP> {
             // sending proofs/circuits
             send_vp,
             recv_vp,
-            blind_vp,
+            send_blind_vp,
+            recv_blind_vp,
             // random element for address
             rcm_addr: CP::CurveScalarField::rand(rng),
             nk,

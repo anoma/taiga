@@ -6,7 +6,7 @@ use plonk_core::{
     proof_system::{pi::PublicInputs, Prover, Verifier},
 };
 
-use crate::circuit::circuit_parameters::CircuitParameters;
+use crate::circuit::circuit_parameters::{ CircuitParameters};
 
 pub struct BlindingCircuit<CP: CircuitParameters> {
     pub public_input: PublicInputs<CP::CurveBaseField>,
@@ -18,9 +18,9 @@ pub struct BlindingCircuit<CP: CircuitParameters> {
     >>::VerifierKey,
 }
 
-impl<CP: CircuitParameters> BlindingCircuit<CP> {
+impl<CP: CircuitParameters> BlindingCircuit<CP>{
     pub fn precompute_prover(
-        setup: &<<CP as CircuitParameters>::OuterCurvePC as PolynomialCommitment<
+        setup: &<CP::OuterCurvePC as PolynomialCommitment<
             CP::CurveBaseField,
             DensePolynomial<CP::CurveBaseField>,
         >>::UniversalParams,
@@ -95,7 +95,7 @@ impl<CP: CircuitParameters> BlindingCircuit<CP> {
     }
 
     pub fn new(
-        setup: &<<CP as CircuitParameters>::OuterCurvePC as PolynomialCommitment<
+        setup: &<CP::OuterCurvePC as PolynomialCommitment<
             CP::CurveBaseField,
             DensePolynomial<CP::CurveBaseField>,
         >>::UniversalParams,

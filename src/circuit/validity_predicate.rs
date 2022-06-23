@@ -5,7 +5,7 @@ use merlin::Transcript;
 use plonk_core::{
     constraint_system::StandardComposer,
     prelude::Proof,
-    proof_system::{pi::PublicInputs, Prover, Verifier, VerifierKey},
+    proof_system::{pi::PublicInputs, Prover, Verifier, VerifierKey, Blinding},
 };
 use rand::prelude::ThreadRng;
 use std::marker::PhantomData;
@@ -18,7 +18,7 @@ use crate::{
 pub struct ValidityPredicate<CP: CircuitParameters> {
     pub desc_vp: VerifierKey<CP::CurveScalarField, CP::CurvePC>, //preprocessed VP
     pub public_input: PublicInputs<CP::CurveScalarField>,
-    pub blind_rand: [CP::CurveScalarField; 20], //blinding randomness
+    pub blind_rand: Blinding<CP::CurveScalarField>, //blinding randomness
     pub proof: Proof<CP::CurveScalarField, CP::CurvePC>,
     pub verifier: Verifier<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>,
     pub vk: <CP::CurvePC as PolynomialCommitment<
@@ -110,16 +110,16 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
             DensePolynomial<CP::CurveScalarField>,
         >>::CommitterKey,
         rng: &mut ThreadRng,
-    ) -> [CP::CurveScalarField; 20] {
+    ) -> plonk_core::proof_system::Blinding<CP::CurveScalarField> {
         // Random F elements for blinding the circuit
-        let blinding_values = [CP::CurveScalarField::rand(rng); 20];
+        let blinding = plonk_core::proof_system::Blinding::<CP::CurveScalarField>::rand(rng);
         prover
-            .preprocess_with_blinding(ck, blinding_values)
+            .preprocess_with_blinding(ck, &blinding)
             .unwrap();
         verifier
-            .preprocess_with_blinding(ck, blinding_values)
+            .preprocess_with_blinding(ck, &blinding)
             .unwrap();
-        blinding_values
+        blinding
     }
 
     pub fn new(
@@ -148,7 +148,7 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
             Self::blinded_preprocess(&mut prover, &mut verifier, &ck, rng)
         } else {
             Self::preprocess(&mut prover, &mut verifier, &ck);
-            [CP::CurveScalarField::zero(); 20]
+            plonk_core::proof_system::Blinding::<CP::CurveScalarField>::default()
         };
 
         // proof
