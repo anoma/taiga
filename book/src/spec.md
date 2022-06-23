@@ -99,18 +99,24 @@ Encodes: token vp
 
 ### Address
 
-Encodes: send vp, nullifier key `nk`, receive (recv) vp
-
+Encodes: send vp, nullifier key `nk`, receive (recv) vp and rcm_addr.
+- address: $\mathbb{F}_r$ is user's shielded payment address, which encodes `nk`, `send_vp`, `recv_vp` and `rcm`.
+- nk: $\mathbb{F}_r$ is the nullifier key to generate nullifier.
+- send_vp: bits of $\mathbb{F}_q$ is the hash of vp description.
+- recv_vp: bits of $\mathbb{F}_q$ is the hash of vp description.
+- rcm_addr: $\mathbb{F}_r$ is a random commitment trapdoor.
 ```
-send_part = Com_r( Com_q(desc_vp_addr_send) || nk )
-recv_part = Com_q(desc_vp_addr_recv)
-address = Com_r(send_part || recv_part, rcm_addr)
+send_addr = Com_r( Com_q(desc_vp_addr_send) || nk )
+recv_addr = Com_q(desc_vp_addr_recv)
+address = Com_r(send_addr || recv_addr, rcm_addr)
 ```
 
-- Address commits to both send and recv vp
 - For sending: requires opening of `address` to  `com_q(desc_vp_addr_send)`, which requires additional knowledge of nullifier key `nk` and `rcm_addr`. This opening is efficient over $\mathbb{F}_r$.
 - For receiving: requires opening of `address` to `com_q(desc_vp_addr_recv)`, which requires additional knowledge of `rcm_addr`. This opening is efficient over $\mathbb{F}_r$
 - `com_q(desc_vp_addr_{send,recv})` are re-used inside ActionCircuit in deriving `addr_com_vp`.
+- To guarantee the compatibility of `addr_com_vp` constraints in ActionCircuit and VPBlindCircuit, `com_q(desc_vp_addr_{send,recv})` over $\mathbb{F}_q$ are converted to bits.
+- In address integrity circuit, the bits of `com_q(desc_vp_addr_{send,recv})` will be converted to $\mathbb{F}_r$(s). When using `bls12-317` as $E_M$, the bits of one $\mathbb{F}_q$ are converted to two $\mathbb{F}_r$.
+- Let `Com_r` be a poseidon hash, which takes four field elements with padding zero. TODO: if the `Com_r` constructed from hash doesn't have the hiding property, we can use PedersenCom(crh(send_fields || recv_fields), rcm) instead?
 
 
 ### Notes

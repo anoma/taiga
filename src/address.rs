@@ -87,8 +87,8 @@ impl<CP: CircuitParameters> Address<CP> {
         let send_hash = poseidon_param.native_hash(&send_fields)?;
 
         // address = Com_r(send_fields || recv_fields, rcm)
-        // TODO: if the Com_r from hash doesn't have the hiding property,
-        // use PedersenCom(crh(send_fields || recv_fields), rcm) instead.
+        // TODO: if the Com_r constructed from hash doesn't have the hiding property,
+        // we can use PedersenCom(crh(send_fields || recv_fields), rcm) instead?
         let mut address_fields = vec![send_hash];
         let recv_fields = bits_to_fields::<CP::CurveScalarField>(&self.recv_vp.to_bits());
         address_fields.extend(recv_fields);
