@@ -6,7 +6,7 @@ use plonk_core::{
     proof_system::{pi::PublicInputs, Prover, Verifier},
 };
 
-use crate::circuit::circuit_parameters::{ CircuitParameters};
+use crate::circuit::circuit_parameters::CircuitParameters;
 
 pub struct BlindingCircuit<CP: CircuitParameters> {
     pub public_input: PublicInputs<CP::CurveBaseField>,
@@ -18,7 +18,7 @@ pub struct BlindingCircuit<CP: CircuitParameters> {
     >>::VerifierKey,
 }
 
-impl<CP: CircuitParameters> BlindingCircuit<CP>{
+impl<CP: CircuitParameters> BlindingCircuit<CP> {
     pub fn precompute_prover(
         setup: &<CP::OuterCurvePC as PolynomialCommitment<
             CP::CurveBaseField,
@@ -107,10 +107,11 @@ impl<CP: CircuitParameters> BlindingCircuit<CP>{
         private_inputs: &[CP::CurveBaseField],
         public_inputs: &[CP::CurveBaseField],
     ) -> Self {
-        // Given a gadget corresponding to a circuit, create all the computations for PBC related to the VP
+        // Given a gadget corresponding to a circuit, create all the computations for taiga related to the VP
 
         // Prover desc_vp
-        let (mut prover, ck, vk, public_input) = Self::precompute_prover(setup, gadget, private_inputs, public_inputs);
+        let (mut prover, ck, vk, public_input) =
+            Self::precompute_prover(setup, gadget, private_inputs, public_inputs);
         let mut verifier = Self::precompute_verifier(gadget, private_inputs, public_inputs);
         Self::preprocess(&mut prover, &mut verifier, &ck);
 

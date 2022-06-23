@@ -1,3 +1,4 @@
+use crate::circuit::gadgets::blinding::blinding_gadget;
 use crate::circuit::gadgets::trivial::trivial_gadget;
 use crate::nullifier_key::NullifierDerivingKey;
 use crate::{add_to_tree, circuit::circuit_parameters::CircuitParameters, crh};
@@ -327,6 +328,7 @@ fn _action_checks<CP: CircuitParameters>() {
         trivial_gadget::<CP>,
         &[],
         &[],
+        blinding_gadget::<CP>,
         &mut rng,
     );
 
@@ -341,6 +343,7 @@ fn _action_checks<CP: CircuitParameters>() {
         trivial_gadget::<CP>,
         &[],
         &[],
+        blinding_gadget::<CP>,
         &mut rng,
     );
 

@@ -3,11 +3,7 @@ use crate::el_gamal::EncryptedNote;
 use crate::nullifier_key::NullifierDerivingKey;
 use crate::{
     circuit::circuit_parameters::CircuitParameters,
-    circuit::{
-        blinding_circuit::{BlindingCircuit},
-        gadgets::blinding::blinding_gadget,
-        validity_predicate::ValidityPredicate,
-    },
+    circuit::{blinding_circuit::BlindingCircuit, validity_predicate::ValidityPredicate},
     el_gamal::{DecryptionKey, EncryptionKey},
     note::Note,
     serializable_to_vec, to_embedded_field,
@@ -70,6 +66,14 @@ impl<CP: CircuitParameters> User<CP> {
         ),
         recv_private_inputs: &[CP::CurveScalarField],
         recv_public_inputs: &[CP::CurveScalarField],
+        blinding_gadget: fn(
+            &mut StandardComposer<
+                <CP as CircuitParameters>::CurveBaseField,
+                <CP as CircuitParameters>::Curve,
+            >,
+            &[CP::CurveBaseField],
+            &[CP::CurveBaseField],
+        ),
         rng: &mut ThreadRng,
     ) -> User<CP> {
         // sending proof
@@ -83,13 +87,8 @@ impl<CP: CircuitParameters> User<CP> {
         );
         // send blinding proof
         let a = send_vp.desc_vp.arithmetic.q_l;
-        let priv_in = ["todo"] + send_vp.blind_rand;
-        let send_blind_vp = BlindingCircuit::<CP>::new(
-            outer_curve_setup,
-            blinding_gadget,
-            priv_in,
-            &[],
-        );
+        let send_blind_vp =
+            BlindingCircuit::<CP>::new(outer_curve_setup, blinding_gadget, &[], &[]);
 
         // Receiving proof
         let recv_vp = ValidityPredicate::<CP>::new(
@@ -101,12 +100,8 @@ impl<CP: CircuitParameters> User<CP> {
             rng,
         );
         // blinding proof
-        let recv_blind_vp = BlindingCircuit::new(
-            outer_curve_setup,
-            blinding_gadget,
-            recv_vp.blind_rand,
-            0, // todo
-        );
+        let recv_blind_vp =
+            BlindingCircuit::<CP>::new(outer_curve_setup, blinding_gadget, &[], &[]);
 
         // nullifier key
         let nk = NullifierDerivingKey::rand(rng);
@@ -193,8 +188,9 @@ impl<CP: CircuitParameters> User<CP> {
 
     pub fn check_proofs(&self) {
         self.send_vp.verify();
+        self.send_blind_vp.verify();
         self.recv_vp.verify();
-        self.blind_vp.verify();
+        self.recv_blind_vp.verify();
     }
 
     pub fn encrypt(&self, rand: &mut ThreadRng, note: &Note<CP>) -> EncryptedNote<CP::InnerCurve> {
@@ -218,7 +214,7 @@ impl<CP: CircuitParameters> User<CP> {
 
 #[test]
 fn test_user_creation() {
-    use crate::circuit::gadgets::trivial::trivial_gadget;
+    use crate::circuit::gadgets::{blinding::blinding_gadget, trivial::trivial_gadget};
     type CP = crate::circuit::circuit_parameters::PairingCircuitParameters;
     let mut rng = ThreadRng::default();
     let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
@@ -236,6 +232,7 @@ fn test_user_creation() {
         trivial_gadget::<CP>,
         &[],
         &[],
+        blinding_gadget::<CP>,
         &mut rng,
     );
 }

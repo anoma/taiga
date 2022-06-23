@@ -5,7 +5,7 @@ use merlin::Transcript;
 use plonk_core::{
     constraint_system::StandardComposer,
     prelude::Proof,
-    proof_system::{pi::PublicInputs, Prover, Verifier, VerifierKey, Blinding},
+    proof_system::{pi::PublicInputs, Blinding, Prover, Verifier, VerifierKey},
 };
 use rand::prelude::ThreadRng;
 use std::marker::PhantomData;
@@ -113,12 +113,8 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
     ) -> plonk_core::proof_system::Blinding<CP::CurveScalarField> {
         // Random F elements for blinding the circuit
         let blinding = plonk_core::proof_system::Blinding::<CP::CurveScalarField>::rand(rng);
-        prover
-            .preprocess_with_blinding(ck, &blinding)
-            .unwrap();
-        verifier
-            .preprocess_with_blinding(ck, &blinding)
-            .unwrap();
+        prover.preprocess_with_blinding(ck, &blinding).unwrap();
+        verifier.preprocess_with_blinding(ck, &blinding).unwrap();
         blinding
     }
 
