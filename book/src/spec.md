@@ -99,7 +99,6 @@ Encodes: token vp
 
 ### Address
 
-Encodes: send vp, nullifier key `nk`, receive (recv) vp and rcm_addr.
 - address: $\mathbb{F}_r$ is user's shielded payment address, which encodes `nk`, `send_vp`, `recv_vp` and `rcm`.
 - nk: $\mathbb{F}_r$ is the nullifier key to generate nullifier.
 - send_vp: bits of $\mathbb{F}_q$ is the hash of vp description.
