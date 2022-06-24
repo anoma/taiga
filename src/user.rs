@@ -1,3 +1,4 @@
+use crate::circuit::gadgets::blinding::blinding_gadget;
 use crate::circuit::nullifier::Nullifier;
 use crate::el_gamal::EncryptedNote;
 use crate::nullifier_key::NullifierDerivingKey;
@@ -66,14 +67,6 @@ impl<CP: CircuitParameters> User<CP> {
         ),
         recv_private_inputs: &[CP::CurveScalarField],
         recv_public_inputs: &[CP::CurveScalarField],
-        blinding_gadget: fn(
-            &mut StandardComposer<
-                <CP as CircuitParameters>::CurveBaseField,
-                <CP as CircuitParameters>::Curve,
-            >,
-            &[CP::CurveBaseField],
-            &[CP::CurveBaseField],
-        ),
         rng: &mut ThreadRng,
     ) -> User<CP> {
         // sending proof
@@ -86,9 +79,8 @@ impl<CP: CircuitParameters> User<CP> {
             rng,
         );
         // send blinding proof
-        let a = send_vp.desc_vp.arithmetic.q_l.clone();
         let send_blind_vp =
-            BlindingCircuit::<CP>::new(outer_curve_setup, blinding_gadget, &[], &[]);
+            BlindingCircuit::<CP>::new(outer_curve_setup, blinding_gadget::<CP>, &[], &[]);
 
         // Receiving proof
         let recv_vp = ValidityPredicate::<CP>::new(
@@ -101,7 +93,7 @@ impl<CP: CircuitParameters> User<CP> {
         );
         // blinding proof
         let recv_blind_vp =
-            BlindingCircuit::<CP>::new(outer_curve_setup, blinding_gadget, &[], &[]);
+            BlindingCircuit::<CP>::new(outer_curve_setup, blinding_gadget::<CP>, &[], &[]);
 
         // nullifier key
         let nk = NullifierDerivingKey::rand(rng);
@@ -214,7 +206,7 @@ impl<CP: CircuitParameters> User<CP> {
 
 #[test]
 fn test_user_creation() {
-    use crate::circuit::gadgets::{blinding::blinding_gadget, trivial::trivial_gadget};
+    use crate::circuit::gadgets::trivial::trivial_gadget;
     type CP = crate::circuit::circuit_parameters::PairingCircuitParameters;
     let mut rng = ThreadRng::default();
     let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
@@ -232,7 +224,6 @@ fn test_user_creation() {
         trivial_gadget::<CP>,
         &[],
         &[],
-        blinding_gadget::<CP>,
         &mut rng,
     );
 }

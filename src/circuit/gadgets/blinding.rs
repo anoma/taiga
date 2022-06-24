@@ -1,5 +1,4 @@
 use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters};
-use plonk_core::constraint_system::Variable;
 use plonk_core::{circuit::Circuit, prelude::StandardComposer};
 
 type CircuitPoint = plonk_core::constraint_system::ecc::Point<

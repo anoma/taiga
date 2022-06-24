@@ -1,5 +1,4 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
-use crate::circuit::gadgets::blinding::blinding_gadget;
 use crate::circuit::gadgets::trivial::trivial_gadget;
 use crate::circuit::nullifier::Nullifier;
 use crate::circuit::validity_predicate::ValidityPredicate;
@@ -29,7 +28,6 @@ fn spawn_user<CP: CircuitParameters>(name: &str) -> User<CP> {
         trivial_gadget::<CP>,
         &[],
         &[],
-        blinding_gadget::<CP>,
         &mut rng,
     )
 }
