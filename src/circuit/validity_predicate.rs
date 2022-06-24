@@ -11,8 +11,10 @@ use rand::prelude::ThreadRng;
 use std::marker::PhantomData;
 
 use crate::{
-    circuit::circuit_parameters::CircuitParameters, serializable_to_vec, to_embedded_field,
-    HashToField,
+    circuit::{
+        circuit_parameters::CircuitParameters, gadgets::field_addition::field_addition_gadget,
+    },
+    serializable_to_vec, to_embedded_field, HashToField,
 };
 
 pub struct ValidityPredicate<CP: CircuitParameters> {
@@ -202,4 +204,31 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
         // p_i.update_size(circuit_size);
         self.verifier.verify(&self.proof, &self.vk, &p_i).unwrap();
     }
+}
+
+#[test]
+fn test_vp_creation() {
+    use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
+    use crate::circuit::gadgets::field_addition::field_addition_gadget;
+
+    type F = <CP as CircuitParameters>::CurveScalarField;
+    type InnerC = <CP as CircuitParameters>::InnerCurve;
+    type PC = <CP as CircuitParameters>::CurvePC;
+
+    let rng = &mut rand::thread_rng();
+    let setup = PC::setup(1 << 4, None, rng).unwrap();
+
+    let a = F::from(2u64);
+    let b = F::from(1u64);
+    let c = F::from(3u64);
+
+    let vp = ValidityPredicate::<CP>::new(
+        &setup,
+        field_addition_gadget::<CP>,
+        &[a, b],
+        &[c],
+        true,
+        rng,
+    );
+    vp.verify();
 }
