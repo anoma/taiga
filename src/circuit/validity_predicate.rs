@@ -23,6 +23,10 @@ pub struct ValidityPredicate<CP: CircuitParameters> {
     pub blind_rand: Blinding<CP::CurveScalarField>, //blinding randomness
     pub proof: Proof<CP::CurveScalarField, CP::CurvePC>,
     pub verifier: Verifier<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>,
+    pub ck: <CP::CurvePC as PolynomialCommitment<
+        CP::CurveScalarField,
+        DensePolynomial<CP::CurveScalarField>,
+    >>::CommitterKey,
     pub vk: <CP::CurvePC as PolynomialCommitment<
         CP::CurveScalarField,
         DensePolynomial<CP::CurveScalarField>,
@@ -166,6 +170,7 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
             blind_rand: blinding_values,
             proof,
             verifier,
+            ck,
             vk,
             rcm_com,
             com_vp,
