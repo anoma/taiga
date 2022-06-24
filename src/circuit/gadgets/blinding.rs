@@ -11,8 +11,8 @@ type InnerCurve = ark_bls12_377::Bls12_377;
 
 pub fn blinding_gadget<CP: CircuitParameters>(
     composer: &mut StandardComposer<
-        <PairingCircuitParameters as CircuitParameters>::CurveBaseField,
-        <PairingCircuitParameters as CircuitParameters>::Curve,
+        <CP as CircuitParameters>::CurveBaseField,
+        <CP as CircuitParameters>::Curve,
     >,
     private_inputs: &[<CP as CircuitParameters>::CurveBaseField],
     public_inputs: &[<CP as CircuitParameters>::CurveBaseField],

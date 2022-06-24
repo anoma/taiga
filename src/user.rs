@@ -86,7 +86,7 @@ impl<CP: CircuitParameters> User<CP> {
             rng,
         );
         // send blinding proof
-        let a = send_vp.desc_vp.arithmetic.q_l;
+        let a = send_vp.desc_vp.arithmetic.q_l.clone();
         let send_blind_vp =
             BlindingCircuit::<CP>::new(outer_curve_setup, blinding_gadget, &[], &[]);
 
