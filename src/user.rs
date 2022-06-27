@@ -210,7 +210,7 @@ fn test_user_creation() {
     let mut rng = ThreadRng::default();
     let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
     let outer_curve_pp =
-        <CP as CircuitParameters>::OuterCurvePC::setup(1 << 12, None, &mut rng).unwrap();
+        <CP as CircuitParameters>::OuterCurvePC::setup(1 << 13, None, &mut rng).unwrap();
 
     let _user = User::<CP>::new(
         "Simon",
