@@ -34,6 +34,24 @@ pub fn address_integrity_circuit<CP: CircuitParameters>(
     poseidon_param.circuit_hash(composer, &address_vars)
 }
 
+pub fn token_integrity_circuit<CP: CircuitParameters>(
+    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+    rcm: &Variable,
+    // convert the vp variables inside, move out if needed.
+    token_vp_bytes: &[bool],
+) -> Result<Variable, TaigaError> {
+    // Init poseidon hash gadget.
+    let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+        PoseidonConstants::generate::<WIDTH_5>();
+
+    // convert send_vp bits to two variable
+    let mut token_fields = bits_to_variables::<CP>(composer, token_vp_bytes);
+
+    // address_send = Com_r( Com_q(send_vp) || nk )
+    token_fields.push(*rcm);
+    poseidon_param.circuit_hash(composer, &token_fields)
+}
+
 // To keep consistent with crate::utils::bytes_to_fields
 // The bits are from unformatted bytes or non-CP::CurveScalarField type.
 // The bits can not be from CP::CurveScalarField, it will have one bit loss.
@@ -67,77 +85,114 @@ pub fn bits_to_variables<CP: CircuitParameters>(
     ret
 }
 
-#[test]
-fn test_bits_to_variables() {
+mod test {
     use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters};
     type Fr = <PairingCircuitParameters as CircuitParameters>::CurveScalarField;
     type P = <PairingCircuitParameters as CircuitParameters>::InnerCurve;
     type Fq = <PairingCircuitParameters as CircuitParameters>::CurveBaseField;
-    use crate::utils::bits_to_fields;
-    use ark_ff::{BigInteger, PrimeField};
-    use ark_std::{test_rng, UniformRand};
-    use plonk_core::constraint_system::StandardComposer;
 
-    let mut rng = test_rng();
-    let src_scalar = Fq::rand(&mut rng);
-    let src_scalar_bits = src_scalar.into_repr().to_bits_le();
+    #[test]
+    fn test_bits_to_variables() {
+        use crate::circuit::integrity::bits_to_variables;
+        use crate::utils::bits_to_fields;
+        use ark_ff::{BigInteger, PrimeField};
+        use ark_std::{test_rng, UniformRand};
+        use plonk_core::constraint_system::StandardComposer;
 
-    // inside-circuit convert
-    let mut composer = StandardComposer::<Fr, P>::new();
-    let target_var = bits_to_variables::<PairingCircuitParameters>(&mut composer, &src_scalar_bits);
-    composer.check_circuit_satisfied();
+        let mut rng = test_rng();
+        let src_scalar = Fq::rand(&mut rng);
+        let src_scalar_bits = src_scalar.into_repr().to_bits_le();
 
-    println!(
-        "circuit size of bits_to_variables: {}",
-        composer.circuit_bound()
-    );
+        // inside-circuit convert
+        let mut composer = StandardComposer::<Fr, P>::new();
+        let target_var =
+            bits_to_variables::<PairingCircuitParameters>(&mut composer, &src_scalar_bits);
+        composer.check_circuit_satisfied();
 
-    // out-of-circuit convert, expect result
-    let target_expect = bits_to_fields::<Fr>(&src_scalar_bits);
+        println!(
+            "circuit size of bits_to_variables: {}",
+            composer.circuit_bound()
+        );
 
-    assert_eq!(target_var.len(), target_expect.len());
-    for i in 0..target_var.len() {
-        let expected_var = composer.add_input(target_expect[i]);
-        composer.assert_equal(expected_var, target_var[i]);
+        // out-of-circuit convert, expect result
+        let target_expect = bits_to_fields::<Fr>(&src_scalar_bits);
+
+        assert_eq!(target_var.len(), target_expect.len());
+        for i in 0..target_var.len() {
+            let expected_var = composer.add_input(target_expect[i]);
+            composer.assert_equal(expected_var, target_var[i]);
+        }
+        composer.check_circuit_satisfied();
     }
-    composer.check_circuit_satisfied();
-}
 
-#[test]
-fn test_address_integrity_circuit() {
-    use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters};
-    use crate::user_address::UserAddress;
-    use ark_std::test_rng;
-    type Fr = <PairingCircuitParameters as CircuitParameters>::CurveScalarField;
-    type P = <PairingCircuitParameters as CircuitParameters>::InnerCurve;
-    type Fq = <PairingCircuitParameters as CircuitParameters>::CurveBaseField;
+    #[test]
+    fn test_address_integrity_circuit() {
+        use crate::user_address::UserAddress;
+        use crate::circuit::integrity::address_integrity_circuit;
+        use ark_std::test_rng;
+        use plonk_core::constraint_system::StandardComposer;
 
-    let mut rng = test_rng();
-    let address = UserAddress::<PairingCircuitParameters>::new(&mut rng);
+        let mut rng = test_rng();
+        let address = UserAddress::<PairingCircuitParameters>::new(&mut rng);
 
-    // address integrity circuit
-    let mut composer = StandardComposer::<Fr, P>::new();
-    let nk_var = composer.add_input(address.nk.inner());
-    let rcm_var = composer.add_input(address.rcm);
-    let address_var = address_integrity_circuit::<PairingCircuitParameters>(
-        &mut composer,
-        &nk_var,
-        &rcm_var,
-        &address.send_vp.to_bits(),
-        &address.recv_vp.to_bits(),
-    )
-    .unwrap();
+        // address integrity circuit
+        let mut composer = StandardComposer::<Fr, P>::new();
+        let nk_var = composer.add_input(address.nk.inner());
+        let rcm_var = composer.add_input(address.rcm);
+        let address_var = address_integrity_circuit::<PairingCircuitParameters>(
+            &mut composer,
+            &nk_var,
+            &rcm_var,
+            &address.send_vp.to_bits(),
+            &address.recv_vp.to_bits(),
+        )
+        .unwrap();
 
-    composer.check_circuit_satisfied();
+        composer.check_circuit_satisfied();
 
-    println!(
-        "circuit size of address_integrity_circuit: {}",
-        composer.circuit_bound()
-    );
+        println!(
+            "circuit size of address_integrity_circuit: {}",
+            composer.circuit_bound()
+        );
 
-    // check expect address
-    let expect_address_opaque = address.opaque_native().unwrap();
-    let expected_var = composer.add_input(expect_address_opaque);
-    composer.assert_equal(expected_var, address_var);
-    composer.check_circuit_satisfied();
+        // check expect address
+        let expect_address_opaque = address.opaque_native().unwrap();
+        let expected_var = composer.add_input(expect_address_opaque);
+        composer.assert_equal(expected_var, address_var);
+        composer.check_circuit_satisfied();
+    }
+
+    #[test]
+    fn test_token_integrity_circuit() {
+        use crate::circuit::integrity::token_integrity_circuit;
+        use crate::token::Token;
+        use ark_std::test_rng;
+        use plonk_core::constraint_system::StandardComposer;
+
+        let mut rng = test_rng();
+        let token = Token::<PairingCircuitParameters>::new(&mut rng);
+
+        // token integrity circuit
+        let mut composer = StandardComposer::<Fr, P>::new();
+        let rcm_var = composer.add_input(token.rcm);
+        let token_var = token_integrity_circuit::<PairingCircuitParameters>(
+            &mut composer,
+            &rcm_var,
+            &token.token_vp.to_bits(),
+        )
+        .unwrap();
+
+        composer.check_circuit_satisfied();
+
+        println!(
+            "circuit size of token_integrity_circuit: {}",
+            composer.circuit_bound()
+        );
+
+        // check expect token
+        let expect_token_opaque = token.opaque_native().unwrap();
+        let expected_var = composer.add_input(expect_token_opaque);
+        composer.assert_equal(expected_var, token_var);
+        composer.check_circuit_satisfied();
+    }
 }
