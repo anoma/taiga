@@ -1,5 +1,4 @@
-use crate::circuit::circuit_parameters::PairingCircuitParameters;
-use crate::circuit::gadgets::blinding::{blinding_gadget, get_inputs};
+use crate::circuit::gadgets::blinding::blinding_gadget;
 use crate::circuit::nullifier::Nullifier;
 use crate::el_gamal::EncryptedNote;
 use crate::nullifier_key::NullifierDerivingKey;
@@ -21,9 +20,9 @@ pub struct User<CP: CircuitParameters> {
     name: String, // probably not useful: a user will be identified with his address / his public key(?)
     _dec_key: DecryptionKey<CP::InnerCurve>,
     send_vp: ValidityPredicate<CP>,
-    send_blind_vp: BlindingCircuit,
+    send_blind_vp: BlindingCircuit<CP>,
     recv_vp: ValidityPredicate<CP>,
-    recv_blind_vp: BlindingCircuit,
+    recv_blind_vp: BlindingCircuit<CP>,
     pub rcm_addr: CP::CurveScalarField, // Commitment randomness for deriving address
     nk: NullifierDerivingKey<CP::CurveScalarField>, // the nullifier key
     pub com_send_part: CP::CurveScalarField,
@@ -43,9 +42,9 @@ impl<CP: CircuitParameters> User<CP> {
             CP::CurveScalarField,
             DensePolynomial<CP::CurveScalarField>,
         >>::UniversalParams,
-        outer_curve_setup: &<<PairingCircuitParameters as CircuitParameters>::OuterCurvePC as PolynomialCommitment<
-            <PairingCircuitParameters as CircuitParameters>::CurveBaseField,
-            DensePolynomial<<PairingCircuitParameters as CircuitParameters>::CurveBaseField>,
+        outer_curve_setup: &<CP::OuterCurvePC as PolynomialCommitment<
+            CP::CurveBaseField,
+            DensePolynomial<CP::CurveBaseField>,
         >>::UniversalParams,
         dec_key: DecryptionKey<CP::InnerCurve>,
         send_gadget: fn(
@@ -79,15 +78,15 @@ impl<CP: CircuitParameters> User<CP> {
             true,
             rng,
         );
+
         // send blinding proof
-        let (priv_blind_in, pub_blind_in) = send_vp.get_inputs();
-        let send_blind_vp =
-            BlindingCircuit::new(
-                outer_curve_setup, 
-                blinding_gadget, 
-                &priv_blind_in[..], 
-                &pub_blind_in[..],
-            );
+        let (priv_blind_in, pub_blind_in) = CP::get_inputs(&send_vp);
+        let send_blind_vp = BlindingCircuit::<CP>::new(
+            outer_curve_setup,
+            blinding_gadget::<CP>,
+            &priv_blind_in[..],
+            &pub_blind_in[..],
+        );
 
         // Receiving proof
         let recv_vp = ValidityPredicate::<CP>::new(
@@ -98,15 +97,15 @@ impl<CP: CircuitParameters> User<CP> {
             true,
             rng,
         );
-        // blinding proof
-        let (priv_blind_in, pub_blind_in) = get_inputs(recv_vp);  
-        let recv_blind_vp =
-            BlindingCircuit::new(
-                outer_curve_setup, 
-                blinding_gadget, 
-                &priv_blind_in[..], 
-                &pub_blind_in[..],
-            );
+
+        // recv blinding proof
+        let (priv_blind_in, pub_blind_in) = CP::get_inputs(&recv_vp);
+        let recv_blind_vp = BlindingCircuit::<CP>::new(
+            outer_curve_setup,
+            blinding_gadget::<CP>,
+            &priv_blind_in[..],
+            &pub_blind_in[..],
+        );
 
         // nullifier key
         let nk = NullifierDerivingKey::rand(rng);
@@ -114,7 +113,7 @@ impl<CP: CircuitParameters> User<CP> {
         // commitment to the send part com_r(com_q(desc_send_vp, 0) || nk, 0)
         let com_send_part = CP::com_r(
             &vec![
-                to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(send_vp.pack()),
+                to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(&send_vp.pack()),
                 nk.inner(),
             ],
             CP::CurveScalarField::zero(),
@@ -126,8 +125,8 @@ impl<CP: CircuitParameters> User<CP> {
             _dec_key: dec_key,
             // sending proofs/circuits
             send_vp,
-            recv_vp,
             send_blind_vp,
+            recv_vp,
             recv_blind_vp,
             // random element for address
             rcm_addr: CP::CurveScalarField::rand(rng),
@@ -185,7 +184,7 @@ impl<CP: CircuitParameters> User<CP> {
         CP::com_r(
             &vec![
                 self.com_send_part,
-                to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(recv_cm),
+                to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(&recv_cm),
             ],
             self.rcm_addr,
         )
@@ -224,7 +223,7 @@ fn test_user_creation() {
     let mut rng = ThreadRng::default();
     let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
     let outer_curve_pp =
-        <CP as CircuitParameters>::OuterCurvePC::setup(1 << 4, None, &mut rng).unwrap();
+        <CP as CircuitParameters>::OuterCurvePC::setup(1 << 10, None, &mut rng).unwrap();
 
     let _user = User::<CP>::new(
         "Simon",

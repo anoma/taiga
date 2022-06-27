@@ -2,59 +2,59 @@ use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use plonk_core::{
     constraint_system::StandardComposer,
-    prelude::{Proof, Point},
+    prelude::{Point, Proof},
     proof_system::{pi::PublicInputs, Prover, Verifier},
 };
 
-use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters as CP};
+use crate::circuit::circuit_parameters::CircuitParameters;
 
-pub struct BlindingCircuit {
-    pub public_input: PublicInputs<<CP as CircuitParameters>::CurveBaseField>,
-    pub proof: Proof<<CP as CircuitParameters>::CurveBaseField, <CP as CircuitParameters>::OuterCurvePC>,
-    pub verifier: Verifier<<CP as CircuitParameters>::CurveBaseField, <CP as CircuitParameters>::Curve, <CP as CircuitParameters>::OuterCurvePC>,
-    pub vk: <<CP as CircuitParameters>::OuterCurvePC as PolynomialCommitment<
-        <CP as CircuitParameters>::CurveBaseField,
-        DensePolynomial<<CP as CircuitParameters>::CurveBaseField>,
+pub struct BlindingCircuit<CP: CircuitParameters> {
+    pub public_input: PublicInputs<CP::CurveBaseField>,
+    pub proof: Proof<CP::CurveBaseField, CP::OuterCurvePC>,
+    pub verifier: Verifier<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC>,
+    pub vk: <CP::OuterCurvePC as PolynomialCommitment<
+        CP::CurveBaseField,
+        DensePolynomial<CP::CurveBaseField>,
     >>::VerifierKey,
 }
 
-impl BlindingCircuit {
+impl<CP: CircuitParameters> BlindingCircuit<CP> {
     pub fn precompute_prover(
-        setup: &<<CP as CircuitParameters>::OuterCurvePC as PolynomialCommitment<
-            <CP as CircuitParameters>::CurveBaseField,
-            DensePolynomial<<CP as CircuitParameters>::CurveBaseField>,
+        setup: &<CP::OuterCurvePC as PolynomialCommitment<
+            CP::CurveBaseField,
+            DensePolynomial<CP::CurveBaseField>,
         >>::UniversalParams,
         gadget: fn(
-            &mut StandardComposer<<CP as CircuitParameters>::CurveBaseField, <CP as CircuitParameters>::Curve>,
-            private_inputs: &[<CP as CircuitParameters>::CurveBaseField],
-            public_inputs: &[<CP as CircuitParameters>::CurveBaseField],
-        )->Point<<CP as CircuitParameters>::Curve>,
-        private_inputs: &[<CP as CircuitParameters>::CurveBaseField],
-        public_inputs: &[<CP as CircuitParameters>::CurveBaseField],
+            &mut StandardComposer<CP::CurveBaseField, CP::Curve>,
+            private_inputs: &[CP::CurveBaseField],
+            public_inputs: &[CP::CurveBaseField],
+        ) -> Point<CP::Curve>,
+        private_inputs: &[CP::CurveBaseField],
+        public_inputs: &[CP::CurveBaseField],
     ) -> (
         // Prover
-        Prover<<CP as CircuitParameters>::CurveBaseField, <CP as CircuitParameters>::Curve, <CP as CircuitParameters>::OuterCurvePC>,
+        Prover<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC>,
         // CommitterKey
-        <<CP as CircuitParameters>::OuterCurvePC as PolynomialCommitment<
-            <CP as CircuitParameters>::CurveBaseField,
-            DensePolynomial<<CP as CircuitParameters>::CurveBaseField>,
+        <CP::OuterCurvePC as PolynomialCommitment<
+            CP::CurveBaseField,
+            DensePolynomial<CP::CurveBaseField>,
         >>::CommitterKey,
         // VerifierKey
-        <<CP as CircuitParameters>::OuterCurvePC as PolynomialCommitment<
-            <CP as CircuitParameters>::CurveBaseField,
-            DensePolynomial<<CP as CircuitParameters>::CurveBaseField>,
+        <CP::OuterCurvePC as PolynomialCommitment<
+            CP::CurveBaseField,
+            DensePolynomial<CP::CurveBaseField>,
         >>::VerifierKey,
         // PublicInput
-        PublicInputs<<CP as CircuitParameters>::CurveBaseField>,
+        PublicInputs<CP::CurveBaseField>,
     ) {
         // Create a `Prover`
         // Set the circuit using `gadget`
         // Output `prover`, `vk`, `public_input`.
 
-        let mut prover = Prover::<<CP as CircuitParameters>::CurveBaseField, <CP as CircuitParameters>::Curve, <CP as CircuitParameters>::OuterCurvePC>::new(b"demo");
+        let mut prover = Prover::<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC>::new(b"demo");
         prover.key_transcript(b"key", b"additional seed information");
         gadget(prover.mut_cs(), private_inputs, public_inputs);
-        let (ck, vk) = <CP as CircuitParameters>::OuterCurvePC::trim(
+        let (ck, vk) = CP::OuterCurvePC::trim(
             setup,
             prover.circuit_bound().next_power_of_two() + 6,
             0,
@@ -68,14 +68,14 @@ impl BlindingCircuit {
 
     pub fn precompute_verifier(
         gadget: fn(
-            &mut StandardComposer<<CP as CircuitParameters>::CurveBaseField, <CP as CircuitParameters>::Curve>,
-            private_inputs: &[<CP as CircuitParameters>::CurveBaseField],
-            public_inputs: &[<CP as CircuitParameters>::CurveBaseField],
-        )->Point<<CP as CircuitParameters>::Curve>,
-        private_inputs: &[<CP as CircuitParameters>::CurveBaseField],
-        public_inputs: &[<CP as CircuitParameters>::CurveBaseField],
-    ) -> Verifier<<CP as CircuitParameters>::CurveBaseField, <CP as CircuitParameters>::Curve, <CP as CircuitParameters>::OuterCurvePC> {
-        let mut verifier: Verifier<<CP as CircuitParameters>::CurveBaseField, <CP as CircuitParameters>::Curve, <CP as CircuitParameters>::OuterCurvePC> =
+            &mut StandardComposer<CP::CurveBaseField, CP::Curve>,
+            private_inputs: &[CP::CurveBaseField],
+            public_inputs: &[CP::CurveBaseField],
+        ) -> Point<CP::Curve>,
+        private_inputs: &[CP::CurveBaseField],
+        public_inputs: &[CP::CurveBaseField],
+    ) -> Verifier<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC> {
+        let mut verifier: Verifier<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC> =
             Verifier::new(b"demo");
         verifier.key_transcript(b"key", b"additional seed information");
         gadget(verifier.mut_cs(), private_inputs, public_inputs);
@@ -83,11 +83,11 @@ impl BlindingCircuit {
     }
 
     pub fn preprocess(
-        prover: &mut Prover<<CP as CircuitParameters>::CurveBaseField, <CP as CircuitParameters>::Curve, <CP as CircuitParameters>::OuterCurvePC>,
-        verifier: &mut Verifier<<CP as CircuitParameters>::CurveBaseField, <CP as CircuitParameters>::Curve, <CP as CircuitParameters>::OuterCurvePC>,
-        ck: &<<CP as CircuitParameters>::OuterCurvePC as PolynomialCommitment<
-            <CP as CircuitParameters>::CurveBaseField,
-            DensePolynomial<<CP as CircuitParameters>::CurveBaseField>,
+        prover: &mut Prover<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC>,
+        verifier: &mut Verifier<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC>,
+        ck: &<CP::OuterCurvePC as PolynomialCommitment<
+            CP::CurveBaseField,
+            DensePolynomial<CP::CurveBaseField>,
         >>::CommitterKey,
     ) {
         prover.preprocess(ck).unwrap();
@@ -95,17 +95,17 @@ impl BlindingCircuit {
     }
 
     pub fn new(
-        setup: &<<CP as CircuitParameters>::OuterCurvePC as PolynomialCommitment<
-            <CP as CircuitParameters>::CurveBaseField,
-            DensePolynomial<<CP as CircuitParameters>::CurveBaseField>,
+        setup: &<CP::OuterCurvePC as PolynomialCommitment<
+            CP::CurveBaseField,
+            DensePolynomial<CP::CurveBaseField>,
         >>::UniversalParams,
         gadget: fn(
-            &mut StandardComposer<<CP as CircuitParameters>::CurveBaseField, <CP as CircuitParameters>::Curve>,
-            &[<CP as CircuitParameters>::CurveBaseField],
-            &[<CP as CircuitParameters>::CurveBaseField],
-        )->Point<<CP as CircuitParameters>::Curve>,
-        private_inputs: &[<CP as CircuitParameters>::CurveBaseField],
-        public_inputs: &[<CP as CircuitParameters>::CurveBaseField],
+            &mut StandardComposer<CP::CurveBaseField, CP::Curve>,
+            &[CP::CurveBaseField],
+            &[CP::CurveBaseField],
+        ) -> Point<CP::Curve>,
+        private_inputs: &[CP::CurveBaseField],
+        public_inputs: &[CP::CurveBaseField],
     ) -> Self {
         // Given a gadget corresponding to a circuit, create all the computations for taiga related to the VP
 

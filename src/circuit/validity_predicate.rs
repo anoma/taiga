@@ -5,19 +5,17 @@ use merlin::Transcript;
 use plonk_core::{
     constraint_system::StandardComposer,
     prelude::Proof,
-    proof_system::{pi::PublicInputs, Blinding, Prover, Verifier, VerifierKey}, circuit::Circuit,
+    proof_system::{pi::PublicInputs, Blinding, Prover, Verifier, VerifierKey},
 };
 use rand::prelude::ThreadRng;
 use std::marker::PhantomData;
 
 use crate::{
-    circuit::circuit_parameters::CircuitParameters,
-    serializable_to_vec, to_embedded_field, HashToField,
+    circuit::circuit_parameters::CircuitParameters, serializable_to_vec, to_embedded_field,
+    HashToField,
 };
 
-use super::circuit_parameters::PairingCircuitParameters;
-
-pub struct ValidityPredicate<CP: CircuitParameters> {
+pub struct ValidityPredicate<CP: CircuitParameters + ?Sized> {
     pub desc_vp: VerifierKey<CP::CurveScalarField, CP::CurvePC>, //preprocessed VP
     pub public_input: PublicInputs<CP::CurveScalarField>,
     pub blind_rand: Blinding<CP::CurveScalarField>, //blinding randomness
@@ -160,7 +158,7 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
         // cannot use `pack()` because it is implemented for a validity predicate and we only have `desc_vp`.
         let h_desc_vp = CP::CurveBaseField::hash_to_field(&serializable_to_vec(&desc_vp));
         let com_vp = CP::com_r(
-            &vec![to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(h_desc_vp)],
+            &vec![to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(&h_desc_vp)],
             rcm_com,
         );
 
@@ -185,7 +183,7 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
     pub fn commitment(&self, rand: CP::CurveScalarField) -> CP::CurveScalarField {
         // computes a commitment C = com_r(com_q(desc_vp, 0), rand)
         CP::com_r(
-            &vec![to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(self.pack())],
+            &vec![to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(&self.pack())],
             rand,
         )
     }
@@ -209,7 +207,6 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
         // p_i.update_size(circuit_size);
         self.verifier.verify(&self.proof, &self.vk, &p_i).unwrap();
     }
-
 }
 
 // pub trait Inputs {

@@ -37,13 +37,13 @@ impl<CP: CircuitParameters> Action<CP> {
                     CP::com_r(
                         &vec![
                             to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(
-                                send_vp_hash
+                                &send_vp_hash
                             ),
                             nk.inner()
                         ],
                         CP::CurveScalarField::zero()
                     ),
-                    to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(recv_vp_hash)
+                    to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(&recv_vp_hash)
                 ],
                 note_rcm,
             ),
@@ -71,7 +71,7 @@ impl<CP: CircuitParameters> Action<CP> {
             CP::com_r(
                 &vec![
                     send_vp_com,
-                    to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(recv_vp_hash)
+                    to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(&recv_vp_hash)
                 ],
                 note_rcm,
             ),
@@ -95,7 +95,7 @@ impl<CP: CircuitParameters> Action<CP> {
     ) {
         assert_eq!(
             CP::com_r(
-                &vec![to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(hash_tok_vp)],
+                &vec![to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(&hash_tok_vp)],
                 token_rcm
             ),
             note_token_addr
@@ -126,7 +126,7 @@ impl<CP: CircuitParameters> Action<CP> {
             com_vp,
             // TODO: Use Blake2s to be efficient on both Fr and Fq
             CP::com_r(
-                &vec![to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(hash_vp)],
+                &vec![to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(&hash_vp)],
                 com_rcm
             )
         );
@@ -314,7 +314,7 @@ fn _action_checks<CP: CircuitParameters>() {
     let mut rng = rand::thread_rng();
 
     let pp = CP::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
-    let outer_curve_pp = CP::OuterCurvePC::setup(1 << 4, None, &mut rng).unwrap();
+    let outer_curve_pp = CP::OuterCurvePC::setup(1 << 10, None, &mut rng).unwrap();
 
     let alice = User::<CP>::new(
         "alice",
