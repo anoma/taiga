@@ -8,6 +8,8 @@ use ark_ec::{
 use ark_ff::PrimeField;
 use plonk_core::commitment::{HomomorphicCommitment, KZG10};
 
+use super::validity_predicate::ValidityPredicate;
+
 pub trait CircuitParameters {
     //               Inner Curve     Curve    Outer Curve
     // Scalar Field                    Fr         Fq
@@ -48,6 +50,8 @@ pub trait CircuitParameters {
     fn com_q(x: &Vec<Self::CurveBaseField>, rand: Self::CurveBaseField) -> Self::CurveBaseField {
         com(x, rand)
     }
+
+    fn get_inputs(vp: ValidityPredicate<Self>)->u32;
 }
 
 // // We decided to continue with KZG for now.
@@ -77,4 +81,5 @@ impl CircuitParameters for PairingCircuitParameters {
     type OuterCurve = ark_bw6_761::g1::Parameters;
     type CurvePC = KZG10<ark_bls12_377::Bls12_377>;
     type OuterCurvePC = KZG10<ark_bw6_761::BW6_761>;
+
 }

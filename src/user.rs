@@ -1,4 +1,5 @@
-use crate::circuit::gadgets::blinding::blinding_gadget;
+use crate::circuit::circuit_parameters::PairingCircuitParameters;
+use crate::circuit::gadgets::blinding::{blinding_gadget, get_inputs};
 use crate::circuit::nullifier::Nullifier;
 use crate::el_gamal::EncryptedNote;
 use crate::nullifier_key::NullifierDerivingKey;
@@ -20,9 +21,9 @@ pub struct User<CP: CircuitParameters> {
     name: String, // probably not useful: a user will be identified with his address / his public key(?)
     _dec_key: DecryptionKey<CP::InnerCurve>,
     send_vp: ValidityPredicate<CP>,
-    send_blind_vp: BlindingCircuit<CP>,
+    send_blind_vp: BlindingCircuit,
     recv_vp: ValidityPredicate<CP>,
-    recv_blind_vp: BlindingCircuit<CP>,
+    recv_blind_vp: BlindingCircuit,
     pub rcm_addr: CP::CurveScalarField, // Commitment randomness for deriving address
     nk: NullifierDerivingKey<CP::CurveScalarField>, // the nullifier key
     pub com_send_part: CP::CurveScalarField,
@@ -42,9 +43,9 @@ impl<CP: CircuitParameters> User<CP> {
             CP::CurveScalarField,
             DensePolynomial<CP::CurveScalarField>,
         >>::UniversalParams,
-        outer_curve_setup: &<CP::OuterCurvePC as PolynomialCommitment<
-            CP::CurveBaseField,
-            DensePolynomial<CP::CurveBaseField>,
+        outer_curve_setup: &<<PairingCircuitParameters as CircuitParameters>::OuterCurvePC as PolynomialCommitment<
+            <PairingCircuitParameters as CircuitParameters>::CurveBaseField,
+            DensePolynomial<<PairingCircuitParameters as CircuitParameters>::CurveBaseField>,
         >>::UniversalParams,
         dec_key: DecryptionKey<CP::InnerCurve>,
         send_gadget: fn(
@@ -79,8 +80,14 @@ impl<CP: CircuitParameters> User<CP> {
             rng,
         );
         // send blinding proof
+        let (priv_blind_in, pub_blind_in) = send_vp.get_inputs();
         let send_blind_vp =
-            BlindingCircuit::<CP>::new(outer_curve_setup, blinding_gadget::<CP>, &[], &[]);
+            BlindingCircuit::new(
+                outer_curve_setup, 
+                blinding_gadget, 
+                &priv_blind_in[..], 
+                &pub_blind_in[..],
+            );
 
         // Receiving proof
         let recv_vp = ValidityPredicate::<CP>::new(
@@ -92,8 +99,14 @@ impl<CP: CircuitParameters> User<CP> {
             rng,
         );
         // blinding proof
+        let (priv_blind_in, pub_blind_in) = get_inputs(recv_vp);  
         let recv_blind_vp =
-            BlindingCircuit::<CP>::new(outer_curve_setup, blinding_gadget::<CP>, &[], &[]);
+            BlindingCircuit::new(
+                outer_curve_setup, 
+                blinding_gadget, 
+                &priv_blind_in[..], 
+                &pub_blind_in[..],
+            );
 
         // nullifier key
         let nk = NullifierDerivingKey::rand(rng);

@@ -5,17 +5,17 @@ use merlin::Transcript;
 use plonk_core::{
     constraint_system::StandardComposer,
     prelude::Proof,
-    proof_system::{pi::PublicInputs, Blinding, Prover, Verifier, VerifierKey},
+    proof_system::{pi::PublicInputs, Blinding, Prover, Verifier, VerifierKey}, circuit::Circuit,
 };
 use rand::prelude::ThreadRng;
 use std::marker::PhantomData;
 
 use crate::{
-    circuit::{
-        circuit_parameters::CircuitParameters, gadgets::field_addition::field_addition_gadget,
-    },
+    circuit::circuit_parameters::CircuitParameters,
     serializable_to_vec, to_embedded_field, HashToField,
 };
+
+use super::circuit_parameters::PairingCircuitParameters;
 
 pub struct ValidityPredicate<CP: CircuitParameters> {
     pub desc_vp: VerifierKey<CP::CurveScalarField, CP::CurvePC>, //preprocessed VP
@@ -209,7 +209,16 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
         // p_i.update_size(circuit_size);
         self.verifier.verify(&self.proof, &self.vk, &p_i).unwrap();
     }
+
 }
+
+// pub trait Inputs {
+//     fn get_inputs(&self) -> u32;
+// }
+
+// impl Inputs for CircuitParameters {
+//     fn get_inputs(&self) -> u32 { 12 }
+// }
 
 #[test]
 fn test_vp_creation() {
