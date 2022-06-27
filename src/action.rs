@@ -312,9 +312,8 @@ fn output_notes_checks<CP: CircuitParameters>(
 
 fn _action_checks<CP: CircuitParameters>() {
     let mut rng = rand::thread_rng();
-
     let pp = CP::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
-    let outer_curve_pp = CP::OuterCurvePC::setup(1 << 10, None, &mut rng).unwrap();
+    let outer_curve_pp = CP::OuterCurvePC::setup(1 << 13, None, &mut rng).unwrap();
 
     let alice = User::<CP>::new(
         "alice",

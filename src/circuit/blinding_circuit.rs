@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use plonk_core::{
@@ -6,7 +8,10 @@ use plonk_core::{
     proof_system::{pi::PublicInputs, Prover, Verifier},
 };
 
-use crate::circuit::circuit_parameters::CircuitParameters;
+use crate::circuit::{
+    circuit_parameters::CircuitParameters, gadgets::blinding::blinding_gadget,
+    validity_predicate::ValidityPredicate,
+};
 
 pub struct BlindingCircuit<CP: CircuitParameters> {
     pub public_input: PublicInputs<CP::CurveBaseField>,
@@ -28,7 +33,7 @@ impl<CP: CircuitParameters> BlindingCircuit<CP> {
             &mut StandardComposer<CP::CurveBaseField, CP::Curve>,
             private_inputs: &[CP::CurveBaseField],
             public_inputs: &[CP::CurveBaseField],
-        ) -> Point<CP::Curve>,
+        ) -> Vec<Point<CP::Curve>>,
         private_inputs: &[CP::CurveBaseField],
         public_inputs: &[CP::CurveBaseField],
     ) -> (
@@ -71,7 +76,7 @@ impl<CP: CircuitParameters> BlindingCircuit<CP> {
             &mut StandardComposer<CP::CurveBaseField, CP::Curve>,
             private_inputs: &[CP::CurveBaseField],
             public_inputs: &[CP::CurveBaseField],
-        ) -> Point<CP::Curve>,
+        ) -> Vec<Point<CP::Curve>>,
         private_inputs: &[CP::CurveBaseField],
         public_inputs: &[CP::CurveBaseField],
     ) -> Verifier<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC> {
@@ -99,24 +104,29 @@ impl<CP: CircuitParameters> BlindingCircuit<CP> {
             CP::CurveBaseField,
             DensePolynomial<CP::CurveBaseField>,
         >>::UniversalParams,
-        gadget: fn(
-            &mut StandardComposer<CP::CurveBaseField, CP::Curve>,
-            &[CP::CurveBaseField],
-            &[CP::CurveBaseField],
-        ) -> Point<CP::Curve>,
-        private_inputs: &[CP::CurveBaseField],
-        public_inputs: &[CP::CurveBaseField],
+        vp: &ValidityPredicate<CP>,
     ) -> Self {
-        // Given a gadget corresponding to a circuit, create all the computations for taiga related to the VP
-
+        let (private_inputs, public_inputs) = CP::get_inputs(vp);
         // Prover desc_vp
-        let (mut prover, ck, vk, public_input) =
-            Self::precompute_prover(setup, gadget, private_inputs, public_inputs);
-        let mut verifier = Self::precompute_verifier(gadget, private_inputs, public_inputs);
+        let (mut prover, ck, vk, public_input) = Self::precompute_prover(
+            setup,
+            blinding_gadget::<CP>,
+            &private_inputs,
+            &public_inputs,
+        );
+        let mut verifier =
+            Self::precompute_verifier(blinding_gadget::<CP>, &private_inputs, &public_inputs);
+        let t = Instant::now();
         Self::preprocess(&mut prover, &mut verifier, &ck);
+        println!(
+            "Time for the (prover and verifier) preprocessing: {:?}",
+            t.elapsed()
+        );
 
         // proof
+        let t = Instant::now();
         let proof = prover.prove(&ck).unwrap();
+        println!("Time for the blinding proof computation: {:?}", t.elapsed());
 
         Self {
             public_input,
@@ -131,4 +141,33 @@ impl<CP: CircuitParameters> BlindingCircuit<CP> {
             .verify(&self.proof, &self.vk, &self.public_input)
             .unwrap();
     }
+}
+
+#[test]
+fn test_vp_blind_creation() {
+    use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
+    use crate::circuit::gadgets::field_addition::field_addition_gadget;
+
+    type F = <CP as CircuitParameters>::CurveScalarField;
+    type InnerC = <CP as CircuitParameters>::InnerCurve;
+    type PC = <CP as CircuitParameters>::CurvePC;
+    type OuterPC = <CP as CircuitParameters>::OuterCurvePC;
+
+    let rng = &mut rand::thread_rng();
+    let setup = PC::setup(1 << 4, None, rng).unwrap();
+
+    let (a, b, c) = (F::from(2u64), F::from(1u64), F::from(3u64));
+
+    let vp = ValidityPredicate::<CP>::new(
+        &setup,
+        field_addition_gadget::<CP>,
+        &[a, b],
+        &[c],
+        true,
+        rng,
+    );
+
+    let setup_outer = OuterPC::setup(1 << 13, None, rng).unwrap();
+    let blinding_vp: BlindingCircuit<CP> = BlindingCircuit::new(&setup_outer, &vp);
+    blinding_vp.verify();
 }

@@ -15,7 +15,7 @@ fn spawn_user<CP: CircuitParameters>(name: &str) -> User<CP> {
     let mut rng = ThreadRng::default();
     let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
     let outer_curve_pp =
-        <CP as CircuitParameters>::OuterCurvePC::setup(1 << 10, None, &mut rng).unwrap();
+        <CP as CircuitParameters>::OuterCurvePC::setup(1 << 13, None, &mut rng).unwrap();
 
     User::<CP>::new(
         name,

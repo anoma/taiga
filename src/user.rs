@@ -1,4 +1,3 @@
-use crate::circuit::gadgets::blinding::blinding_gadget;
 use crate::circuit::nullifier::Nullifier;
 use crate::el_gamal::EncryptedNote;
 use crate::nullifier_key::NullifierDerivingKey;
@@ -80,13 +79,7 @@ impl<CP: CircuitParameters> User<CP> {
         );
 
         // send blinding proof
-        let (priv_blind_in, pub_blind_in) = CP::get_inputs(&send_vp);
-        let send_blind_vp = BlindingCircuit::<CP>::new(
-            outer_curve_setup,
-            blinding_gadget::<CP>,
-            &priv_blind_in[..],
-            &pub_blind_in[..],
-        );
+        let send_blind_vp = BlindingCircuit::<CP>::new(outer_curve_setup, &send_vp);
 
         // Receiving proof
         let recv_vp = ValidityPredicate::<CP>::new(
@@ -99,13 +92,7 @@ impl<CP: CircuitParameters> User<CP> {
         );
 
         // recv blinding proof
-        let (priv_blind_in, pub_blind_in) = CP::get_inputs(&recv_vp);
-        let recv_blind_vp = BlindingCircuit::<CP>::new(
-            outer_curve_setup,
-            blinding_gadget::<CP>,
-            &priv_blind_in[..],
-            &pub_blind_in[..],
-        );
+        let recv_blind_vp = BlindingCircuit::<CP>::new(outer_curve_setup, &recv_vp);
 
         // nullifier key
         let nk = NullifierDerivingKey::rand(rng);
@@ -223,7 +210,7 @@ fn test_user_creation() {
     let mut rng = ThreadRng::default();
     let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
     let outer_curve_pp =
-        <CP as CircuitParameters>::OuterCurvePC::setup(1 << 10, None, &mut rng).unwrap();
+        <CP as CircuitParameters>::OuterCurvePC::setup(1 << 12, None, &mut rng).unwrap();
 
     let _user = User::<CP>::new(
         "Simon",

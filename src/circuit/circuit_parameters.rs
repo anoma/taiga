@@ -110,22 +110,30 @@ impl CircuitParameters for PairingCircuitParameters {
             TEGroupAffine::<ark_bls12_377::g1::Parameters>::new(x_te, y_te)
         }
 
-        let unblinded_q_l = ws_to_te(vp.desc_vp.arithmetic.q_l.0);
-        let blinding_factor = vp.blind_rand;
-        let b0 = blinding_factor.q_l;
+        let unblinded_qs = vec![
+            (ws_to_te(vp.desc_vp.arithmetic.q_m.0), vp.blind_rand.q_m),
+            (ws_to_te(vp.desc_vp.arithmetic.q_l.0), vp.blind_rand.q_l),
+            (ws_to_te(vp.desc_vp.arithmetic.q_r.0), vp.blind_rand.q_r),
+            (ws_to_te(vp.desc_vp.arithmetic.q_o.0), vp.blind_rand.q_o),
+            (ws_to_te(vp.desc_vp.arithmetic.q_4.0), vp.blind_rand.q_4),
+            (ws_to_te(vp.desc_vp.arithmetic.q_c.0), vp.blind_rand.q_c),
+        ];
 
-        // [b0 * Z_H + q_l] ?= b0 *[Z_H] + [q_l]
+        // [b * Z_H + q] ?= b *[Z_H] + [q]
         let n = vp.ck.powers_of_g.len();
         let com_g_n = vp.ck.powers_of_g[n - 1];
         let com_g_0 = vp.ck.powers_of_g[0];
         let com_z_h = ws_to_te(com_g_n + com_g_0.neg());
-
-        let private_inputs: Vec<Self::CurveBaseField> = vec![
-            unblinded_q_l.x,
-            unblinded_q_l.y,
-            Self::CurveBaseField::from_le_bytes_mod_order(&b0.into_repr().to_bytes_le()),
-        ];
         let public_inputs: Vec<Self::CurveBaseField> = vec![com_z_h.x, com_z_h.y];
+
+        let mut private_inputs: Vec<Self::CurveBaseField> = vec![];
+        for (q, b) in unblinded_qs {
+            private_inputs.push(q.x);
+            private_inputs.push(q.y);
+            private_inputs.push(Self::CurveBaseField::from_le_bytes_mod_order(
+                &b.into_repr().to_bytes_le(),
+            ));
+        }
         (private_inputs, public_inputs)
     }
 }
