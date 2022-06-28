@@ -27,8 +27,8 @@ pub mod note;
 pub mod poseidon;
 pub mod token;
 // pub mod transaction;
-pub mod user;
 pub mod user_address;
+// pub mod user;
 pub mod utils;
 pub mod validity_predicate;
 

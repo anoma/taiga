@@ -17,6 +17,11 @@ use plonk_hashing::poseidon::constants::PoseidonConstants;
 pub struct Nullifier<CP: CircuitParameters>(CP::CurveScalarField);
 
 impl<CP: CircuitParameters> Nullifier<CP> {
+    // for test
+    pub fn new(nf: CP::CurveScalarField) -> Self {
+        Self(nf)
+    }
+
     // $nf =Extract_P([PRF_{nk}(\rho) = \psi \ mod \ q] * K + cm)$
     pub fn derive_native(
         nk: &NullifierDerivingKey<CP::CurveScalarField>,

@@ -1,9 +1,14 @@
+// The interfaces may not perfectly defined, the caller can refine them if needed.
+
 use crate::circuit::{circuit_parameters::CircuitParameters, gadgets::hash::FieldHasherGadget};
 use crate::error::TaigaError;
-use crate::poseidon::WIDTH_5;
+use crate::poseidon::{WIDTH_3, WIDTH_5, WIDTH_9};
 use ark_ff::{Field, One, PrimeField};
 use plonk_core::{constraint_system::StandardComposer, prelude::Variable};
-use plonk_hashing::poseidon::constants::PoseidonConstants;
+use plonk_hashing::poseidon::{
+    constants::PoseidonConstants,
+    poseidon::{PlonkSpec, Poseidon},
+};
 
 pub fn address_integrity_circuit<CP: CircuitParameters>(
     composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
@@ -50,6 +55,36 @@ pub fn token_integrity_circuit<CP: CircuitParameters>(
     // address_send = Com_r( Com_q(send_vp) || nk )
     token_fields.push(*rcm);
     poseidon_param.circuit_hash(composer, &token_fields)
+}
+
+pub fn note_commitment_circuit<CP: CircuitParameters>(
+    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+    address: &Variable,
+    token: &Variable,
+    value: &Variable, // To be decided where to constrain the range of value, add the range constraints here first.
+    data: &Variable,
+    rho: &Variable,
+    rcm: &Variable,
+) -> Result<Variable, TaigaError> {
+    // constrain the value to be 64 bit
+    composer.range_gate(*value, 64);
+
+    // psi = prf(rho, rcm)
+    let poseidon_param_3: PoseidonConstants<CP::CurveScalarField> =
+        PoseidonConstants::generate::<WIDTH_3>();
+    let psi = poseidon_param_3.circuit_hash_two(composer, rho, rcm)?;
+
+    // cm = crh(address, token, value, data, rho, psi, rcm)
+    let note_variables = vec![*address, *token, *value, *data, *rho, psi, *rcm];
+    let poseidon_param_9: PoseidonConstants<CP::CurveScalarField> =
+        PoseidonConstants::generate::<WIDTH_9>();
+    let mut poseidon_circuit =
+        Poseidon::<_, PlonkSpec<WIDTH_9>, WIDTH_9>::new(composer, &poseidon_param_9);
+    // Default padding zero
+    note_variables.into_iter().for_each(|f| {
+        poseidon_circuit.input(f).unwrap();
+    });
+    Ok(poseidon_circuit.output_hash(composer))
 }
 
 // To keep consistent with crate::utils::bytes_to_fields
@@ -127,8 +162,8 @@ mod test {
 
     #[test]
     fn test_address_integrity_circuit() {
-        use crate::user_address::UserAddress;
         use crate::circuit::integrity::address_integrity_circuit;
+        use crate::user_address::UserAddress;
         use ark_std::test_rng;
         use plonk_core::constraint_system::StandardComposer;
 
@@ -193,6 +228,59 @@ mod test {
         let expect_token_opaque = token.opaque_native().unwrap();
         let expected_var = composer.add_input(expect_token_opaque);
         composer.assert_equal(expected_var, token_var);
+        composer.check_circuit_satisfied();
+    }
+
+    #[test]
+    fn test_note_commitment_circuit() {
+        use crate::circuit::integrity::note_commitment_circuit;
+        use crate::circuit::nullifier::Nullifier;
+        use crate::note::Note;
+        use crate::token::Token;
+        use crate::user_address::UserAddress;
+        use ark_std::{test_rng, UniformRand};
+        use plonk_core::constraint_system::StandardComposer;
+        use rand::Rng;
+
+        let mut rng = test_rng();
+        let address = UserAddress::<PairingCircuitParameters>::new(&mut rng);
+        let token = Token::<PairingCircuitParameters>::new(&mut rng);
+        let rho = Nullifier::new(Fr::rand(&mut rng));
+        let value: u64 = rng.gen();
+        let data = Fr::rand(&mut rng);
+        let rcm = Fr::rand(&mut rng);
+        let note = Note::new(address, token, value, rho, data, rcm);
+
+        let mut composer = StandardComposer::<Fr, P>::new();
+        let address_var = composer.add_input(note.address.opaque_native().unwrap());
+        let token_var = composer.add_input(note.token.opaque_native().unwrap());
+        let value_var = composer.add_input(Fr::from(value));
+        let data_var = composer.add_input(note.data);
+        let rho_var = composer.add_input(note.rho.inner());
+        let rcm_var = composer.add_input(note.rcm);
+
+        let cm_var = note_commitment_circuit::<PairingCircuitParameters>(
+            &mut composer,
+            &address_var,
+            &token_var,
+            &value_var,
+            &data_var,
+            &rho_var,
+            &rcm_var,
+        )
+        .unwrap();
+
+        composer.check_circuit_satisfied();
+
+        println!(
+            "circuit size of note_commitment_circuit: {}",
+            composer.circuit_bound()
+        );
+
+        // check expect token
+        let expect_cm = note.commitment().unwrap();
+        let expected_var = composer.add_input(expect_cm.inner());
+        composer.assert_equal(expected_var, cm_var);
         composer.check_circuit_satisfied();
     }
 }

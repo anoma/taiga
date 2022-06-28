@@ -10,6 +10,7 @@ use plonk_hashing::poseidon::{
 // WIDTH_3 = ARITY + 1
 pub const WIDTH_3: usize = 3;
 pub const WIDTH_5: usize = 5;
+pub const WIDTH_9: usize = 9;
 lazy_static! {
     pub static ref POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2: PoseidonConstants<ark_bls12_377::Fr> =
         PoseidonConstants::generate::<WIDTH_3>();
