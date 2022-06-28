@@ -27,6 +27,7 @@ pub mod note;
 // TODO: put the nullifier_key in address later.
 pub mod nullifier_key;
 pub mod poseidon;
+pub mod signature;
 pub mod token;
 pub mod transaction;
 pub mod user;
