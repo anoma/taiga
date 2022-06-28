@@ -25,6 +25,7 @@ pub mod error;
 pub mod merkle_tree;
 pub mod note;
 pub mod poseidon;
+pub mod signature;
 pub mod token;
 pub mod transaction;
 pub mod user;
