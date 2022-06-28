@@ -1,18 +1,18 @@
 //! Implementation of a Merkle tree of commitments used to prove the existence of notes.
 //!
 use crate::error::TaigaError;
-use crate::poseidon::BinaryHasher;
+use crate::poseidon::FieldHasher;
 use ark_ff::{BigInteger, PrimeField};
 use rand::{Rng, RngCore};
 use std::marker::PhantomData;
 pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
 
 #[derive(Clone)]
-pub struct MerkleTreeLeafs<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> {
+pub struct MerkleTreeLeafs<F: PrimeField, BH: FieldHasher<F> + std::clone::Clone> {
     leafs: Vec<Node<F, BH>>,
 }
 
-impl<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> MerkleTreeLeafs<F, BH> {
+impl<F: PrimeField, BH: FieldHasher<F> + std::clone::Clone> MerkleTreeLeafs<F, BH> {
     pub fn new(values: Vec<F>) -> Self {
         let nodes_vec = values
             .iter()
@@ -42,11 +42,11 @@ impl<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> MerkleTreeLeafs<F, 
 
 /// A path from a position in a particular commitment tree to the root of that tree.
 #[derive(Clone, Debug, PartialEq)]
-pub struct MerklePath<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> {
+pub struct MerklePath<F: PrimeField, BH: FieldHasher<F> + std::clone::Clone> {
     auth_path: Vec<(Node<F, BH>, bool)>,
 }
 
-impl<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> MerklePath<F, BH> {
+impl<F: PrimeField, BH: FieldHasher<F> + std::clone::Clone> MerklePath<F, BH> {
     /// Constructs a random dummy merkle path with depth.
     pub fn dummy(rng: &mut impl RngCore, depth: usize) -> Self {
         let auth_path = (0..depth).map(|_| (Node::rand(rng), rng.gen())).collect();
@@ -81,12 +81,12 @@ impl<F: PrimeField, BH: BinaryHasher<F> + std::clone::Clone> MerklePath<F, BH> {
 
 /// A node within the Sapling commitment tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Node<F: PrimeField, BH: BinaryHasher<F>> {
+pub struct Node<F: PrimeField, BH: FieldHasher<F>> {
     repr: F,
     _hasher: PhantomData<BH>,
 }
 
-impl<F: PrimeField, BH: BinaryHasher<F>> Node<F, BH> {
+impl<F: PrimeField, BH: FieldHasher<F>> Node<F, BH> {
     pub fn new(repr: F) -> Self {
         Node {
             repr,

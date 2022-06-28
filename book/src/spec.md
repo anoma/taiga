@@ -97,25 +97,30 @@ Encodes: token vp
 
 `token = Com_r(Com_q(desc_vp_token), rcm_token)`
 
-### Address
+### UserAddress
 
-Encodes: send vp, nullifier key `nk`, receive (recv) vp
-
+- user address: $\mathbb{F}_r$ is user's shielded payment address, which encodes `nk`, `send_vp`, `recv_vp` and `rcm`.
+- nk: $\mathbb{F}_r$ is the nullifier key to generate nullifier.
+- send_vp: bits of $\mathbb{F}_q$ is the hash of vp description.
+- recv_vp: bits of $\mathbb{F}_q$ is the hash of vp description.
+- rcm_addr: $\mathbb{F}_r$ is a random commitment trapdoor.
 ```
-send_part = Com_r( Com_q(desc_vp_addr_send) || nk )
-recv_part = Com_q(desc_vp_addr_recv)
-address = Com_r(send_part || recv_part, rcm_addr)
+send_addr = Com_r( Com_q(desc_vp_addr_send) || nk )
+recv_addr = Com_q(desc_vp_addr_recv)
+address = Com_r(send_addr || recv_addr, rcm_addr)
 ```
 
-- Address commits to both send and recv vp
 - For sending: requires opening of `address` to  `com_q(desc_vp_addr_send)`, which requires additional knowledge of nullifier key `nk` and `rcm_addr`. This opening is efficient over $\mathbb{F}_r$.
 - For receiving: requires opening of `address` to `com_q(desc_vp_addr_recv)`, which requires additional knowledge of `rcm_addr`. This opening is efficient over $\mathbb{F}_r$
 - `com_q(desc_vp_addr_{send,recv})` are re-used inside ActionCircuit in deriving `addr_com_vp`.
+- To guarantee the compatibility of `addr_com_vp` constraints in ActionCircuit and VPBlindCircuit, `com_q(desc_vp_addr_{send,recv})` over $\mathbb{F}_q$ are converted to bits.
+- In address integrity circuit, the bits of `com_q(desc_vp_addr_{send,recv})` will be converted to $\mathbb{F}_r$(s). When using `bls12-317` as $E_M$, the bits of one $\mathbb{F}_q$ are converted to two $\mathbb{F}_r$.
+- Let `Com_r` be a poseidon hash, which takes four field elements with padding zero. TODO: if the `Com_r` constructed from hash doesn't have the hiding property, we can use PedersenCom(crh(send_fields || recv_fields), rcm) instead?
 
 
 ### Notes
 
-Needs to encode: asset type, owner address, value (fungible value), data (non-fungible value)
+Needs to encode: asset type, user address, value (fungible value), data (non-fungible value)
 * `note = (address, token, v, data, ρ, ψ, rcm_note)`
 * `cm = NoteCom(note, rcm_note)`
 * `nf = DeriveNullifier_nk(note)`
@@ -198,11 +203,11 @@ Arithmetized over $\mathbb{F}_r$. Represented as a Plonk circuit, `ActionCircuit
 Public inputs (`x`):
 - Merkle root `rt`
 - Spent note nullifier `nf`, which commits to note token type, value, and data
-    - Address VP commitment: `com_vp_addr_send` (commiting to `desc_vp_addr_send`)
+    - UserAddress VP commitment: `com_vp_addr_send` (commiting to `desc_vp_addr_send`)
     - Token VP commitment: `com_vp_token`
     - `EnableSpend`
 - Output note commitment `cm`
-    - Address VP commitment: `com_vp_addr_recv` (commiting to `desc_vp_addr_recv`)
+    - UserAddress VP commitment: `com_vp_addr_recv` (commiting to `desc_vp_addr_recv`)
     - Token VP commitment: `com_vp_token`
     - `EnableOutput`
 
@@ -237,7 +242,7 @@ Action circuit checks:
     - Note is a valid note in `rt`
         - Same as Orchard, there is a path in Merkle tree with root `rt` to a note commitment `cm` that opens to `note`
     - `address` and `com_vp_addr` opens to the same `desc_vp_addr`
-        - Note address integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv), rcm_addr)`
+        - Note UserAddress integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv), rcm_addr)`
         - Address VP integrity for input note: `com_vp_addr = Com(Com_q(desc_vp_addr_send), rcm_com_vp_addr)`
         - Nullifier integrity(input note only): `nf = DeriveNullier_nk(note)`.
     - `token` and `com_vp_token` opens to the same `desc_token_vp`
@@ -245,7 +250,7 @@ Action circuit checks:
         - Token VP integrity: `com_vp_token = Com(Com_q(desc_vp_token), rcm_com_vp_token)`
 - For output note `note = (address, token, v, data, ρ, ψ, rcm_note)`:
     - `address` and `com_vp_addr` opens to the same `desc_vp_addr`
-        - Note address integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv), rcm_addr)`
+        - Note UserAddress integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv), rcm_addr)`
         - Address VP integrity for output note: `com_vp_addr = Com(Com_q(desc_vp_addr_recv), rcm_com_vp_addr)`
         - Commitment integrity(output note only): `cm = NoteCom(note, rcm_note)`
     - `token` and `com_vp_token` opens to the same `desc_vp_token`

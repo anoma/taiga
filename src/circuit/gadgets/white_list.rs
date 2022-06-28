@@ -8,13 +8,13 @@ use plonk_core::constraint_system::Variable;
 use plonk_core::prelude::StandardComposer;
 use plonk_hashing::poseidon::constants::PoseidonConstants;
 
-use super::hash::BinaryHasherGadget;
+use super::hash::FieldHasherGadget;
 use super::merkle_tree::merkle_tree_gadget;
 
 pub fn white_list_gadget<
     F: PrimeField,
     P: TEModelParameters<BaseField = F>,
-    BHG: BinaryHasherGadget<F, P>,
+    BHG: FieldHasherGadget<F, P>,
     CP: CircuitParameters<CurveScalarField = F, InnerCurve = P>,
 >(
     composer: &mut StandardComposer<F, P>,
@@ -53,7 +53,7 @@ fn test_white_list_gadget() {
     use crate::merkle_tree::MerkleTreeLeafs;
     use crate::merkle_tree::Node;
     use crate::note::Note;
-    use crate::poseidon::BinaryHasher;
+    use crate::poseidon::FieldHasher;
     use ark_std::UniformRand;
     use plonk_core::constraint_system::StandardComposer;
     use plonk_hashing::poseidon::constants::PoseidonConstants;

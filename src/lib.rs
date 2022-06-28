@@ -24,12 +24,12 @@ pub mod el_gamal;
 pub mod error;
 pub mod merkle_tree;
 pub mod note;
-// TODO: put the nullifier_key in address later.
-pub mod nullifier_key;
 pub mod poseidon;
 pub mod token;
 pub mod transaction;
 pub mod user;
+pub mod user_address;
+pub mod utils;
 
 pub trait HashToField: PrimeField {
     fn hash2_to_field(x: Self, y: Self) -> Self;
