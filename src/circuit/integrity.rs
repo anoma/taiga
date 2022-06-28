@@ -71,7 +71,7 @@ pub fn bits_to_variables<CP: CircuitParameters>(
 fn test_bits_to_variables() {
     use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters};
     type Fr = <PairingCircuitParameters as CircuitParameters>::CurveScalarField;
-    type Curv = <PairingCircuitParameters as CircuitParameters>::InnerCurve;
+    type P = <PairingCircuitParameters as CircuitParameters>::InnerCurve;
     type Fq = <PairingCircuitParameters as CircuitParameters>::CurveBaseField;
     use crate::utils::bits_to_fields;
     use ark_ff::{BigInteger, PrimeField};
@@ -83,7 +83,7 @@ fn test_bits_to_variables() {
     let src_scalar_bits = src_scalar.into_repr().to_bits_le();
 
     // inside-circuit convert
-    let mut composer = StandardComposer::<Fr, Curv>::new();
+    let mut composer = StandardComposer::<Fr, P>::new();
     let target_var = bits_to_variables::<PairingCircuitParameters>(&mut composer, &src_scalar_bits);
     composer.check_circuit_satisfied();
 
@@ -105,18 +105,18 @@ fn test_bits_to_variables() {
 
 #[test]
 fn test_address_integrity_circuit() {
-    use crate::address::Address;
     use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters};
+    use crate::user_address::UserAddress;
     use ark_std::test_rng;
     type Fr = <PairingCircuitParameters as CircuitParameters>::CurveScalarField;
-    type Curv = <PairingCircuitParameters as CircuitParameters>::InnerCurve;
+    type P = <PairingCircuitParameters as CircuitParameters>::InnerCurve;
     type Fq = <PairingCircuitParameters as CircuitParameters>::CurveBaseField;
 
     let mut rng = test_rng();
-    let address = Address::<PairingCircuitParameters>::new(&mut rng);
+    let address = UserAddress::<PairingCircuitParameters>::new(&mut rng);
 
     // address integrity circuit
-    let mut composer = StandardComposer::<Fr, Curv>::new();
+    let mut composer = StandardComposer::<Fr, P>::new();
     let nk_var = composer.add_input(address.nk.inner());
     let rcm_var = composer.add_input(address.rcm);
     let address_var = address_integrity_circuit::<PairingCircuitParameters>(

@@ -19,7 +19,6 @@ use poseidon::POSEIDON_HASH_PARAM_BLS12_377_BASE_ARITY4;
 use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
 
 pub mod action;
-pub mod address;
 pub mod circuit;
 pub mod el_gamal;
 pub mod error;
@@ -29,6 +28,7 @@ pub mod poseidon;
 pub mod token;
 pub mod transaction;
 pub mod user;
+pub mod user_address;
 pub mod utils;
 
 pub trait HashToField: PrimeField {

@@ -1,7 +1,7 @@
-use crate::address::NullifierDerivingKey;
 use crate::circuit::{circuit_parameters::CircuitParameters, gadgets::hash::FieldHasherGadget};
 use crate::error::TaigaError;
 use crate::poseidon::{FieldHasher, WIDTH_3};
+use crate::user_address::NullifierDerivingKey;
 use ark_ec::{
     twisted_edwards_extended::GroupAffine as TEGroupAffine, AffineCurve, ProjectiveCurve,
 };
@@ -92,7 +92,7 @@ fn nullifier_circuit_test() {
     use ark_std::{test_rng, UniformRand};
     use plonk_core::constraint_system::{ecc::Point, StandardComposer};
     type Fr = <PairingCircuitParameters as CircuitParameters>::CurveScalarField;
-    type Curv = <PairingCircuitParameters as CircuitParameters>::InnerCurve;
+    type P = <PairingCircuitParameters as CircuitParameters>::InnerCurve;
 
     let mut rng = test_rng();
     let nk = NullifierDerivingKey::<Fr>::rand(&mut rng);
@@ -102,13 +102,13 @@ fn nullifier_circuit_test() {
     let expect_nf = Nullifier::<PairingCircuitParameters>::derive_native(&nk, &rho, &psi, &cm);
 
     // Nullifier derive circuit
-    let mut composer = StandardComposer::<Fr, Curv>::new();
+    let mut composer = StandardComposer::<Fr, P>::new();
     let variable_nk = composer.add_input(nk.inner());
     let variable_rho = composer.add_input(rho);
     let psi_variable = composer.add_input(psi);
     let cm_x = composer.add_input(cm.x);
     let cm_y = composer.add_input(cm.y);
-    let cm_variable = Point::<Curv>::new(cm_x, cm_y);
+    let cm_variable = Point::<P>::new(cm_x, cm_y);
 
     let nullifier_variable = Nullifier::<PairingCircuitParameters>::derive_circuit(
         &mut composer,

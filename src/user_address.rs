@@ -13,9 +13,9 @@ const PRF_NK_PERSONALIZATION: &[u8; 12] = b"Taiga_PRF_NK";
 #[derive(Copy, Debug, Clone)]
 pub struct NullifierDerivingKey<F: PrimeField>(F);
 
-/// The payment address binded with send vp and received vp.
+/// The user address binded with send vp and received vp.
 #[derive(Copy, Debug, Clone)]
-pub struct Address<CP: CircuitParameters> {
+pub struct UserAddress<CP: CircuitParameters> {
     pub nk: NullifierDerivingKey<CP::CurveScalarField>,
     pub rcm: CP::CurveScalarField,
     pub send_vp: MockHashVP<CP>,
@@ -63,7 +63,7 @@ impl<F: PrimeField> NullifierDerivingKey<F> {
     }
 }
 
-impl<CP: CircuitParameters> Address<CP> {
+impl<CP: CircuitParameters> UserAddress<CP> {
     pub fn new(rng: &mut impl RngCore) -> Self {
         let nk = NullifierDerivingKey::<CP::CurveScalarField>::rand(rng);
         let rcm = CP::CurveScalarField::rand(rng);
