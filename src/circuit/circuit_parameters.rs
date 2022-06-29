@@ -65,6 +65,7 @@ pub trait CircuitParameters {
 //     type OuterCurvePC = IPA<SWGroupAffine<Self::OuterCurve>, blake2::Blake2b>;
 // }
 
+#[derive(Copy, Debug, Clone)]
 pub struct PairingCircuitParameters {}
 
 impl CircuitParameters for PairingCircuitParameters {
