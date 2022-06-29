@@ -29,6 +29,7 @@ pub mod token;
 // pub mod transaction;
 pub mod user_address;
 // pub mod user;
+pub mod nullifier;
 pub mod utils;
 pub mod validity_predicate;
 

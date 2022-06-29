@@ -1,6 +1,6 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
-use crate::circuit::nullifier::Nullifier;
 use crate::error::TaigaError;
+use crate::nullifier::Nullifier;
 use crate::poseidon::{FieldHasher, WIDTH_3, WIDTH_9};
 use crate::token::Token;
 use crate::user_address::UserAddress;
@@ -50,9 +50,9 @@ impl<CP: CircuitParameters> Note<CP> {
         }
     }
 
-    // To simplify implementation, use Commit from VERI-ZEXE.
+    // To simplify implementation, can we use NoteCommit from VERI-ZEXE(P26 Commitment).
     // Commit(m, r) = CRH(m||r||0), m is a n filed elements vector, CRH is an algebraic hash function(poseidon here).
-    // If the Commit can't provide enough hiding security(to be verify, we have the same problem in
+    // If the Commit can't provide enough hiding security(to be verified, we have the same problem in
     // address commit and vp commit), consider using hash_to_curve(pedersen_hash_to_curve used in sapling
     // or Sinsemilla_hash_to_curve used in Orchard) and adding rcm*fixed_generator, which based on DL assumption.
     pub fn commitment(&self) -> Result<NoteCommitment<CP>, TaigaError> {

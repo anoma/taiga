@@ -1,4 +1,4 @@
-use crate::circuit::nullifier::Nullifier;
+use crate::nullifier::Nullifier;
 use crate::circuit::validity_predicate::ValidityPredicate;
 use crate::el_gamal::EncryptedNote;
 use crate::{

@@ -65,7 +65,7 @@ pub fn note_commitment_circuit<CP: CircuitParameters>(
     data: &Variable,
     rho: &Variable,
     rcm: &Variable,
-) -> Result<Variable, TaigaError> {
+) -> Result<(Variable, Variable), TaigaError> {
     // constrain the value to be 64 bit
     composer.range_gate(*value, 64);
 
@@ -84,8 +84,61 @@ pub fn note_commitment_circuit<CP: CircuitParameters>(
     note_variables.into_iter().for_each(|f| {
         poseidon_circuit.input(f).unwrap();
     });
-    Ok(poseidon_circuit.output_hash(composer))
+    Ok((poseidon_circuit.output_hash(composer), psi))
 }
+
+// cm is a scalar
+pub fn nullifier_circuit<CP: CircuitParameters>(
+    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+    nk: &Variable,
+    rho: &Variable,
+    psi: &Variable,
+    cm: &Variable,
+) -> Result<Variable, TaigaError> {
+    let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+        PoseidonConstants::generate::<WIDTH_5>();
+    let variavle_vec = vec![*nk, *rho, *psi, *cm];
+    let nullifier_variable = poseidon_param.circuit_hash(composer, &variavle_vec)?;
+
+    // public the nullifier
+    composer.public_inputize(&nullifier_variable);
+
+    // return the nullifier variable.(if we don't need it, pls get rid of it)
+    Ok(nullifier_variable)
+}
+
+// cm is a point
+// pub fn nullifier_circuit<CP: CircuitParameters>(
+//     composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+//     nk: &Variable,
+//     rho: &Variable,
+//     psi: &Variable,
+//     cm: &Point<CP::InnerCurve>,
+// ) -> Result<Variable, TaigaError> {
+//     let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+//         PoseidonConstants::generate::<WIDTH_3>();
+//     let prf_ret = poseidon_param.circuit_hash_two(composer, nk, rho)?;
+
+//     // scalar = prf_nk(rho) + psi
+//     let scalar = composer.arithmetic_gate(|gate| {
+//         gate.witness(prf_ret, *psi, None)
+//             .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
+//     });
+
+//     // point_scalar = scalar * generator
+//     let point_scalar =
+//         composer.fixed_base_scalar_mul(scalar, TEGroupAffine::prime_subgroup_generator());
+
+//     // nullifier_point = point_scalar + cm
+//     let nullifier_point = composer.point_addition_gate(point_scalar, *cm);
+
+//     // public the nullifier
+//     let nullifier_variable = nullifier_point.x();
+//     composer.public_inputize(nullifier_variable);
+
+//     // return the nullifier variable.(if we don't need it, pls get rid of it)
+//     Ok(*nullifier_variable)
+// }
 
 // To keep consistent with crate::utils::bytes_to_fields
 // The bits are from unformatted bytes or non-CP::CurveScalarField type.
@@ -161,81 +214,13 @@ mod test {
     }
 
     #[test]
-    fn test_address_integrity_circuit() {
+    fn test_integrity_circuit() {
         use crate::circuit::integrity::address_integrity_circuit;
-        use crate::user_address::UserAddress;
-        use ark_std::test_rng;
-        use plonk_core::constraint_system::StandardComposer;
-
-        let mut rng = test_rng();
-        let address = UserAddress::<PairingCircuitParameters>::new(&mut rng);
-
-        // address integrity circuit
-        let mut composer = StandardComposer::<Fr, P>::new();
-        let nk_var = composer.add_input(address.nk.inner());
-        let rcm_var = composer.add_input(address.rcm);
-        let address_var = address_integrity_circuit::<PairingCircuitParameters>(
-            &mut composer,
-            &nk_var,
-            &rcm_var,
-            &address.send_vp.to_bits(),
-            &address.recv_vp.to_bits(),
-        )
-        .unwrap();
-
-        composer.check_circuit_satisfied();
-
-        println!(
-            "circuit size of address_integrity_circuit: {}",
-            composer.circuit_bound()
-        );
-
-        // check expect address
-        let expect_address_opaque = address.opaque_native().unwrap();
-        let expected_var = composer.add_input(expect_address_opaque);
-        composer.assert_equal(expected_var, address_var);
-        composer.check_circuit_satisfied();
-    }
-
-    #[test]
-    fn test_token_integrity_circuit() {
-        use crate::circuit::integrity::token_integrity_circuit;
-        use crate::token::Token;
-        use ark_std::test_rng;
-        use plonk_core::constraint_system::StandardComposer;
-
-        let mut rng = test_rng();
-        let token = Token::<PairingCircuitParameters>::new(&mut rng);
-
-        // token integrity circuit
-        let mut composer = StandardComposer::<Fr, P>::new();
-        let rcm_var = composer.add_input(token.rcm);
-        let token_var = token_integrity_circuit::<PairingCircuitParameters>(
-            &mut composer,
-            &rcm_var,
-            &token.token_vp.to_bits(),
-        )
-        .unwrap();
-
-        composer.check_circuit_satisfied();
-
-        println!(
-            "circuit size of token_integrity_circuit: {}",
-            composer.circuit_bound()
-        );
-
-        // check expect token
-        let expect_token_opaque = token.opaque_native().unwrap();
-        let expected_var = composer.add_input(expect_token_opaque);
-        composer.assert_equal(expected_var, token_var);
-        composer.check_circuit_satisfied();
-    }
-
-    #[test]
-    fn test_note_commitment_circuit() {
         use crate::circuit::integrity::note_commitment_circuit;
-        use crate::circuit::nullifier::Nullifier;
+        use crate::circuit::integrity::nullifier_circuit;
+        use crate::circuit::integrity::token_integrity_circuit;
         use crate::note::Note;
+        use crate::nullifier::Nullifier;
         use crate::token::Token;
         use crate::user_address::UserAddress;
         use ark_std::{test_rng, UniformRand};
@@ -243,44 +228,94 @@ mod test {
         use rand::Rng;
 
         let mut rng = test_rng();
+        let mut composer = StandardComposer::<Fr, P>::new();
+
+        // Test user address integrity
+        // Create a user address
         let address = UserAddress::<PairingCircuitParameters>::new(&mut rng);
+
+        let nk_var = composer.add_input(address.nk.inner());
+        let address_rcm_var = composer.add_input(address.rcm);
+        let address_var = address_integrity_circuit::<PairingCircuitParameters>(
+            &mut composer,
+            &nk_var,
+            &address_rcm_var,
+            &address.send_vp.to_bits(),
+            &address.recv_vp.to_bits(),
+        )
+        .unwrap();
+        let expect_address_opaque = address.opaque_native().unwrap();
+        let expected_address_var = composer.add_input(expect_address_opaque);
+        composer.assert_equal(expected_address_var, address_var);
+        composer.check_circuit_satisfied();
+
+        // Test token integrity
+        // Create a token
         let token = Token::<PairingCircuitParameters>::new(&mut rng);
+
+        let token_rcm_var = composer.add_input(token.rcm);
+        let token_var = token_integrity_circuit::<PairingCircuitParameters>(
+            &mut composer,
+            &token_rcm_var,
+            &token.token_vp.to_bits(),
+        )
+        .unwrap();
+        let expect_token_opaque = token.opaque_native().unwrap();
+        let token_expected_var = composer.add_input(expect_token_opaque);
+        composer.assert_equal(token_expected_var, token_var);
+        composer.check_circuit_satisfied();
+
+        // Test note commitment
+        // Create a note
         let rho = Nullifier::new(Fr::rand(&mut rng));
         let value: u64 = rng.gen();
         let data = Fr::rand(&mut rng);
         let rcm = Fr::rand(&mut rng);
         let note = Note::new(address, token, value, rho, data, rcm);
 
-        let mut composer = StandardComposer::<Fr, P>::new();
-        let address_var = composer.add_input(note.address.opaque_native().unwrap());
-        let token_var = composer.add_input(note.token.opaque_native().unwrap());
         let value_var = composer.add_input(Fr::from(value));
         let data_var = composer.add_input(note.data);
         let rho_var = composer.add_input(note.rho.inner());
-        let rcm_var = composer.add_input(note.rcm);
+        let note_rcm_var = composer.add_input(note.rcm);
 
-        let cm_var = note_commitment_circuit::<PairingCircuitParameters>(
+        let (cm_var, psi_var) = note_commitment_circuit::<PairingCircuitParameters>(
             &mut composer,
             &address_var,
             &token_var,
             &value_var,
             &data_var,
             &rho_var,
-            &rcm_var,
+            &note_rcm_var,
         )
         .unwrap();
 
+        let expect_cm = note.commitment().unwrap();
+        let cm_expected_var = composer.add_input(expect_cm.inner());
+        composer.assert_equal(cm_expected_var, cm_var);
+        composer.check_circuit_satisfied();
+
+        // Test nullifier
+        let expect_nf = Nullifier::<PairingCircuitParameters>::derive_native(
+            &note.address.nk,
+            &note.rho,
+            &note.psi,
+            &expect_cm,
+        );
+        let nullifier_variable = nullifier_circuit::<PairingCircuitParameters>(
+            &mut composer,
+            &nk_var,
+            &rho_var,
+            &psi_var,
+            &cm_var,
+        )
+        .unwrap();
+        let nf_expected_var = composer.add_input(expect_nf.inner());
+        composer.assert_equal(nf_expected_var, nullifier_variable);
         composer.check_circuit_satisfied();
 
         println!(
-            "circuit size of note_commitment_circuit: {}",
+            "circuit size of test_integrity_circuit: {}",
             composer.circuit_bound()
         );
-
-        // check expect token
-        let expect_cm = note.commitment().unwrap();
-        let expected_var = composer.add_input(expect_cm.inner());
-        composer.assert_equal(expected_var, cm_var);
-        composer.check_circuit_satisfied();
     }
 }
