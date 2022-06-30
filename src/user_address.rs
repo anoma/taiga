@@ -34,12 +34,12 @@ impl<F: PrimeField> NullifierDerivingKey<F> {
         Self::prf_nk(rng_bytes)
     }
 
-    fn prf_nk(r: &[u8]) -> Self {
+    fn prf_nk(random: &[u8]) -> Self {
         let mut h = Params::new()
             .hash_length(64)
             .personal(PRF_NK_PERSONALIZATION)
             .to_state();
-        h.update(r);
+        h.update(random);
         Self::from_bytes(h.finalize().as_bytes())
     }
 
