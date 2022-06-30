@@ -5,6 +5,7 @@ use merlin::Transcript;
 use plonk_core::{
     constraint_system::StandardComposer,
     prelude::Proof,
+    circuit::Circuit,
     proof_system::{pi::PublicInputs, Prover, Verifier, VerifierKey},
 };
 use rand::prelude::ThreadRng;
@@ -13,9 +14,40 @@ use std::marker::PhantomData;
 use crate::{
     circuit::circuit_parameters::CircuitParameters, serializable_to_vec, to_embedded_field,
     HashToField,
+    note::Note,
 };
 
-pub struct ValidityPredicate<CP: CircuitParameters> {
+pub struct ExampleValidityPredicate<CP: CircuitParameters> {
+    pub input_notes: [Note<CP>; 4],
+    pub output_notes: [Note<CP>; 4],
+}
+
+pub trait ValidityPredicate<CP: CircuitParameters> : Circuit<CP::InnerCurveScalarField, CP::InnerCurve> {
+    fn new(input_notes: [Note<CP>; 4], output_notes: [Note<CP>; 4]) -> Self;
+}
+
+impl<CP> ValidityPredicate<CP> for ExampleValidityPredicate<CP>  where CP : CircuitParameters {
+    fn new(input_notes: [Note<CP>; 4], output_notes: [Note<CP>; 4]) -> Self {
+        Self { input_notes, output_notes }
+    }
+
+}
+
+impl<CP> Circuit<CP::InnerCurveScalarField, CP::InnerCurve> for ExampleValidityPredicate<CP> where CP : CircuitParameters {
+    fn gadget(
+            &mut self,
+            composer: &mut StandardComposer<CP::InnerCurveScalarField, CP::InnerCurve>,
+        ) -> Result<(), plonk_core::prelude::Error> {
+        
+            // do soemthing with self.input_notes, self.output_notes
+            unimplemented!()
+    }
+    fn padded_circuit_size(&self) -> usize {
+        1 << 9
+    }
+}
+
+pub struct ValidityPredicateProver<CP: CircuitParameters> {
     desc_vp: VerifierKey<CP::CurveScalarField, CP::CurvePC>, //preprocessed VP
     pub public_input: PublicInputs<CP::CurveScalarField>,
     _blind_rand: [CP::CurveScalarField; 20], //blinding randomness
@@ -29,17 +61,13 @@ pub struct ValidityPredicate<CP: CircuitParameters> {
     pub com_vp: CP::CurveScalarField,
 }
 
-impl<CP: CircuitParameters> ValidityPredicate<CP> {
-    pub fn precompute_prover(
+impl<CP: CircuitParameters> ValidityPredicateProver<CP> {
+    pub fn precompute_prover<VP>(
         setup: &<<CP as CircuitParameters>::CurvePC as PolynomialCommitment<
             CP::CurveScalarField,
             DensePolynomial<CP::CurveScalarField>,
         >>::UniversalParams,
-        gadget: fn(
-            &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-            private_inputs: &[CP::CurveScalarField],
-            public_inputs: &[CP::CurveScalarField],
-        ),
+        gadget: &VP,
         private_inputs: &[CP::CurveScalarField],
         public_inputs: &[CP::CurveScalarField],
     ) -> (
@@ -54,14 +82,15 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
         >>::VerifierKey,
         PublicInputs<CP::CurveScalarField>,
         VerifierKey<CP::CurveScalarField, CP::CurvePC>,
-    ) {
+    ) 
+    where VP: ValidityPredicate<CP> {
         // Create a `Prover`
         // Set the circuit using `gadget`
         // Output `prover`, `vk`, `public_input`, and `desc_vp`.
 
         let mut prover = Prover::<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>::new(b"demo");
         prover.key_transcript(b"key", b"additional seed information");
-        gadget(prover.mut_cs(), private_inputs, public_inputs);
+        gadget.synthesize(prover.mut_cs(), private_inputs, public_inputs);
         let circuit_size = prover.circuit_bound().next_power_of_two();
         let (ck, vk) = CP::CurvePC::trim(setup, circuit_size, 0, None).unwrap();
         let desc_vp = prover
@@ -74,15 +103,12 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
         (prover, ck, vk, pub_inp, desc_vp)
     }
 
-    pub fn precompute_verifier(
-        gadget: fn(
-            &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-            private_inputs: &[CP::CurveScalarField],
-            public_inputs: &[CP::CurveScalarField],
-        ),
+    pub fn precompute_verifier<VP>(
+        gadget: &VP,
         private_inputs: &[CP::CurveScalarField],
         public_inputs: &[CP::CurveScalarField],
-    ) -> Verifier<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC> {
+    ) -> Verifier<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC> 
+    where VP : ValidityPredicate<CP>{
         let mut verifier: Verifier<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC> =
             Verifier::new(b"demo");
         verifier.key_transcript(b"key", b"additional seed information");
@@ -122,21 +148,17 @@ impl<CP: CircuitParameters> ValidityPredicate<CP> {
         blinding_values
     }
 
-    pub fn new(
+    pub fn new<VP>(
         setup: &<<CP as CircuitParameters>::CurvePC as PolynomialCommitment<
             CP::CurveScalarField,
             DensePolynomial<CP::CurveScalarField>,
         >>::UniversalParams,
-        gadget: fn(
-            &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-            &[CP::CurveScalarField],
-            &[CP::CurveScalarField],
-        ),
+        gadget: &VP,
         private_inputs: &[CP::CurveScalarField],
         public_inputs: &[CP::CurveScalarField],
         blind: bool,
         rng: &mut ThreadRng,
-    ) -> Self {
+    ) -> Self where VP: ValidityPredicate<CP> {
         // Given a gadget corresponding to a circuit, create all the computations for PBC related to the VP
 
         // Prover desc_vp
