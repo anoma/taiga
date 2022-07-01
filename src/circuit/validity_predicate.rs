@@ -1,46 +1,75 @@
-use ark_ff::{UniformRand, Zero};
+use ark_ec::TEModelParameters;
+use ark_ff::{UniformRand, Zero, PrimeField};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use merlin::Transcript;
 use plonk_core::{
     constraint_system::StandardComposer,
-    prelude::Proof,
+    prelude::{Proof, Point},
     circuit::Circuit,
     proof_system::{pi::PublicInputs, Prover, Verifier, VerifierKey},
 };
+use plonk_hashing::poseidon::{constants::PoseidonConstants, poseidon::{Poseidon, NativeSpec}};
 use rand::prelude::ThreadRng;
 use std::marker::PhantomData;
 
 use crate::{
     circuit::circuit_parameters::CircuitParameters, serializable_to_vec, to_embedded_field,
     HashToField,
-    note::Note,
+    note::Note, poseidon::WIDTH_3,
 };
 
-pub struct ExampleValidityPredicate<CP: CircuitParameters> {
-    pub input_notes: [Note<CP>; 4],
-    pub output_notes: [Note<CP>; 4],
+pub struct ExampleValidityPredicate<'a, CP: CircuitParameters> {
+    pub input_notes: &'a[Note<CP>],
+    pub output_notes: &'a[Note<CP>],
+    pub other_params: &'a[CP::CurveScalarField],
 }
 
 pub trait ValidityPredicate<CP: CircuitParameters> : Circuit<CP::InnerCurveScalarField, CP::InnerCurve> {
-    fn new(input_notes: [Note<CP>; 4], output_notes: [Note<CP>; 4]) -> Self;
+    fn new(input_notes: &[Note<CP>], output_notes: &[Note<CP>], other_params: &[CP::CurveScalarField]) -> Self;
 }
 
-impl<CP> ValidityPredicate<CP> for ExampleValidityPredicate<CP>  where CP : CircuitParameters {
-    fn new(input_notes: [Note<CP>; 4], output_notes: [Note<CP>; 4]) -> Self {
-        Self { input_notes, output_notes }
+impl<CP> ValidityPredicate<CP> for ExampleValidityPredicate<'_, CP>  where CP : CircuitParameters {
+    fn new(input_notes: &[Note<CP>], output_notes: &[Note<CP>], other_params: &[CP::CurveScalarField]) -> Self {
+        Self { input_notes, output_notes, other_params }
     }
 
 }
 
-impl<CP> Circuit<CP::InnerCurveScalarField, CP::InnerCurve> for ExampleValidityPredicate<CP> where CP : CircuitParameters {
+pub fn field_addition_gadget<CP: CircuitParameters>(
+    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+    private_inputs: [CP::CurveScalarField;2],
+    public_input: CP::CurveScalarField,
+) {
+    // simple circuit that checks that a + b == c
+    let a = private_inputs[0];
+    let b = private_inputs[1];
+    let c = public_input;
+    let one = <CP as CircuitParameters>::CurveScalarField::one();
+    let var_a = composer.add_input(a);
+    let var_b = composer.add_input(b);
+    let var_zero = composer.zero_var();
+    // Make first constraint a + b = c (as public input)
+    composer.arithmetic_gate(|gate| {
+        gate.witness(var_a, var_b, Some(var_zero))
+            .add(one, one)
+            .pi(-c)
+    });
+}
+
+
+impl<CP> Circuit<CP::InnerCurveScalarField, CP::InnerCurve> for ExampleValidityPredicate<'_, CP> where CP : CircuitParameters {
     fn gadget(
             &mut self,
             composer: &mut StandardComposer<CP::InnerCurveScalarField, CP::InnerCurve>,
         ) -> Result<(), plonk_core::prelude::Error> {
         
-            // do soemthing with self.input_notes, self.output_notes
-            unimplemented!()
+            let cm = self.input_notes[2].commitment();
+            let a = cm.x;
+            let b = cm.y;
+            let c = a+b;
+            field_addition_gadget(composer, [a,b], c);
+            Ok(())
     }
     fn padded_circuit_size(&self) -> usize {
         1 << 9
