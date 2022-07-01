@@ -221,7 +221,7 @@ mod test {
         use crate::circuit::integrity::token_integrity_circuit;
         use crate::note::Note;
         use crate::nullifier::Nullifier;
-        use crate::token::Token;
+        use crate::token::TokenAddress;
         use crate::user_address::UserAddress;
         use ark_std::{test_rng, UniformRand};
         use plonk_core::constraint_system::StandardComposer;
@@ -251,7 +251,7 @@ mod test {
 
         // Test token integrity
         // Create a token
-        let token = Token::<PairingCircuitParameters>::new(&mut rng);
+        let token = TokenAddress::<PairingCircuitParameters>::new(&mut rng);
 
         let token_rcm_var = composer.add_input(token.rcm);
         let token_var = token_integrity_circuit::<PairingCircuitParameters>(

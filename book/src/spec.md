@@ -91,33 +91,33 @@ TODO: Should we use `fulldesc_vp` in place of `desc_vp`?
 
 - `VPCom(desc_vp; rcm_com_vp) := Com( Com_q(desc_vp), rcm_com_vp)`
 
-### Token (types)
+### TokenAddress (types)
 
 Encodes: token vp and rcm
 ```
-token_vp = Com_q(desc_vp_token)
-token = Com_r(token_vp, rcm_token)
+token_vp_hash = Com_q(desc_vp_token)
+token_address = Com_r(token_vp_hash, rcm_token)
 ```
 
 where:
 
 |Variable/Function|Type||
 |-|-|-|
-|`token_vp` | $\mathbb F_q$ element bits | hash of the vp description|
+|`token_vp_hash` | $\mathbb F_q$ element bits | hash of the token vp description|
 |`rcm_token`|$\mathbb F_r$ element | random commitment trapdoor|
-| `Com_r` | | Poseidon hash |
+| `Com_r` | $[\mathbb F_r] \to \mathbb F_r$ | Poseidon hash with four input field elements|
 
-The bits of `token_vp` are converted to $\mathbb{F}_r$ element(s).
+The bits of `token_vp_hash` are converted to $\mathbb{F}_r$ element(s).
 
 > When using `bls12-317` as $E_M$, the bits of one $\mathbb{F}_q$ are converted to two $\mathbb{F}_r$.
 
 ### UserAddress
 
 ```
-send_vp = Com_q(desc_vp_addr_send)
-send_addr = Com_r( send_vp || nk )
-recv_vp = Com_q(desc_vp_addr_recv)
-user_address = Com_r(send_addr || recv_vp, rcm_addr)
+send_vp_hash = Com_q(desc_vp_addr_send)
+send_addr = Com_r( send_vp_hash || nk )
+recv_vp_hash = Com_q(desc_vp_addr_recv)
+user_address = Com_r(send_addr || recv_vp_hash, rcm_addr)
 ```
 
 where:
@@ -125,14 +125,14 @@ where:
 |Variable/Function|Type||
 |-|-|-|
 |`nk`| $\mathbb{F}_r$| nullifier key for generating a nullifier|
-|`send_vp`| $\mathbb F_q$ bits | hash of vp description|
-|`recv_vp` | $\mathbb F_q$ bits | hash of vp description|
+|`send_vp_hash`| $\mathbb F_q$ bits | hash of send vp description|
+|`recv_vp_hash` | $\mathbb F_q$ bits | hash of receive vp description|
 |`rcm_addr` | $\mathbb{F}_r$ | random commitment trapdoor|
-|`user_address`| $\mathbb F_r$ | address encoding `nk`, `send_vp`, `recv_vp`, `rcm_addr`|
-|`Com_r`| (into $\mathbb F_r$) | Poseidon hash with four input field elements|
+|`user_address`| $\mathbb F_r$ | address encoding `nk`, `send_vp_hash`, `recv_vp_hash`, `rcm_addr`|
+|`Com_r`| $[\mathbb F_r] \to \mathbb F_r$ | Poseidon hash with four input field elements|
 
-* Sending a note requires opening a `user_address` to  `send_vp`, which requires additional knowledge of nullifier key `nk` and `rcm_addr`. This opening is efficient over $\mathbb{F}_r$.
-* Receiving a note requires opening a `user_address` to `recv_vp`, which requires additional knowledge of `rcm_addr`. This opening is efficient over $\mathbb{F}_r$
+* Sending a note requires opening a `user_address` to  `send_vp_hash`, which requires additional knowledge of nullifier key `nk` and `rcm_addr`. This opening is efficient over $\mathbb{F}_r$.
+* Receiving a note requires opening a `user_address` to `recv_vp_hash`, which requires additional knowledge of `rcm_addr`. This opening is efficient over $\mathbb{F}_r$
 * `Com_q(desc_vp_addr_{send,recv})` are re-used inside ActionCircuit in deriving `addr_com_vp`.
 
 To guarantee the compatibility of `addr_com_vp` constraints in ActionCircuit and VPBlindCircuit, `Com_q(desc_vp_addr_{send,recv})` over $\mathbb{F}_q$ are converted to bits.
@@ -152,7 +152,7 @@ A note encodes:
 * the value (fungible),
 * additional data (non-fungible).
 ```
-note = (user_address, token, v, data, ρ, ψ)
+note = (user_address, token_address, v, data, ρ, ψ)
 cm = NoteCom(note, rcm_note)
 ```
 
@@ -160,14 +160,14 @@ where:
 
 |Variable/Function|Type||
 |-|-|-|
-|`token`| $\mathbb{F}_r$ | a token type encoding `token_vp`, `rcm_token`|
-|`v`| `u64` (in a $\mathbb F_r$ element in the circuit) | the quantity of fungible value |
+|`token_address`| $\mathbb{F}_r$ | a token type encoding `token_vp`, `rcm_token`|
+|`v`| `u64` ($\mathbb F_r$ element in circuit) | the quantity of fungible value |
 |`data`| $\mathbb{F}_r$ |non-fungible value(to be decided?)|
 |`ρ`| $\mathbb{F}_r$ | an old nullifier|
 |`rcm_note` | $\mathbb{F}_r$| a random commitment trapdoor|
 |`ψ`| $\mathbb{F}_r$ | the prf output of `ρ` and `rcm_note`|
 | `user_address`| $\mathbb F_r$ | address encoding `nk`, `send_vp`, `recv_vp`, `rcm_addr`|
-| `NoteCom` | (into $\mathbb F_r$) | Poseidon hash with two input elements|
+| `NoteCom` | $[\mathbb F_r] \to \mathbb F_r$ | Poseidon hash with eight input elements|
 
 Dummy notes: A note is dummy iff `v = 0`.
 
@@ -195,7 +195,7 @@ where:
 
 The nullifier is derived using:
 ```
-DeriveNullifier = CRH(nk, ρ, ψ, cm)
+DeriveNullifier = PRF(nk, ρ, ψ, cm)
 ```
 
 where:
@@ -206,13 +206,13 @@ where:
 |`ρ`| $\mathbb{F}_r$ | an old nullifier|
 |`ψ`| $\mathbb{F}_r$ | the prf output of `ρ` and `rcm_note`|
 |`cm` | $\mathbb F_r$ | a commitment from `NoteCom` |
-| `CRH` | (into $\mathbb F_r$) | Poseidon hash with four input elements|
+| `PRF` | $[\mathbb F_r] \to \mathbb F_r$ | Poseidon hash with four input elements|
 
 ### Nullifier $-$ designed for other options of `NoteCom` (deprecated)
 
 Use the nullifier derivation as in Orchard:
 ```
-DeriveNullifier_nk(ρ, ψ, cm) = Extract([PRF_nk(ρ) + ψ mod r]K^{nf} + cm)
+DeriveNullifier_nk(ρ, ψ, cm) = Extract([PRF_nk(ρ) + ψ mod r]K + cm)
 ```
 
 where:
@@ -223,8 +223,8 @@ where:
 |`ρ`| $\mathbb{F}_r$ | an old nullifier|
 |`ψ`| $\mathbb{F}_r$ | the prf output of `ρ` and `rcm_note`|
 |`cm` | $\mathbb F_r$ | a commitment from `NoteCom` |
-|`K^{nf}`| | a fixed base generator of the inner curve|
-| `PRF` | (into $\mathbb F_r$) | Poseidon hash with two input elements (`nk` and `ρ`)|
+|`K`|($\mathbb F_r$, $\mathbb F_r$) | a fixed base generator of the inner curve|
+| `PRF` | $[\mathbb F_r] \to \mathbb F_r$ | Poseidon hash with two input elements (`nk` and `ρ`)|
 |`Extract` | $\mathbb F_r$ | the $x$ coordinate of a (inner curve) point|
 
 

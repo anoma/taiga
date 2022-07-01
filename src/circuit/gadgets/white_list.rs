@@ -55,7 +55,7 @@ fn test_white_list_gadget() {
     use crate::note::Note;
     use crate::nullifier::Nullifier;
     use crate::poseidon::FieldHasher;
-    use crate::token::Token;
+    use crate::token::TokenAddress;
     use crate::user_address::UserAddress;
     use ark_std::UniformRand;
     use plonk_core::constraint_system::StandardComposer;
@@ -78,7 +78,7 @@ fn test_white_list_gadget() {
         .root(&poseidon_hash_param_bls12_377_scalar_arity2);
 
     // a note owned by one of the white list user
-    let token = Token::<CP>::new(&mut rng);
+    let token = TokenAddress::<CP>::new(&mut rng);
     let rho = Nullifier::new(F::rand(&mut rng));
     let value = 12u64;
     let data = F::rand(&mut rng);

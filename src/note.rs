@@ -2,7 +2,7 @@ use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::error::TaigaError;
 use crate::nullifier::Nullifier;
 use crate::poseidon::{FieldHasher, WIDTH_3, WIDTH_9};
-use crate::token::Token;
+use crate::token::TokenAddress;
 use crate::user_address::UserAddress;
 use ark_ff::{BigInteger, PrimeField};
 use plonk_hashing::poseidon::{
@@ -14,7 +14,7 @@ use plonk_hashing::poseidon::{
 #[derive(Copy, Debug, Clone)]
 pub struct Note<CP: CircuitParameters> {
     pub address: UserAddress<CP>,
-    pub token: Token<CP>,
+    pub token: TokenAddress<CP>,
     pub value: u64,
     pub data: CP::CurveScalarField, // for NFT or whatever. TODO: to be decided the value format.
     pub rho: Nullifier<CP>,         // old nullifier
@@ -29,7 +29,7 @@ pub struct NoteCommitment<CP: CircuitParameters>(CP::CurveScalarField);
 impl<CP: CircuitParameters> Note<CP> {
     pub fn new(
         address: UserAddress<CP>,
-        token: Token<CP>,
+        token: TokenAddress<CP>,
         value: u64,
         rho: Nullifier<CP>,
         data: CP::CurveScalarField,
