@@ -8,7 +8,7 @@ use ark_ec::{
 use ark_ff::PrimeField;
 use plonk_core::commitment::{HomomorphicCommitment, KZG10};
 
-pub trait CircuitParameters {
+pub trait CircuitParameters: Copy {
     //               Inner Curve     Curve    Outer Curve
     // Scalar Field                    Fr         Fq
     //   Base Field      Fr            Fq

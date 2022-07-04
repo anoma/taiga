@@ -1,8 +1,10 @@
 use crate::circuit::gadgets::hash::FieldHasherGadget;
-use crate::error::TaigaError;
 use ark_ec::TEModelParameters;
 use ark_ff::PrimeField;
-use plonk_core::{constraint_system::StandardComposer, prelude::Variable};
+use plonk_core::{
+    constraint_system::StandardComposer,
+    prelude::{Error, Variable},
+};
 
 /// A Merkle Tree Gadget takes leaf node variable, authorization path to the
 /// root and the FieldHasherGadget, then returns the merkle root variable.
@@ -15,7 +17,7 @@ pub fn merkle_tree_gadget<
     cur_leaf: &Variable,
     auth_path: &[(F, bool)],
     hash_gadget: &BHG,
-) -> Result<Variable, TaigaError> {
+) -> Result<Variable, Error> {
     let mut cur = *cur_leaf;
 
     // Ascend the merkle tree authentication path
