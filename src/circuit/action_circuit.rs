@@ -1,16 +1,13 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
-use crate::merkle_tree::TAIGA_COMMITMENT_TREE_DEPTH;
-use crate::note::Note;
-use plonk_core::{
-    circuit::Circuit,
-    constraint_system::StandardComposer,
-};
 use crate::circuit::gadgets::merkle_tree::merkle_tree_gadget;
 use crate::circuit::integrity::{
     note_commitment_circuit, nullifier_circuit, output_user_address_integrity_circuit,
     spent_user_address_integrity_circuit, token_integrity_circuit,
 };
+use crate::merkle_tree::TAIGA_COMMITMENT_TREE_DEPTH;
+use crate::note::Note;
 use crate::poseidon::WIDTH_3;
+use plonk_core::{circuit::Circuit, constraint_system::StandardComposer};
 use plonk_hashing::poseidon::constants::PoseidonConstants;
 
 /// Action circuit
@@ -126,7 +123,7 @@ where
 
             // TODO: add user receive address VP commitment and token VP commitment
 
-            // TODO: add note encryption 
+            // TODO: add note encryption
         }
 
         Ok(())
