@@ -2,12 +2,9 @@ use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::merkle_tree::TAIGA_COMMITMENT_TREE_DEPTH;
 use crate::note::Note;
 use plonk_core::{
-    // prelude::Proof,
     circuit::Circuit,
-    // proof_system::{pi::PublicInputs, Prover, Verifier, VerifierKey},
     constraint_system::StandardComposer,
 };
-// use crate::error::TaigaError;
 use crate::circuit::gadgets::merkle_tree::merkle_tree_gadget;
 use crate::circuit::integrity::{
     note_commitment_circuit, nullifier_circuit, output_user_address_integrity_circuit,
@@ -84,15 +81,10 @@ where
             >(composer, &cm_var, &self.auth_path, &poseidon_param)?;
             composer.public_inputize(&root);
 
-            // check and publish nullifier
-            let nullifier_var =
-                nullifier_circuit::<CP>(composer, &nk_var, &rho_var, &psi_var, &cm_var)?;
-            composer.public_inputize(&nullifier_var);
+            // TODO: user send address VP commitment and token VP commitment
 
-            // TODO: user send address VP and token VP integrity
-
-            // return old nf
-            nullifier_var
+            // check nullifier and return it
+            nullifier_circuit::<CP>(composer, &nk_var, &rho_var, &psi_var, &cm_var)?
         };
 
         // output note
@@ -132,12 +124,63 @@ where
 
             composer.public_inputize(&cm_var);
 
-            // TODO: user receive address VP and token VP integrity
+            // TODO: add user receive address VP commitment and token VP commitment
+
+            // TODO: add note encryption 
         }
 
         Ok(())
     }
     fn padded_circuit_size(&self) -> usize {
-        1 << 9
+        1 << 16
     }
+}
+
+#[test]
+fn action_circuit_test() {
+    use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters as CP};
+    type Fr = <CP as CircuitParameters>::CurveScalarField;
+    type P = <CP as CircuitParameters>::InnerCurve;
+    type PC = <CP as CircuitParameters>::CurvePC;
+    use crate::action::*;
+    use crate::merkle_tree::MerklePath;
+    use crate::poseidon::POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2;
+    use ark_poly_commit::PolynomialCommitment;
+    use ark_std::test_rng;
+    use plonk_core::circuit::{verify_proof, VerifierData};
+    use plonk_core::proof_system::pi::PublicInputs;
+
+    let mut rng = test_rng();
+    let spend_note = Note::<CP>::dummy(&mut rng);
+    let merkle_path =
+        MerklePath::<Fr, PoseidonConstants<Fr>>::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+    let spend_info = SpendInfo::<CP>::new(
+        spend_note,
+        merkle_path,
+        &POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2,
+    );
+
+    let output_info = OutputInfo::<CP>::dummy(&mut rng);
+
+    let action_info = ActionInfo::<CP>::new(spend_info, output_info);
+    let (action, mut action_circuit) = action_info.build(&mut rng).unwrap();
+
+    // Generate CRS
+    let pp = PC::setup(1 << 16, None, &mut rng).unwrap();
+
+    // Compile the circuit
+    let (pk_p, vk) = action_circuit.compile::<PC>(&pp).unwrap();
+
+    // Prover
+    let (proof, pi) = action_circuit.gen_proof::<PC>(&pp, pk_p, b"Test").unwrap();
+
+    // Check the public inputs
+    let mut expect_pi = PublicInputs::new(1 << 16);
+    expect_pi.insert(24336, action.root);
+    expect_pi.insert(25814, action.nf.inner());
+    expect_pi.insert(33918, action.cm.inner());
+    assert_eq!(pi, expect_pi);
+    // Verifier
+    let verifier_data = VerifierData::new(vk, expect_pi);
+    verify_proof::<Fr, P, PC>(&pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
 }
