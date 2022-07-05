@@ -91,76 +91,142 @@ TODO: Should we use `fulldesc_vp` in place of `desc_vp`?
 
 - `VPCom(desc_vp; rcm_com_vp) := Com( Com_q(desc_vp), rcm_com_vp)`
 
-### Token (types)
+### TokenAddress (types)
 
-Encodes: token vp
+Encodes: token vp and rcm
+```
+token_vp_hash = Com_q(desc_vp_token)
+token_address = Com_r(token_vp_hash, rcm_token)
+```
 
-`token = Com_r(Com_q(desc_vp_token), rcm_token)`
+where:
+
+|Variable/Function|Type||
+|-|-|-|
+|`token_vp_hash` | $\mathbb F_q$ element bits | hash of the token vp description|
+|`rcm_token`|$\mathbb F_r$ element | random commitment trapdoor|
+| `Com_r` | $[\mathbb F_r] \to \mathbb F_r$ | Poseidon hash with four input field elements|
+
+The bits of `token_vp_hash` are converted to $\mathbb{F}_r$ element(s).
+
+> When using `bls12-317` as $E_M$, the bits of one $\mathbb{F}_q$ are converted to two $\mathbb{F}_r$.
 
 ### UserAddress
 
-- user address: $\mathbb{F}_r$ is user's shielded payment address, which encodes `nk`, `send_vp`, `recv_vp` and `rcm`.
-- nk: $\mathbb{F}_r$ is the nullifier key to generate nullifier.
-- send_vp: bits of $\mathbb{F}_q$ is the hash of vp description.
-- recv_vp: bits of $\mathbb{F}_q$ is the hash of vp description.
-- rcm_addr: $\mathbb{F}_r$ is a random commitment trapdoor.
 ```
-send_addr = Com_r( Com_q(desc_vp_addr_send) || nk )
-recv_addr = Com_q(desc_vp_addr_recv)
-address = Com_r(send_addr || recv_addr, rcm_addr)
+send_vp_hash = Com_q(desc_vp_addr_send)
+send_addr = Com_r( send_vp_hash || nk )
+recv_vp_hash = Com_q(desc_vp_addr_recv)
+user_address = Com_r(send_addr || recv_vp_hash, rcm_addr)
 ```
 
-- For sending: requires opening of `address` to  `com_q(desc_vp_addr_send)`, which requires additional knowledge of nullifier key `nk` and `rcm_addr`. This opening is efficient over $\mathbb{F}_r$.
-- For receiving: requires opening of `address` to `com_q(desc_vp_addr_recv)`, which requires additional knowledge of `rcm_addr`. This opening is efficient over $\mathbb{F}_r$
-- `com_q(desc_vp_addr_{send,recv})` are re-used inside ActionCircuit in deriving `addr_com_vp`.
-- To guarantee the compatibility of `addr_com_vp` constraints in ActionCircuit and VPBlindCircuit, `com_q(desc_vp_addr_{send,recv})` over $\mathbb{F}_q$ are converted to bits.
-- In address integrity circuit, the bits of `com_q(desc_vp_addr_{send,recv})` will be converted to $\mathbb{F}_r$(s). When using `bls12-317` as $E_M$, the bits of one $\mathbb{F}_q$ are converted to two $\mathbb{F}_r$.
-- Let `Com_r` be a poseidon hash, which takes four field elements with padding zero. TODO: if the `Com_r` constructed from hash doesn't have the hiding property, we can use PedersenCom(crh(send_fields || recv_fields), rcm) instead?
+where:
+
+|Variable/Function|Type||
+|-|-|-|
+|`nk`| $\mathbb{F}_r$| nullifier key for generating a nullifier|
+|`send_vp_hash`| $\mathbb F_q$ bits | hash of send vp description|
+|`recv_vp_hash` | $\mathbb F_q$ bits | hash of receive vp description|
+|`rcm_addr` | $\mathbb{F}_r$ | random commitment trapdoor|
+|`user_address`| $\mathbb F_r$ | address encoding `nk`, `send_vp_hash`, `recv_vp_hash`, `rcm_addr`|
+|`Com_r`| $[\mathbb F_r] \to \mathbb F_r$ | Poseidon hash with four input field elements|
+
+* Sending a note requires opening a `user_address` to  `send_vp_hash`, which requires additional knowledge of nullifier key `nk` and `rcm_addr`. This opening is efficient over $\mathbb{F}_r$.
+* Receiving a note requires opening a `user_address` to `recv_vp_hash`, which requires additional knowledge of `rcm_addr`. This opening is efficient over $\mathbb{F}_r$
+* `Com_q(desc_vp_addr_{send,recv})` are re-used inside ActionCircuit in deriving `addr_com_vp`.
+
+To guarantee the compatibility of `addr_com_vp` constraints in ActionCircuit and VPBlindCircuit, `Com_q(desc_vp_addr_{send,recv})` over $\mathbb{F}_q$ are converted to bits.
+
+In address integrity circuit, the bits of `Com_q(desc_vp_addr_{send,recv})` are converted to $\mathbb{F}_r$ element(s).
+
+> When using `bls12-317` as $E_M$, the bits of one $\mathbb{F}_q$ are converted to two $\mathbb{F}_r$.
+
+TODO: We use a padding with zeros for `Com_r`. If the `Com_r` constructed from hash doesn't have the hiding property, we can use PedersenCom(crh(send_fields || recv_fields), rcm) instead?
 
 
-### Notes
+### Note
 
-Needs to encode: asset type, user address, value (fungible value), data (non-fungible value)
-* `note = (address, token, v, data, ρ, ψ, rcm_note)`
-* `cm = NoteCom(note, rcm_note)`
-* `nf = DeriveNullifier_nk(note)`
+A note encodes:
+* the asset (token) type,
+* the user (owner) address,
+* the value (fungible),
+* additional data (non-fungible).
+```
+note = (user_address, token_address, v, data, ρ, ψ)
+cm = NoteCom(note, rcm_note)
+```
+
+where:
+
+|Variable/Function|Type||
+|-|-|-|
+|`token_address`| $\mathbb{F}_r$ | a token type encoding `token_vp`, `rcm_token`|
+|`v`| `u64` ($\mathbb F_r$ element in circuit) | the quantity of fungible value |
+|`data`| $\mathbb{F}_r$ |non-fungible value(to be decided?)|
+|`ρ`| $\mathbb{F}_r$ | an old nullifier|
+|`rcm_note` | $\mathbb{F}_r$| a random commitment trapdoor|
+|`ψ`| $\mathbb{F}_r$ | the prf output of `ρ` and `rcm_note`|
+| `user_address`| $\mathbb F_r$ | address encoding `nk`, `send_vp`, `recv_vp`, `rcm_addr`|
+| `NoteCom` | $[\mathbb F_r] \to \mathbb F_r$ | Poseidon hash with eight input elements|
 
 Dummy notes: A note is dummy iff `v = 0`.
 
-`NoteCom` and `DeriveNullifier` same as Orchard.
-
-ZCash: Spending key `sk` derives nullifier key `nk`, and nullifier is then `nf = PRF_nk("function of note")`
+Other options of `NoteCom`:
+1. `cm = hash_to_curve(note) + [rcm_note] * H` the same as Sapling or Orchard.
+2. `cm = [CRH(note||0)] G + [rcm] H`. Then `cm` is a point of $E_M$.
 
 For us: knowing the opening of `address` to `desc_vp_addr_send` <=> can derive `nf` for the notes owned by `address`
 
-### NullifierDerivingKey(nk)
-`nk` is nullifier deriving key, randomly generated by user.
+### Nullifier deriving key
+The nullifier deriving key is denoted `nk` and is randomly generated (by the user).
+```
+nk = PRF_random(PERSONALIZATION_NK) mod r
+```
 
-* $nk = PRF_r(PERSONALIZATION_{NK}) \ mod \ \mathbb{F}_r$
+where:
 
-`r` is a fresh 32 random bytes.
+|Variable/Function|Type||
+|-|-|-|
+|`random`| 32 bytes | random value |
+| `PERSONALIZATION_NK` | string bytes | set to `"Taiga_PRF_NK"`|
+| `PRF` | outputs 64 bytes | Blake2b function |
 
-`PERSONALIZATION_{NK}` is a fixed string bytes "Taiga_PRF_NK".
+### Nullifier
 
-Use blake2b as the PRF, which outputs 64 bytes.
+The nullifier is derived using:
+```
+DeriveNullifier = PRF(nk, ρ, ψ, cm)
+```
 
-### Nullifier(nf)
-Use the same derivation of nullifier with Orchard.
-Define the DeriveNullifier function: $\mathbb{F}_r \times \mathbb{F}_r \times \mathbb{F}_r \times E_I \to \mathbb{F}_r$ as follows:
+where:
 
-* $DeriveNullifier_{nk}(\rho, \psi, cm) = Extract([PRF_{nk}(\rho) + \psi \ mod \ \mathbb{F}_r]K^{nf} + cm)$
+|Variable/Function|Type||
+|-|-|-|
+|`nk` | $\mathbb F_r$ | the nullifier deriving key |
+|`ρ`| $\mathbb{F}_r$ | an old nullifier|
+|`ψ`| $\mathbb{F}_r$ | the prf output of `ρ` and `rcm_note`|
+|`cm` | $\mathbb F_r$ | a commitment from `NoteCom` |
+| `PRF` | $[\mathbb F_r] \to \mathbb F_r$ | Poseidon hash with four input elements|
 
-`nk` is the nullifier deriving key, randomly generated by user.
+### Nullifier $-$ designed for other options of `NoteCom` (deprecated)
 
-$\rho$ and $\psi$ are parts of note to guarantee the uniqueness of `nf`. $\rho = nf^{old}$ is from the same action description, and uses the dummy note's nullifier as $nf^{old}$ if no real spent note in action. $\psi = PRF_{rseed}(\rho)$, `rseed` is used to generate `rcm` of note commitment.
+Use the nullifier derivation as in Orchard:
+```
+DeriveNullifier_nk(ρ, ψ, cm) = Extract([PRF_nk(ρ) + ψ mod r]K + cm)
+```
 
-`K^{nf}` is a fixed base generator of inner curve.
+where:
 
-`cm` is the note commitment.
+|Variable/Function|Type||
+|-|-|-|
+|`nk` | $\mathbb F_r$ | the nullifier deriving key |
+|`ρ`| $\mathbb{F}_r$ | an old nullifier|
+|`ψ`| $\mathbb{F}_r$ | the prf output of `ρ` and `rcm_note`|
+|`cm` | $\mathbb F_r$ | a commitment from `NoteCom` |
+|`K`|($\mathbb F_r$, $\mathbb F_r$) | a fixed base generator of the inner curve|
+| `PRF` | $[\mathbb F_r] \to \mathbb F_r$ | Poseidon hash with two input elements (`nk` and `ρ`)|
+|`Extract` | $\mathbb F_r$ | the $x$ coordinate of a (inner curve) point|
 
-`Extract` is the x coordinate extractor of curve point.
-
-Use binary poseidon hash as PRF: $PRF_{nk}(\rho) = BinaryPoseidonHash(nk, \rho)$
 
 ## ZK Circuits
 

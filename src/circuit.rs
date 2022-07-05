@@ -3,5 +3,4 @@ pub mod circuit_parameters;
 pub mod gadgets;
 
 pub mod integrity;
-pub mod nullifier;
 pub mod validity_predicate;

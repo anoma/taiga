@@ -1,4 +1,4 @@
-use crate::circuit::nullifier::Nullifier;
+use crate::nullifier::Nullifier;
 use crate::el_gamal::EncryptedNote;
 use crate::user_address::NullifierDerivingKey;
 use crate::{
