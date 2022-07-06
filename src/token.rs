@@ -8,12 +8,12 @@ use plonk_hashing::poseidon::constants::PoseidonConstants;
 use rand::RngCore;
 
 #[derive(Copy, Debug, Clone)]
-pub struct TokenAddress<CP: CircuitParameters> {
+pub struct Token<CP: CircuitParameters> {
     pub rcm: CP::CurveScalarField,
     pub token_vp: MockHashVP<CP>,
 }
 
-impl<CP: CircuitParameters> TokenAddress<CP> {
+impl<CP: CircuitParameters> Token<CP> {
     pub fn new(rng: &mut impl RngCore) -> Self {
         let rcm = CP::CurveScalarField::rand(rng);
         Self {
@@ -23,7 +23,7 @@ impl<CP: CircuitParameters> TokenAddress<CP> {
         }
     }
 
-    pub fn opaque_native(&self) -> Result<CP::CurveScalarField, TaigaError> {
+    pub fn address(&self) -> Result<CP::CurveScalarField, TaigaError> {
         // Init poseidon param.
         let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
             PoseidonConstants::generate::<WIDTH_5>();
