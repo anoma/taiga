@@ -114,7 +114,7 @@ impl<CP: CircuitParameters> UserSendAddress<CP> {
         UserSendAddress::Open(nk, send_vp)
     }
 
-    /// Creates an closed user send address.
+    /// Creates a closed user send address.
     pub fn from_closed(x: CP::CurveScalarField) -> Self {
         UserSendAddress::Closed(x)
     }
