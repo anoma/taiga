@@ -198,9 +198,10 @@ mod test {
             &self,
             composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
             _input_note_variables: &[ValidityPredicateInputNoteVariables],
-            _output_note_variables: &[ValidityPredicateOuputNoteVariables],
+            output_note_variables: &[ValidityPredicateOuputNoteVariables],
         ) -> Result<(), Error> {
             let owner_var = composer.add_input(self.add.opaque_native().unwrap());
+            // let owner_var = output_note_variables[1].addr;
             let root_var = white_list_gadget::<
                 CP::CurveScalarField,
                 CP::InnerCurve,
