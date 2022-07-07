@@ -69,8 +69,6 @@ mod tests {
     type P = <CP as CircuitParameters>::InnerCurve;
 
     pub fn dummy_note(user: User<CP>) -> Note<CP> {
-        type F = <CP as CircuitParameters>::CurveScalarField;
-
         let mut rng = test_rng();
         let token = Token::<CP>::new(&mut rng);
         let rho = Nullifier::new(F::rand(&mut rng));
