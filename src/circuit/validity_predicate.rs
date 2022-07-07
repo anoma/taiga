@@ -31,7 +31,7 @@ pub trait ValidityPredicate<CP: CircuitParameters>:
         Error,
     > {
         let input_notes = self.get_input_notes();
-        let output_notes = self.output_notes();
+        let output_notes = self.get_output_notes();
         let mut input_note_variables = vec![];
         let mut output_note_variables = vec![];
         for i in 0..NUM_NOTE {
@@ -46,7 +46,7 @@ pub trait ValidityPredicate<CP: CircuitParameters>:
 
     // VP designer should implement the following functions.
     fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE];
-    fn output_notes(&self) -> &[Note<CP>; NUM_NOTE];
+    fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE];
     fn custom_constraints(
         &self,
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
@@ -62,9 +62,10 @@ mod test {
         ValidityPredicateInputNoteVariables, ValidityPredicateOuputNoteVariables,
     };
     use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
+    use crate::merkle_tree::MerklePath;
     use crate::note::Note;
-    use ark_ff::One;
     use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
+    use plonk_hashing::poseidon::constants::PoseidonConstants;
 
     // ExampleValidityPredicate have a custom constraint with a + b = c,
     // in which a, b are private inputs and c is a public input.
@@ -87,7 +88,7 @@ mod test {
             &self.input_notes
         }
 
-        fn output_notes(&self) -> &[Note<CP>; NUM_NOTE] {
+        fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE] {
             &self.output_notes
         }
 
@@ -99,20 +100,10 @@ mod test {
         ) -> Result<(), Error> {
             let var_a = composer.add_input(self.a);
             let var_b = composer.add_input(self.b);
-            let var_zero = composer.zero_var();
-
             field_addition_gadget::<CP>(composer, var_a, var_b, self.c);
-
-            let one = <CP as CircuitParameters>::CurveScalarField::one();
-            // Make first constraint a + b = c (as public input)
-            composer.arithmetic_gate(|gate| {
-                gate.witness(var_a, var_b, Some(var_zero))
-                    .add(one, one)
-                    .pi(-self.c)
-            });
             Ok(())
         }
-    }
+    }   
 
     impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for ExampleValidityPredicate<CP>
     where
@@ -171,4 +162,47 @@ mod test {
         verify_proof::<Fr, P, PC>(&pp, verifier_data.key, &proof, &verifier_data.pi, b"Test")
             .unwrap();
     }
+
+
+    
+
+
+
+    // // SimonValidityPredicate have a custom constraint checking that the received notes come from known users.
+    // pub struct SimonValidityPredicate<CP: CircuitParameters> {
+    //     // basic "private" inputs to the VP
+    //     pub input_notes: [Note<CP>; NUM_NOTE],
+    //     pub output_notes: [Note<CP>; NUM_NOTE],
+    //     // custom "private" inputs to the VP
+    //     pub path: MerklePath<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>,
+    // }
+
+    // impl<CP> ValidityPredicate<CP> for SimonValidityPredicate<CP>
+    // where
+    //     CP: CircuitParameters,
+    // {
+    //     fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE] {
+    //         &self.input_notes
+    //     }
+
+    //     fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE] {
+    //         &self.output_notes
+    //     }
+
+    //     fn custom_constraints(
+    //         &self,
+    //         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+
+    //         _input_note_variables: &[ValidityPredicateInputNoteVariables],
+    //         _output_note_variables: &[ValidityPredicateOuputNoteVariables],
+    //     ) -> Result<(), Error> {
+    //         let var_a = composer.add_input(self.a);
+    //         let var_b = composer.add_input(self.b);
+    //         field_addition_gadget::<CP>(composer, var_a, var_b, self.c);
+    //         Ok(())
+    //     }
+    // }   
+
+
+    
 }
