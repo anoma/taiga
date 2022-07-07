@@ -1,8 +1,10 @@
 use crate::circuit::gadgets::hash::FieldHasherGadget;
-use crate::error::TaigaError;
 use ark_ec::TEModelParameters;
 use ark_ff::PrimeField;
-use plonk_core::{constraint_system::StandardComposer, prelude::Variable};
+use plonk_core::{
+    constraint_system::StandardComposer,
+    prelude::{Error, Variable},
+};
 
 /// A Merkle Tree Gadget takes leaf node variable, authorization path to the
 /// root and the FieldHasherGadget, then returns the merkle root variable.
@@ -15,7 +17,7 @@ pub fn merkle_tree_gadget<
     cur_leaf: &Variable,
     auth_path: &[(F, bool)],
     hash_gadget: &BHG,
-) -> Result<Variable, TaigaError> {
+) -> Result<Variable, Error> {
     let mut cur = *cur_leaf;
 
     // Ascend the merkle tree authentication path
@@ -44,11 +46,12 @@ pub fn merkle_tree_gadget<
 
 #[test]
 fn test_merkle_circuit() {
+    use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters};
     use crate::merkle_tree::TAIGA_COMMITMENT_TREE_DEPTH;
     use crate::merkle_tree::{MerklePath, Node};
     use crate::poseidon::POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2;
-    use ark_bls12_377::Fr;
-    use ark_ed_on_bls12_377::EdwardsParameters as Curv;
+    type Fr = <PairingCircuitParameters as CircuitParameters>::CurveScalarField;
+    type P = <PairingCircuitParameters as CircuitParameters>::InnerCurve;
     use ark_std::test_rng;
     use plonk_hashing::poseidon::constants::PoseidonConstants;
 
@@ -64,9 +67,9 @@ fn test_merkle_circuit() {
         )
         .unwrap();
 
-    let mut composer = StandardComposer::<Fr, Curv>::new();
+    let mut composer = StandardComposer::<Fr, P>::new();
     let commitment = composer.add_input(cur_leaf.inner());
-    let root = merkle_tree_gadget::<Fr, Curv, PoseidonConstants<Fr>>(
+    let root = merkle_tree_gadget::<Fr, P, PoseidonConstants<Fr>>(
         &mut composer,
         &commitment,
         &merkle_path.get_path(),

@@ -1,23 +1,26 @@
 // The interfaces may not perfectly defined, the caller can refine them if needed.
 
 use crate::circuit::{circuit_parameters::CircuitParameters, gadgets::hash::FieldHasherGadget};
-use crate::error::TaigaError;
+// use crate::error::TaigaError;
 use crate::poseidon::{WIDTH_3, WIDTH_5, WIDTH_9};
 use ark_ff::{Field, One, PrimeField};
-use plonk_core::{constraint_system::StandardComposer, prelude::Variable};
+use plonk_core::{
+    constraint_system::StandardComposer,
+    prelude::{Error, Variable},
+};
 use plonk_hashing::poseidon::{
     constants::PoseidonConstants,
     poseidon::{PlonkSpec, Poseidon},
 };
 
-pub fn address_integrity_circuit<CP: CircuitParameters>(
+pub fn spent_user_address_integrity_circuit<CP: CircuitParameters>(
     composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
     nk: &Variable,
     rcm: &Variable,
     // convert the vp variables inside, move out if needed.
     send_vp_bytes: &[bool],
     recv_vp_bytes: &[bool],
-) -> Result<Variable, TaigaError> {
+) -> Result<Variable, Error> {
     // Init poseidon hash gadget.
     let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
         PoseidonConstants::generate::<WIDTH_5>();
@@ -39,12 +42,33 @@ pub fn address_integrity_circuit<CP: CircuitParameters>(
     poseidon_param.circuit_hash(composer, &address_vars)
 }
 
+pub fn output_user_address_integrity_circuit<CP: CircuitParameters>(
+    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+    address_send: &Variable,
+    rcm: &Variable,
+    // convert the vp variables inside, move out if needed.
+    recv_vp_bytes: &[bool],
+) -> Result<Variable, Error> {
+    // Init poseidon hash gadget.
+    let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+        PoseidonConstants::generate::<WIDTH_5>();
+
+    // convert recv_vp bits to two variable
+    let address_recv = bits_to_variables::<CP>(composer, recv_vp_bytes);
+
+    // generate address variable
+    let mut address_vars = vec![*address_send];
+    address_vars.extend(address_recv);
+    address_vars.push(*rcm);
+    poseidon_param.circuit_hash(composer, &address_vars)
+}
+
 pub fn token_integrity_circuit<CP: CircuitParameters>(
     composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
     rcm: &Variable,
     // convert the vp variables inside, move out if needed.
     token_vp_bytes: &[bool],
-) -> Result<Variable, TaigaError> {
+) -> Result<Variable, Error> {
     // Init poseidon hash gadget.
     let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
         PoseidonConstants::generate::<WIDTH_5>();
@@ -65,7 +89,7 @@ pub fn note_commitment_circuit<CP: CircuitParameters>(
     data: &Variable,
     rho: &Variable,
     rcm: &Variable,
-) -> Result<(Variable, Variable), TaigaError> {
+) -> Result<(Variable, Variable), Error> {
     // constrain the value to be 64 bit
     composer.range_gate(*value, 64);
 
@@ -94,7 +118,7 @@ pub fn nullifier_circuit<CP: CircuitParameters>(
     rho: &Variable,
     psi: &Variable,
     cm: &Variable,
-) -> Result<Variable, TaigaError> {
+) -> Result<Variable, Error> {
     let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
         PoseidonConstants::generate::<WIDTH_5>();
     let variavle_vec = vec![*nk, *rho, *psi, *cm];
@@ -114,7 +138,7 @@ pub fn nullifier_circuit<CP: CircuitParameters>(
 //     rho: &Variable,
 //     psi: &Variable,
 //     cm: &Point<CP::InnerCurve>,
-// ) -> Result<Variable, TaigaError> {
+// ) -> Result<Variable, Error> {
 //     let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
 //         PoseidonConstants::generate::<WIDTH_3>();
 //     let prf_ret = poseidon_param.circuit_hash_two(composer, nk, rho)?;
@@ -215,9 +239,9 @@ mod test {
 
     #[test]
     fn test_integrity_circuit() {
-        use crate::circuit::integrity::address_integrity_circuit;
         use crate::circuit::integrity::note_commitment_circuit;
         use crate::circuit::integrity::nullifier_circuit;
+        use crate::circuit::integrity::spent_user_address_integrity_circuit;
         use crate::circuit::integrity::token_integrity_circuit;
         use crate::note::Note;
         use crate::nullifier::Nullifier;
@@ -234,13 +258,15 @@ mod test {
         // Create a user address
         let address = UserAddress::<PairingCircuitParameters>::new(&mut rng);
 
-        let nk_var = composer.add_input(address.nk.inner());
+        let nk = address.send_addr.get_nk().unwrap();
+        let nk_var = composer.add_input(nk.inner());
         let address_rcm_var = composer.add_input(address.rcm);
-        let address_var = address_integrity_circuit::<PairingCircuitParameters>(
+        let send_vp = address.send_addr.get_send_vp().unwrap();
+        let address_var = spent_user_address_integrity_circuit::<PairingCircuitParameters>(
             &mut composer,
             &nk_var,
             &address_rcm_var,
-            &address.send_vp.to_bits(),
+            &send_vp.to_bits(),
             &address.recv_vp.to_bits(),
         )
         .unwrap();
@@ -296,10 +322,7 @@ mod test {
 
         // Test nullifier
         let expect_nf = Nullifier::<PairingCircuitParameters>::derive_native(
-            &note.address.nk,
-            &note.rho,
-            &note.psi,
-            &expect_cm,
+            &nk, &note.rho, &note.psi, &expect_cm,
         );
         let nullifier_variable = nullifier_circuit::<PairingCircuitParameters>(
             &mut composer,

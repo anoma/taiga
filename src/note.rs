@@ -9,6 +9,7 @@ use plonk_hashing::poseidon::{
     constants::PoseidonConstants,
     poseidon::{NativeSpec, Poseidon},
 };
+use rand::RngCore;
 
 /// A note
 #[derive(Copy, Debug, Clone)]
@@ -35,6 +36,32 @@ impl<CP: CircuitParameters> Note<CP> {
         data: CP::CurveScalarField,
         rcm: CP::CurveScalarField,
     ) -> Self {
+        // Init poseidon param.
+        let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+            PoseidonConstants::generate::<WIDTH_3>();
+        let psi = poseidon_param.native_hash_two(&rho.inner(), &rcm).unwrap();
+        Self {
+            address,
+            token,
+            value,
+            data,
+            rho,
+            psi,
+            rcm,
+        }
+    }
+
+    pub fn dummy(rng: &mut impl RngCore) -> Self {
+        use ark_ff::UniformRand;
+        use rand::Rng;
+
+        let address = UserAddress::<CP>::new(rng);
+        let token = TokenAddress::<CP>::new(rng);
+        let value: u64 = rng.gen();
+        let data = CP::CurveScalarField::rand(rng);
+        let rho = Nullifier::new(CP::CurveScalarField::rand(rng));
+        let rcm = CP::CurveScalarField::rand(rng);
+
         // Init poseidon param.
         let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
             PoseidonConstants::generate::<WIDTH_3>();

@@ -17,10 +17,15 @@ pub struct NullifierDerivingKey<F: PrimeField>(F);
 /// The user address binded with send vp and received vp.
 #[derive(Copy, Debug, Clone)]
 pub struct UserAddress<CP: CircuitParameters> {
-    pub nk: NullifierDerivingKey<CP::CurveScalarField>,
+    pub send_addr: UserSendAddress<CP>,
     pub rcm: CP::CurveScalarField,
-    pub send_vp: MockHashVP<CP>,
     pub recv_vp: MockHashVP<CP>,
+}
+
+#[derive(Copy, Debug, Clone)]
+pub enum UserSendAddress<CP: CircuitParameters> {
+    Closed(CP::CurveScalarField),
+    Open(NullifierDerivingKey<CP::CurveScalarField>, MockHashVP<CP>),
 }
 
 impl<F: PrimeField> NullifierDerivingKey<F> {
@@ -59,43 +64,88 @@ impl<F: PrimeField> NullifierDerivingKey<F> {
 impl<CP: CircuitParameters> UserAddress<CP> {
     pub fn new(rng: &mut impl RngCore) -> Self {
         let nk = NullifierDerivingKey::<CP::CurveScalarField>::rand(rng);
+        let send_vp = MockHashVP::dummy(rng);
+        let send_addr = UserSendAddress::<CP>::from_open(nk, send_vp);
         let rcm = CP::CurveScalarField::rand(rng);
         Self {
-            nk,
+            send_addr,
             rcm,
             // TODO: fix this in future.
-            send_vp: MockHashVP::dummy(rng),
             recv_vp: MockHashVP::dummy(rng),
         }
     }
 
-    pub fn opaque_native(&self) -> Result<CP::CurveScalarField, TaigaError> {
-        // Init poseidon param.
-        let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
-            PoseidonConstants::generate::<WIDTH_5>();
+    // pub fn opaque_send(&self) -> Result<CP::CurveScalarField, TaigaError> {
+    //     // Init poseidon param.
+    //     let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+    //         PoseidonConstants::generate::<WIDTH_5>();
 
+    //     // send_part = Com_r( Com_q(desc_vp_addr_send) || nk )
+    //     let mut send_fields = bits_to_fields::<CP::CurveScalarField>(&self.send_vp.to_bits());
+    //     send_fields.push(self.nk.inner());
+    //     poseidon_param.native_hash(&send_fields)
+    // }
+
+    pub fn opaque_native(&self) -> Result<CP::CurveScalarField, TaigaError> {
         // send_part = Com_r( Com_q(desc_vp_addr_send) || nk )
-        let mut send_fields = bits_to_fields::<CP::CurveScalarField>(&self.send_vp.to_bits());
-        send_fields.push(self.nk.inner());
-        let send_hash = poseidon_param.native_hash(&send_fields)?;
+        let send_hash = self.send_addr.get_closed()?;
 
         // address = Com_r(send_fields || recv_fields, rcm)
         // TODO: if the Com_r constructed from hash doesn't have the hiding property,
         // we can use PedersenCom(crh(send_fields || recv_fields), rcm) instead?
+
+        // Init poseidon param.
+        let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+            PoseidonConstants::generate::<WIDTH_5>();
         let mut address_fields = vec![send_hash];
         let recv_fields = bits_to_fields::<CP::CurveScalarField>(&self.recv_vp.to_bits());
         address_fields.extend(recv_fields);
         address_fields.push(self.rcm);
         poseidon_param.native_hash(&address_fields)
     }
+}
 
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let mut buf: Vec<u8> = vec![];
-        buf.extend(&self.nk.to_bytes());
-        buf.extend(&self.rcm.into_repr().to_bytes_le());
-        buf.extend(&self.send_vp.to_bytes());
-        buf.extend(&self.recv_vp.to_bytes());
+impl<CP: CircuitParameters> UserSendAddress<CP> {
+    /// Creates an open user send address.
+    pub fn from_open(
+        nk: NullifierDerivingKey<CP::CurveScalarField>,
+        send_vp: MockHashVP<CP>,
+    ) -> Self {
+        UserSendAddress::Open(nk, send_vp)
+    }
 
-        buf
+    /// Creates a closed user send address.
+    pub fn from_closed(x: CP::CurveScalarField) -> Self {
+        UserSendAddress::Closed(x)
+    }
+
+    pub fn get_nk(&self) -> Option<NullifierDerivingKey<CP::CurveScalarField>> {
+        match self {
+            UserSendAddress::Closed(_) => None,
+            UserSendAddress::Open(nk, _) => Some(*nk),
+        }
+    }
+
+    pub fn get_send_vp(&self) -> Option<&MockHashVP<CP>> {
+        match self {
+            UserSendAddress::Closed(_) => None,
+            UserSendAddress::Open(_, send_vp) => Some(send_vp),
+        }
+    }
+
+    pub fn get_closed(&self) -> Result<CP::CurveScalarField, TaigaError> {
+        match self {
+            UserSendAddress::Closed(v) => Ok(*v),
+            UserSendAddress::Open(nk, send_vp) => {
+                // Init poseidon param.
+                let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+                    PoseidonConstants::generate::<WIDTH_5>();
+
+                // send_part = Com_r( Com_q(desc_vp_addr_send) || nk )
+                let mut send_fields = bits_to_fields::<CP::CurveScalarField>(&send_vp.to_bits());
+                send_fields.push(nk.inner());
+                poseidon_param.native_hash(&send_fields)
+            }
+        }
     }
 }

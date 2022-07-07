@@ -1,8 +1,10 @@
-use crate::error::TaigaError;
 use crate::poseidon::{WIDTH_3, WIDTH_5};
 use ark_ec::TEModelParameters;
 use ark_ff::PrimeField;
-use plonk_core::{constraint_system::StandardComposer, prelude::Variable};
+use plonk_core::{
+    constraint_system::StandardComposer,
+    prelude::{Error, Variable},
+};
 use plonk_hashing::poseidon::{
     constants::PoseidonConstants,
     poseidon::{PlonkSpec, Poseidon},
@@ -17,13 +19,13 @@ pub trait FieldHasherGadget<F: PrimeField, P: TEModelParameters<BaseField = F>> 
         composer: &mut StandardComposer<F, P>,
         left: &Variable,
         right: &Variable,
-    ) -> Result<Variable, TaigaError>;
+    ) -> Result<Variable, Error>;
 
     fn circuit_hash(
         &self,
         composer: &mut StandardComposer<F, P>,
         inputs: &[Variable],
-    ) -> Result<Variable, TaigaError>;
+    ) -> Result<Variable, Error>;
 }
 
 /// A FieldHasherGadget implementation for Poseidon hash.
@@ -35,10 +37,10 @@ impl<F: PrimeField, P: TEModelParameters<BaseField = F>> FieldHasherGadget<F, P>
         composer: &mut StandardComposer<F, P>,
         left: &Variable,
         right: &Variable,
-    ) -> Result<Variable, TaigaError> {
+    ) -> Result<Variable, Error> {
         let mut poseidon_circuit = Poseidon::<_, PlonkSpec<WIDTH_3>, WIDTH_3>::new(composer, self);
-        poseidon_circuit.input(*left)?;
-        poseidon_circuit.input(*right)?;
+        poseidon_circuit.input(*left).unwrap();
+        poseidon_circuit.input(*right).unwrap();
 
         Ok(poseidon_circuit.output_hash(composer))
     }
@@ -47,7 +49,7 @@ impl<F: PrimeField, P: TEModelParameters<BaseField = F>> FieldHasherGadget<F, P>
         &self,
         composer: &mut StandardComposer<F, P>,
         inputs: &[Variable],
-    ) -> Result<Variable, TaigaError> {
+    ) -> Result<Variable, Error> {
         let mut poseidon_circuit = Poseidon::<_, PlonkSpec<WIDTH_5>, WIDTH_5>::new(composer, self);
         // Default padding zero
         inputs.iter().for_each(|f| {
