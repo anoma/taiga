@@ -5,6 +5,9 @@ use crate::poseidon::FieldHasher;
 use ark_ff::{BigInteger, PrimeField};
 use rand::{Rng, RngCore};
 use std::marker::PhantomData;
+use plonk_hashing::poseidon::constants::PoseidonConstants;
+use crate::poseidon::WIDTH_3;
+
 pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
 
 #[derive(Clone)]
@@ -46,6 +49,38 @@ pub struct MerklePath<F: PrimeField, BH: FieldHasher<F> + std::clone::Clone> {
     auth_path: Vec<(Node<F, BH>, bool)>,
 }
 
+
+pub fn find_sibling<F: PrimeField>(leaf_hashes: &Vec<F>, position: usize) -> (usize, F) {
+    if position % 2 == 0 { // if position is even
+        let pos = position + 1;
+        (pos, leaf_hashes[pos])
+    } else {
+        let pos = position - 1;
+        (pos, leaf_hashes[pos])
+    }
+}
+
+pub fn build_auth_path<F: PrimeField>(leaf_hashes: Vec<F>, position: usize, path : &mut Vec<F>) {
+    let mut new_leaves = vec![];
+    if leaf_hashes.len() > 1 {  
+        let (sibling_pos, sibling) = find_sibling(&leaf_hashes, position);
+        path.push(sibling);
+
+        for (i, pair) in leaf_hashes.chunks(2).enumerate() {
+            if i != position && i != sibling_pos {
+                let hash_pair = PoseidonConstants::generate::<WIDTH_3>()
+                                .native_hash_two(&pair[0], &pair[1])
+                                .unwrap();
+
+                new_leaves.push(hash_pair);
+            }
+        }
+    }
+    build_auth_path(new_leaves, position % 2, path);
+}
+
+
+
 impl<F: PrimeField, BH: FieldHasher<F> + std::clone::Clone> MerklePath<F, BH> {
     /// Constructs a random dummy merkle path with depth.
     pub fn dummy(rng: &mut impl RngCore, depth: usize) -> Self {
@@ -57,6 +92,13 @@ impl<F: PrimeField, BH: FieldHasher<F> + std::clone::Clone> MerklePath<F, BH> {
     pub fn from_path(auth_path: Vec<(Node<F, BH>, bool)>) -> Self {
         MerklePath { auth_path }
     }
+
+    pub fn build_merkle_path(leaf_hashes: Vec<F>, position: usize) -> Self {
+        let mut path = vec![];
+        build_auth_path(leaf_hashes, position, &mut path);
+        MerklePath {path}
+    }
+    
 
     /// Returns the root of the tree corresponding to this path applied to `leaf`.
     pub fn root(&self, leaf: Node<F, BH>, hasher: &BH) -> Result<Node<F, BH>, TaigaError> {
