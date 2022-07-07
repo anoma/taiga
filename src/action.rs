@@ -5,8 +5,8 @@ use crate::merkle_tree::{MerklePath, Node, TAIGA_COMMITMENT_TREE_DEPTH};
 use crate::note::{Note, NoteCommitment};
 use crate::nullifier::Nullifier;
 use crate::poseidon::FieldHasher;
-use crate::token::TokenAddress;
-use crate::user_address::{UserAddress, UserSendAddress};
+use crate::token::Token;
+use crate::user::{User, UserSendAddress};
 use crate::validity_predicate::MockHashVP;
 use ark_ff::UniformRand;
 use rand::RngCore;
@@ -57,7 +57,7 @@ impl<CP: CircuitParameters> ActionInfo<CP> {
         rng: &mut impl RngCore,
     ) -> Result<(Action<CP>, ActionCircuit<CP>), TaigaError> {
         let spend_cm = self.spend.note.commitment()?;
-        let nk = self.spend.note.address.send_addr.get_nk().unwrap();
+        let nk = self.spend.note.user.send_addr.get_nk().unwrap();
         let nf = Nullifier::<CP>::derive_native(
             &nk,
             &self.spend.note.rho,
@@ -66,13 +66,13 @@ impl<CP: CircuitParameters> ActionInfo<CP> {
         );
 
         let addr_rcm = CP::CurveScalarField::rand(rng);
-        let address = UserAddress::<CP> {
+        let address = User::<CP> {
             send_addr: self.output.addr_send_closed,
             rcm: addr_rcm,
             recv_vp: self.output.addr_recv_vp,
         };
         let token_rcm = CP::CurveScalarField::rand(rng);
-        let token = TokenAddress::<CP> {
+        let token = Token::<CP> {
             rcm: token_rcm,
             token_vp: self.output.addr_token_vp,
         };

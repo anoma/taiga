@@ -33,16 +33,16 @@ where
         // spent note
         let nf = {
             // check user address
-            let nk = self.spend_note.address.send_addr.get_nk().unwrap();
+            let nk = self.spend_note.user.send_addr.get_nk().unwrap();
             let nk_var = composer.add_input(nk.inner());
-            let address_rcm_var = composer.add_input(self.spend_note.address.rcm);
-            let send_vp = self.spend_note.address.send_addr.get_send_vp().unwrap();
+            let address_rcm_var = composer.add_input(self.spend_note.user.rcm);
+            let send_vp = self.spend_note.user.send_addr.get_send_vp().unwrap();
             let address_var = spent_user_address_integrity_circuit::<CP>(
                 composer,
                 &nk_var,
                 &address_rcm_var,
                 &send_vp.to_bits(),
-                &self.spend_note.address.recv_vp.to_bits(),
+                &self.spend_note.user.recv_vp.to_bits(),
             )?;
 
             // check token address
@@ -87,14 +87,14 @@ where
         // output note
         {
             // check user address
-            let addr_send = self.output_note.address.send_addr.get_closed().unwrap();
+            let addr_send = self.output_note.user.send_addr.get_closed().unwrap();
             let addr_send_var = composer.add_input(addr_send);
-            let address_rcm_var = composer.add_input(self.output_note.address.rcm);
+            let address_rcm_var = composer.add_input(self.output_note.user.rcm);
             let address_var = output_user_address_integrity_circuit::<CP>(
                 composer,
                 &addr_send_var,
                 &address_rcm_var,
-                &self.output_note.address.recv_vp.to_bits(),
+                &self.output_note.user.recv_vp.to_bits(),
             )?;
 
             // check token address

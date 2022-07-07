@@ -245,8 +245,8 @@ mod test {
         use crate::circuit::integrity::token_integrity_circuit;
         use crate::note::Note;
         use crate::nullifier::Nullifier;
-        use crate::token::TokenAddress;
-        use crate::user_address::UserAddress;
+        use crate::token::Token;
+        use crate::user::User;
         use ark_std::{test_rng, UniformRand};
         use plonk_core::constraint_system::StandardComposer;
         use rand::Rng;
@@ -256,7 +256,7 @@ mod test {
 
         // Test user address integrity
         // Create a user address
-        let address = UserAddress::<PairingCircuitParameters>::new(&mut rng);
+        let address = User::<PairingCircuitParameters>::new(&mut rng);
 
         let nk = address.send_addr.get_nk().unwrap();
         let nk_var = composer.add_input(nk.inner());
@@ -270,14 +270,14 @@ mod test {
             &address.recv_vp.to_bits(),
         )
         .unwrap();
-        let expect_address_opaque = address.opaque_native().unwrap();
+        let expect_address_opaque = address.address().unwrap();
         let expected_address_var = composer.add_input(expect_address_opaque);
         composer.assert_equal(expected_address_var, address_var);
         composer.check_circuit_satisfied();
 
         // Test token integrity
         // Create a token
-        let token = TokenAddress::<PairingCircuitParameters>::new(&mut rng);
+        let token = Token::<PairingCircuitParameters>::new(&mut rng);
 
         let token_rcm_var = composer.add_input(token.rcm);
         let token_var = token_integrity_circuit::<PairingCircuitParameters>(
@@ -286,7 +286,7 @@ mod test {
             &token.token_vp.to_bits(),
         )
         .unwrap();
-        let expect_token_opaque = token.opaque_native().unwrap();
+        let expect_token_opaque = token.address().unwrap();
         let token_expected_var = composer.add_input(expect_token_opaque);
         composer.assert_equal(token_expected_var, token_var);
         composer.check_circuit_satisfied();
