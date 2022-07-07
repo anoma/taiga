@@ -37,7 +37,7 @@ where
             let nk_var = composer.add_input(nk.inner());
             let address_rcm_var = composer.add_input(self.spend_note.address.rcm);
             let send_vp = self.spend_note.address.send_addr.get_send_vp().unwrap();
-            let address_var = spent_user_address_integrity_circuit::<CP>(
+            let (address_var, _, _) = spent_user_address_integrity_circuit::<CP>(
                 composer,
                 &nk_var,
                 &address_rcm_var,
@@ -47,7 +47,7 @@ where
 
             // check token address
             let token_rcm_var = composer.add_input(self.spend_note.token.rcm);
-            let token_var = token_integrity_circuit::<CP>(
+            let (token_var, _) = token_integrity_circuit::<CP>(
                 composer,
                 &token_rcm_var,
                 &self.spend_note.token.token_vp.to_bits(),
@@ -90,7 +90,7 @@ where
             let addr_send = self.output_note.address.send_addr.get_closed().unwrap();
             let addr_send_var = composer.add_input(addr_send);
             let address_rcm_var = composer.add_input(self.output_note.address.rcm);
-            let address_var = output_user_address_integrity_circuit::<CP>(
+            let (address_var, _) = output_user_address_integrity_circuit::<CP>(
                 composer,
                 &addr_send_var,
                 &address_rcm_var,
@@ -99,7 +99,7 @@ where
 
             // check token address
             let token_rcm_var = composer.add_input(self.output_note.token.rcm);
-            let token_var = token_integrity_circuit::<CP>(
+            let (token_var, _) = token_integrity_circuit::<CP>(
                 composer,
                 &token_rcm_var,
                 &self.output_note.token.token_vp.to_bits(),

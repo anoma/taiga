@@ -2,6 +2,7 @@
 
 use crate::circuit::{circuit_parameters::CircuitParameters, gadgets::hash::FieldHasherGadget};
 // use crate::error::TaigaError;
+use crate::note::Note;
 use crate::poseidon::{WIDTH_3, WIDTH_5, WIDTH_9};
 use ark_ff::{Field, One, PrimeField};
 use plonk_core::{
@@ -20,13 +21,14 @@ pub fn spent_user_address_integrity_circuit<CP: CircuitParameters>(
     // convert the vp variables inside, move out if needed.
     send_vp_bytes: &[bool],
     recv_vp_bytes: &[bool],
-) -> Result<Variable, Error> {
+) -> Result<(Variable, Vec<Variable>, Vec<Variable>), Error> {
     // Init poseidon hash gadget.
     let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
         PoseidonConstants::generate::<WIDTH_5>();
 
     // convert send_vp bits to two variable
-    let mut address_send_fields = bits_to_variables::<CP>(composer, send_vp_bytes);
+    let send_vp = bits_to_variables::<CP>(composer, send_vp_bytes);
+    let mut address_send_fields = send_vp.clone();
 
     // address_send = Com_r( Com_q(send_vp) || nk )
     address_send_fields.push(*nk);
@@ -37,9 +39,10 @@ pub fn spent_user_address_integrity_circuit<CP: CircuitParameters>(
 
     // generate address variable
     let mut address_vars = vec![address_send];
-    address_vars.extend(address_recv);
+    address_vars.extend(address_recv.clone());
     address_vars.push(*rcm);
-    poseidon_param.circuit_hash(composer, &address_vars)
+    let address = poseidon_param.circuit_hash(composer, &address_vars)?;
+    Ok((address, send_vp, address_recv))
 }
 
 pub fn output_user_address_integrity_circuit<CP: CircuitParameters>(
@@ -48,7 +51,7 @@ pub fn output_user_address_integrity_circuit<CP: CircuitParameters>(
     rcm: &Variable,
     // convert the vp variables inside, move out if needed.
     recv_vp_bytes: &[bool],
-) -> Result<Variable, Error> {
+) -> Result<(Variable, Vec<Variable>), Error> {
     // Init poseidon hash gadget.
     let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
         PoseidonConstants::generate::<WIDTH_5>();
@@ -58,9 +61,10 @@ pub fn output_user_address_integrity_circuit<CP: CircuitParameters>(
 
     // generate address variable
     let mut address_vars = vec![*address_send];
-    address_vars.extend(address_recv);
+    address_vars.extend(address_recv.clone());
     address_vars.push(*rcm);
-    poseidon_param.circuit_hash(composer, &address_vars)
+    let address = poseidon_param.circuit_hash(composer, &address_vars)?;
+    Ok((address, address_recv))
 }
 
 pub fn token_integrity_circuit<CP: CircuitParameters>(
@@ -68,17 +72,19 @@ pub fn token_integrity_circuit<CP: CircuitParameters>(
     rcm: &Variable,
     // convert the vp variables inside, move out if needed.
     token_vp_bytes: &[bool],
-) -> Result<Variable, Error> {
+) -> Result<(Variable, Vec<Variable>), Error> {
     // Init poseidon hash gadget.
     let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
         PoseidonConstants::generate::<WIDTH_5>();
 
     // convert send_vp bits to two variable
-    let mut token_fields = bits_to_variables::<CP>(composer, token_vp_bytes);
+    let token_vp_var = bits_to_variables::<CP>(composer, token_vp_bytes);
+    let mut token_fields = token_vp_var.clone();
 
     // address_send = Com_r( Com_q(send_vp) || nk )
     token_fields.push(*rcm);
-    poseidon_param.circuit_hash(composer, &token_fields)
+    let token_var = poseidon_param.circuit_hash(composer, &token_fields)?;
+    Ok((token_var, token_vp_var))
 }
 
 pub fn note_commitment_circuit<CP: CircuitParameters>(
@@ -197,6 +203,129 @@ pub fn bits_to_variables<CP: CircuitParameters>(
     ret
 }
 
+// FIXME: It includes all the variables in input note, maybe it's not necessary.
+// {*}_vp use the conversion result format, modify it if needed.
+pub struct ValidityPredicateInputNoteVariables {
+    pub send_vp: Vec<Variable>,
+    pub nk: Variable,
+    pub recv_vp: Vec<Variable>,
+    pub token_vp: Vec<Variable>,
+    pub value: Variable,
+    pub data: Variable,
+    pub nf: Variable,
+}
+
+// FIXME: It includes all the variables in output note, maybe it's not necessary.
+pub struct ValidityPredicateOuputNoteVariables {
+    pub send_addr: Variable,
+    pub recv_vp: Vec<Variable>,
+    pub token_vp: Vec<Variable>,
+    pub value: Variable,
+    pub data: Variable,
+}
+
+pub fn input_note_constraint<CP>(
+    note: &Note<CP>,
+    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+) -> Result<ValidityPredicateInputNoteVariables, Error>
+where
+    CP: CircuitParameters,
+{
+    // check user address
+    let nk = note.address.send_addr.get_nk().unwrap();
+    let nk_var = composer.add_input(nk.inner());
+    let address_rcm_var = composer.add_input(note.address.rcm);
+    let send_vp = note.address.send_addr.get_send_vp().unwrap();
+    let (address_var, send_vp_var, recv_vp_var) = spent_user_address_integrity_circuit::<CP>(
+        composer,
+        &nk_var,
+        &address_rcm_var,
+        &send_vp.to_bits(),
+        &note.address.recv_vp.to_bits(),
+    )?;
+
+    // check token address
+    let token_rcm_var = composer.add_input(note.token.rcm);
+    let (token_var, token_vp_var) =
+        token_integrity_circuit::<CP>(composer, &token_rcm_var, &note.token.token_vp.to_bits())?;
+
+    // check note commitment
+    let value_var = composer.add_input(CP::CurveScalarField::from(note.value));
+    let data_var = composer.add_input(note.data);
+    let rho_var = composer.add_input(note.rho.inner());
+    let note_rcm_var = composer.add_input(note.rcm);
+    let (cm_var, psi_var) = note_commitment_circuit::<CP>(
+        composer,
+        &address_var,
+        &token_var,
+        &value_var,
+        &data_var,
+        &rho_var,
+        &note_rcm_var,
+    )?;
+
+    let nf = nullifier_circuit::<CP>(composer, &nk_var, &rho_var, &psi_var, &cm_var)?;
+
+    Ok(ValidityPredicateInputNoteVariables {
+        send_vp: send_vp_var,
+        nk: nk_var,
+        recv_vp: recv_vp_var,
+        token_vp: token_vp_var,
+        value: value_var,
+        data: data_var,
+        nf,
+    })
+}
+
+pub fn output_note_constraint<CP>(
+    note: &Note<CP>,
+    nf: &Variable,
+    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+) -> Result<ValidityPredicateOuputNoteVariables, Error>
+where
+    CP: CircuitParameters,
+{
+    // check user address
+    let addr_send = note.address.send_addr.get_closed().unwrap();
+    let addr_send_var = composer.add_input(addr_send);
+    let address_rcm_var = composer.add_input(note.address.rcm);
+    let (address_var, recv_vp_var) = output_user_address_integrity_circuit::<CP>(
+        composer,
+        &addr_send_var,
+        &address_rcm_var,
+        &note.address.recv_vp.to_bits(),
+    )?;
+
+    // check token address
+    let token_rcm_var = composer.add_input(note.token.rcm);
+    let (token_var, token_vp_var) =
+        token_integrity_circuit::<CP>(composer, &token_rcm_var, &note.token.token_vp.to_bits())?;
+
+    // check and publish note commitment
+    let value_var = composer.add_input(CP::CurveScalarField::from(note.value));
+    let data_var = composer.add_input(note.data);
+    let note_rcm_var = composer.add_input(note.rcm);
+    let (cm_var, _psi_var) = note_commitment_circuit::<CP>(
+        composer,
+        &address_var,
+        &token_var,
+        &value_var,
+        &data_var,
+        nf,
+        &note_rcm_var,
+    )?;
+
+    composer.public_inputize(&cm_var);
+
+    Ok(ValidityPredicateOuputNoteVariables {
+        send_addr: addr_send_var,
+        recv_vp: recv_vp_var,
+        token_vp: token_vp_var,
+        value: value_var,
+        data: data_var,
+    })
+}
+
 mod test {
     use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters};
     type Fr = <PairingCircuitParameters as CircuitParameters>::CurveScalarField;
@@ -262,7 +391,7 @@ mod test {
         let nk_var = composer.add_input(nk.inner());
         let address_rcm_var = composer.add_input(address.rcm);
         let send_vp = address.send_addr.get_send_vp().unwrap();
-        let address_var = spent_user_address_integrity_circuit::<PairingCircuitParameters>(
+        let (address_var, _, _) = spent_user_address_integrity_circuit::<PairingCircuitParameters>(
             &mut composer,
             &nk_var,
             &address_rcm_var,
@@ -280,7 +409,7 @@ mod test {
         let token = TokenAddress::<PairingCircuitParameters>::new(&mut rng);
 
         let token_rcm_var = composer.add_input(token.rcm);
-        let token_var = token_integrity_circuit::<PairingCircuitParameters>(
+        let (token_var, _) = token_integrity_circuit::<PairingCircuitParameters>(
             &mut composer,
             &token_rcm_var,
             &token.token_vp.to_bits(),
