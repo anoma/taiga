@@ -217,7 +217,7 @@ pub struct ValidityPredicateInputNoteVariables {
 
 // FIXME: It includes all the variables in output note, maybe it's not necessary.
 pub struct ValidityPredicateOuputNoteVariables {
-    pub send_addr: Variable,
+    pub addr: Variable,
     pub recv_vp: Vec<Variable>,
     pub token_vp: Vec<Variable>,
     pub value: Variable,
@@ -286,12 +286,12 @@ where
     CP: CircuitParameters,
 {
     // check user address
-    let addr_send = note.address.send_addr.get_closed().unwrap();
-    let addr_send_var = composer.add_input(addr_send);
+    let addr = note.address.send_addr.get_closed().unwrap();
+    let addr_var = composer.add_input(addr);
     let address_rcm_var = composer.add_input(note.address.rcm);
     let (address_var, recv_vp_var) = output_user_address_integrity_circuit::<CP>(
         composer,
-        &addr_send_var,
+        &addr_var,
         &address_rcm_var,
         &note.address.recv_vp.to_bits(),
     )?;
@@ -318,7 +318,7 @@ where
     composer.public_inputize(&cm_var);
 
     Ok(ValidityPredicateOuputNoteVariables {
-        send_addr: addr_send_var,
+        addr: addr_var,
         recv_vp: recv_vp_var,
         token_vp: token_vp_var,
         value: value_var,

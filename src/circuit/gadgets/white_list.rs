@@ -18,7 +18,7 @@ pub fn white_list_gadget<
 >(
     composer: &mut StandardComposer<F, P>,
     owner_variable: Variable,
-    merkle_path: MerklePath<F, PoseidonConstants<F>>,
+    merkle_path: &MerklePath<F, PoseidonConstants<F>>,
 ) -> Variable {
     // merkle tree gadget for white list membership
     let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
@@ -74,8 +74,7 @@ fn test_white_list_gadget() {
         .native_hash_two(&white_list_f[2], &white_list_f[3])
         .unwrap();
 
-    let merkle_path = MerklePath::from_path(
-        vec![
+    let merkle_path = MerklePath::from_path(vec![
         (Node::<F, PoseidonConstants<_>>::new(white_list_f[0]), true),
         (Node::<F, PoseidonConstants<_>>::new(hash_2_3), false),
     ]);
@@ -83,9 +82,9 @@ fn test_white_list_gadget() {
     let mut composer = StandardComposer::<F, <CP as CircuitParameters>::InnerCurve>::new();
 
     let owner_var = composer.add_input(note.address.opaque_native().unwrap());
-    
+
     let root_var =
-        white_list_gadget::<F, P, PoseidonConstants<F>, CP>(&mut composer, owner_var, merkle_path);
+        white_list_gadget::<F, P, PoseidonConstants<F>, CP>(&mut composer, owner_var, &merkle_path);
 
     let expected_var = composer.add_input(mk_root.inner());
     composer.assert_equal(expected_var, root_var);
