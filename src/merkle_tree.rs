@@ -169,3 +169,42 @@ impl<F: PrimeField, BH: FieldHasher<F>> Node<F, BH> {
         Ok(Self::new(hash))
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters as CP};
+    use crate::merkle_tree::Node;
+    use crate::poseidon::FieldHasher;
+    use crate::user::User;
+    use plonk_hashing::poseidon::constants::PoseidonConstants;
+    use super::*;
+
+    type F = <CP as CircuitParameters>::CurveScalarField;
+    type P = <CP as CircuitParameters>::InnerCurve;
+
+    #[test]
+    fn test_auth_path() {
+        // white list addresses and mk root associated
+        let mut rng = rand::thread_rng();
+        // user addresses
+        let addresses: Vec<F> = (0..4)
+            .map(|_| User::<CP>::new(&mut rng).address().unwrap())
+            .collect();
+        // I wanted to use hash_two but I was not able...
+        let hash_2_3 = PoseidonConstants::generate::<WIDTH_3>()
+        .native_hash_two(&addresses[2], &addresses[3])
+        .unwrap();
+    
+        let auth_path = &[
+            (Node::<F, PoseidonConstants<_>>::new(addresses[0]), true),
+            (Node::<F, PoseidonConstants<_>>::new(hash_2_3), false),
+        ];
+    
+        let merkle_path = MerklePath::from_path(auth_path.to_vec());
+    
+        let merkle_path_2 : MerklePath<F, PoseidonConstants<_>> = MerklePath::build_merkle_path(addresses, 1);
+    
+        assert_eq!(merkle_path, merkle_path_2);
+    }
+}
