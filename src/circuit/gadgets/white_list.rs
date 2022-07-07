@@ -68,13 +68,9 @@ fn test_white_list_gadget() {
 
     // white list addresses and mk root associated
     let mut rng = rand::thread_rng();
-    let white_list: Vec<User<CP>> =
-        (0..4).map(|_| User::<CP>::new(&mut rng)).collect();
+    let white_list: Vec<User<CP>> = (0..4).map(|_| User::<CP>::new(&mut rng)).collect();
     // user addresses
-    let white_list_f: Vec<F> = white_list
-        .iter()
-        .map(|v| v.address().unwrap())
-        .collect();
+    let white_list_f: Vec<F> = white_list.iter().map(|v| v.address().unwrap()).collect();
 
     let mk_root = MerkleTreeLeafs::<F, PoseidonConstants<F>>::new(white_list_f.to_vec())
         .root(&poseidon_hash_param_bls12_377_scalar_arity2);
