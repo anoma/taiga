@@ -96,16 +96,6 @@ mod tests {
         // a note owned by one of the white list user
         let note = dummy_note(user);
 
-        // I wanted to use hash_two but I was not able...
-        let hash_2_3 = PoseidonConstants::generate::<WIDTH_3>()
-            .native_hash_two(&white_list_f[2], &white_list_f[3])
-            .unwrap();
-
-        let auth_path = &[
-            (Node::<F, PoseidonConstants<_>>::new(white_list_f[0]), true),
-            (Node::<F, PoseidonConstants<_>>::new(hash_2_3), false),
-        ];
-
         let merkle_path: MerklePath<F, PoseidonConstants<_>> =
             MerklePath::build_merkle_path(white_list_f, 1);
 
