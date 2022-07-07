@@ -57,6 +57,7 @@ pub trait ValidityPredicate<CP: CircuitParameters>:
 
 mod test {
     use crate::circuit::circuit_parameters::CircuitParameters;
+    use crate::circuit::gadgets::field_addition::field_addition_gadget;
     use crate::circuit::integrity::{
         ValidityPredicateInputNoteVariables, ValidityPredicateOuputNoteVariables,
     };
@@ -99,6 +100,9 @@ mod test {
             let var_a = composer.add_input(self.a);
             let var_b = composer.add_input(self.b);
             let var_zero = composer.zero_var();
+
+            field_addition_gadget::<CP>(composer, var_a, var_b, self.c);
+
             let one = <CP as CircuitParameters>::CurveScalarField::one();
             // Make first constraint a + b = c (as public input)
             composer.arithmetic_gate(|gate| {
