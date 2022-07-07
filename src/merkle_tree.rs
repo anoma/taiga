@@ -11,11 +11,11 @@ use std::marker::PhantomData;
 pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
 
 #[derive(Clone)]
-pub struct MerkleTreeLeafs<F: PrimeField, BH: FieldHasher<F> + std::clone::Clone> {
+pub struct MerkleTreeLeafs<F: PrimeField, BH: FieldHasher<F>> {
     leafs: Vec<Node<F, BH>>,
 }
 
-impl<F: PrimeField, BH: FieldHasher<F> + std::clone::Clone> MerkleTreeLeafs<F, BH> {
+impl<F: PrimeField, BH: FieldHasher<F>> MerkleTreeLeafs<F, BH> {
     pub fn new(values: Vec<F>) -> Self {
         let nodes_vec = values
             .iter()
@@ -45,7 +45,7 @@ impl<F: PrimeField, BH: FieldHasher<F> + std::clone::Clone> MerkleTreeLeafs<F, B
 
 /// A path from a position in a particular commitment tree to the root of that tree.
 #[derive(Clone, Debug, PartialEq)]
-pub struct MerklePath<F: PrimeField, BH: FieldHasher<F> + std::clone::Clone> {
+pub struct MerklePath<F: PrimeField, BH: FieldHasher<F>> {
     auth_path: Vec<(Node<F, BH>, bool)>,
 }
 
@@ -64,7 +64,7 @@ pub fn find_sibling<F: PrimeField>(leaf_hashes: &Vec<F>, position: usize) -> (us
     }
 }
 
-fn build_auth_path<F: PrimeField, BH: FieldHasher<F> + std::clone::Clone>(
+fn build_auth_path<F: PrimeField, BH: FieldHasher<F>>(
     leaf_hashes: Vec<F>,
     position: usize,
     path: &mut Vec<(Node<F, BH>, bool)>,
@@ -88,7 +88,7 @@ fn build_auth_path<F: PrimeField, BH: FieldHasher<F> + std::clone::Clone>(
     }
 }
 
-impl<F: PrimeField, BH: FieldHasher<F> + std::clone::Clone> MerklePath<F, BH> {
+impl<F: PrimeField, BH: FieldHasher<F>> MerklePath<F, BH> {
     /// Constructs a random dummy merkle path with depth.
     pub fn dummy(rng: &mut impl RngCore, depth: usize) -> Self {
         let auth_path = (0..depth).map(|_| (Node::rand(rng), rng.gen())).collect();

@@ -18,7 +18,7 @@ use poseidon::POSEIDON_HASH_PARAM_BLS12_377_BASE_ARITY2;
 use poseidon::POSEIDON_HASH_PARAM_BLS12_377_BASE_ARITY4;
 use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
 
-// pub mod action;
+pub mod action;
 pub mod circuit;
 pub mod el_gamal;
 pub mod error;

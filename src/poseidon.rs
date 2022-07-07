@@ -28,7 +28,7 @@ lazy_static! {
 /// A FieldHasher over prime field takes field elements as input and
 /// outputs one field element. `native_hash_two` takes two field elements;
 /// `native_hash` takes at most four field elements.
-pub trait FieldHasher<F: PrimeField> {
+pub trait FieldHasher<F: PrimeField>: Clone {
     fn native_hash_two(&self, left: &F, right: &F) -> Result<F, TaigaError>;
     fn native_hash(&self, inputs: &[F]) -> Result<F, TaigaError>;
 }
