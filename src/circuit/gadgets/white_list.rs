@@ -47,9 +47,9 @@ pub fn white_list_gadget<
     .unwrap()
 }
 
-
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters as CP};
     use crate::merkle_tree::MerkleTreeLeafs;
     use crate::merkle_tree::Node;
@@ -58,21 +58,19 @@ mod tests {
     use crate::poseidon::FieldHasher;
     use crate::token::Token;
     use crate::user::User;
+    use ark_std::test_rng;
     use ark_std::UniformRand;
     use plonk_core::constraint_system::StandardComposer;
     use plonk_hashing::poseidon::constants::PoseidonConstants;
-    use rand::{RngCore};
-    use ark_std::{test_rng};
-    use super::*;
     use rand::Rng;
+    use rand::RngCore;
 
     type F = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;
 
-    pub fn dummy_note(
-        user: User<CP>) -> Note<CP> {
+    pub fn dummy_note(user: User<CP>) -> Note<CP> {
         type F = <CP as CircuitParameters>::CurveScalarField;
-        
+
         let mut rng = test_rng();
         let token = Token::<CP>::new(&mut rng);
         let rho = Nullifier::new(F::rand(&mut rng));
@@ -84,18 +82,13 @@ mod tests {
 
     #[test]
     fn test_white_list_gadget() {
-
         let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
 
         // white list addresses and mk root associated
         let mut rng = rand::thread_rng();
-        let white_list: Vec<User<CP>> =
-            (0..4).map(|_| User::<CP>::new(&mut rng)).collect();
+        let white_list: Vec<User<CP>> = (0..4).map(|_| User::<CP>::new(&mut rng)).collect();
         // user addresses
-        let white_list_f: Vec<F> = white_list
-            .iter()
-            .map(|v| v.address().unwrap())
-            .collect();
+        let white_list_f: Vec<F> = white_list.iter().map(|v| v.address().unwrap()).collect();
 
         let mk_root = MerkleTreeLeafs::<F, PoseidonConstants<F>>::new(white_list_f.to_vec())
             .root(&poseidon_hash_param_bls12_377_scalar_arity2);
@@ -115,8 +108,8 @@ mod tests {
             (Node::<F, PoseidonConstants<_>>::new(hash_2_3), false),
         ];
 
-
-        let merkle_path : MerklePath<F, PoseidonConstants<_>> = MerklePath::build_merkle_path(white_list_f, 1);
+        let merkle_path: MerklePath<F, PoseidonConstants<_>> =
+            MerklePath::build_merkle_path(white_list_f, 1);
 
         // wrap the private input as slice of F elements
         let mut private_inputs: Vec<F> = vec![note.user.address().unwrap()];
@@ -126,8 +119,11 @@ mod tests {
         }
 
         let mut composer = StandardComposer::<F, P>::new();
-        let root_var =
-            white_list_gadget::<F, P, PoseidonConstants<F>, CP>(&mut composer, &private_inputs, &[]);
+        let root_var = white_list_gadget::<F, P, PoseidonConstants<F>, CP>(
+            &mut composer,
+            &private_inputs,
+            &[],
+        );
 
         let expected_var = composer.add_input(mk_root.inner());
         composer.assert_equal(expected_var, root_var);

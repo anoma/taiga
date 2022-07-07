@@ -14,15 +14,15 @@ use plonk_hashing::poseidon::{
 #[derive(Copy, Debug, Clone)]
 pub struct Note<CP: CircuitParameters> {
     /// Owner of the note
-    pub user: User<CP>, 
+    pub user: User<CP>,
     pub token: Token<CP>,
     pub value: u64,
     /// for NFT or whatever. TODO: to be decided the value format.
-    pub data: CP::CurveScalarField, 
+    pub data: CP::CurveScalarField,
     /// old nullifier. Nonce which is a deterministically computed, unique nonce
-    pub rho: Nullifier<CP>,        
+    pub rho: Nullifier<CP>,
     /// computed from spent_note_nf using a PRF
-    pub psi: CP::CurveScalarField,  
+    pub psi: CP::CurveScalarField,
     pub rcm: CP::CurveScalarField,
 }
 
