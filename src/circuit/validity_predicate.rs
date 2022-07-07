@@ -10,6 +10,7 @@ use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude:
 pub trait ValidityPredicate<CP: CircuitParameters>:
     Circuit<CP::CurveScalarField, CP::InnerCurve>
 {
+    // Default implementation, used in gadgets function in Circuit trait.
     fn gadget_vp(
         &mut self,
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
@@ -18,6 +19,7 @@ pub trait ValidityPredicate<CP: CircuitParameters>:
         self.custom_constraints(composer, &input_note_variables, &output_note_variables)
     }
 
+    // Default implementation, constrains the notes integrity and outputs variables of notes.
     fn basic_constraints(
         &self,
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
@@ -42,6 +44,7 @@ pub trait ValidityPredicate<CP: CircuitParameters>:
         Ok((input_note_variables, output_note_variables))
     }
 
+    // VP designer should implement the following functions.
     fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE];
     fn output_notes(&self) -> &[Note<CP>; NUM_NOTE];
     fn custom_constraints(
@@ -113,13 +116,12 @@ mod test {
     {
         const CIRCUIT_ID: [u8; 32] = [0x00; 32];
 
+        // Default implementation
         fn gadget(
             &mut self,
             composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
         ) -> Result<(), Error> {
-            self.gadget_vp(composer)?;
-            println!("circuit size: {}", composer.circuit_bound());
-            Ok(())
+            self.gadget_vp(composer)
         }
 
         fn padded_circuit_size(&self) -> usize {
