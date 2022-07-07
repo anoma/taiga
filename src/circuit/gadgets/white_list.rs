@@ -117,6 +117,10 @@ mod tests {
 
         let merkle_path = MerklePath::from_path(auth_path.to_vec());
 
+        let merkle_path_2 : MerklePath<F, PoseidonConstants<_>> = MerklePath::build_merkle_path(white_list_f, 1);
+
+        assert_eq!(merkle_path, merkle_path_2);
+
         // wrap the private input as slice of F elements
         let mut private_inputs: Vec<F> = vec![note.user.address().unwrap()];
         for (x, y) in merkle_path.get_path() {

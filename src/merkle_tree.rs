@@ -53,21 +53,26 @@ pub struct MerklePath<F: PrimeField, BH: FieldHasher<F> + std::clone::Clone> {
 pub fn find_sibling<F: PrimeField>(leaf_hashes: &Vec<F>, position: usize) -> (usize, F) {
     if position % 2 == 0 { // if position is even
         let pos = position + 1;
-        (pos, leaf_hashes[pos])
+        if leaf_hashes.len() == 1 {
+            (1, leaf_hashes[0])
+        } else {
+            (pos, leaf_hashes[pos])
+        }
     } else {
         let pos = position - 1;
         (pos, leaf_hashes[pos])
     }
 }
 
-pub fn build_auth_path<F: PrimeField>(leaf_hashes: Vec<F>, position: usize, path : &mut Vec<F>) {
+
+fn build_auth_path<F: PrimeField, BH: FieldHasher<F> + std::clone::Clone>(leaf_hashes: Vec<F>, position: usize, path : &mut Vec<(Node<F, BH>, bool)>) {
     let mut new_leaves = vec![];
-    if leaf_hashes.len() > 1 {  
+    if leaf_hashes.len() > 0 {  
         let (sibling_pos, sibling) = find_sibling(&leaf_hashes, position);
-        path.push(sibling);
+        path.push((Node::new(sibling), sibling_pos % 2 == 0));
 
         for (i, pair) in leaf_hashes.chunks(2).enumerate() {
-            if i != position && i != sibling_pos {
+            if i != position / 2 {
                 let hash_pair = PoseidonConstants::generate::<WIDTH_3>()
                                 .native_hash_two(&pair[0], &pair[1])
                                 .unwrap();
@@ -75,10 +80,11 @@ pub fn build_auth_path<F: PrimeField>(leaf_hashes: Vec<F>, position: usize, path
                 new_leaves.push(hash_pair);
             }
         }
-    }
-    build_auth_path(new_leaves, position % 2, path);
-}
 
+
+        build_auth_path(new_leaves, position / 2, path);
+    }
+}
 
 
 impl<F: PrimeField, BH: FieldHasher<F> + std::clone::Clone> MerklePath<F, BH> {
@@ -93,10 +99,12 @@ impl<F: PrimeField, BH: FieldHasher<F> + std::clone::Clone> MerklePath<F, BH> {
         MerklePath { auth_path }
     }
 
+
+
     pub fn build_merkle_path(leaf_hashes: Vec<F>, position: usize) -> Self {
-        let mut path = vec![];
-        build_auth_path(leaf_hashes, position, &mut path);
-        MerklePath {path}
+        let mut auth_path = vec![];
+        build_auth_path(leaf_hashes, position, &mut auth_path);
+        MerklePath {auth_path}
     }
     
 
