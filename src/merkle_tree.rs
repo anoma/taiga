@@ -53,11 +53,7 @@ pub fn find_sibling<F: PrimeField>(leaf_hashes: &Vec<F>, position: usize) -> (us
     if position % 2 == 0 {
         // if position is even
         let pos = position + 1;
-        if leaf_hashes.len() == 1 {
-            (1, leaf_hashes[0])
-        } else {
-            (pos, leaf_hashes[pos])
-        }
+        (pos, leaf_hashes[pos])
     } else {
         let pos = position - 1;
         (pos, leaf_hashes[pos])
@@ -70,18 +66,18 @@ fn build_auth_path<F: PrimeField, BH: FieldHasher<F>>(
     path: &mut Vec<(Node<F, BH>, bool)>,
 ) {
     let mut new_leaves = vec![];
-    if leaf_hashes.len() > 0 {
+    if leaf_hashes.len() > 1 {
         let (sibling_pos, sibling) = find_sibling(&leaf_hashes, position);
         path.push((Node::new(sibling), sibling_pos % 2 == 0));
 
         for (i, pair) in leaf_hashes.chunks(2).enumerate() {
-            if i != position / 2 {
-                let hash_pair = PoseidonConstants::generate::<WIDTH_3>()
-                    .native_hash_two(&pair[0], &pair[1])
-                    .unwrap();
+            // if i != position / 2 {
+            let hash_pair = PoseidonConstants::generate::<WIDTH_3>()
+                .native_hash_two(&pair[0], &pair[1])
+                .unwrap();
 
-                new_leaves.push(hash_pair);
-            }
+            new_leaves.push(hash_pair);
+            // }
         }
 
         build_auth_path(new_leaves, position / 2, path);
@@ -181,13 +177,16 @@ mod tests {
     type P = <CP as CircuitParameters>::InnerCurve;
 
     #[test]
-    fn test_auth_path() {
+    fn test_auth_path_4() {
         // white list addresses and mk root associated
         let mut rng = rand::thread_rng();
         // user addresses
         let addresses: Vec<F> = (0..4)
             .map(|_| User::<CP>::new(&mut rng).address().unwrap())
             .collect();
+
+        let position = 1;
+
         // I wanted to use hash_two but I was not able...
         let hash_2_3 = PoseidonConstants::generate::<WIDTH_3>()
             .native_hash_two(&addresses[2], &addresses[3])
@@ -201,8 +200,48 @@ mod tests {
         let merkle_path = MerklePath::from_path(auth_path.to_vec());
 
         let merkle_path_2: MerklePath<F, PoseidonConstants<_>> =
-            MerklePath::build_merkle_path(addresses, 1);
+            MerklePath::build_merkle_path(addresses, position);
 
         assert_eq!(merkle_path, merkle_path_2);
     }
+
+    #[test]
+    fn test_auth_path_8() {
+        // white list addresses and mk root associated
+        let mut rng = rand::thread_rng();
+        // user addresses
+        let addresses: Vec<F> = (0..8)
+            .map(|_| User::<CP>::new(&mut rng).address().unwrap())
+            .collect();
+
+        let position = 4;
+
+        let hash_0_1 = PoseidonConstants::generate::<WIDTH_3>()
+            .native_hash_two(&addresses[0], &addresses[1])
+            .unwrap();
+        let hash_2_3 = PoseidonConstants::generate::<WIDTH_3>()
+            .native_hash_two(&addresses[2], &addresses[3])
+            .unwrap();
+        let hash_0_1_2_3 = PoseidonConstants::generate::<WIDTH_3>()
+            .native_hash_two(&hash_0_1, &hash_2_3)
+            .unwrap();
+        let hash_6_7 = PoseidonConstants::generate::<WIDTH_3>()
+            .native_hash_two(&addresses[6], &addresses[7])
+            .unwrap();
+
+        let auth_path = &[
+            (Node::<F, PoseidonConstants<_>>::new(addresses[5]), false),
+            (Node::<F, PoseidonConstants<_>>::new(hash_6_7), false),
+            (Node::<F, PoseidonConstants<_>>::new(hash_0_1_2_3), true),
+        ];
+
+        let merkle_path = MerklePath::from_path(auth_path.to_vec());
+
+        let merkle_path_2: MerklePath<F, PoseidonConstants<_>> =
+            MerklePath::build_merkle_path(addresses, position);
+
+        assert_eq!(merkle_path, merkle_path_2);
+    }
+
+    // TODO: What if the merkle tree has odd elements?
 }
