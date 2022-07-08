@@ -21,8 +21,6 @@ pub fn white_list_gadget<
     private_inputs: &[F],
     _public_inputs: &[F],
 ) -> Variable {
-    // TODO prove note ownership
-
     // wrap private inputs in the format of the proof
     let owner_variable = composer.add_input(private_inputs[0]);
     let mut v: Vec<(Node<F, PoseidonConstants<F>>, bool)> = vec![];
