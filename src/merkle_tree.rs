@@ -62,14 +62,12 @@ impl<F: PrimeField, BH: FieldHasher<F>> MerklePath<F, BH> {
     }
 
     pub fn find_sibling(leaf_hashes: &[F], position: usize) -> (usize, F) {
-        if position % 2 == 0 {
-            // if position is even
-            let pos = position + 1;
-            (pos, leaf_hashes[pos])
+        let pos = if position % 2 == 0 {
+            position + 1
         } else {
-            let pos = position - 1;
-            (pos, leaf_hashes[pos])
-        }
+            position - 1
+        };
+        (pos, leaf_hashes[pos])
     }
 
     fn build_auth_path(leaf_hashes: Vec<F>, position: usize, path: &mut Vec<(Node<F, BH>, bool)>) {
