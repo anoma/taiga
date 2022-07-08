@@ -81,7 +81,6 @@ impl<CP: CircuitParameters> Note<CP> {
         }
     }
 
-
     pub fn dummy_from_user(user: User<CP>, rng: &mut impl RngCore) -> Note<CP> {
         use ark_ff::UniformRand;
         use rand::Rng;
