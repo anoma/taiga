@@ -81,6 +81,31 @@ impl<CP: CircuitParameters> Note<CP> {
         }
     }
 
+    pub fn dummy_from_user(user: User<CP>, rng: &mut impl RngCore) -> Note<CP> {
+        use ark_ff::UniformRand;
+        use rand::Rng;
+
+        let token = Token::<CP>::new(rng);
+        let value: u64 = rng.gen();
+        let data = CP::CurveScalarField::rand(rng);
+        let rho = Nullifier::new(CP::CurveScalarField::rand(rng));
+        let rcm = CP::CurveScalarField::rand(rng);
+
+        // Init poseidon param.
+        let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+            PoseidonConstants::generate::<WIDTH_3>();
+        let psi = poseidon_param.native_hash_two(&rho.inner(), &rcm).unwrap();
+        Self {
+            user,
+            token,
+            value,
+            data,
+            rho,
+            psi,
+            rcm,
+        }
+    }
+
     // To simplify implementation, can we use NoteCommit from VERI-ZEXE(P26 Commitment).
     // Commit(m, r) = CRH(m||r||0), m is a n filed elements vector, CRH is an algebraic hash function(poseidon here).
     // If the Commit can't provide enough hiding security(to be verified, we have the same problem in
@@ -88,17 +113,8 @@ impl<CP: CircuitParameters> Note<CP> {
     // or Sinsemilla_hash_to_curve used in Orchard) and adding rcm*fixed_generator, which based on DL assumption.
     pub fn commitment(&self) -> Result<NoteCommitment<CP>, TaigaError> {
         let user_address = self.user.address()?;
-        let token_address = self.token.address()?;
+        let token_address = self.token.address();
         let value_filed = CP::CurveScalarField::from(self.value);
-        let commit_fields = vec![
-            user_address,
-            token_address,
-            value_filed,
-            self.data,
-            self.rho.inner(),
-            self.psi,
-            self.rcm,
-        ];
 
         let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
             PoseidonConstants::generate::<WIDTH_9>();
@@ -106,10 +122,14 @@ impl<CP: CircuitParameters> Note<CP> {
             &mut (),
             &poseidon_param,
         );
-        // Default padding zero
-        commit_fields.iter().for_each(|f| {
-            poseidon.input(*f).unwrap();
-        });
+        poseidon.input(user_address).unwrap();
+        poseidon.input(token_address[0]).unwrap();
+        poseidon.input(token_address[1]).unwrap();
+        poseidon.input(value_filed).unwrap();
+        poseidon.input(self.data).unwrap();
+        poseidon.input(self.rho.inner()).unwrap();
+        poseidon.input(self.psi).unwrap();
+        poseidon.input(self.rcm).unwrap();
         Ok(NoteCommitment(poseidon.output_hash(&mut ())))
     }
 

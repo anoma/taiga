@@ -1,209 +1,300 @@
-use ark_ff::{UniformRand, Zero};
-use ark_poly::univariate::DensePolynomial;
-use ark_poly_commit::PolynomialCommitment;
-use merlin::Transcript;
-use plonk_core::{
-    constraint_system::StandardComposer,
-    prelude::Proof,
-    proof_system::{pi::PublicInputs, Prover, Verifier, VerifierKey},
+pub const NUM_NOTE: usize = 4;
+use crate::circuit::circuit_parameters::CircuitParameters;
+use crate::circuit::integrity::{
+    input_note_constraint, output_note_constraint, ValidityPredicateInputNoteVariables,
+    ValidityPredicateOuputNoteVariables,
 };
-use rand::prelude::ThreadRng;
-use std::marker::PhantomData;
+use crate::note::Note;
+use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
 
-use crate::{
-    circuit::circuit_parameters::CircuitParameters, serializable_to_vec, to_embedded_field,
-    HashToField,
-};
+pub trait ValidityPredicate<CP: CircuitParameters>:
+    Circuit<CP::CurveScalarField, CP::InnerCurve>
+{
+    // Default implementation, used in gadgets function in Circuit trait.
+    fn gadget_vp(
+        &mut self,
+        composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+    ) -> Result<(), Error> {
+        let (input_note_variables, output_note_variables) = self.basic_constraints(composer)?;
+        self.custom_constraints(composer, &input_note_variables, &output_note_variables)
+    }
 
-pub struct ValidityPredicate<CP: CircuitParameters> {
-    desc_vp: VerifierKey<CP::CurveScalarField, CP::CurvePC>, //preprocessed VP
-    pub public_input: PublicInputs<CP::CurveScalarField>,
-    _blind_rand: [CP::CurveScalarField; 20], //blinding randomness
-    pub proof: Proof<CP::CurveScalarField, CP::CurvePC>,
-    pub verifier: Verifier<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>,
-    pub vk: <CP::CurvePC as PolynomialCommitment<
-        CP::CurveScalarField,
-        DensePolynomial<CP::CurveScalarField>,
-    >>::VerifierKey,
-    pub rcm_com: CP::CurveScalarField,
-    pub com_vp: CP::CurveScalarField,
+    // Default implementation, constrains the notes integrity and outputs variables of notes.
+    fn basic_constraints(
+        &self,
+        composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+    ) -> Result<
+        (
+            Vec<ValidityPredicateInputNoteVariables>,
+            Vec<ValidityPredicateOuputNoteVariables>,
+        ),
+        Error,
+    > {
+        let input_notes = self.get_input_notes();
+        let output_notes = self.get_output_notes();
+        let mut input_note_variables = vec![];
+        let mut output_note_variables = vec![];
+        for i in 0..NUM_NOTE {
+            let input_note_var = input_note_constraint(&input_notes[i], composer)?;
+            let output_note_var =
+                output_note_constraint(&output_notes[i], &input_note_var.nf, composer)?;
+            input_note_variables.push(input_note_var);
+            output_note_variables.push(output_note_var);
+        }
+        Ok((input_note_variables, output_note_variables))
+    }
+
+    // VP designer should implement the following functions.
+    fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE];
+    fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE];
+    fn custom_constraints(
+        &self,
+        composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+        input_note_variables: &[ValidityPredicateInputNoteVariables],
+        output_note_variables: &[ValidityPredicateOuputNoteVariables],
+    ) -> Result<(), Error>;
 }
 
-impl<CP: CircuitParameters> ValidityPredicate<CP> {
-    pub fn precompute_prover(
-        setup: &<<CP as CircuitParameters>::CurvePC as PolynomialCommitment<
-            CP::CurveScalarField,
-            DensePolynomial<CP::CurveScalarField>,
-        >>::UniversalParams,
-        gadget: fn(
-            &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-            private_inputs: &[CP::CurveScalarField],
-            public_inputs: &[CP::CurveScalarField],
-        ),
-        private_inputs: &[CP::CurveScalarField],
-        public_inputs: &[CP::CurveScalarField],
-    ) -> (
-        Prover<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>,
-        <CP::CurvePC as PolynomialCommitment<
-            CP::CurveScalarField,
-            DensePolynomial<CP::CurveScalarField>,
-        >>::CommitterKey,
-        <CP::CurvePC as PolynomialCommitment<
-            CP::CurveScalarField,
-            DensePolynomial<CP::CurveScalarField>,
-        >>::VerifierKey,
-        PublicInputs<CP::CurveScalarField>,
-        VerifierKey<CP::CurveScalarField, CP::CurvePC>,
-    ) {
-        // Create a `Prover`
-        // Set the circuit using `gadget`
-        // Output `prover`, `vk`, `public_input`, and `desc_vp`.
+mod test {
+    use crate::circuit::circuit_parameters::CircuitParameters;
+    use crate::circuit::gadgets::field_addition::field_addition_gadget;
+    use crate::circuit::gadgets::white_list::white_list_gadget;
+    use crate::circuit::integrity::{
+        ValidityPredicateInputNoteVariables, ValidityPredicateOuputNoteVariables,
+    };
+    use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
+    use crate::merkle_tree::{MerklePath, Node};
+    use crate::note::Note;
+    use crate::user::User;
+    use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
+    use plonk_hashing::poseidon::constants::PoseidonConstants;
 
-        let mut prover = Prover::<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>::new(b"demo");
-        prover.key_transcript(b"key", b"additional seed information");
-        gadget(prover.mut_cs(), private_inputs, public_inputs);
-        let circuit_size = prover.circuit_bound().next_power_of_two();
-        let (ck, vk) = CP::CurvePC::trim(setup, circuit_size, 0, None).unwrap();
-        let desc_vp = prover
-            .mut_cs()
-            .preprocess_verifier(&ck, &mut Transcript::new(b""), PhantomData::<CP::CurvePC>)
-            .unwrap();
-        prover.cs.public_inputs.update_size(circuit_size);
-        let pub_inp = prover.mut_cs().get_pi().clone();
-
-        (prover, ck, vk, pub_inp, desc_vp)
+    // ExampleValidityPredicate have a custom constraint with a + b = c,
+    // in which a, b are private inputs and c is a public input.
+    pub struct ExampleValidityPredicate<CP: CircuitParameters> {
+        // basic "private" inputs to the VP
+        pub input_notes: [Note<CP>; NUM_NOTE],
+        pub output_notes: [Note<CP>; NUM_NOTE],
+        // custom "private" inputs to the VP
+        pub a: CP::CurveScalarField,
+        pub b: CP::CurveScalarField,
+        // custom "public" inputs to the VP
+        pub c: CP::CurveScalarField,
     }
 
-    pub fn precompute_verifier(
-        gadget: fn(
-            &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-            private_inputs: &[CP::CurveScalarField],
-            public_inputs: &[CP::CurveScalarField],
-        ),
-        private_inputs: &[CP::CurveScalarField],
-        public_inputs: &[CP::CurveScalarField],
-    ) -> Verifier<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC> {
-        let mut verifier: Verifier<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC> =
-            Verifier::new(b"demo");
-        verifier.key_transcript(b"key", b"additional seed information");
-        gadget(verifier.mut_cs(), private_inputs, public_inputs);
-        verifier
-    }
+    impl<CP> ValidityPredicate<CP> for ExampleValidityPredicate<CP>
+    where
+        CP: CircuitParameters,
+    {
+        fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE] {
+            &self.input_notes
+        }
 
-    pub fn preprocess(
-        prover: &mut Prover<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>,
-        verifier: &mut Verifier<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>,
-        ck: &<CP::CurvePC as PolynomialCommitment<
-            CP::CurveScalarField,
-            DensePolynomial<CP::CurveScalarField>,
-        >>::CommitterKey,
-    ) {
-        prover.preprocess(ck).unwrap();
-        verifier.preprocess(ck).unwrap();
-    }
+        fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE] {
+            &self.output_notes
+        }
 
-    pub fn blinded_preprocess(
-        prover: &mut Prover<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>,
-        verifier: &mut Verifier<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>,
-        ck: &<CP::CurvePC as PolynomialCommitment<
-            CP::CurveScalarField,
-            DensePolynomial<CP::CurveScalarField>,
-        >>::CommitterKey,
-        rng: &mut ThreadRng,
-    ) -> [CP::CurveScalarField; 20] {
-        // Random F elements for blinding the circuit
-        let blinding_values = [CP::CurveScalarField::rand(rng); 20];
-        prover
-            .preprocess_with_blinding(ck, blinding_values)
-            .unwrap();
-        verifier
-            .preprocess_with_blinding(ck, blinding_values)
-            .unwrap();
-        blinding_values
-    }
-
-    pub fn new(
-        setup: &<<CP as CircuitParameters>::CurvePC as PolynomialCommitment<
-            CP::CurveScalarField,
-            DensePolynomial<CP::CurveScalarField>,
-        >>::UniversalParams,
-        gadget: fn(
-            &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-            &[CP::CurveScalarField],
-            &[CP::CurveScalarField],
-        ),
-        private_inputs: &[CP::CurveScalarField],
-        public_inputs: &[CP::CurveScalarField],
-        blind: bool,
-        rng: &mut ThreadRng,
-    ) -> Self {
-        // Given a gadget corresponding to a circuit, create all the computations for PBC related to the VP
-
-        // Prover desc_vp
-        let (mut prover, ck, vk, public_input, desc_vp) =
-            Self::precompute_prover(setup, gadget, private_inputs, public_inputs);
-        let mut verifier = Self::precompute_verifier(gadget, private_inputs, public_inputs);
-        // (blinding or not) preprocessing
-        let blinding_values = if blind {
-            Self::blinded_preprocess(&mut prover, &mut verifier, &ck, rng)
-        } else {
-            Self::preprocess(&mut prover, &mut verifier, &ck);
-            [CP::CurveScalarField::zero(); 20]
-        };
-
-        // proof
-        let proof = prover.prove(&ck).unwrap();
-
-        let rcm_com = CP::CurveScalarField::rand(rng);
-        // cannot use `pack()` because it is implemented for a validity predicate and we only have `desc_vp`.
-        let h_desc_vp = CP::CurveBaseField::hash_to_field(&serializable_to_vec(&desc_vp));
-        let com_vp = CP::com_r(
-            &vec![to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(h_desc_vp)],
-            rcm_com,
-        );
-
-        Self {
-            desc_vp,
-            public_input,
-            _blind_rand: blinding_values,
-            proof,
-            verifier,
-            vk,
-            rcm_com,
-            com_vp,
+        fn custom_constraints(
+            &self,
+            composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+            _input_note_variables: &[ValidityPredicateInputNoteVariables],
+            _output_note_variables: &[ValidityPredicateOuputNoteVariables],
+        ) -> Result<(), Error> {
+            let var_a = composer.add_input(self.a);
+            let var_b = composer.add_input(self.b);
+            field_addition_gadget::<CP>(composer, var_a, var_b, self.c);
+            Ok(())
         }
     }
 
-    pub fn pack(&self) -> CP::CurveBaseField {
-        // bits representing desc_vp
-        CP::CurveBaseField::hash_to_field(&serializable_to_vec(&self.desc_vp))
+    impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for ExampleValidityPredicate<CP>
+    where
+        CP: CircuitParameters,
+    {
+        const CIRCUIT_ID: [u8; 32] = [0x00; 32];
+
+        // Default implementation
+        fn gadget(
+            &mut self,
+            composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+        ) -> Result<(), Error> {
+            self.gadget_vp(composer)
+        }
+
+        fn padded_circuit_size(&self) -> usize {
+            1 << 17
+        }
     }
 
-    pub fn commitment(&self, rand: CP::CurveScalarField) -> CP::CurveScalarField {
-        // computes a commitment C = com_r(com_q(desc_vp, 0), rand)
-        CP::com_r(
-            &vec![to_embedded_field::<CP::CurveBaseField, CP::CurveScalarField>(self.pack())],
-            rand,
-        )
+    #[test]
+    fn test_vp_example() {
+        use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
+        type Fr = <CP as CircuitParameters>::CurveScalarField;
+        type P = <CP as CircuitParameters>::InnerCurve;
+        type PC = <CP as CircuitParameters>::CurvePC;
+        use ark_poly_commit::PolynomialCommitment;
+        use ark_std::{test_rng, UniformRand};
+        use plonk_core::circuit::{verify_proof, VerifierData};
+
+        let mut rng = test_rng();
+        let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
+        let output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
+        let a = Fr::rand(&mut rng);
+        let b = Fr::rand(&mut rng);
+        let c = a + b;
+        let mut example_vp = ExampleValidityPredicate {
+            input_notes,
+            output_notes,
+            a,
+            b,
+            c,
+        };
+
+        // Generate CRS
+        let pp = PC::setup(example_vp.padded_circuit_size(), None, &mut rng).unwrap();
+
+        // Compile the circuit
+        let (pk_p, vk) = example_vp.compile::<PC>(&pp).unwrap();
+
+        // Prover
+        let (proof, pi) = example_vp.gen_proof::<PC>(&pp, pk_p, b"Test").unwrap();
+
+        // Verifier
+        let verifier_data = VerifierData::new(vk, pi);
+        verify_proof::<Fr, P, PC>(&pp, verifier_data.key, &proof, &verifier_data.pi, b"Test")
+            .unwrap();
     }
 
-    pub fn binding_commitment(&self) -> CP::CurveScalarField {
-        // computes a commitment without randomness
-        self.commitment(CP::CurveScalarField::zero())
+    //
+    //
+    //
+    //
+    //
+    // SimonValidityPredicate have a custom constraint checking that the received notes come from known users.
+    pub struct WhiteListValidityPredicate<CP: CircuitParameters> {
+        // basic "private" inputs to the VP
+        pub input_notes: [Note<CP>; NUM_NOTE],
+        pub output_notes: [Note<CP>; NUM_NOTE],
+        // custom "private" inputs to the VP
+        pub white_list: Vec<User<CP>>,
+        pub mk_root: Node<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>,
+        pub path: MerklePath<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>,
     }
 
-    pub fn fresh_commitment(
-        &self,
-        rng: &mut ThreadRng,
-    ) -> (CP::CurveScalarField, CP::CurveScalarField) {
-        // computes a fresh commitment C = com_r(com_q(desc_vp, 0), rand) and return (C, rand)
-        let rand = CP::CurveScalarField::rand(rng);
-        (self.commitment(rand), rand)
+    impl<CP> ValidityPredicate<CP> for WhiteListValidityPredicate<CP>
+    where
+        CP: CircuitParameters,
+    {
+        fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE] {
+            &self.input_notes
+        }
+
+        fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE] {
+            &self.output_notes
+        }
+
+        fn custom_constraints(
+            &self,
+            composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+            _input_note_variables: &[ValidityPredicateInputNoteVariables],
+            output_note_variables: &[ValidityPredicateOuputNoteVariables],
+        ) -> Result<(), Error> {
+            let owner_var = output_note_variables[0].recipient_addr;
+            let root_var = white_list_gadget::<
+                CP::CurveScalarField,
+                CP::InnerCurve,
+                PoseidonConstants<CP::CurveScalarField>,
+                CP,
+            >(composer, owner_var, &self.path);
+            let expected_var = composer.add_input(self.mk_root.inner());
+            composer.assert_equal(expected_var, root_var);
+            Ok(())
+        }
     }
 
-    pub fn verify(&self) {
-        let p_i = self.public_input.clone();
-        // p_i.update_size(circuit_size);
-        self.verifier.verify(&self.proof, &self.vk, &p_i).unwrap();
+    impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for WhiteListValidityPredicate<CP>
+    where
+        CP: CircuitParameters,
+    {
+        const CIRCUIT_ID: [u8; 32] = [0x00; 32];
+
+        // Default implementation
+        fn gadget(
+            &mut self,
+            composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+        ) -> Result<(), Error> {
+            self.gadget_vp(composer)
+        }
+
+        fn padded_circuit_size(&self) -> usize {
+            1 << 17
+        }
+    }
+
+    #[test]
+    fn test_white_list_vp_example() {
+        use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
+        use crate::merkle_tree::MerkleTreeLeafs;
+        use crate::poseidon::{FieldHasher, WIDTH_3};
+        use ark_std::test_rng;
+
+        type Fr = <CP as CircuitParameters>::CurveScalarField;
+        type P = <CP as CircuitParameters>::InnerCurve;
+        type PC = <CP as CircuitParameters>::CurvePC;
+        use ark_poly_commit::PolynomialCommitment;
+        use plonk_core::circuit::{verify_proof, VerifierData};
+
+        let mut rng = test_rng();
+        let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
+        let output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
+
+        // white list is a list of four user addresses, containing `output_notes[0]`'s address.
+        let white_list: Vec<User<CP>> = vec![
+            User::<CP>::new(&mut rng),
+            output_notes[0].user,
+            User::<CP>::new(&mut rng),
+            User::<CP>::new(&mut rng),
+        ];
+
+        let white_list_to_fields: Vec<Fr> =
+            white_list.iter().map(|v| v.address().unwrap()).collect();
+
+        let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
+        let mk_root =
+            MerkleTreeLeafs::<Fr, PoseidonConstants<Fr>>::new(white_list_to_fields.to_vec())
+                .root(&poseidon_hash_param_bls12_377_scalar_arity2);
+
+        let hash_2_3 = PoseidonConstants::generate::<WIDTH_3>()
+            .native_hash_two(&white_list_to_fields[2], &white_list_to_fields[3])
+            .unwrap();
+        let path = MerklePath::from_path(vec![
+            (
+                Node::<Fr, PoseidonConstants<_>>::new(white_list_to_fields[0]),
+                true,
+            ),
+            (Node::<Fr, PoseidonConstants<_>>::new(hash_2_3), false),
+        ]);
+
+        let mut white_list_vp = WhiteListValidityPredicate {
+            input_notes,
+            output_notes,
+            white_list,
+            mk_root,
+            path,
+        };
+
+        // Generate CRS
+        let pp = PC::setup(white_list_vp.padded_circuit_size(), None, &mut rng).unwrap();
+
+        // Compile the circuit
+        let (pk_p, vk) = white_list_vp.compile::<PC>(&pp).unwrap();
+
+        // Prover
+        let (proof, pi) = white_list_vp.gen_proof::<PC>(&pp, pk_p, b"Test").unwrap();
+
+        // Verifier
+        let verifier_data = VerifierData::new(vk, pi);
+        verify_proof::<Fr, P, PC>(&pp, verifier_data.key, &proof, &verifier_data.pi, b"Test")
+            .unwrap();
     }
 }

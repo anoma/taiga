@@ -49,39 +49,6 @@ pub struct MerklePath<F: PrimeField, BH: FieldHasher<F>> {
     auth_path: Vec<(Node<F, BH>, bool)>,
 }
 
-pub fn find_sibling<F: PrimeField>(leaf_hashes: &Vec<F>, position: usize) -> (usize, F) {
-    if position % 2 == 0 {
-        // if position is even
-        let pos = position + 1;
-        (pos, leaf_hashes[pos])
-    } else {
-        let pos = position - 1;
-        (pos, leaf_hashes[pos])
-    }
-}
-
-fn build_auth_path<F: PrimeField, BH: FieldHasher<F>>(
-    leaf_hashes: Vec<F>,
-    position: usize,
-    path: &mut Vec<(Node<F, BH>, bool)>,
-) {
-    let mut new_leaves = vec![];
-    if leaf_hashes.len() > 1 {
-        let (sibling_pos, sibling) = find_sibling(&leaf_hashes, position);
-        path.push((Node::new(sibling), sibling_pos % 2 == 0));
-
-        for (i, pair) in leaf_hashes.chunks(2).enumerate() {
-            let hash_pair = PoseidonConstants::generate::<WIDTH_3>()
-                .native_hash_two(&pair[0], &pair[1])
-                .unwrap();
-
-            new_leaves.push(hash_pair);
-        }
-
-        build_auth_path(new_leaves, position / 2, path);
-    }
-}
-
 impl<F: PrimeField, BH: FieldHasher<F>> MerklePath<F, BH> {
     /// Constructs a random dummy merkle path with depth.
     pub fn dummy(rng: &mut impl RngCore, depth: usize) -> Self {
@@ -94,10 +61,39 @@ impl<F: PrimeField, BH: FieldHasher<F>> MerklePath<F, BH> {
         MerklePath { auth_path }
     }
 
+    pub fn find_sibling(leaf_hashes: &[F], position: usize) -> (usize, F) {
+        if position % 2 == 0 {
+            // if position is even
+            let pos = position + 1;
+            (pos, leaf_hashes[pos])
+        } else {
+            let pos = position - 1;
+            (pos, leaf_hashes[pos])
+        }
+    }
+
+    fn build_auth_path(leaf_hashes: Vec<F>, position: usize, path: &mut Vec<(Node<F, BH>, bool)>) {
+        let mut new_leaves = vec![];
+        if leaf_hashes.len() > 1 {
+            let (sibling_pos, sibling) = Self::find_sibling(&leaf_hashes, position);
+            path.push((Node::new(sibling), sibling_pos % 2 == 0));
+
+            for pair in leaf_hashes.chunks(2) {
+                let hash_pair = PoseidonConstants::generate::<WIDTH_3>()
+                    .native_hash_two(&pair[0], &pair[1])
+                    .unwrap();
+
+                new_leaves.push(hash_pair);
+            }
+
+            Self::build_auth_path(new_leaves, position / 2, path);
+        }
+    }
+
     pub fn build_merkle_path(leaf_hashes: Vec<F>, position: usize) -> Self {
         let mut auth_path = vec![];
         let completed_leaf_hashes = add_remaining_addresses(&leaf_hashes);
-        build_auth_path(completed_leaf_hashes, position, &mut auth_path);
+        Self::build_auth_path(completed_leaf_hashes, position, &mut auth_path);
         MerklePath { auth_path }
     }
 
