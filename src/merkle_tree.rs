@@ -94,7 +94,7 @@ impl<F: PrimeField, BH: FieldHasher<F>> MerklePath<F, BH> {
 
     pub fn build_merkle_path(leaf_hashes: &Vec<F>, position: usize) -> Self {
         let mut auth_path = vec![];
-        let completed_leaf_hashes = add_remaining_addresses(&leaf_hashes);
+        let completed_leaf_hashes = add_remaining_addresses(leaf_hashes);
         Self::build_auth_path(completed_leaf_hashes, position, &mut auth_path);
         MerklePath { auth_path }
     }

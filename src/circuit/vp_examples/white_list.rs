@@ -40,9 +40,7 @@ where
         output_note_variables: &[ValidityPredicateOuputNoteVariables],
     ) -> Result<(), Error> {
         let expected_var = composer.add_input(self.mk_root.inner());
-        for (output_note_variable, path) in
-            output_note_variables.into_iter().zip(self.paths.clone())
-        {
+        for (output_note_variable, path) in output_note_variables.iter().zip(self.paths.clone()) {
             let owner_var = output_note_variable.recipient_addr;
             let root_var = white_list_gadget::<
                 CP::CurveScalarField,
