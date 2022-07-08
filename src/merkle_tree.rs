@@ -78,7 +78,7 @@ impl<F: PrimeField, BH: FieldHasher<F>> MerklePath<F, BH> {
             let (sibling_pos, sibling) = Self::find_sibling(&leaf_hashes, position);
             path.push((Node::new(sibling), sibling_pos % 2 == 0));
 
-            for (_, pair) in leaf_hashes.chunks(2).enumerate() {
+            for pair in leaf_hashes.chunks(2) {
                 let hash_pair = PoseidonConstants::generate::<WIDTH_3>()
                     .native_hash_two(&pair[0], &pair[1])
                     .unwrap();
