@@ -3,7 +3,7 @@ use crate::error::TaigaError;
 use crate::poseidon::{FieldHasher, WIDTH_5};
 use crate::utils::bits_to_fields;
 use crate::validity_predicate::MockHashVP;
-use ark_ff::{BigInteger, PrimeField, UniformRand};
+use ark_ff::{BigInteger, PrimeField};
 use blake2b_simd::Params;
 use plonk_hashing::poseidon::constants::PoseidonConstants;
 use rand::RngCore;
@@ -17,8 +17,7 @@ pub struct NullifierDerivingKey<F: PrimeField>(F);
 /// The user address binded with send vp and received vp.
 #[derive(Copy, Debug, Clone)]
 pub struct User<CP: CircuitParameters> {
-    pub send_addr: UserSendAddress<CP>,
-    pub rcm: CP::CurveScalarField,
+    pub send_com: UserSendAddress<CP>,
     pub recv_vp: MockHashVP<CP>,
 }
 
@@ -65,42 +64,26 @@ impl<CP: CircuitParameters> User<CP> {
     pub fn new(rng: &mut impl RngCore) -> Self {
         let nk = NullifierDerivingKey::<CP::CurveScalarField>::rand(rng);
         let send_vp = MockHashVP::dummy(rng);
-        let send_addr = UserSendAddress::<CP>::from_open(nk, send_vp);
-        let rcm = CP::CurveScalarField::rand(rng);
+        let send_com = UserSendAddress::<CP>::from_open(nk, send_vp);
         Self {
-            send_addr,
-            rcm,
+            send_com,
             // TODO: fix this in future.
             recv_vp: MockHashVP::dummy(rng),
         }
     }
 
-    // pub fn opaque_send(&self) -> Result<CP::CurveScalarField, TaigaError> {
-    //     // Init poseidon param.
-    //     let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
-    //         PoseidonConstants::generate::<WIDTH_5>();
-
-    //     // send_part = Com_r( Com_q(desc_vp_addr_send) || nk )
-    //     let mut send_fields = bits_to_fields::<CP::CurveScalarField>(&self.send_vp.to_bits());
-    //     send_fields.push(self.nk.inner());
-    //     poseidon_param.native_hash(&send_fields)
-    // }
-
     pub fn address(&self) -> Result<CP::CurveScalarField, TaigaError> {
-        // send_part = Com_r( Com_q(desc_vp_addr_send) || nk )
-        let send_hash = self.send_addr.get_closed()?;
+        // send_com = Com_r( Com_q(send_vp_hash) || nk )
+        let send_com = self.send_com.get_closed()?;
 
-        // address = Com_r(send_fields || recv_fields, rcm)
-        // TODO: if the Com_r constructed from hash doesn't have the hiding property,
-        // we can use PedersenCom(crh(send_fields || recv_fields), rcm) instead?
+        // address = Com_r(send_com || recv_vp_hash)
 
         // Init poseidon param.
         let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
             PoseidonConstants::generate::<WIDTH_5>();
-        let mut address_fields = vec![send_hash];
+        let mut address_fields = vec![send_com];
         let recv_fields = bits_to_fields::<CP::CurveScalarField>(&self.recv_vp.to_bits());
         address_fields.extend(recv_fields);
-        address_fields.push(self.rcm);
         poseidon_param.native_hash(&address_fields)
     }
 }
