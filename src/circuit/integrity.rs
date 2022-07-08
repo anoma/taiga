@@ -1,4 +1,4 @@
-// The interfaces may not perfectly defined, the caller can refine them if needed.
+// The interfaces may not be perfectly defined, the caller can refine them if needed.
 
 use crate::circuit::{circuit_parameters::CircuitParameters, gadgets::hash::FieldHasherGadget};
 // use crate::error::TaigaError;

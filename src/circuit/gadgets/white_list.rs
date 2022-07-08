@@ -79,7 +79,7 @@ fn test_white_list_gadget() {
 
     let mut composer = StandardComposer::<F, <CP as CircuitParameters>::InnerCurve>::new();
 
-    let owner_var = composer.add_input(note.address.opaque_native().unwrap());
+    let owner_var = composer.add_input(note.user.address().unwrap());
 
     let root_var =
         white_list_gadget::<F, P, PoseidonConstants<F>, CP>(&mut composer, owner_var, &merkle_path);

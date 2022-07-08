@@ -65,7 +65,7 @@ mod test {
     use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
     use crate::merkle_tree::{MerklePath, Node};
     use crate::note::Note;
-    use crate::user_address::UserAddress;
+    use crate::user::User;
     use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
     use plonk_hashing::poseidon::constants::PoseidonConstants;
 
@@ -176,10 +176,9 @@ mod test {
         pub input_notes: [Note<CP>; NUM_NOTE],
         pub output_notes: [Note<CP>; NUM_NOTE],
         // custom "private" inputs to the VP
-        pub white_list: Vec<UserAddress<CP>>,
+        pub white_list: Vec<User<CP>>,
         pub mk_root: Node<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>,
         pub path: MerklePath<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>,
-        pub add: UserAddress<CP>,
     }
 
     impl<CP> ValidityPredicate<CP> for SimonValidityPredicate<CP>
@@ -200,8 +199,7 @@ mod test {
             _input_note_variables: &[ValidityPredicateInputNoteVariables],
             output_note_variables: &[ValidityPredicateOuputNoteVariables],
         ) -> Result<(), Error> {
-            let owner_var = composer.add_input(self.add.opaque_native().unwrap());
-            // let owner_var = output_note_variables[1].addr;
+            let owner_var = output_note_variables[0].recipient_addr;
             let root_var = white_list_gadget::<
                 CP::CurveScalarField,
                 CP::InnerCurve,
@@ -251,17 +249,15 @@ mod test {
         let output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
 
         // white list is a list of four user addresses, containing `output_notes[0]`'s address.
-        let white_list: Vec<UserAddress<CP>> = vec![
-            UserAddress::<CP>::new(&mut rng),
-            output_notes[0].address,
-            UserAddress::<CP>::new(&mut rng),
-            UserAddress::<CP>::new(&mut rng),
+        let white_list: Vec<User<CP>> = vec![
+            User::<CP>::new(&mut rng),
+            output_notes[0].user,
+            User::<CP>::new(&mut rng),
+            User::<CP>::new(&mut rng),
         ];
 
-        let white_list_to_fields: Vec<Fr> = white_list
-            .iter()
-            .map(|v| v.opaque_native().unwrap())
-            .collect();
+        let white_list_to_fields: Vec<Fr> =
+            white_list.iter().map(|v| v.address().unwrap()).collect();
 
         let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
         let mk_root =
@@ -279,15 +275,12 @@ mod test {
             (Node::<Fr, PoseidonConstants<_>>::new(hash_2_3), false),
         ]);
 
-        let add = white_list[1];
-
         let mut simon_vp = SimonValidityPredicate {
             input_notes,
             output_notes,
             white_list,
             mk_root,
             path,
-            add,
         };
 
         // Generate CRS
