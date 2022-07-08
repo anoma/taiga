@@ -18,7 +18,7 @@ pub struct WhiteListValidityPredicate<CP: CircuitParameters> {
     // custom "private" inputs to the VP
     pub white_list: Vec<User<CP>>,
     pub mk_root: Node<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>,
-    pub path: MerklePath<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>,
+    pub paths: Vec<MerklePath<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>>,
 }
 
 impl<CP> ValidityPredicate<CP> for WhiteListValidityPredicate<CP>
@@ -39,15 +39,19 @@ where
         _input_note_variables: &[ValidityPredicateInputNoteVariables],
         output_note_variables: &[ValidityPredicateOuputNoteVariables],
     ) -> Result<(), Error> {
-        let owner_var = output_note_variables[0].recipient_addr;
-        let root_var = white_list_gadget::<
-            CP::CurveScalarField,
-            CP::InnerCurve,
-            PoseidonConstants<CP::CurveScalarField>,
-            CP,
-        >(composer, owner_var, &self.path);
         let expected_var = composer.add_input(self.mk_root.inner());
-        composer.assert_equal(expected_var, root_var);
+        for (output_note_variable, path) in
+            output_note_variables.into_iter().zip(self.paths.clone())
+        {
+            let owner_var = output_note_variable.recipient_addr;
+            let root_var = white_list_gadget::<
+                CP::CurveScalarField,
+                CP::InnerCurve,
+                PoseidonConstants<CP::CurveScalarField>,
+                CP,
+            >(composer, owner_var, &path);
+            composer.assert_equal(expected_var, root_var);
+        }
         Ok(())
     }
 }
@@ -75,7 +79,7 @@ where
 fn test_white_list_vp_example() {
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::merkle_tree::MerkleTreeLeafs;
-    use crate::poseidon::{FieldHasher, WIDTH_3};
+    use crate::poseidon::WIDTH_3;
     use ark_std::test_rng;
 
     type Fr = <CP as CircuitParameters>::CurveScalarField;
@@ -88,10 +92,17 @@ fn test_white_list_vp_example() {
     let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
     let output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
 
-    // white list is a list of four user addresses, containing `output_notes[0]`'s address.
+    // white list is a list of user addresses, containing the output notes addresses.
     let white_list: Vec<User<CP>> = vec![
         User::<CP>::new(&mut rng),
+        output_notes[1].user,
+        User::<CP>::new(&mut rng),
+        User::<CP>::new(&mut rng),
+        output_notes[3].user,
+        output_notes[2].user,
+        User::<CP>::new(&mut rng),
         output_notes[0].user,
+        User::<CP>::new(&mut rng),
         User::<CP>::new(&mut rng),
         User::<CP>::new(&mut rng),
     ];
@@ -102,23 +113,19 @@ fn test_white_list_vp_example() {
     let mk_root = MerkleTreeLeafs::<Fr, PoseidonConstants<Fr>>::new(white_list_to_fields.to_vec())
         .root(&poseidon_hash_param_bls12_377_scalar_arity2);
 
-    let hash_2_3 = PoseidonConstants::generate::<WIDTH_3>()
-        .native_hash_two(&white_list_to_fields[2], &white_list_to_fields[3])
-        .unwrap();
-    let path = MerklePath::from_path(vec![
-        (
-            Node::<Fr, PoseidonConstants<_>>::new(white_list_to_fields[0]),
-            true,
-        ),
-        (Node::<Fr, PoseidonConstants<_>>::new(hash_2_3), false),
-    ]);
+    let paths: Vec<MerklePath<Fr, PoseidonConstants<Fr>>> = vec![
+        MerklePath::build_merkle_path(&white_list_to_fields, 7),
+        MerklePath::build_merkle_path(&white_list_to_fields, 1),
+        MerklePath::build_merkle_path(&white_list_to_fields, 5),
+        MerklePath::build_merkle_path(&white_list_to_fields, 4),
+    ];
 
     let mut white_list_vp = WhiteListValidityPredicate {
         input_notes,
         output_notes,
         white_list,
         mk_root,
-        path,
+        paths,
     };
 
     // Generate CRS
