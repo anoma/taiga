@@ -65,7 +65,7 @@ impl<CP: CircuitParameters> ActionInfo<CP> {
             &spend_cm,
         );
 
-        let address = User::<CP> {
+        let user = User::<CP> {
             send_com: self.output.addr_send_closed,
             recv_vp: self.output.addr_recv_vp,
         };
@@ -75,7 +75,7 @@ impl<CP: CircuitParameters> ActionInfo<CP> {
 
         let note_rcm = CP::CurveScalarField::rand(rng);
         let output_note = Note::new(
-            address,
+            user,
             token,
             self.output.value,
             nf,
