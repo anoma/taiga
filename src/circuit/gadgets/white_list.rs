@@ -52,10 +52,8 @@ mod tests {
     use super::*;
     use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters as CP};
     use crate::merkle_tree::MerkleTreeLeafs;
-    use crate::merkle_tree::Node;
     use crate::note::Note;
     use crate::nullifier::Nullifier;
-    use crate::poseidon::FieldHasher;
     use crate::token::Token;
     use crate::user::User;
     use ark_std::test_rng;
@@ -63,7 +61,6 @@ mod tests {
     use plonk_core::constraint_system::StandardComposer;
     use plonk_hashing::poseidon::constants::PoseidonConstants;
     use rand::Rng;
-    use rand::RngCore;
 
     type F = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;

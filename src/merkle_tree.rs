@@ -49,7 +49,7 @@ pub struct MerklePath<F: PrimeField, BH: FieldHasher<F>> {
     auth_path: Vec<(Node<F, BH>, bool)>,
 }
 
-pub fn find_sibling<F: PrimeField>(leaf_hashes: &Vec<F>, position: usize) -> (usize, F) {
+pub fn find_sibling<F: PrimeField>(leaf_hashes: &[F], position: usize) -> (usize, F) {
     if position % 2 == 0 {
         // if position is even
         let pos = position + 1;
@@ -70,7 +70,7 @@ fn build_auth_path<F: PrimeField, BH: FieldHasher<F>>(
         let (sibling_pos, sibling) = find_sibling(&leaf_hashes, position);
         path.push((Node::new(sibling), sibling_pos % 2 == 0));
 
-        for (i, pair) in leaf_hashes.chunks(2).enumerate() {
+        for (_, pair) in leaf_hashes.chunks(2).enumerate() {
             let hash_pair = PoseidonConstants::generate::<WIDTH_3>()
                 .native_hash_two(&pair[0], &pair[1])
                 .unwrap();
