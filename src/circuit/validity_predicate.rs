@@ -171,7 +171,7 @@ mod test {
     //
     //
     // SimonValidityPredicate have a custom constraint checking that the received notes come from known users.
-    pub struct SimonValidityPredicate<CP: CircuitParameters> {
+    pub struct WhiteListValidityPredicate<CP: CircuitParameters> {
         // basic "private" inputs to the VP
         pub input_notes: [Note<CP>; NUM_NOTE],
         pub output_notes: [Note<CP>; NUM_NOTE],
@@ -181,7 +181,7 @@ mod test {
         pub path: MerklePath<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>,
     }
 
-    impl<CP> ValidityPredicate<CP> for SimonValidityPredicate<CP>
+    impl<CP> ValidityPredicate<CP> for WhiteListValidityPredicate<CP>
     where
         CP: CircuitParameters,
     {
@@ -212,7 +212,7 @@ mod test {
         }
     }
 
-    impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for SimonValidityPredicate<CP>
+    impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for WhiteListValidityPredicate<CP>
     where
         CP: CircuitParameters,
     {
@@ -232,7 +232,7 @@ mod test {
     }
 
     #[test]
-    fn test_simon_vp_example() {
+    fn test_white_list_vp_example() {
         use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
         use crate::merkle_tree::MerkleTreeLeafs;
         use crate::poseidon::{FieldHasher, WIDTH_3};
@@ -275,7 +275,7 @@ mod test {
             (Node::<Fr, PoseidonConstants<_>>::new(hash_2_3), false),
         ]);
 
-        let mut simon_vp = SimonValidityPredicate {
+        let mut white_list_vp = WhiteListValidityPredicate {
             input_notes,
             output_notes,
             white_list,
@@ -284,13 +284,13 @@ mod test {
         };
 
         // Generate CRS
-        let pp = PC::setup(simon_vp.padded_circuit_size(), None, &mut rng).unwrap();
+        let pp = PC::setup(white_list_vp.padded_circuit_size(), None, &mut rng).unwrap();
 
         // Compile the circuit
-        let (pk_p, vk) = simon_vp.compile::<PC>(&pp).unwrap();
+        let (pk_p, vk) = white_list_vp.compile::<PC>(&pp).unwrap();
 
         // Prover
-        let (proof, pi) = simon_vp.gen_proof::<PC>(&pp, pk_p, b"Test").unwrap();
+        let (proof, pi) = white_list_vp.gen_proof::<PC>(&pp, pk_p, b"Test").unwrap();
 
         // Verifier
         let verifier_data = VerifierData::new(vk, pi);
