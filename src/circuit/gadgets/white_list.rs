@@ -37,27 +37,12 @@ mod tests {
     use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters as CP};
     use crate::merkle_tree::MerkleTreeLeafs;
     use crate::note::Note;
-    use crate::nullifier::Nullifier;
-    use crate::token::Token;
     use crate::user::User;
-    use ark_std::test_rng;
-    use ark_std::UniformRand;
     use plonk_core::constraint_system::StandardComposer;
     use plonk_hashing::poseidon::constants::PoseidonConstants;
-    use rand::Rng;
 
     type F = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;
-
-    pub fn dummy_note(user: User<CP>) -> Note<CP> {
-        let mut rng = test_rng();
-        let token = Token::<CP>::new(&mut rng);
-        let rho = Nullifier::new(F::rand(&mut rng));
-        let value: u64 = rng.gen();
-        let data = F::rand(&mut rng);
-        let rcm = F::rand(&mut rng);
-        Note::new(user, token, value, rho, data, rcm)
-    }
 
     #[test]
     fn test_white_list_gadget() {
@@ -75,7 +60,7 @@ mod tests {
         let user = white_list[1];
 
         // a note owned by one of the white list user
-        let note = dummy_note(user);
+        let note = Note::dummy_from_user(user, &mut rng);
 
         let merkle_path: MerklePath<F, PoseidonConstants<_>> =
             MerklePath::build_merkle_path(white_list_f, 1);
