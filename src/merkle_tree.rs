@@ -96,7 +96,8 @@ impl<F: PrimeField, BH: FieldHasher<F>> MerklePath<F, BH> {
 
     pub fn build_merkle_path(leaf_hashes: Vec<F>, position: usize) -> Self {
         let mut auth_path = vec![];
-        build_auth_path(leaf_hashes, position, &mut auth_path);
+        let completed_leaf_hashes = add_remaining_addresses(&leaf_hashes);
+        build_auth_path(completed_leaf_hashes, position, &mut auth_path);
         MerklePath { auth_path }
     }
 
@@ -160,6 +161,17 @@ impl<F: PrimeField, BH: FieldHasher<F>> Node<F, BH> {
         let hash = hasher.native_hash_two(&lhs.repr, &rhs.repr)?;
         Ok(Self::new(hash))
     }
+}
+
+fn add_remaining_addresses<F: PrimeField>(addresses: &Vec<F>) -> Vec<F> {
+    let number_of_elems = addresses.len();
+    let next_power_of_two = number_of_elems.next_power_of_two();
+    let remaining = next_power_of_two - number_of_elems;
+    let slice = &addresses[..remaining];
+    let mut added = slice.to_vec();
+    let mut new_addresses = addresses.clone();
+    new_addresses.append(&mut added);
+    new_addresses
 }
 
 #[cfg(test)]
@@ -241,17 +253,6 @@ mod tests {
         assert_eq!(merkle_path, merkle_path_2);
     }
 
-    fn add_remaining_addresses(addresses: &Vec<F>) -> Vec<F> {
-        let number_of_elems = addresses.len();
-        let next_power_of_two = number_of_elems.next_power_of_two();
-        let remaining = next_power_of_two - number_of_elems;
-        let slice = &addresses[..remaining];
-        let mut added = slice.to_vec();
-        let mut new_addresses = addresses.clone();
-        new_addresses.append(&mut added);
-        new_addresses
-    }
-
     #[test]
     // Test power of two
     fn test_power_of_two_5() {
@@ -282,7 +283,21 @@ mod tests {
     }
 
     #[test]
-    // Test a Merkle tree with 5 leaves
+    // Test that a vector with 2^n elements stays the same
+    fn test_power_of_two_8() {
+        let mut rng = rand::thread_rng();
+        // user addresses
+        let addresses: Vec<F> = (0..8)
+            .map(|_| User::<CP>::new(&mut rng).address().unwrap())
+            .collect();
+
+        let pow2_addresses = add_remaining_addresses(&addresses);
+
+        assert_eq!(pow2_addresses, addresses);
+    }
+
+    #[test]
+    // Test a Merkle tree with 5 leaves (not a power of 2)
     fn test_auth_path_5() {
         let mut rng = rand::thread_rng();
         // user addresses
@@ -290,23 +305,28 @@ mod tests {
             .map(|_| User::<CP>::new(&mut rng).address().unwrap())
             .collect();
 
+        let completed_addresses = add_remaining_addresses(&addresses);
+
         let position = 4;
 
         let hash_0_1 = PoseidonConstants::generate::<WIDTH_3>()
-            .native_hash_two(&addresses[0], &addresses[1])
+            .native_hash_two(&addresses[0], &completed_addresses[1])
             .unwrap();
         let hash_2_3 = PoseidonConstants::generate::<WIDTH_3>()
-            .native_hash_two(&addresses[2], &addresses[3])
+            .native_hash_two(&addresses[2], &completed_addresses[3])
             .unwrap();
         let hash_0_1_2_3 = PoseidonConstants::generate::<WIDTH_3>()
             .native_hash_two(&hash_0_1, &hash_2_3)
             .unwrap();
         let hash_6_7 = PoseidonConstants::generate::<WIDTH_3>()
-            .native_hash_two(&addresses[6], &addresses[7])
+            .native_hash_two(&completed_addresses[6], &completed_addresses[7])
             .unwrap();
 
         let auth_path = &[
-            (Node::<F, PoseidonConstants<_>>::new(addresses[5]), false),
+            (
+                Node::<F, PoseidonConstants<_>>::new(completed_addresses[5]),
+                false,
+            ),
             (Node::<F, PoseidonConstants<_>>::new(hash_6_7), false),
             (Node::<F, PoseidonConstants<_>>::new(hash_0_1_2_3), true),
         ];
@@ -318,6 +338,4 @@ mod tests {
 
         assert_eq!(merkle_path, merkle_path_2);
     }
-
-    // TODO: What if the merkle tree has odd elements?
 }
