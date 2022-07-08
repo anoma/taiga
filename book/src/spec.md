@@ -54,7 +54,7 @@ Definitions from Section 4.1 of [BCMS20](https://eprint.iacr.org/2020/499.pdf), 
 ## Abstractions
 
 ### Data types
-- Input / output of each abstract interface, e.g. `Com, Com_q, rcm_addr`, defines a distinct type.
+- Input / output of each abstract interface, e.g. `Com, Com_q`, defines a distinct type.
 - Each distinct data field defines a type, e.g. `v, data, asset_type`.
 - Data types are linked via interface definition and usage as required, e.g. `v` is of the same type as the first input to `Com_v`.
 - All data types have **fixed length**.
@@ -93,7 +93,7 @@ TODO: Should we use `fulldesc_vp` in place of `desc_vp`?
 
 ### Token (types)
 
-Encodes: token vp and rcm
+Encodes: token vp
 ```
 token_address = Com_q(desc_vp_token)
 ```
@@ -114,7 +114,7 @@ The bits of `token_address` are converted to $\mathbb{F}_r$ element(s).
 send_vp_hash = Com_q(desc_vp_addr_send)
 send_com = Com_r(send_vp_hash || nk)
 recv_vp_hash = Com_q(desc_vp_addr_recv)
-user_address = Com_r(send_com || recv_vp_hash, rcm_addr)
+user_address = Com_r(send_com || recv_vp_hash)
 ```
 
 where:
@@ -154,13 +154,13 @@ where:
 
 |Variable/Function|Type||
 |-|-|-|
-|`token_address`| $\mathbb{F}_r$ | a token type encoding `token_vp`, `rcm_token`|
+|`token_address`| $\mathbb{F}_r$ | a token type encoding `token_vp`|
 |`v`| `u64` ($\mathbb F_r$ element in circuit) | the quantity of fungible value |
 |`data`| $\mathbb{F}_r$ |non-fungible value(to be decided?)|
 |`ρ`| $\mathbb{F}_r$ | an old nullifier|
 |`rcm_note` | $\mathbb{F}_r$| a random commitment trapdoor|
 |`ψ`| $\mathbb{F}_r$ | the prf output of `ρ` and `rcm_note`|
-| `user_address`| $\mathbb F_r$ | address encoding `nk`, `send_vp`, `recv_vp`, `rcm_addr`|
+| `user_address`| $\mathbb F_r$ | address encoding `nk`, `send_vp`, `recv_vp`|
 | `NoteCom` | $[\mathbb F_r] \to \mathbb F_r$ | Poseidon hash with eight input elements|
 
 Dummy notes: A note is dummy iff `v = 0`.
