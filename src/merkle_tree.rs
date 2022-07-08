@@ -78,10 +78,9 @@ impl<F: PrimeField, BH: FieldHasher<F>> MerklePath<F, BH> {
             let (sibling_pos, sibling) = Self::find_sibling(&leaf_hashes, position);
             path.push((Node::new(sibling), sibling_pos % 2 == 0));
 
+            let hasher = PoseidonConstants::generate::<WIDTH_3>();
             for pair in leaf_hashes.chunks(2) {
-                let hash_pair = PoseidonConstants::generate::<WIDTH_3>()
-                    .native_hash_two(&pair[0], &pair[1])
-                    .unwrap();
+                let hash_pair = hasher.native_hash_two(&pair[0], &pair[1]).unwrap();
 
                 new_leaves.push(hash_pair);
             }
@@ -193,8 +192,8 @@ mod tests {
 
         let position = 1;
 
-        // I wanted to use hash_two but I was not able...
-        let hash_2_3 = PoseidonConstants::generate::<WIDTH_3>()
+        let hasher = PoseidonConstants::generate::<WIDTH_3>();
+        let hash_2_3 = hasher
             .native_hash_two(&addresses[2], &addresses[3])
             .unwrap();
 
@@ -222,16 +221,15 @@ mod tests {
 
         let position = 4;
 
-        let hash_0_1 = PoseidonConstants::generate::<WIDTH_3>()
+        let hasher = PoseidonConstants::generate::<WIDTH_3>();
+        let hash_0_1 = hasher
             .native_hash_two(&addresses[0], &addresses[1])
             .unwrap();
-        let hash_2_3 = PoseidonConstants::generate::<WIDTH_3>()
+        let hash_2_3 = hasher
             .native_hash_two(&addresses[2], &addresses[3])
             .unwrap();
-        let hash_0_1_2_3 = PoseidonConstants::generate::<WIDTH_3>()
-            .native_hash_two(&hash_0_1, &hash_2_3)
-            .unwrap();
-        let hash_6_7 = PoseidonConstants::generate::<WIDTH_3>()
+        let hash_0_1_2_3 = hasher.native_hash_two(&hash_0_1, &hash_2_3).unwrap();
+        let hash_6_7 = hasher
             .native_hash_two(&addresses[6], &addresses[7])
             .unwrap();
 
@@ -305,16 +303,15 @@ mod tests {
 
         let position = 4;
 
-        let hash_0_1 = PoseidonConstants::generate::<WIDTH_3>()
+        let hasher = PoseidonConstants::generate::<WIDTH_3>();
+        let hash_0_1 = hasher
             .native_hash_two(&addresses[0], &completed_addresses[1])
             .unwrap();
-        let hash_2_3 = PoseidonConstants::generate::<WIDTH_3>()
+        let hash_2_3 = hasher
             .native_hash_two(&addresses[2], &completed_addresses[3])
             .unwrap();
-        let hash_0_1_2_3 = PoseidonConstants::generate::<WIDTH_3>()
-            .native_hash_two(&hash_0_1, &hash_2_3)
-            .unwrap();
-        let hash_6_7 = PoseidonConstants::generate::<WIDTH_3>()
+        let hash_0_1_2_3 = hasher.native_hash_two(&hash_0_1, &hash_2_3).unwrap();
+        let hash_6_7 = hasher
             .native_hash_two(&completed_addresses[6], &completed_addresses[7])
             .unwrap();
 
