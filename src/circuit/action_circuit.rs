@@ -1,9 +1,6 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::gadgets::merkle_tree::merkle_tree_gadget;
-use crate::circuit::integrity::{
-    note_commitment_circuit, nullifier_circuit, output_user_address_integrity_circuit,
-    spent_user_address_integrity_circuit, token_integrity_circuit,
-};
+use crate::circuit::integrity::{input_note_constraint, output_note_constraint};
 use crate::merkle_tree::TAIGA_COMMITMENT_TREE_DEPTH;
 use crate::note::Note;
 use crate::poseidon::WIDTH_3;
@@ -32,42 +29,7 @@ where
     ) -> Result<(), plonk_core::prelude::Error> {
         // spent note
         let nf = {
-            // check user address
-            let nk = self.spend_note.user.send_addr.get_nk().unwrap();
-            let nk_var = composer.add_input(nk.inner());
-            let address_rcm_var = composer.add_input(self.spend_note.user.rcm);
-            let send_vp = self.spend_note.user.send_addr.get_send_vp().unwrap();
-            let (address_var, _, _) = spent_user_address_integrity_circuit::<CP>(
-                composer,
-                &nk_var,
-                &address_rcm_var,
-                &send_vp.to_bits(),
-                &self.spend_note.user.recv_vp.to_bits(),
-            )?;
-
-            // check token address
-            let token_rcm_var = composer.add_input(self.spend_note.token.rcm);
-            let (token_var, _) = token_integrity_circuit::<CP>(
-                composer,
-                &token_rcm_var,
-                &self.spend_note.token.token_vp.to_bits(),
-            )?;
-
-            // check note commitment
-            let value_var = composer.add_input(CP::CurveScalarField::from(self.spend_note.value));
-            let data_var = composer.add_input(self.spend_note.data);
-            let rho_var = composer.add_input(self.spend_note.rho.inner());
-            let note_rcm_var = composer.add_input(self.spend_note.rcm);
-            let (cm_var, psi_var) = note_commitment_circuit::<CP>(
-                composer,
-                &address_var,
-                &token_var,
-                &value_var,
-                &data_var,
-                &rho_var,
-                &note_rcm_var,
-            )?;
-
+            let input_note_var = input_note_constraint(&self.spend_note, composer)?;
             // check merkle tree and publish root
             let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
                 PoseidonConstants::generate::<WIDTH_3>();
@@ -75,61 +37,34 @@ where
                 CP::CurveScalarField,
                 CP::InnerCurve,
                 PoseidonConstants<CP::CurveScalarField>,
-            >(composer, &cm_var, &self.auth_path, &poseidon_param)?;
+            >(
+                composer,
+                &input_note_var.cm,
+                &self.auth_path,
+                &poseidon_param,
+            )?;
             composer.public_inputize(&root);
 
             // TODO: user send address VP commitment and token VP commitment
-
-            // check nullifier and return it
-            nullifier_circuit::<CP>(composer, &nk_var, &rho_var, &psi_var, &cm_var)?
+            input_note_var.nf
         };
 
         // output note
         {
-            // check user address
-            let addr_send = self.output_note.user.send_addr.get_closed().unwrap();
-            let addr_send_var = composer.add_input(addr_send);
-            let address_rcm_var = composer.add_input(self.output_note.user.rcm);
-            let (address_var, _) = output_user_address_integrity_circuit::<CP>(
-                composer,
-                &addr_send_var,
-                &address_rcm_var,
-                &self.output_note.user.recv_vp.to_bits(),
-            )?;
-
-            // check token address
-            let token_rcm_var = composer.add_input(self.output_note.token.rcm);
-            let (token_var, _) = token_integrity_circuit::<CP>(
-                composer,
-                &token_rcm_var,
-                &self.output_note.token.token_vp.to_bits(),
-            )?;
-
-            // check and publish note commitment
-            let value_var = composer.add_input(CP::CurveScalarField::from(self.output_note.value));
-            let data_var = composer.add_input(self.output_note.data);
-            let note_rcm_var = composer.add_input(self.output_note.rcm);
-            let (cm_var, _psi_var) = note_commitment_circuit::<CP>(
-                composer,
-                &address_var,
-                &token_var,
-                &value_var,
-                &data_var,
-                &nf,
-                &note_rcm_var,
-            )?;
-
-            composer.public_inputize(&cm_var);
+            let _output_note_var = output_note_constraint(&self.output_note, &nf, composer)?;
 
             // TODO: add user receive address VP commitment and token VP commitment
 
             // TODO: add note encryption
         }
 
+        composer.check_circuit_satisfied();
+        println!("circuit size: {}", composer.circuit_bound());
+
         Ok(())
     }
     fn padded_circuit_size(&self) -> usize {
-        1 << 16
+        1 << 15
     }
 }
 
@@ -163,7 +98,7 @@ fn action_circuit_test() {
     let (action, mut action_circuit) = action_info.build(&mut rng).unwrap();
 
     // Generate CRS
-    let pp = PC::setup(1 << 16, None, &mut rng).unwrap();
+    let pp = PC::setup(action_circuit.padded_circuit_size(), None, &mut rng).unwrap();
 
     // Compile the circuit
     let (pk_p, vk) = action_circuit.compile::<PC>(&pp).unwrap();
@@ -172,10 +107,10 @@ fn action_circuit_test() {
     let (proof, pi) = action_circuit.gen_proof::<PC>(&pp, pk_p, b"Test").unwrap();
 
     // Check the public inputs
-    let mut expect_pi = PublicInputs::new(1 << 16);
-    expect_pi.insert(24336, action.root);
-    expect_pi.insert(25814, action.nf.inner());
-    expect_pi.insert(33918, action.cm.inner());
+    let mut expect_pi = PublicInputs::new(action_circuit.padded_circuit_size());
+    expect_pi.insert(24337, action.root);
+    expect_pi.insert(10352, action.nf.inner());
+    expect_pi.insert(30964, action.cm.inner());
     assert_eq!(pi, expect_pi);
     // Verifier
     let verifier_data = VerifierData::new(vk, expect_pi);

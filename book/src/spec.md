@@ -95,19 +95,16 @@ TODO: Should we use `fulldesc_vp` in place of `desc_vp`?
 
 Encodes: token vp and rcm
 ```
-token_vp_hash = Com_q(desc_vp_token)
-token_address = Com_r(token_vp_hash, rcm_token)
+token_address = Com_q(desc_vp_token)
 ```
 
 where:
 
 |Variable/Function|Type||
 |-|-|-|
-|`token_vp_hash` | $\mathbb F_q$ element bits | hash of the token vp description|
-|`rcm_token`|$\mathbb F_r$ element | random commitment trapdoor|
-| `Com_r` | $[\mathbb F_r] \to \mathbb F_r$ | Poseidon hash with four input field elements|
+|`token_address` | $\mathbb F_q$ element bits | hash of the token vp description|
 
-The bits of `token_vp_hash` are converted to $\mathbb{F}_r$ element(s).
+The bits of `token_address` are converted to $\mathbb{F}_r$ element(s).
 
 > When using `bls12-317` as $E_M$, the bits of one $\mathbb{F}_q$ are converted to two $\mathbb{F}_r$.
 
@@ -115,9 +112,9 @@ The bits of `token_vp_hash` are converted to $\mathbb{F}_r$ element(s).
 
 ```
 send_vp_hash = Com_q(desc_vp_addr_send)
-send_addr = Com_r( send_vp_hash || nk )
+send_com = Com_r(send_vp_hash || nk)
 recv_vp_hash = Com_q(desc_vp_addr_recv)
-user_address = Com_r(send_addr || recv_vp_hash, rcm_addr)
+user_address = Com_r(send_com || recv_vp_hash, rcm_addr)
 ```
 
 where:
@@ -127,21 +124,18 @@ where:
 |`nk`| $\mathbb{F}_r$| nullifier key for generating a nullifier|
 |`send_vp_hash`| $\mathbb F_q$ bits | hash of send vp description|
 |`recv_vp_hash` | $\mathbb F_q$ bits | hash of receive vp description|
-|`rcm_addr` | $\mathbb{F}_r$ | random commitment trapdoor|
-|`user_address`| $\mathbb F_r$ | address encoding `nk`, `send_vp_hash`, `recv_vp_hash`, `rcm_addr`|
+|`user_address`| $\mathbb F_r$ | address encoding `nk`, `send_vp_hash`, `recv_vp_hash`|
 |`Com_r`| $[\mathbb F_r] \to \mathbb F_r$ | Poseidon hash with four input field elements|
 
-* Sending a note requires opening a `user_address` to  `send_vp_hash`, which requires additional knowledge of nullifier key `nk` and `rcm_addr`. This opening is efficient over $\mathbb{F}_r$.
-* Receiving a note requires opening a `user_address` to `recv_vp_hash`, which requires additional knowledge of `rcm_addr`. This opening is efficient over $\mathbb{F}_r$
-* `Com_q(desc_vp_addr_{send,recv})` are re-used inside ActionCircuit in deriving `addr_com_vp`.
+* Sending a note requires opening a `user_address` to  `send_vp_hash`, which requires additional knowledge of nullifier key `nk`. This opening is efficient over $\mathbb{F}_r$.
+* Receiving a note requires opening a `user_address` to `recv_vp_hash`. This opening is efficient over $\mathbb{F}_r$
+* `Com_q(desc_vp_{send,recv})` are re-used inside ActionCircuit in deriving `addr_com_vp`.
 
 To guarantee the compatibility of `addr_com_vp` constraints in ActionCircuit and VPBlindCircuit, `Com_q(desc_vp_addr_{send,recv})` over $\mathbb{F}_q$ are converted to bits.
 
-In address integrity circuit, the bits of `Com_q(desc_vp_addr_{send,recv})` are converted to $\mathbb{F}_r$ element(s).
+In address integrity circuit, the bits of `Com_q(desc_vp_{send,recv})` are converted to $\mathbb{F}_r$ element(s).
 
 > When using `bls12-317` as $E_M$, the bits of one $\mathbb{F}_q$ are converted to two $\mathbb{F}_r$.
-
-TODO: We use a padding with zeros for `Com_r`. If the `Com_r` constructed from hash doesn't have the hiding property, we can use PedersenCom(crh(send_fields || recv_fields), rcm) instead?
 
 
 ### Note
@@ -285,22 +279,18 @@ Private inputs (`w`):
         - `Com_q(desc_vp_addr_send)`, 
         - `nk`, 
         - `Com_q(desc_vp_addr_recv)`, 
-        - `rcm_addr`, 
         - `rcm_com_vp_addr`
     - `com_vp_token` of spent note:
         - `Com_q(desc_vp_token)`, 
-        - `rcm_token`, 
         - `rcm_com_vp_token`
 - opening of created note
     - `note = (address, token, v, data, rho, psi, rcm)`
     - `com_vp_addr` of output note:
         - `Com_r(Com_q(desc_vp_address_send)||nk)`,
         -  `Com_q(desc_vp_address_recv)`, 
-        -  `rcm_address`, 
         -  `rcm_com_vp_addr`
     - `com_vp_token` of output note:
         - `Com_q(desc_vp_token)`, 
-        - `rcm_token`, 
         - `rcm_com_vp_token`
 
 Action circuit checks:
@@ -308,19 +298,19 @@ Action circuit checks:
     - Note is a valid note in `rt`
         - Same as Orchard, there is a path in Merkle tree with root `rt` to a note commitment `cm` that opens to `note`
     - `address` and `com_vp_addr` opens to the same `desc_vp_addr`
-        - Note User integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv), rcm_addr)`
+        - Note User integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv))`
         - Address VP integrity for input note: `com_vp_addr = Com(Com_q(desc_vp_addr_send), rcm_com_vp_addr)`
         - Nullifier integrity(input note only): `nf = DeriveNullier_nk(note)`.
     - `token` and `com_vp_token` opens to the same `desc_token_vp`
-        - Token (type) integrity: `token = Com_r(Com_q(desc_vp_token), rcm_token)`
+        - Token (type) integrity(only bits conversion): `token = Com_q(desc_vp_token)`
         - Token VP integrity: `com_vp_token = Com(Com_q(desc_vp_token), rcm_com_vp_token)`
 - For output note `note = (address, token, v, data, ρ, ψ, rcm_note)`:
     - `address` and `com_vp_addr` opens to the same `desc_vp_addr`
-        - Note User integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv), rcm_addr)`
+        - Note User integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv))`
         - Address VP integrity for output note: `com_vp_addr = Com(Com_q(desc_vp_addr_recv), rcm_com_vp_addr)`
         - Commitment integrity(output note only): `cm = NoteCom(note, rcm_note)`
     - `token` and `com_vp_token` opens to the same `desc_vp_token`
-        - Token (type) integrity: `token = Com_r(Com_q(desc_vp_token), rcm_token)`
+        - Token (type) integrity(only bits conversion): `token = Com_q(desc_vp_token)`
         - Token VP integrity: `com_vp = Com(Com_q(desc_vp_token), rcm_com_vp_token)`
 
 + checks of `EnableSpend` and `EnableOutput` flags?

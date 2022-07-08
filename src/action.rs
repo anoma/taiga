@@ -57,7 +57,7 @@ impl<CP: CircuitParameters> ActionInfo<CP> {
         rng: &mut impl RngCore,
     ) -> Result<(Action<CP>, ActionCircuit<CP>), TaigaError> {
         let spend_cm = self.spend.note.commitment()?;
-        let nk = self.spend.note.user.send_addr.get_nk().unwrap();
+        let nk = self.spend.note.user.send_com.get_nk().unwrap();
         let nf = Nullifier::<CP>::derive_native(
             &nk,
             &self.spend.note.rho,
@@ -65,15 +65,11 @@ impl<CP: CircuitParameters> ActionInfo<CP> {
             &spend_cm,
         );
 
-        let addr_rcm = CP::CurveScalarField::rand(rng);
         let address = User::<CP> {
-            send_addr: self.output.addr_send_closed,
-            rcm: addr_rcm,
+            send_com: self.output.addr_send_closed,
             recv_vp: self.output.addr_recv_vp,
         };
-        let token_rcm = CP::CurveScalarField::rand(rng);
         let token = Token::<CP> {
-            rcm: token_rcm,
             token_vp: self.output.addr_token_vp,
         };
 
