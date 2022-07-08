@@ -1,6 +1,5 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::merkle_tree::MerklePath;
-use crate::merkle_tree::Node;
 use crate::poseidon::WIDTH_3;
 use ark_ec::TEModelParameters;
 use ark_ff::PrimeField;
@@ -18,24 +17,9 @@ pub fn white_list_gadget<
     CP: CircuitParameters<CurveScalarField = F, InnerCurve = P>,
 >(
     composer: &mut StandardComposer<F, P>,
-    private_inputs: &[F],
-    _public_inputs: &[F],
+    owner_variable: Variable,
+    merkle_path: &MerklePath<F, PoseidonConstants<F>>,
 ) -> Variable {
-    // TODO prove note ownership
-
-    // wrap private inputs in the format of the proof
-    let owner_variable = composer.add_input(private_inputs[0]);
-    let mut v: Vec<(Node<F, PoseidonConstants<F>>, bool)> = vec![];
-    let mut i = 1;
-    while i < 5 {
-        v.push((
-            Node::<F, PoseidonConstants<_>>::new(private_inputs[i]),
-            !private_inputs[i + 1].is_zero(),
-        ));
-        i += 2;
-    }
-    let merkle_path = MerklePath::from_path(v);
-
     // merkle tree gadget for white list membership
     let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
     merkle_tree_gadget::<F, P, PoseidonConstants<F>>(
@@ -88,23 +72,17 @@ fn test_white_list_gadget() {
         .native_hash_two(&white_list_f[2], &white_list_f[3])
         .unwrap();
 
-    let auth_path = &[
+    let merkle_path = MerklePath::from_path(vec![
         (Node::<F, PoseidonConstants<_>>::new(white_list_f[0]), true),
         (Node::<F, PoseidonConstants<_>>::new(hash_2_3), false),
-    ];
-
-    let merkle_path = MerklePath::from_path(auth_path.to_vec());
-
-    // wrap the private input as slice of F elements
-    let mut private_inputs: Vec<F> = vec![note.user.address().unwrap()];
-    for (x, y) in merkle_path.get_path() {
-        private_inputs.push(x);
-        private_inputs.push(F::from(y));
-    }
+    ]);
 
     let mut composer = StandardComposer::<F, <CP as CircuitParameters>::InnerCurve>::new();
+
+    let owner_var = composer.add_input(note.address.opaque_native().unwrap());
+
     let root_var =
-        white_list_gadget::<F, P, PoseidonConstants<F>, CP>(&mut composer, &private_inputs, &[]);
+        white_list_gadget::<F, P, PoseidonConstants<F>, CP>(&mut composer, owner_var, &merkle_path);
 
     let expected_var = composer.add_input(mk_root.inner());
     composer.assert_equal(expected_var, root_var);
