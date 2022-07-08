@@ -1,22 +1,15 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
-use ark_ff::{One, Zero};
-use plonk_core::prelude::StandardComposer;
+use ark_ff::One;
+use plonk_core::{constraint_system::Variable, prelude::StandardComposer};
 
 pub fn field_addition_gadget<CP: CircuitParameters>(
     composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-    private_inputs: &[CP::CurveScalarField],
-    public_inputs: &[CP::CurveScalarField],
+    var_a: Variable,
+    var_b: Variable,
+    c: CP::CurveScalarField,
 ) {
     // simple circuit that checks that a + b == c
-    let (a, b) = if private_inputs.is_empty() {
-        (CP::CurveScalarField::zero(), CP::CurveScalarField::zero())
-    } else {
-        (private_inputs[0], private_inputs[1])
-    };
-    let c = public_inputs[0];
-    let one = <CP as CircuitParameters>::CurveScalarField::one();
-    let var_a = composer.add_input(a);
-    let var_b = composer.add_input(b);
+    let one = CP::CurveScalarField::one();
     let var_zero = composer.zero_var();
     // Make first constraint a + b = c (as public input)
     composer.arithmetic_gate(|gate| {
@@ -38,6 +31,8 @@ fn test_field_addition_gadget() {
         <CP as CircuitParameters>::CurveScalarField,
         <CP as CircuitParameters>::InnerCurve,
     >::new();
-    field_addition_gadget::<CP>(&mut composer, &[a, b], &[c]);
+    let var_a = composer.add_input(a);
+    let var_b = composer.add_input(b);
+    field_addition_gadget::<CP>(&mut composer, var_a, var_b, c);
     composer.check_circuit_satisfied();
 }
