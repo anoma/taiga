@@ -71,13 +71,11 @@ fn build_auth_path<F: PrimeField, BH: FieldHasher<F>>(
         path.push((Node::new(sibling), sibling_pos % 2 == 0));
 
         for (i, pair) in leaf_hashes.chunks(2).enumerate() {
-            // if i != position / 2 {
             let hash_pair = PoseidonConstants::generate::<WIDTH_3>()
                 .native_hash_two(&pair[0], &pair[1])
                 .unwrap();
 
             new_leaves.push(hash_pair);
-            // }
         }
 
         build_auth_path(new_leaves, position / 2, path);
