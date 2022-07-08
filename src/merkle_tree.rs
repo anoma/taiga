@@ -175,8 +175,8 @@ mod tests {
     type P = <CP as CircuitParameters>::InnerCurve;
 
     #[test]
+    // Test a Merkle tree with 4 leaves
     fn test_auth_path_4() {
-        // white list addresses and mk root associated
         let mut rng = rand::thread_rng();
         // user addresses
         let addresses: Vec<F> = (0..4)
@@ -204,11 +204,89 @@ mod tests {
     }
 
     #[test]
+    // Test a Merkle tree with 8 leaves
     fn test_auth_path_8() {
-        // white list addresses and mk root associated
         let mut rng = rand::thread_rng();
         // user addresses
         let addresses: Vec<F> = (0..8)
+            .map(|_| User::<CP>::new(&mut rng).address().unwrap())
+            .collect();
+
+        let position = 4;
+
+        let hash_0_1 = PoseidonConstants::generate::<WIDTH_3>()
+            .native_hash_two(&addresses[0], &addresses[1])
+            .unwrap();
+        let hash_2_3 = PoseidonConstants::generate::<WIDTH_3>()
+            .native_hash_two(&addresses[2], &addresses[3])
+            .unwrap();
+        let hash_0_1_2_3 = PoseidonConstants::generate::<WIDTH_3>()
+            .native_hash_two(&hash_0_1, &hash_2_3)
+            .unwrap();
+        let hash_6_7 = PoseidonConstants::generate::<WIDTH_3>()
+            .native_hash_two(&addresses[6], &addresses[7])
+            .unwrap();
+
+        let auth_path = &[
+            (Node::<F, PoseidonConstants<_>>::new(addresses[5]), false),
+            (Node::<F, PoseidonConstants<_>>::new(hash_6_7), false),
+            (Node::<F, PoseidonConstants<_>>::new(hash_0_1_2_3), true),
+        ];
+
+        let merkle_path = MerklePath::from_path(auth_path.to_vec());
+
+        let merkle_path_2: MerklePath<F, PoseidonConstants<_>> =
+            MerklePath::build_merkle_path(addresses, position);
+
+        assert_eq!(merkle_path, merkle_path_2);
+    }
+
+    fn add_remaining_addresses(addresses: &Vec<F>) -> Vec<F> {
+        let number_of_elems = addresses.len();
+        let next_power_of_two = number_of_elems.next_power_of_two();
+        let remaining = next_power_of_two - number_of_elems;
+        let slice = &addresses[..remaining];
+        let mut added = slice.to_vec();
+        let mut new_addresses = addresses.clone();
+        new_addresses.append(&mut added);
+        new_addresses
+    }
+
+    #[test]
+    // Test power of two
+    fn test_power_of_two_5() {
+        let mut rng = rand::thread_rng();
+        // user addresses
+        let addresses: Vec<F> = (0..5)
+            .map(|_| User::<CP>::new(&mut rng).address().unwrap())
+            .collect();
+
+        let pow2_addresses = add_remaining_addresses(&addresses);
+
+        assert_eq!(pow2_addresses.len(), 8);
+        assert_eq!(pow2_addresses[5..8], addresses[0..3]);
+    }
+
+    #[test]
+    fn test_power_of_two_9() {
+        let mut rng = rand::thread_rng();
+        // user addresses
+        let addresses: Vec<F> = (0..9)
+            .map(|_| User::<CP>::new(&mut rng).address().unwrap())
+            .collect();
+
+        let pow2_addresses = add_remaining_addresses(&addresses);
+
+        assert_eq!(pow2_addresses.len(), 16);
+        assert_eq!(pow2_addresses[9..16], addresses[0..7]);
+    }
+
+    #[test]
+    // Test a Merkle tree with 5 leaves
+    fn test_auth_path_5() {
+        let mut rng = rand::thread_rng();
+        // user addresses
+        let addresses: Vec<F> = (0..5)
             .map(|_| User::<CP>::new(&mut rng).address().unwrap())
             .collect();
 
