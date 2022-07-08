@@ -91,7 +91,7 @@ TODO: Should we use `fulldesc_vp` in place of `desc_vp`?
 
 - `VPCom(desc_vp; rcm_com_vp) := Com( Com_q(desc_vp), rcm_com_vp)`
 
-### TokenAddress (types)
+### Token (types)
 
 Encodes: token vp and rcm
 ```
@@ -111,7 +111,7 @@ The bits of `token_vp_hash` are converted to $\mathbb{F}_r$ element(s).
 
 > When using `bls12-317` as $E_M$, the bits of one $\mathbb{F}_q$ are converted to two $\mathbb{F}_r$.
 
-### UserAddress
+### User
 
 ```
 send_vp_hash = Com_q(desc_vp_addr_send)
@@ -269,11 +269,11 @@ Arithmetized over $\mathbb{F}_r$. Represented as a Plonk circuit, `ActionCircuit
 Public inputs (`x`):
 - Merkle root `rt`
 - Spent note nullifier `nf`, which commits to note token type, value, and data
-    - UserAddress VP commitment: `com_vp_addr_send` (commiting to `desc_vp_addr_send`)
+    - User VP commitment: `com_vp_addr_send` (commiting to `desc_vp_addr_send`)
     - Token VP commitment: `com_vp_token`
     - `EnableSpend`
 - Output note commitment `cm`
-    - UserAddress VP commitment: `com_vp_addr_recv` (commiting to `desc_vp_addr_recv`)
+    - User VP commitment: `com_vp_addr_recv` (commiting to `desc_vp_addr_recv`)
     - Token VP commitment: `com_vp_token`
     - `EnableOutput`
 
@@ -308,7 +308,7 @@ Action circuit checks:
     - Note is a valid note in `rt`
         - Same as Orchard, there is a path in Merkle tree with root `rt` to a note commitment `cm` that opens to `note`
     - `address` and `com_vp_addr` opens to the same `desc_vp_addr`
-        - Note UserAddress integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv), rcm_addr)`
+        - Note User integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv), rcm_addr)`
         - Address VP integrity for input note: `com_vp_addr = Com(Com_q(desc_vp_addr_send), rcm_com_vp_addr)`
         - Nullifier integrity(input note only): `nf = DeriveNullier_nk(note)`.
     - `token` and `com_vp_token` opens to the same `desc_token_vp`
@@ -316,7 +316,7 @@ Action circuit checks:
         - Token VP integrity: `com_vp_token = Com(Com_q(desc_vp_token), rcm_com_vp_token)`
 - For output note `note = (address, token, v, data, ρ, ψ, rcm_note)`:
     - `address` and `com_vp_addr` opens to the same `desc_vp_addr`
-        - Note UserAddress integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv), rcm_addr)`
+        - Note User integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv), rcm_addr)`
         - Address VP integrity for output note: `com_vp_addr = Com(Com_q(desc_vp_addr_recv), rcm_com_vp_addr)`
         - Commitment integrity(output note only): `cm = NoteCom(note, rcm_note)`
     - `token` and `com_vp_token` opens to the same `desc_vp_token`

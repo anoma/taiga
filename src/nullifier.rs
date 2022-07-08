@@ -1,7 +1,7 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::note::NoteCommitment;
 use crate::poseidon::{FieldHasher, WIDTH_5};
-use crate::user_address::NullifierDerivingKey;
+use crate::user::NullifierDerivingKey;
 use ark_ff::{BigInteger, PrimeField};
 use plonk_hashing::poseidon::constants::PoseidonConstants;
 

@@ -55,8 +55,8 @@ fn test_white_list_gadget() {
     use crate::note::Note;
     use crate::nullifier::Nullifier;
     use crate::poseidon::FieldHasher;
-    use crate::token::TokenAddress;
-    use crate::user_address::UserAddress;
+    use crate::token::Token;
+    use crate::user::User;
     use ark_std::UniformRand;
     use plonk_core::constraint_system::StandardComposer;
     use plonk_hashing::poseidon::constants::PoseidonConstants;
@@ -68,17 +68,15 @@ fn test_white_list_gadget() {
 
     // white list addresses and mk root associated
     let mut rng = rand::thread_rng();
-    let white_list: Vec<UserAddress<CP>> =
-        (0..4).map(|_| UserAddress::<CP>::new(&mut rng)).collect();
-    let white_list_f: Vec<F> = white_list
-        .iter()
-        .map(|v| v.opaque_native().unwrap())
-        .collect();
+    let white_list: Vec<User<CP>> = (0..4).map(|_| User::<CP>::new(&mut rng)).collect();
+    // user addresses
+    let white_list_f: Vec<F> = white_list.iter().map(|v| v.address().unwrap()).collect();
+
     let mk_root = MerkleTreeLeafs::<F, PoseidonConstants<F>>::new(white_list_f.to_vec())
         .root(&poseidon_hash_param_bls12_377_scalar_arity2);
 
     // a note owned by one of the white list user
-    let token = TokenAddress::<CP>::new(&mut rng);
+    let token = Token::<CP>::new(&mut rng);
     let rho = Nullifier::new(F::rand(&mut rng));
     let value = 12u64;
     let data = F::rand(&mut rng);
@@ -98,7 +96,7 @@ fn test_white_list_gadget() {
     let merkle_path = MerklePath::from_path(auth_path.to_vec());
 
     // wrap the private input as slice of F elements
-    let mut private_inputs: Vec<F> = vec![note.address.opaque_native().unwrap()];
+    let mut private_inputs: Vec<F> = vec![note.user.address().unwrap()];
     for (x, y) in merkle_path.get_path() {
         private_inputs.push(x);
         private_inputs.push(F::from(y));
