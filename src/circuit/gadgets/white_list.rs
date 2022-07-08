@@ -31,61 +31,51 @@ pub fn white_list_gadget<
     .unwrap()
 }
 
-#[test]
-fn test_white_list_gadget() {
+#[cfg(test)]
+mod tests {
+    use super::*;
     use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters as CP};
     use crate::merkle_tree::MerkleTreeLeafs;
-    use crate::merkle_tree::Node;
     use crate::note::Note;
-    use crate::nullifier::Nullifier;
-    use crate::poseidon::FieldHasher;
-    use crate::token::Token;
     use crate::user::User;
-    use ark_std::UniformRand;
     use plonk_core::constraint_system::StandardComposer;
     use plonk_hashing::poseidon::constants::PoseidonConstants;
 
     type F = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;
 
-    let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
+    #[test]
+    fn test_white_list_gadget() {
+        let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
 
-    // white list addresses and mk root associated
-    let mut rng = rand::thread_rng();
-    let white_list: Vec<User<CP>> = (0..4).map(|_| User::<CP>::new(&mut rng)).collect();
-    // user addresses
-    let white_list_f: Vec<F> = white_list.iter().map(|v| v.address().unwrap()).collect();
+        // white list addresses and mk root associated
+        let mut rng = rand::thread_rng();
+        let white_list: Vec<User<CP>> = (0..4).map(|_| User::<CP>::new(&mut rng)).collect();
+        // user addresses
+        let white_list_f: Vec<F> = white_list.iter().map(|v| v.address().unwrap()).collect();
 
-    let mk_root = MerkleTreeLeafs::<F, PoseidonConstants<F>>::new(white_list_f.to_vec())
-        .root(&poseidon_hash_param_bls12_377_scalar_arity2);
+        let mk_root = MerkleTreeLeafs::<F, PoseidonConstants<F>>::new(white_list_f.to_vec())
+            .root(&poseidon_hash_param_bls12_377_scalar_arity2);
 
-    // a note owned by one of the white list user
-    let token = Token::<CP>::new(&mut rng);
-    let rho = Nullifier::new(F::rand(&mut rng));
-    let value = 12u64;
-    let data = F::rand(&mut rng);
-    let rcm = F::rand(&mut rng);
-    let note = Note::new(white_list[1], token, value, rho, data, rcm);
+        let user = white_list[1];
 
-    // I wanted to use hash_two but I was not able...
-    let hash_2_3 = PoseidonConstants::generate::<WIDTH_3>()
-        .native_hash_two(&white_list_f[2], &white_list_f[3])
-        .unwrap();
+        // a note owned by one of the white list user
+        let note = Note::dummy_from_user(user, &mut rng);
 
-    let merkle_path = MerklePath::from_path(vec![
-        (Node::<F, PoseidonConstants<_>>::new(white_list_f[0]), true),
-        (Node::<F, PoseidonConstants<_>>::new(hash_2_3), false),
-    ]);
+        let merkle_path: MerklePath<F, PoseidonConstants<_>> =
+            MerklePath::build_merkle_path(white_list_f, 1);
 
-    let mut composer = StandardComposer::<F, <CP as CircuitParameters>::InnerCurve>::new();
+        let mut composer = StandardComposer::<F, P>::new();
+        let owner_variable = composer.add_input(note.user.address().unwrap());
+        let root_var = white_list_gadget::<F, P, PoseidonConstants<F>, CP>(
+            &mut composer,
+            owner_variable,
+            &merkle_path,
+        );
 
-    let owner_var = composer.add_input(note.user.address().unwrap());
+        let expected_var = composer.add_input(mk_root.inner());
+        composer.assert_equal(expected_var, root_var);
 
-    let root_var =
-        white_list_gadget::<F, P, PoseidonConstants<F>, CP>(&mut composer, owner_var, &merkle_path);
-
-    let expected_var = composer.add_input(mk_root.inner());
-    composer.assert_equal(expected_var, root_var);
-
-    composer.check_circuit_satisfied();
+        composer.check_circuit_satisfied();
+    }
 }

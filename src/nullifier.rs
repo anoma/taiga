@@ -43,7 +43,7 @@ impl<CP: CircuitParameters> Nullifier<CP> {
     // nf = CRH(nk, rho, psi, cm)
     pub fn derive_native(
         nk: &NullifierDerivingKey<CP::CurveScalarField>,
-        rho: &Nullifier<CP>,
+        rho: &Nullifier<CP>, // Old nullifier
         psi: &CP::CurveScalarField,
         cm: &NoteCommitment<CP>,
     ) -> Self {
