@@ -108,8 +108,6 @@ fn test_white_list_tokens_vp_example() {
         Token::<CP>::new(&mut rng),
         output_notes[0].token,
         Token::<CP>::new(&mut rng),
-        Token::<CP>::new(&mut rng),
-        Token::<CP>::new(&mut rng),
     ];
 
     let white_list_tokens_to_fields: Vec<Fr> = white_list_tokens
