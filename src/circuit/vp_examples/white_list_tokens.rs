@@ -1,13 +1,13 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
+use crate::circuit::gadgets::merkle_tree::merkle_tree_gadget;
 use crate::circuit::integrity::{
     ValidityPredicateInputNoteVariables, ValidityPredicateOuputNoteVariables,
 };
-use crate::circuit::gadgets::merkle_tree::merkle_tree_gadget;
 use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
 use crate::merkle_tree::{MerklePath, Node};
 use crate::note::Note;
-use crate::poseidon::{POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2, WIDTH_3};
-use crate::user::User;
+use crate::poseidon::WIDTH_3;
+use crate::token::Token;
 use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
 use plonk_hashing::poseidon::constants::PoseidonConstants;
 
@@ -17,7 +17,7 @@ pub struct WhiteListTokensValidityPredicate<CP: CircuitParameters> {
     pub input_notes: [Note<CP>; NUM_NOTE],
     pub output_notes: [Note<CP>; NUM_NOTE],
     // custom "private" inputs to the VP
-    pub white_list_tokens: Vec<User<CP>>,
+    pub white_list_tokens: Vec<Token<CP>>,
     pub mk_root: Node<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>,
     pub paths: Vec<MerklePath<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>>,
 }
@@ -43,17 +43,18 @@ where
         let expected_var = composer.add_input(self.mk_root.inner());
         let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
         for (output_note_variable, path) in output_note_variables.iter().zip(self.paths.clone()) {
-            let token_var = output_note_variable.token_addr;// why is it a vector?
-            let root_var =  merkle_tree_gadget::<
+            let token_var = output_note_variable.token_addr;
+            let root_var = merkle_tree_gadget::<
                 CP::CurveScalarField,
                 CP::InnerCurve,
                 PoseidonConstants<CP::CurveScalarField>,
             >(
                 composer,
-                &token_var[0],
+                &token_var,
                 &path.get_path(),
                 &poseidon_hash_param_bls12_377_scalar_arity2,
-            ).unwrap();
+            )
+            .unwrap();
             composer.assert_equal(expected_var, root_var);
         }
         Ok(())
@@ -96,26 +97,30 @@ fn test_white_list_tokens_vp_example() {
     let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
     let output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
 
-    // white list is a list of user addresses, containing the output notes addresses.
-    let white_list_tokens: Vec<User<CP>> = vec![
-        User::<CP>::new(&mut rng),
-        output_notes[1].user,
-        User::<CP>::new(&mut rng),
-        User::<CP>::new(&mut rng),
-        output_notes[3].user,
-        output_notes[2].user,
-        User::<CP>::new(&mut rng),
-        output_notes[0].user,
-        User::<CP>::new(&mut rng),
-        User::<CP>::new(&mut rng),
-        User::<CP>::new(&mut rng),
+    // white list is a list of token addresses, containing the output note token addresses.
+    let white_list_tokens: Vec<Token<CP>> = vec![
+        Token::<CP>::new(&mut rng),
+        output_notes[1].token,
+        Token::<CP>::new(&mut rng),
+        Token::<CP>::new(&mut rng),
+        output_notes[3].token,
+        output_notes[2].token,
+        Token::<CP>::new(&mut rng),
+        output_notes[0].token,
+        Token::<CP>::new(&mut rng),
+        Token::<CP>::new(&mut rng),
+        Token::<CP>::new(&mut rng),
     ];
 
-    let white_list_tokens_to_fields: Vec<Fr> = white_list_tokens.iter().map(|v| v.address().unwrap()).collect();
+    let white_list_tokens_to_fields: Vec<Fr> = white_list_tokens
+        .iter()
+        .map(|v| v.address().unwrap())
+        .collect();
 
     let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
-    let mk_root = MerkleTreeLeafs::<Fr, PoseidonConstants<Fr>>::new(white_list_tokens_to_fields.to_vec())
-        .root(&poseidon_hash_param_bls12_377_scalar_arity2);
+    let mk_root =
+        MerkleTreeLeafs::<Fr, PoseidonConstants<Fr>>::new(white_list_tokens_to_fields.to_vec())
+            .root(&poseidon_hash_param_bls12_377_scalar_arity2);
 
     let paths: Vec<MerklePath<Fr, PoseidonConstants<Fr>>> = vec![
         MerklePath::build_merkle_path(&white_list_tokens_to_fields, 7),
@@ -139,7 +144,9 @@ fn test_white_list_tokens_vp_example() {
     let (pk_p, vk) = white_list_tokens_vp.compile::<PC>(&pp).unwrap();
 
     // Prover
-    let (proof, pi) = white_list_tokens_vp.gen_proof::<PC>(&pp, pk_p, b"Test").unwrap();
+    let (proof, pi) = white_list_tokens_vp
+        .gen_proof::<PC>(&pp, pk_p, b"Test")
+        .unwrap();
 
     // Verifier
     let verifier_data = VerifierData::new(vk, pi);

@@ -66,16 +66,25 @@ pub fn token_integrity_circuit<CP: CircuitParameters>(
     composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
     // convert the vp variables inside, move out if needed.
     token_vp_bytes: &[bool],
-) -> Result<(Vec<Variable>, Vec<Variable>), Error> {
-    // convert send_vp bits to two variable
-    let (token_vp_var, token_bits_var) = bits_to_variables::<CP>(composer, token_vp_bytes);
-    Ok((token_vp_var, token_bits_var))
+) -> Result<(Variable, Vec<Variable>), Error> {
+    // Init poseidon hash gadget.
+    let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+        PoseidonConstants::generate::<WIDTH_3>();
+
+    // convert token_vp bits to two variable
+    let (token_vp_vars, token_bits_var) = bits_to_variables::<CP>(composer, token_vp_bytes);
+
+    // generate address variable
+    let token_address =
+        poseidon_param.circuit_hash_two(composer, &token_vp_vars[0], &token_vp_vars[1])?;
+
+    Ok((token_address, token_bits_var))
 }
 
 pub fn note_commitment_circuit<CP: CircuitParameters>(
     composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
     address: &Variable,
-    token: &[Variable],
+    token: &Variable,
     value: &Variable, // To be decided where to constrain the range of value, add the range constraints here first.
     data: &Variable,
     rho: &Variable,
@@ -96,8 +105,7 @@ pub fn note_commitment_circuit<CP: CircuitParameters>(
         Poseidon::<_, PlonkSpec<WIDTH_9>, WIDTH_9>::new(composer, &poseidon_param_9);
     // Default padding zero
     poseidon_circuit.input(*address).unwrap();
-    poseidon_circuit.input(token[0]).unwrap();
-    poseidon_circuit.input(token[1]).unwrap();
+    poseidon_circuit.input(*token).unwrap();
     poseidon_circuit.input(*value).unwrap();
     poseidon_circuit.input(*data).unwrap();
     poseidon_circuit.input(*rho).unwrap();
@@ -198,7 +206,7 @@ pub struct ValidityPredicateInputNoteVariables {
     pub nk: Variable,
     // send_vp_bits will be used in vp commitment in future.
     pub send_vp_bits: Vec<Variable>,
-    pub token_addr: Vec<Variable>,
+    pub token_addr: Variable,
     // token_bits will be used in vp commitment in future.
     pub token_bits: Vec<Variable>,
     pub value: Variable,
@@ -211,7 +219,7 @@ pub struct ValidityPredicateInputNoteVariables {
 pub struct ValidityPredicateOuputNoteVariables {
     pub recipient_addr: Variable,
     pub recv_vp_bits: Vec<Variable>,
-    pub token_addr: Vec<Variable>,
+    pub token_addr: Variable,
     pub token_bits: Vec<Variable>,
     pub value: Variable,
     pub data: Variable,
@@ -401,11 +409,9 @@ mod test {
             &token.token_vp.to_bits(),
         )
         .unwrap();
-        let expect_token_addr = token.address();
-        let token_expected_var_0 = composer.add_input(expect_token_addr[0]);
-        let token_expected_var_1 = composer.add_input(expect_token_addr[1]);
-        composer.assert_equal(token_expected_var_0, token_var[0]);
-        composer.assert_equal(token_expected_var_1, token_var[1]);
+        let expected_token_addr = token.address().unwrap();
+        let token_expected_var = composer.add_input(expected_token_addr);
+        composer.assert_equal(token_expected_var, token_var);
         composer.check_circuit_satisfied();
 
         // Test note commitment

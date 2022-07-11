@@ -113,7 +113,7 @@ impl<CP: CircuitParameters> Note<CP> {
     // or Sinsemilla_hash_to_curve used in Orchard) and adding rcm*fixed_generator, which based on DL assumption.
     pub fn commitment(&self) -> Result<NoteCommitment<CP>, TaigaError> {
         let user_address = self.user.address()?;
-        let token_address = self.token.address();
+        let token_address = self.token.address()?;
         let value_filed = CP::CurveScalarField::from(self.value);
 
         let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
@@ -123,8 +123,7 @@ impl<CP: CircuitParameters> Note<CP> {
             &poseidon_param,
         );
         poseidon.input(user_address).unwrap();
-        poseidon.input(token_address[0]).unwrap();
-        poseidon.input(token_address[1]).unwrap();
+        poseidon.input(token_address).unwrap();
         poseidon.input(value_filed).unwrap();
         poseidon.input(self.data).unwrap();
         poseidon.input(self.rho.inner()).unwrap();
