@@ -127,12 +127,6 @@ fn test_send<CP: CircuitParameters>() {
     assert!(proof_mt.verify(root_mt, &[1], &[hash_nc_bob], 2));
 }
 
-// // We decided to continue with KZG for now
-// #[test]
-// fn test_send_ipa() {
-//     test_send::<crate::circuit::circuit_parameters::DLCircuitParameters>();
-// }
-
 #[test]
 fn test_send_kzg() {
     test_send::<crate::circuit::circuit_parameters::PairingCircuitParameters>();
