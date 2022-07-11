@@ -382,20 +382,20 @@ mod test {
         let mut composer = StandardComposer::<Fr, P>::new();
 
         // Test user address integrity
-        // Create a user address
-        let address = User::<PairingCircuitParameters>::new(&mut rng);
+        // Create a user
+        let user = User::<PairingCircuitParameters>::new(&mut rng);
 
-        let nk = address.send_com.get_nk().unwrap();
+        let nk = user.send_com.get_nk().unwrap();
         let nk_var = composer.add_input(nk.inner());
-        let send_vp = address.send_com.get_send_vp().unwrap();
+        let send_vp = user.send_com.get_send_vp().unwrap();
         let (address_var, _) = spent_user_address_integrity_circuit::<PairingCircuitParameters>(
             &mut composer,
             &nk_var,
             &send_vp.to_bits(),
-            &address.recv_vp.to_bits(),
+            &user.recv_vp.to_bits(),
         )
         .unwrap();
-        let expect_address_opaque = address.address().unwrap();
+        let expect_address_opaque = user.address().unwrap();
         let expected_address_var = composer.add_input(expect_address_opaque);
         composer.assert_equal(expected_address_var, address_var);
         composer.check_circuit_satisfied();
@@ -420,7 +420,7 @@ mod test {
         let value: u64 = rng.gen();
         let data = Fr::rand(&mut rng);
         let rcm = Fr::rand(&mut rng);
-        let note = Note::new(address, token, value, rho, data, rcm);
+        let note = Note::new(user, token, value, rho, data, rcm);
 
         let value_var = composer.add_input(Fr::from(value));
         let data_var = composer.add_input(note.data);
