@@ -27,9 +27,8 @@ pub mod note;
 pub mod poseidon;
 pub mod token;
 // pub mod transaction;
-pub mod user;
-// pub mod user;
 pub mod nullifier;
+pub mod user;
 pub mod utils;
 pub mod validity_predicate;
 
@@ -157,5 +156,5 @@ fn to_embedded_field<F1: PrimeField, F2: PrimeField>(x: F1) -> F2 {
     F2::from_le_bytes_mod_order(&x.into_repr().to_bytes_le())
 }
 
-// #[cfg(test)]
-// pub mod tests;
+#[cfg(test)]
+pub mod tests;

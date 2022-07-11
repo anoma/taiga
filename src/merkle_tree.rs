@@ -8,7 +8,8 @@ use plonk_hashing::poseidon::constants::PoseidonConstants;
 use rand::{Rng, RngCore};
 use std::marker::PhantomData;
 
-pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
+// pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
+pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 4;
 
 #[derive(Clone)]
 pub struct MerkleTreeLeafs<F: PrimeField, BH: FieldHasher<F>> {
