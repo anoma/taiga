@@ -108,9 +108,9 @@ fn action_circuit_test() {
 
     // Check the public inputs
     let mut expect_pi = PublicInputs::new(action_circuit.padded_circuit_size());
-    expect_pi.insert(24766, action.root);
     expect_pi.insert(10781, action.nf.inner());
-    expect_pi.insert(31822, action.cm.inner());
+    expect_pi.insert(12530, action.root);
+    expect_pi.insert(19586, action.cm.inner());
     assert_eq!(pi, expect_pi);
     // Verifier
     let verifier_data = VerifierData::new(vk, expect_pi);
