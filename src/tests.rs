@@ -1,93 +1,303 @@
-use crate::action::{ActionInfo, OutputInfo, SpendInfo};
 use crate::circuit::circuit_parameters::CircuitParameters;
-use crate::merkle_tree::{MerklePath, MerkleTreeLeafs, TAIGA_COMMITMENT_TREE_DEPTH};
+use crate::circuit::gadgets::trivial::trivial_gadget;
 use crate::nullifier::Nullifier;
-use crate::poseidon::WIDTH_3;
-use crate::user::UserSendAddress;
-// use crate::transaction::Transaction;
-use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
-use crate::{note::Note, token::Token, user::User};
-use ark_ff::Zero;
-use ark_std::UniformRand;
-use plonk_core::circuit::{Circuit, VerifierData, verify_proof};
-use plonk_core::proof_system::pi::PublicInputs;
-use plonk_hashing::poseidon::constants::PoseidonConstants;
+use crate::circuit::validity_predicate::ValidityPredicate;
+use crate::el_gamal::DecryptionKey;
+use crate::transaction::Transaction;
+use crate::{add_to_tree, note::Note, serializable_to_vec, token::Token, user::User};
+use ark_ff::{One, Zero};
 use ark_poly_commit::PolynomialCommitment;
+use rand::rngs::ThreadRng;
+use rs_merkle::algorithms::Blake2s;
+use rs_merkle::{Hasher, MerkleTree};
 
-#[test]
-fn test_send() {
-    // create a user and a note owned by this user
-    // create a second user
-    // compute the (partial) action circuit corresponding to sending the note to the second user
-    // the note commitment is stored in a merkle tree for the action proof.
-    type Fr = <CP as CircuitParameters>::CurveScalarField;
-    type PC = <CP as CircuitParameters>::CurvePC;
-    type P = <CP as CircuitParameters>::InnerCurve;
+fn spawn_user<CP: CircuitParameters>(name: &str) -> User<CP> {
+    let mut rng = ThreadRng::default();
+    let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
+    let outer_curve_pp =
+        <CP as CircuitParameters>::OuterCurvePC::setup(1 << 4, None, &mut rng).unwrap();
+
+    User::<CP>::new(
+        name,
+        &pp,
+        &outer_curve_pp,
+        DecryptionKey::<CP::InnerCurve>::new(&mut rng),
+        trivial_gadget::<CP>,
+        &[],
+        &[],
+        trivial_gadget::<CP>,
+        &[],
+        &[],
+        &mut rng,
+    )
+}
+
+fn spawn_token<CP: CircuitParameters>(name: &str) -> Token<CP> {
+    let mut rng = ThreadRng::default();
+    let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
+
+    Token::<CP>::new(name, &pp, trivial_gadget::<CP>, &mut rng)
+}
+
+fn spawn_trivial_vps<CP: CircuitParameters>(
+    i: usize,
+    rng: &mut ThreadRng,
+) -> Vec<ValidityPredicate<CP>> {
+    let pp = <CP as CircuitParameters>::CurvePC::setup(2 * 300, None, rng).unwrap();
+    (0..i)
+        .map(|_| ValidityPredicate::<CP>::new(&pp, trivial_gadget::<CP>, &[], &[], true, rng))
+        .collect()
+}
+
+fn test_send<CP: CircuitParameters>() {
+    // --- SET UP ---
 
     //Create global structures
-    let mut rng = ark_std::test_rng();
-    let mut cms: Vec<Fr> = vec![Fr::zero(); 1 << TAIGA_COMMITMENT_TREE_DEPTH];
-    // we modify `cms` at `index` for updating `cms` with a new note commitment
-    let mut index: usize = 0;
+    let mut rng = rand::thread_rng();
+    let mut nf_tree = MerkleTree::<Blake2s>::from_leaves(&[]);
+    let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&[]);
+    let mut cm_ce_list = Vec::new();
 
-    // Create users and tokens to exchange
-    let xan = Token::<CP>::new(&mut rng);
-    let alice = User::<CP>::new(&mut rng);
-    let bob = User::<CP>::new(&mut rng);
+    //Create users and tokens to exchange
+    let xan = spawn_token::<CP>("XAN");
+    let alice = spawn_user::<CP>("alice");
+    let bob = spawn_user::<CP>("bob");
+
+    //Create VPs for the users and tokens
+    let vps = spawn_trivial_vps(3, &mut rng);
 
     // Create a 1XAN note for Alice
-    let note_alice_1xan = Note::<CP>::new(
-        alice,
-        xan,
+    let note_a1xan = Note::<CP>::new(
+        alice.address(),
+        xan.address(),
         1,
-        Nullifier::new(Fr::rand(&mut rng)),
-        Fr::rand(&mut rng),
-        Fr::rand(&mut rng),
+        <CP>::CurveScalarField::one(),
+        <CP>::CurveScalarField::zero(),
+        &mut rng,
     );
 
-    let hasher: PoseidonConstants<Fr> = PoseidonConstants::generate::<WIDTH_3>();
+    //Add note to the global structures
+    add_to_tree(&note_a1xan.get_cm_bytes(), &mut mt_tree);
+    let note_a1xan_ec = alice.encrypt(&mut rng, &note_a1xan);
+    cm_ce_list.push((note_a1xan.commitment(), note_a1xan_ec));
 
-    // Add note to the note commitments Merkle tree
-    // Todo: do we need to do the same for the nullifier tree ?
-    // It seems to be an output of the proof and does not requires a membership proof?
-    cms[index] = note_alice_1xan.commitment().unwrap().inner();
-    let merkle_path: MerklePath<Fr, PoseidonConstants<Fr>> =
-        MerklePath::build_merkle_path(&cms, index);
-    index += 1;
-    let mk_root = MerkleTreeLeafs::<Fr, PoseidonConstants<Fr>>::new(cms.to_vec()).root(&hasher);
+    //Prepare the hash for future MTtree membership check
+    let hash_nc_alice = Blake2s::hash(&serializable_to_vec(&note_a1xan.commitment()));
 
-    // Action
-    let spend_info = SpendInfo::<CP>::new(note_alice_1xan, merkle_path, &hasher);
-    let output_info = OutputInfo::<CP>::new(
-        UserSendAddress::from_closed(alice.address().unwrap()),
-        bob.recv_vp,
-        xan.token_vp,
-        1,
-        Fr::rand(&mut rng),
+    //Check that Alice's note has been created
+    let proof_mt = mt_tree.proof(&[0]);
+    let root_mt = mt_tree.root().unwrap();
+    assert!(proof_mt.verify(root_mt, &[0], &[hash_nc_alice], 1));
+
+    // --- SET UP END ---
+
+    //Generate the output notes
+    let output_notes_and_ec = alice.send(&mut [&note_a1xan], vec![(&bob, 1_u32)], &mut rng);
+
+    //Prepare the hash for future MTtree membership check
+    let bytes = serializable_to_vec(&output_notes_and_ec[0].0.commitment());
+    let hash_nc_bob = Blake2s::hash(&bytes);
+
+    //Prepare the nf hash for future spent notes check
+    let nullifier = Nullifier::derive_native(
+        &alice.get_nk(),
+        &note_a1xan.rho,
+        &note_a1xan.psi,
+        &note_a1xan.commitment(),
     );
-    let action_info = ActionInfo::<CP>::new(spend_info, output_info);
-    let (action, mut action_circuit) = action_info.build(&mut rng).unwrap();
+    let hash_nf = Blake2s::hash(&nullifier.to_bytes());
 
-    // Proof computation
-    let pp = PC::setup(action_circuit.padded_circuit_size(), None, &mut rng).unwrap();
-    let (pk_p, vk) = action_circuit.compile::<PC>(&pp).unwrap();
-    let (proof, pi) = action_circuit.gen_proof::<PC>(&pp, pk_p, b"Test").unwrap();
-    let mut expect_pi = PublicInputs::new(action_circuit.padded_circuit_size());
-    expect_pi.insert(24766, action.root);
-    expect_pi.insert(10781, action.nf.inner());
-    expect_pi.insert(31822, action.cm.inner());
-    assert_eq!(pi, expect_pi);
-    let verifier_data = VerifierData::new(vk, expect_pi);
-    verify_proof::<Fr, P, PC>(&pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
+    //Create a tx spending Alice's note and creating a note for Bob
+    let tx: Transaction<CP> = Transaction::new(
+        vec![],
+        vec![(note_a1xan, nullifier)],
+        output_notes_and_ec,
+        &vps,
+    );
+    tx.process(&mut nf_tree, &mut mt_tree, &mut cm_ce_list);
 
-    // creation of the Bob's note
-    let note_bob_1xan = Note::<CP>::new(
-        bob,
-        xan,
-        1,
-        action.nf,
-        Fr::rand(&mut rng),
-        Fr::rand(&mut rng),
+    //Check that Alice's note has been spent
+    let proof_nf = nf_tree.proof(&[0]);
+    let root_nf = nf_tree.root().unwrap();
+    assert!(proof_nf.verify(root_nf, &[0], &[hash_nf], 1));
+
+    //Check that Bob's note has been created
+    let proof_mt = mt_tree.proof(&[1]);
+    let root_mt = mt_tree.root().unwrap();
+    assert!(proof_mt.verify(root_mt, &[1], &[hash_nc_bob], 2));
+}
+
+// // We decided to continue with KZG for now
+// #[test]
+// fn test_send_ipa() {
+//     test_send::<crate::circuit::circuit_parameters::DLCircuitParameters>();
+// }
+
+#[test]
+fn test_send_kzg() {
+    test_send::<crate::circuit::circuit_parameters::PairingCircuitParameters>();
+}
+
+fn test_check_proofs<CP: CircuitParameters>() {
+    spawn_user::<CP>("Ferdinand").check_proofs();
+}
+
+#[test]
+fn test_check_proofs_kzg() {
+    test_check_proofs::<crate::circuit::circuit_parameters::PairingCircuitParameters>();
+}
+
+fn split_and_merge_notes_test<CP: CircuitParameters>() {
+    // --- SET UP ---
+
+    //Create global structures
+    let mut rng = ThreadRng::default();
+
+    let mut nf_tree = MerkleTree::<Blake2s>::from_leaves(&[]);
+    let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&[]);
+    let mut cm_ce_list = Vec::new();
+
+    //Create users and tokens
+    let yulia = spawn_user::<CP>("yulia");
+    let simon = spawn_user::<CP>("simon");
+    let xan = spawn_token::<CP>("xan");
+
+    //Create VPs for the users and tokens
+    let vps = spawn_trivial_vps(3, &mut rng);
+
+    //Create the initial note
+    let initial_note = Note::<CP>::new(
+        yulia.address(),
+        xan.address(),
+        4,
+        <CP>::CurveScalarField::one(),
+        <CP>::CurveScalarField::zero(),
+        &mut rng,
     );
 
+    add_to_tree(&initial_note.get_cm_bytes(), &mut mt_tree);
+    let initial_note_ec = yulia.encrypt(&mut rng, &initial_note);
+    cm_ce_list.push((initial_note.commitment(), initial_note_ec));
+
+    //Prepare the hash for future MTtree membership check
+    let hash_in = Blake2s::hash(&serializable_to_vec(&initial_note.commitment()));
+
+    //Check that the note has been created
+    let proof_mt = mt_tree.proof(&[0]);
+    let root_mt = mt_tree.root().unwrap();
+    assert!(proof_mt.verify(root_mt, &[0], &[hash_in], 1));
+
+    // --- SET UP END ---
+
+    // Split a note between users
+    let split_output_notes = yulia.send(
+        &mut [&initial_note],
+        vec![(&yulia, 1), (&yulia, 1), (&simon, 2)],
+        &mut rng,
+    );
+
+    //Prepare the hashes for future MTtree membership check
+    let mut bytes = serializable_to_vec(&split_output_notes[0].0.commitment());
+    let hash1 = Blake2s::hash(&bytes);
+    bytes = serializable_to_vec(&split_output_notes[1].0.commitment());
+    let hash2 = Blake2s::hash(&bytes);
+    bytes = serializable_to_vec(&split_output_notes[2].0.commitment());
+    let hash3 = Blake2s::hash(&bytes);
+
+    //Prepare the nf hash for future spent notes check
+    let nullifier = Nullifier::derive_native(
+        &yulia.get_nk(),
+        &initial_note.rho,
+        &initial_note.psi,
+        &initial_note.commitment(),
+    );
+    let hash_nf = Blake2s::hash(&nullifier.to_bytes());
+
+    //Create a tx splitting the initial note
+    let tx: Transaction<CP> = Transaction::new(
+        vec![],
+        vec![(initial_note, nullifier)],
+        split_output_notes.clone(),
+        &vps,
+    );
+    tx.process(&mut nf_tree, &mut mt_tree, &mut cm_ce_list);
+
+    //Check the amount of output notes and their values
+    assert_eq!(split_output_notes.len(), 3);
+    assert_eq!(split_output_notes[0].0.value, 1);
+    assert_eq!(split_output_notes[1].0.value, 1);
+    assert_eq!(split_output_notes[2].0.value, 2);
+
+    //Check that the initial note has been spent
+    let proof_nf = nf_tree.proof(&[0]);
+    let root_nf = nf_tree.root().unwrap();
+    assert!(proof_nf.verify(root_nf, &[0], &[hash_nf], 1));
+
+    //Check that the notes has been added to the tree
+    let proof_mt = mt_tree.proof(&[1, 2, 3]);
+    let root_mt = mt_tree.root().unwrap();
+    assert!(proof_mt.verify(root_mt, &[1, 2, 3], &[hash1, hash2, hash3], 4));
+
+    let merge_output_notes = yulia.send(
+        &mut [&split_output_notes[0].0, &split_output_notes[1].0],
+        vec![(&yulia, 2)],
+        &mut rng,
+    );
+
+    //Prepare the hash for future MTtree membership check
+    bytes = serializable_to_vec(&merge_output_notes[0].0.commitment());
+    let hash4 = Blake2s::hash(&bytes);
+
+    //Prepare the nf hash for future spent notes check
+    let nullifier1 = Nullifier::derive_native(
+        &yulia.get_nk(),
+        &split_output_notes[0].0.rho,
+        &split_output_notes[0].0.psi,
+        &split_output_notes[0].0.commitment(),
+    );
+    let nullifier2 = Nullifier::derive_native(
+        &yulia.get_nk(),
+        &split_output_notes[1].0.rho,
+        &split_output_notes[1].0.psi,
+        &split_output_notes[1].0.commitment(),
+    );
+    let hash_nf1 = Blake2s::hash(&nullifier1.to_bytes());
+    let hash_nf2 = Blake2s::hash(&nullifier2.to_bytes());
+
+    //Create a tx splitting the initial note
+    let tx: Transaction<CP> = Transaction::new(
+        vec![],
+        vec![
+            (split_output_notes[0].0, nullifier1),
+            (split_output_notes[1].0, nullifier2),
+        ],
+        merge_output_notes.clone(),
+        &vps,
+    );
+    tx.process(&mut nf_tree, &mut mt_tree, &mut cm_ce_list);
+
+    //Check the amount of notes and their values
+    assert_eq!(merge_output_notes.len(), 1);
+    assert_eq!(merge_output_notes[0].0.value, 2);
+
+    //Check that the notes has been spent
+    let proof_nf = nf_tree.proof(&[1, 2]);
+    let root_nf = nf_tree.root().unwrap();
+    assert!(proof_nf.verify(root_nf, &[1, 2], &[hash_nf1, hash_nf2], 3));
+
+    //Check that the notes has been added to the tree
+    let proof_mt = mt_tree.proof(&[4]);
+    let root_mt = mt_tree.root().unwrap();
+    assert!(proof_mt.verify(root_mt, &[4], &[hash4], 5));
+}
+
+// // We decided to continue with KZG for now
+// #[test]
+// fn split_and_merge_notes_test_ipa() {
+//     split_and_merge_notes_test::<crate::circuit::circuit_parameters::DLCircuitParameters>();
+// }
+
+#[test]
+fn split_and_merge_notes_test_kzg() {
+    split_and_merge_notes_test::<crate::circuit::circuit_parameters::PairingCircuitParameters>();
 }
