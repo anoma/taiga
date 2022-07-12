@@ -134,7 +134,7 @@ impl<CP: CircuitParameters> UserSendAddress<CP> {
 }
 
 #[test]
-fn test_user_address_creation() {
+fn test_user_address_computation() {
     let mut rng = ark_std::test_rng();
     let u = User::<crate::circuit::circuit_parameters::PairingCircuitParameters>::new(&mut rng);
     u.address().unwrap();
