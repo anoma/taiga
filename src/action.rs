@@ -14,11 +14,11 @@ use rand::RngCore;
 /// The action result used in transaction.
 #[derive(Copy, Debug, Clone)]
 pub struct Action<CP: CircuitParameters> {
-    /// The root of merkle tree
+    /// The root of the note commitment Merkle tree.
     pub root: CP::CurveScalarField,
-    /// The nullifier of spend note.
+    /// The nullifier of the spend note.
     pub nf: Nullifier<CP>,
-    /// The commitment of output.
+    /// The commitment of the output note.
     pub cm: NoteCommitment<CP>,
     // TODO: The EncryptedNote.
     // encrypted_note,
