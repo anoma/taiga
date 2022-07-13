@@ -81,6 +81,31 @@ impl<CP: CircuitParameters> Note<CP> {
         }
     }
 
+    pub fn dummy_from_token(token: Token<CP>, rng: &mut impl RngCore) -> Note<CP> {
+        use ark_ff::UniformRand;
+        use rand::Rng;
+
+        let user = User::<CP>::new(rng);
+        let value: u64 = rng.gen();
+        let data = CP::CurveScalarField::rand(rng);
+        let rho = Nullifier::new(CP::CurveScalarField::rand(rng));
+        let rcm = CP::CurveScalarField::rand(rng);
+
+        // Init poseidon param.
+        let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+            PoseidonConstants::generate::<WIDTH_3>();
+        let psi = poseidon_param.native_hash_two(&rho.inner(), &rcm).unwrap();
+        Self {
+            user,
+            token,
+            value,
+            data,
+            rho,
+            psi,
+            rcm,
+        }
+    }
+
     pub fn dummy_from_user(user: User<CP>, rng: &mut impl RngCore) -> Note<CP> {
         use ark_ff::UniformRand;
         use rand::Rng;

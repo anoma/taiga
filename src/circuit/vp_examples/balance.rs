@@ -5,6 +5,7 @@ use crate::circuit::integrity::{
 };
 use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
 use crate::note::Note;
+use crate::token::Token;
 use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
 
 // BalanceValidityPredicate have a custom constraint with a + b = c,
@@ -33,6 +34,15 @@ where
         input_note_variables: &[ValidityPredicateInputNoteVariables],
         output_note_variables: &[ValidityPredicateOuputNoteVariables],
     ) -> Result<(), Error> {
+        // check that all notes use the same token
+        let var_token = input_note_variables[0].token_addr;
+        for note_var in input_note_variables {
+            composer.assert_equal(note_var.token_addr, var_token);
+        }
+        for note_var in output_note_variables {
+            composer.assert_equal(note_var.token_addr, var_token);
+        }
+
         // sum of the input note values
         let mut balance_input_var = composer.zero_var();
         for note_var in input_note_variables {
@@ -80,8 +90,15 @@ fn test_balance_vp_example() {
     use plonk_core::circuit::{verify_proof, VerifierData};
 
     let mut rng = test_rng();
-    let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
-    let output_notes = input_notes; // for a right balance
+    let xan = Token::<CP>::new(&mut rng);
+    // input notes
+    let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_from_token(xan, &mut rng));
+    // output notes
+    let mut output_notes = input_notes;
+    let tmp = output_notes[0].value;
+    output_notes[0].value = output_notes[1].value;
+    output_notes[1].value = tmp;
+
     let mut balance_vp = BalanceValidityPredicate {
         input_notes,
         output_notes,
