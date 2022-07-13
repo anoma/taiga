@@ -3,7 +3,7 @@
 This repository provides a starting point for
 [Anoma](https://anoma.network/) Taiga.
 We try to follow the (work-in-progress) [specification](https://hackmd.io/IV6AZgoRQWC91D4Z4AG6jQ?view) as much as possible.
-Currently, we are not able to produce all the proofs needed for Taiga (the main blocker is the implementation of hash function circuits), but we can already implement lots of structures with empty/simple circuits.
+Currently, we are not able to produce all the proofs needed for Taiga (the main blocker is the implementation of hash function circuits), but we can already implement lots of structures with simple circuits.
 
 ## Warning
 The implementation is probably not secure nor efficient:

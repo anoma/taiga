@@ -6,10 +6,10 @@ pub fn field_addition_gadget<CP: CircuitParameters>(
     composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
     var_a: Variable,
     var_b: Variable,
-    c: CP::CurveScalarField,
-) {
-    // simple circuit that checks that a + b == c
+) -> Variable {
+    // simple circuit for the computaiton of a+b (and return the variable corresponding to c=a+b).
     let one = CP::CurveScalarField::one();
+    let c = composer.get_value(&var_a) + composer.get_value(&var_b);
     let var_zero = composer.zero_var();
     // Make first constraint a + b = c (as public input)
     composer.arithmetic_gate(|gate| {
@@ -17,6 +17,7 @@ pub fn field_addition_gadget<CP: CircuitParameters>(
             .add(one, one)
             .pi(-c)
     });
+    composer.add_input(c)
 }
 
 #[test]
@@ -33,6 +34,8 @@ fn test_field_addition_gadget() {
     >::new();
     let var_a = composer.add_input(a);
     let var_b = composer.add_input(b);
-    field_addition_gadget::<CP>(&mut composer, var_a, var_b, c);
+    let var_c = composer.add_input(c);
+    let var_a_plus_b = field_addition_gadget::<CP>(&mut composer, var_a, var_b);
+    composer.assert_equal(var_c, var_a_plus_b);
     composer.check_circuit_satisfied();
 }

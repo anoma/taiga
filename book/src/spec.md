@@ -95,18 +95,17 @@ TODO: Should we use `fulldesc_vp` in place of `desc_vp`?
 
 Encodes: token vp
 ```
-token_address = Com_q(desc_vp_token)
+token_address = Com_r(Com_q(desc_vp_token))
 ```
 
 where:
 
 |Variable/Function|Type||
 |-|-|-|
-|`token_address` | $\mathbb F_q$ element bits | hash of the token vp description|
+|`token_address` | $\mathbb F_r$ element | hash of the token vp description|
 
-The bits of `token_address` are converted to $\mathbb{F}_r$ element(s).
-
-> When using `bls12-317` as $E_M$, the bits of one $\mathbb{F}_q$ are converted to two $\mathbb{F}_r$.
+The token VP description is hashed into $\mathbb F_q$ and then $\mathbb F_r$.
+The outer hash is not useful in terms of security but simplify the circuits involving the token address.
 
 ### User
 
@@ -282,7 +281,7 @@ Private inputs (`w`):
         - `rcm_com_vp_addr`
     - `com_vp_token` of spent note:
         - `Com_q(desc_vp_token)`, 
-        - `rcm_com_vp_token`
+        - `rcm_com_vp_token` 
 - opening of created note
     - `note = (address, token, v, data, rho, psi, rcm)`
     - `com_vp_addr` of output note:
@@ -302,7 +301,7 @@ Action circuit checks:
         - Address VP integrity for input note: `com_vp_addr = Com(Com_q(desc_vp_addr_send), rcm_com_vp_addr)`
         - Nullifier integrity(input note only): `nf = DeriveNullier_nk(note)`.
     - `token` and `com_vp_token` opens to the same `desc_token_vp`
-        - Token (type) integrity(only bits conversion): `token = Com_q(desc_vp_token)`
+        - Token (type) integrity: `token = Com_r(Com_q(desc_vp_token))`
         - Token VP integrity: `com_vp_token = Com(Com_q(desc_vp_token), rcm_com_vp_token)`
 - For output note `note = (address, token, v, data, ρ, ψ, rcm_note)`:
     - `address` and `com_vp_addr` opens to the same `desc_vp_addr`
@@ -310,7 +309,7 @@ Action circuit checks:
         - Address VP integrity for output note: `com_vp_addr = Com(Com_q(desc_vp_addr_recv), rcm_com_vp_addr)`
         - Commitment integrity(output note only): `cm = NoteCom(note, rcm_note)`
     - `token` and `com_vp_token` opens to the same `desc_vp_token`
-        - Token (type) integrity(only bits conversion): `token = Com_q(desc_vp_token)`
+        - Token (type) integrity: `token = Com_r(Com_q(desc_vp_token))`
         - Token VP integrity: `com_vp = Com(Com_q(desc_vp_token), rcm_com_vp_token)`
 
 + checks of `EnableSpend` and `EnableOutput` flags?

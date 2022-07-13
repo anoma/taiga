@@ -8,7 +8,8 @@ use plonk_hashing::poseidon::constants::PoseidonConstants;
 use rand::{Rng, RngCore};
 use std::marker::PhantomData;
 
-pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
+// pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
+pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 4;
 
 #[derive(Clone)]
 pub struct MerkleTreeLeafs<F: PrimeField, BH: FieldHasher<F>> {
@@ -24,10 +25,15 @@ impl<F: PrimeField, BH: FieldHasher<F>> MerkleTreeLeafs<F, BH> {
         Self { leafs: nodes_vec }
     }
 
-    // todo this is not working yet
-    pub fn root(&self, hasher: &BH) -> Node<F, BH> {
-        // we suppose self.leafs.len() is a power of 2
-        let mut list = self.leafs.clone();
+    pub fn root(&mut self, hasher: &BH) -> Node<F, BH> {
+        // the list of leafs is extended with copies of elements so that its length is a power of 2.
+        let list = &mut self.leafs;
+        let n = list.len();
+        let m = n.next_power_of_two();
+        let mut ext = list.clone();
+        ext.truncate(m - n);
+        list.extend(ext);
+
         let mut len = list.len();
         while len > 1 {
             for i in 0..len / 2 {
@@ -87,9 +93,9 @@ impl<F: PrimeField, BH: FieldHasher<F>> MerklePath<F, BH> {
         }
     }
 
-    pub fn build_merkle_path(leaf_hashes: Vec<F>, position: usize) -> Self {
+    pub fn build_merkle_path(leaf_hashes: &Vec<F>, position: usize) -> Self {
         let mut auth_path = vec![];
-        let completed_leaf_hashes = add_remaining_addresses(&leaf_hashes);
+        let completed_leaf_hashes = add_remaining_addresses(leaf_hashes);
         Self::build_auth_path(completed_leaf_hashes, position, &mut auth_path);
         MerklePath { auth_path }
     }
@@ -203,7 +209,7 @@ mod tests {
         let merkle_path = MerklePath::from_path(auth_path.to_vec());
 
         let merkle_path_2: MerklePath<F, PoseidonConstants<_>> =
-            MerklePath::build_merkle_path(addresses, position);
+            MerklePath::build_merkle_path(&addresses, position);
 
         assert_eq!(merkle_path, merkle_path_2);
     }
@@ -240,7 +246,7 @@ mod tests {
         let merkle_path = MerklePath::from_path(auth_path.to_vec());
 
         let merkle_path_2: MerklePath<F, PoseidonConstants<_>> =
-            MerklePath::build_merkle_path(addresses, position);
+            MerklePath::build_merkle_path(&addresses, position);
 
         assert_eq!(merkle_path, merkle_path_2);
     }
@@ -325,7 +331,7 @@ mod tests {
         let merkle_path = MerklePath::from_path(auth_path.to_vec());
 
         let merkle_path_2: MerklePath<F, PoseidonConstants<_>> =
-            MerklePath::build_merkle_path(addresses, position);
+            MerklePath::build_merkle_path(&addresses, position);
 
         assert_eq!(merkle_path, merkle_path_2);
     }
