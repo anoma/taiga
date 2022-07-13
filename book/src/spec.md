@@ -281,6 +281,7 @@ Private inputs (`w`):
         - `rcm_com_vp_addr`
     - `com_vp_token` of spent note:
         - `Com_q(desc_vp_token)`, 
+        - `rcm_com_vp_token` 
 - opening of created note
     - `note = (address, token, v, data, rho, psi, rcm)`
     - `com_vp_addr` of output note:
@@ -289,6 +290,7 @@ Private inputs (`w`):
         -  `rcm_com_vp_addr`
     - `com_vp_token` of output note:
         - `Com_q(desc_vp_token)`, 
+        - `rcm_com_vp_token`
 
 Action circuit checks:
 - For spent note `note = (address, token, v, data, ρ, ψ, rcm_note)`:
