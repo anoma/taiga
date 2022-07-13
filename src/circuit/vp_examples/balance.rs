@@ -5,7 +5,6 @@ use crate::circuit::integrity::{
 };
 use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
 use crate::note::Note;
-use crate::token::Token;
 use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
 
 // BalanceValidityPredicate have a custom constraint with a + b = c,
@@ -82,6 +81,7 @@ where
 #[test]
 fn test_balance_vp_example() {
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
+    use crate::token::Token;
     type Fr = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;
     type PC = <CP as CircuitParameters>::CurvePC;
