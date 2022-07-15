@@ -10,6 +10,7 @@ use plonk_hashing::poseidon::{
 // WIDTH_3 = ARITY + 1
 pub const WIDTH_3: usize = 3;
 pub const WIDTH_5: usize = 5;
+pub const WIDTH_9: usize = 9;
 lazy_static! {
     pub static ref POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2: PoseidonConstants<ark_bls12_377::Fr> =
         PoseidonConstants::generate::<WIDTH_3>();
@@ -24,18 +25,30 @@ lazy_static! {
         PoseidonConstants::generate::<WIDTH_5>();
 }
 
-/// A BinaryHasher over prime field takes two field elements as input and
-/// outputs one field element.
-pub trait BinaryHasher<F: PrimeField> {
+/// A FieldHasher over prime field takes field elements as input and
+/// outputs one field element. `native_hash_two` takes two field elements;
+/// `native_hash` takes at most four field elements.
+pub trait FieldHasher<F: PrimeField>: Clone {
     fn native_hash_two(&self, left: &F, right: &F) -> Result<F, TaigaError>;
+    fn native_hash(&self, inputs: &[F]) -> Result<F, TaigaError>;
 }
 
-/// A BinaryHasher implementation for Poseidon Hash.
-impl<F: PrimeField> BinaryHasher<F> for PoseidonConstants<F> {
+/// A FieldHasher implementation for Poseidon Hash.
+impl<F: PrimeField> FieldHasher<F> for PoseidonConstants<F> {
     fn native_hash_two(&self, left: &F, right: &F) -> Result<F, TaigaError> {
         let mut poseidon = Poseidon::<(), NativeSpec<F, WIDTH_3>, WIDTH_3>::new(&mut (), self);
         poseidon.input(*left)?;
         poseidon.input(*right)?;
+        Ok(poseidon.output_hash(&mut ()))
+    }
+
+    fn native_hash(&self, inputs: &[F]) -> Result<F, TaigaError> {
+        assert!(inputs.len() < WIDTH_5);
+        let mut poseidon = Poseidon::<(), NativeSpec<F, WIDTH_5>, WIDTH_5>::new(&mut (), self);
+        // Default padding zero
+        inputs.iter().for_each(|f| {
+            poseidon.input(*f).unwrap();
+        });
         Ok(poseidon.output_hash(&mut ()))
     }
 }
