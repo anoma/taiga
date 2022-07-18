@@ -1,5 +1,4 @@
 pub mod bad_hash_to_curve;
-// pub mod blinding;
 pub mod field_addition;
 pub mod hash;
 pub mod merkle_tree;
