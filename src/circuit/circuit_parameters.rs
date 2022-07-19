@@ -54,6 +54,10 @@ pub trait CircuitParameters: Copy {
         com(x, rand)
     }
 
+    fn compress_vk(
+        vk: &VerifierKey<Self::CurveScalarField, Self::CurvePC>,
+    ) -> Vec<Self::CurveBaseField>;
+
     fn get_inputs(
         desc_vp: &VerifierKey<Self::CurveScalarField, Self::CurvePC>,
         ck: &<Self::CurvePC as PolynomialCommitment<
@@ -92,6 +96,40 @@ impl CircuitParameters for PairingCircuitParameters {
     type OuterCurve = ark_bw6_761::g1::Parameters;
     type CurvePC = KZG10<ark_bls12_377::Bls12_377>;
     type OuterCurvePC = KZG10<ark_bw6_761::BW6_761>;
+
+    fn compress_vk(
+        vk: &VerifierKey<Self::CurveScalarField, Self::CurvePC>,
+    ) -> Vec<Self::CurveBaseField> {
+        let com_vec = vec![
+            ws_to_te(vk.arithmetic.q_m.0),
+            ws_to_te(vk.arithmetic.q_l.0),
+            ws_to_te(vk.arithmetic.q_r.0),
+            ws_to_te(vk.arithmetic.q_o.0),
+            ws_to_te(vk.arithmetic.q_4.0),
+            ws_to_te(vk.arithmetic.q_c.0),
+            ws_to_te(vk.arithmetic.q_arith.0),
+            ws_to_te(vk.range_selector_commitment.0),
+            ws_to_te(vk.logic_selector_commitment.0),
+            ws_to_te(vk.fixed_group_add_selector_commitment.0),
+            ws_to_te(vk.variable_group_add_selector_commitment.0),
+            ws_to_te(vk.permutation.left_sigma.0),
+            ws_to_te(vk.permutation.right_sigma.0),
+            ws_to_te(vk.permutation.out_sigma.0),
+            ws_to_te(vk.permutation.fourth_sigma.0),
+            ws_to_te(vk.lookup.q_lookup.0),
+            ws_to_te(vk.lookup.table_1.0),
+            ws_to_te(vk.lookup.table_2.0),
+            ws_to_te(vk.lookup.table_3.0),
+            ws_to_te(vk.lookup.table_4.0),
+        ];
+
+        let mut ret = vec![];
+        com_vec.into_iter().for_each(|v| {
+            ret.push(v.x);
+            ret.push(v.y);
+        });
+        ret
+    }
 
     fn get_inputs(
         desc_vp: &VerifierKey<Self::CurveScalarField, Self::CurvePC>,

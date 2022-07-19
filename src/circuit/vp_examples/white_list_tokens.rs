@@ -100,13 +100,13 @@ fn test_white_list_tokens_vp_example() {
     // white list is a list of token addresses, containing the output note token addresses.
     let white_list_tokens: Vec<Token<CP>> = vec![
         Token::<CP>::new(&mut rng),
-        output_notes[1].token,
+        output_notes[1].token.clone(),
         Token::<CP>::new(&mut rng),
         Token::<CP>::new(&mut rng),
-        output_notes[3].token,
-        output_notes[2].token,
+        output_notes[3].token.clone(),
+        output_notes[2].token.clone(),
         Token::<CP>::new(&mut rng),
-        output_notes[0].token,
+        output_notes[0].token.clone(),
         Token::<CP>::new(&mut rng),
     ];
 

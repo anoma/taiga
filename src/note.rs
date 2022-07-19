@@ -12,7 +12,7 @@ use plonk_hashing::poseidon::{
 use rand::RngCore;
 
 /// A note
-#[derive(Copy, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Note<CP: CircuitParameters> {
     /// Owner of the note
     pub user: User<CP>,
