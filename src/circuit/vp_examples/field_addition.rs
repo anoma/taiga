@@ -77,6 +77,7 @@ fn test_field_addition_vp_example() {
     type Opc = <CP as CircuitParameters>::OuterCurvePC;
     use crate::circuit::blinding_circuit::BlindingCircuit;
     use crate::utils::ws_to_te;
+    use crate::vp_description::ValidityPredicateDescription;
     use ark_poly_commit::PolynomialCommitment;
     use ark_std::{test_rng, UniformRand};
     use plonk_core::circuit::{verify_proof, VerifierData};
@@ -100,8 +101,15 @@ fn test_field_addition_vp_example() {
     let vp_setup = PC::setup(field_addition_vp.padded_circuit_size(), None, &mut rng).unwrap();
 
     // Generate blinding circuit for vp
-    let mut blinding_circuit =
-        BlindingCircuit::<CP>::new(&mut rng, &mut field_addition_vp, &vp_setup).unwrap();
+    let vp_desc = ValidityPredicateDescription::from_vp(&mut field_addition_vp, &vp_setup).unwrap();
+    let vp_desc_compressed = vp_desc.get_compress();
+    let mut blinding_circuit = BlindingCircuit::<CP>::new(
+        &mut rng,
+        vp_desc,
+        &vp_setup,
+        field_addition_vp.padded_circuit_size(),
+    )
+    .unwrap();
 
     // Compile vp(must use compile_with_blinding)
     let (pk_p, vk_blind) = field_addition_vp
@@ -134,8 +142,6 @@ fn test_field_addition_vp_example() {
         .gen_proof::<Opc>(&pp_blind, pk_p, b"Test")
         .unwrap();
 
-    println!("pi: {:?}", pi);
-
     // Expecting vk_blind(out of circuit)
     let mut expect_pi = PublicInputs::new(blinding_circuit_size);
     let q_m = ws_to_te(vk_blind.arithmetic.q_m.0);
@@ -156,6 +162,7 @@ fn test_field_addition_vp_example() {
     let q_c = ws_to_te(vk_blind.arithmetic.q_c.0);
     expect_pi.insert(2318, q_c.x);
     expect_pi.insert(2319, q_c.y);
+    expect_pi.insert(21364, vp_desc_compressed);
 
     assert_eq!(pi, expect_pi);
 

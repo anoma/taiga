@@ -36,7 +36,7 @@ impl<CP: CircuitParameters> ValidityPredicateDescription<CP> {
     }
 
     pub fn from_vk(vk: &VerifierKey<CP::CurveScalarField, CP::CurvePC>) -> Self {
-        let vp_desc = CP::compress_vk(vk);
+        let vp_desc = CP::pack_vk(vk);
         Self::Packed(vp_desc)
     }
 
@@ -50,7 +50,7 @@ impl<CP: CircuitParameters> ValidityPredicateDescription<CP> {
     pub fn get_compress(&self) -> CP::CurveBaseField {
         match self {
             ValidityPredicateDescription::Packed(v) => {
-                assert_eq!(v.len(), 20);
+                assert_eq!(v.len(), 40);
                 let poseidon_param: PoseidonConstants<CP::CurveBaseField> =
                     PoseidonConstants::generate::<WIDTH_9>();
                 let mut poseidon =
@@ -70,7 +70,7 @@ impl<CP: CircuitParameters> ValidityPredicateDescription<CP> {
                     .collect::<Vec<CP::CurveBaseField>>();
 
                 poseidon.reset(&mut ());
-                for x in v[16..].iter().chain(hash_vec.iter()) {
+                for x in hash_vec.iter() {
                     poseidon.input(*x).unwrap();
                 }
                 poseidon.output_hash(&mut ())
