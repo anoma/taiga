@@ -24,12 +24,13 @@ pub mod el_gamal;
 pub mod error;
 pub mod merkle_tree;
 pub mod note;
-// TODO: put the nullifier_key in address later.
-pub mod nullifier_key;
 pub mod poseidon;
 pub mod token;
-pub mod transaction;
+// pub mod transaction;
+pub mod nullifier;
 pub mod user;
+pub mod utils;
+pub mod validity_predicate;
 
 pub trait HashToField: PrimeField {
     fn hash2_to_field(x: Self, y: Self) -> Self;
@@ -155,5 +156,5 @@ fn to_embedded_field<F1: PrimeField, F2: PrimeField>(x: &F1) -> F2 {
     F2::from_le_bytes_mod_order(&x.into_repr().to_bytes_le())
 }
 
-#[cfg(test)]
-pub mod tests;
+// #[cfg(test)]
+// pub mod tests;

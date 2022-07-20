@@ -1,6 +1,6 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::gadgets::trivial::trivial_gadget;
-use crate::circuit::nullifier::Nullifier;
+use crate::nullifier::Nullifier;
 use crate::circuit::validity_predicate::ValidityPredicate;
 use crate::el_gamal::DecryptionKey;
 use crate::transaction::Transaction;

@@ -1,55 +1,37 @@
-use crate::circuit::{
-    circuit_parameters::CircuitParameters, validity_predicate::ValidityPredicate,
-};
-use ark_ff::UniformRand;
-use ark_poly::univariate::DensePolynomial;
-use ark_poly_commit::PolynomialCommitment;
-use plonk_core::constraint_system::StandardComposer;
-use rand::prelude::ThreadRng;
+use crate::circuit::circuit_parameters::CircuitParameters;
+use crate::error::TaigaError;
+use crate::poseidon::{FieldHasher, WIDTH_3};
+use crate::utils::bits_to_fields;
+use crate::validity_predicate::MockHashVP;
+use plonk_hashing::poseidon::constants::PoseidonConstants;
+use rand::RngCore;
 
+#[derive(Copy, Debug, Clone)]
 pub struct Token<CP: CircuitParameters> {
-    name: String, // not really useful: a token will be identified with its address, defined below.
-    token_vp: ValidityPredicate<CP>,
-    pub rcm_addr: CP::CurveScalarField,
-}
-
-impl<CP: CircuitParameters> std::fmt::Display for Token<CP> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Token {}", self.name,)
-    }
+    pub token_vp: MockHashVP<CP>,
 }
 
 impl<CP: CircuitParameters> Token<CP> {
-    pub fn new(
-        name: &str,
-        setup: &<CP::CurvePC as PolynomialCommitment<
-            CP::CurveScalarField,
-            DensePolynomial<CP::CurveScalarField>,
-        >>::UniversalParams,
-        token_gadget: fn(
-            &mut StandardComposer<
-                <CP as CircuitParameters>::CurveScalarField,
-                <CP as CircuitParameters>::InnerCurve,
-            >,
-            private_inputs: &[CP::CurveScalarField],
-            public_inputs: &[CP::CurveScalarField],
-        ),
-        rng: &mut ThreadRng,
-    ) -> Self {
-        let token_vp = ValidityPredicate::<CP>::new(setup, token_gadget, &[], &[], false, rng);
+    pub fn new(rng: &mut impl RngCore) -> Self {
         Self {
-            name: String::from(name),
-            token_vp,
-            rcm_addr: CP::CurveScalarField::rand(rng),
+            // TODO: fix this in future.
+            token_vp: MockHashVP::dummy(rng),
         }
     }
 
-    pub fn address(&self) -> CP::CurveScalarField {
-        // The token address is a binding commitment of the token VP. TODO add name for unicity?
-        self.token_vp.commitment(self.rcm_addr)
-    }
+    pub fn address(&self) -> Result<CP::CurveScalarField, TaigaError> {
+        // Init poseidon param.
+        let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+            PoseidonConstants::generate::<WIDTH_3>();
 
-    pub fn get_vp(&self) -> &ValidityPredicate<CP> {
-        &self.token_vp
+        let address_fields = bits_to_fields::<CP::CurveScalarField>(&self.token_vp.to_bits());
+        poseidon_param.native_hash_two(&address_fields[0], &address_fields[1])
     }
+}
+
+#[test]
+fn token_address_computation() {
+    let mut rng = ark_std::test_rng();
+    let xan = Token::<crate::circuit::circuit_parameters::PairingCircuitParameters>::new(&mut rng);
+    xan.address().unwrap();
 }
