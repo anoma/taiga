@@ -1,141 +1,102 @@
-use ark_ff::One;
+use crate::circuit::circuit_parameters::CircuitParameters;
+use crate::circuit::validity_predicate::ValidityPredicate;
+use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
+use ark_ff::UniformRand;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use plonk_core::{
+    circuit::Circuit,
     constraint_system::StandardComposer,
-    prelude::Proof,
-    proof_system::{pi::PublicInputs, Prover, Verifier},
+    error::to_pc_error,
+    prelude::{Error, Point},
+    proof_system::{verifier::Verifier, Blinding, VerifierKey},
 };
-
-use crate::circuit::circuit_parameters::CircuitParameters;
+use rand::RngCore;
 
 pub struct BlindingCircuit<CP: CircuitParameters> {
-    pub public_input: PublicInputs<CP::CurveBaseField>,
-    pub proof: Proof<CP::CurveBaseField, CP::OuterCurvePC>,
-    pub verifier: Verifier<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC>,
-    pub vk: <CP::OuterCurvePC as PolynomialCommitment<
-        CP::CurveBaseField,
-        DensePolynomial<CP::CurveBaseField>,
-    >>::VerifierKey,
+    pub vk: VerifierKey<CP::CurveScalarField, CP::CurvePC>,
+    pub blinding: Blinding<CP::CurveScalarField>,
+    pub zh: [CP::CurveBaseField; 2],
+    pub private_inputs: Vec<CP::CurveBaseField>,
+}
+
+impl<CP> Circuit<CP::CurveBaseField, CP::Curve> for BlindingCircuit<CP>
+where
+    CP: CircuitParameters,
+{
+    const CIRCUIT_ID: [u8; 32] = [0x01; 32];
+
+    // Default implementation
+    fn gadget(
+        &mut self,
+        composer: &mut StandardComposer<CP::CurveBaseField, CP::Curve>,
+    ) -> Result<(), Error> {
+        // parse the public inputs (todo is Com(Z_H) a public input?)
+        let com_z_h = TEGroupAffine::<CP::Curve>::new(self.zh[0], self.zh[1]);
+
+        assert_eq!(self.private_inputs.len() % 3, 0);
+        let mut i = 0;
+        let mut q: Point<CP::Curve>;
+        while i < self.private_inputs.len() {
+            // parse the private inputs
+            q = composer.add_affine(TEGroupAffine::<CP::Curve>::new(
+                self.private_inputs[i],
+                self.private_inputs[i + 1],
+            ));
+            let b = composer.add_input(self.private_inputs[i + 2]);
+            // constraints
+            let b_zh = composer.fixed_base_scalar_mul(b, com_z_h);
+            let b_zh_add_q = composer.point_addition_gate(q, b_zh);
+
+            // public blinded point
+            composer.public_inputize(b_zh_add_q.x());
+            composer.public_inputize(b_zh_add_q.y());
+
+            i += 3;
+        }
+
+        println!("circuit size: {}", composer.circuit_bound());
+        Ok(())
+    }
+
+    fn padded_circuit_size(&self) -> usize {
+        1 << 12
+    }
 }
 
 impl<CP: CircuitParameters> BlindingCircuit<CP> {
-    pub fn precompute_prover(
-        setup: &<<CP as CircuitParameters>::OuterCurvePC as PolynomialCommitment<
-            CP::CurveBaseField,
-            DensePolynomial<CP::CurveBaseField>,
+    pub fn new<VP>(
+        rng: &mut impl RngCore,
+        vp: &mut VP,
+        vp_setup: &<CP::CurvePC as PolynomialCommitment<
+            CP::CurveScalarField,
+            DensePolynomial<CP::CurveScalarField>,
         >>::UniversalParams,
-        gadget: fn(&mut StandardComposer<CP::CurveBaseField, CP::Curve>),
-    ) -> (
-        // Prover
-        Prover<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC>,
-        // CommitterKey
-        <CP::OuterCurvePC as PolynomialCommitment<
-            CP::CurveBaseField,
-            DensePolynomial<CP::CurveBaseField>,
-        >>::CommitterKey,
-        // VerifierKey
-        <CP::OuterCurvePC as PolynomialCommitment<
-            CP::CurveBaseField,
-            DensePolynomial<CP::CurveBaseField>,
-        >>::VerifierKey,
-        // PublicInput
-        PublicInputs<CP::CurveBaseField>,
-    ) {
-        // Create a `Prover`
-        // Set the circuit using `gadget`
-        // Output `prover`, `vk`, `public_input`.
-
-        let mut prover = Prover::<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC>::new(b"demo");
-        prover.key_transcript(b"key", b"additional seed information");
-        gadget(prover.mut_cs());
-        let (ck, vk) = CP::OuterCurvePC::trim(
-            setup,
-            prover.circuit_bound().next_power_of_two() + 6,
-            0,
-            None,
-        )
-        .unwrap();
-        let public_input = prover.mut_cs().get_pi().clone();
-
-        (prover, ck, vk, public_input)
-    }
-
-    pub fn precompute_verifier(
-        gadget: fn(&mut StandardComposer<CP::CurveBaseField, CP::Curve>),
-    ) -> Verifier<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC> {
-        let mut verifier: Verifier<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC> =
-            Verifier::new(b"demo");
-        verifier.key_transcript(b"key", b"additional seed information");
-        gadget(verifier.mut_cs());
+    ) -> Result<Self, Error>
+    where
+        VP: ValidityPredicate<CP>,
+    {
+        let blinding = Blinding::<CP::CurveScalarField>::rand(rng);
+        let vp_circuit_size = vp.padded_circuit_size();
+        let (ck, _) = CP::CurvePC::trim(vp_setup, vp_circuit_size, 0, None)
+            .map_err(to_pc_error::<CP::CurveScalarField, CP::CurvePC>)?;
+        let mut verifier = Verifier::new(b"CircuitCompilation");
+        vp.gadget(verifier.mut_cs())?;
         verifier
-    }
+            .cs
+            .public_inputs
+            .update_size(verifier.circuit_bound());
+        verifier.preprocess(&ck)?;
+        let vk = verifier
+            .verifier_key
+            .expect("Unexpected error. Missing VerifierKey in compilation");
+        let (private_inputs, zh) = CP::get_inputs(&vk, &ck, &blinding);
 
-    pub fn preprocess(
-        prover: &mut Prover<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC>,
-        verifier: &mut Verifier<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC>,
-        ck: &<CP::OuterCurvePC as PolynomialCommitment<
-            CP::CurveBaseField,
-            DensePolynomial<CP::CurveBaseField>,
-        >>::CommitterKey,
-    ) {
-        prover.preprocess(ck).unwrap();
-        verifier.preprocess(ck).unwrap();
-    }
-
-    pub fn new(
-        setup: &<<CP as CircuitParameters>::OuterCurvePC as PolynomialCommitment<
-            CP::CurveBaseField,
-            DensePolynomial<CP::CurveBaseField>,
-        >>::UniversalParams,
-        gadget: fn(&mut StandardComposer<CP::CurveBaseField, CP::Curve>),
-    ) -> Self {
-        // Given a gadget corresponding to a circuit, create all the computations for PBC related to the VP
-
-        // Prover desc_vp
-        let (mut prover, ck, vk, public_input) = Self::precompute_prover(setup, gadget);
-        let mut verifier = Self::precompute_verifier(gadget);
-        Self::preprocess(&mut prover, &mut verifier, &ck);
-
-        // proof
-        let proof = prover.prove(&ck).unwrap();
-
-        Self {
-            public_input,
-            proof,
-            verifier,
+        Ok(Self {
             vk,
-        }
+            blinding,
+            zh,
+            private_inputs,
+        })
     }
-
-    pub fn verify(&self) {
-        self.verifier
-            .verify(&self.proof, &self.vk, &self.public_input)
-            .unwrap();
-    }
-}
-
-pub fn blind_gadget<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveBaseField, CP::Curve>,
-) {
-    // this one could be hard-coded here (not customizable)
-    let var_one = composer.add_input(CP::CurveBaseField::one());
-    composer.arithmetic_gate(|gate| {
-        gate.witness(var_one, var_one, None)
-            .add(CP::CurveBaseField::one(), CP::CurveBaseField::one())
-    });
-}
-
-fn _blinding_circuit_proof<CP: CircuitParameters>() {
-    use rand::rngs::ThreadRng;
-    let mut rng = ThreadRng::default();
-    let pp = <CP as CircuitParameters>::OuterCurvePC::setup(1 << 4, None, &mut rng).unwrap();
-
-    let circuit = BlindingCircuit::<CP>::new(&pp, blind_gadget::<CP>);
-    circuit.verify();
-}
-
-#[test]
-fn test_blinding_cirucit_proof_kzg() {
-    _blinding_circuit_proof::<crate::circuit::circuit_parameters::PairingCircuitParameters>()
 }

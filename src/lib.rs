@@ -151,7 +151,7 @@ fn add_to_tree(elem: &[u8], tree: &mut MerkleTree<Blake2s>) {
     tree.commit();
 }
 
-fn to_embedded_field<F1: PrimeField, F2: PrimeField>(x: F1) -> F2 {
+fn to_embedded_field<F1: PrimeField, F2: PrimeField>(x: &F1) -> F2 {
     // todo this embedding is probably not secure when we use bls12_377::BaseField \hookrightarrow bls12_377::ScalarField because of the different sizes.
     F2::from_le_bytes_mod_order(&x.into_repr().to_bytes_le())
 }
