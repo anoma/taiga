@@ -76,7 +76,7 @@ fn action_circuit_test() {
     type PC = <CP as CircuitParameters>::CurvePC;
     use crate::action::*;
     use crate::merkle_tree::MerklePath;
-    use crate::poseidon::POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2;
+    use crate::poseidon::POSEIDON_HASH_PARAM_BLS12_381_NEW_SCALAR_ARITY2;
     use ark_poly_commit::PolynomialCommitment;
     use ark_std::test_rng;
     use plonk_core::circuit::{verify_proof, VerifierData};
@@ -89,7 +89,7 @@ fn action_circuit_test() {
     let spend_info = SpendInfo::<CP>::new(
         spend_note,
         merkle_path,
-        &POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2,
+        &POSEIDON_HASH_PARAM_BLS12_381_NEW_SCALAR_ARITY2,
     );
 
     let output_info = OutputInfo::<CP>::dummy(&mut rng);

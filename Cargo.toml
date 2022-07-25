@@ -7,21 +7,19 @@ edition = "2021"
 
 [dependencies]
 ark-serialize = { version = "^0.3.0", default-features = false }
-ark-ff = { version = "^0.3.0", default-features = false }
-ark-ec = { version = "^0.3.0", default-features = false }
+ark-ff = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }
+ark-ec = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }
 ark-poly-commit = "0.3"
 ark-poly = "0.3"
-ark-bls12-377 = "0.3"
-ark-ed-on-bls12-377 = "0.3"
-ark-bw6-761 = "0.3"
-ark-pallas = "0.3"
-ark-vesta = "0.3"
+ark-bls12-381-new = { git="https://github.com/simonmasson/curves/", branch="new-pairing-layer" }
+ark-ed-on-bls12-381-new = { git="https://github.com/simonmasson/curves/", branch="new-pairing-layer" }
+ark-bw6-764-new = { git="https://github.com/simonmasson/curves/", branch="new-pairing-layer" }
 
 merlin = { version = "3.0", default-features = false }
 rand = "0.8.4"
 sha2 = "0.10.1"
-plonk-core = { git = "https://github.com/heliaxdev/ark-plonk/", features = ["trace"], branch="taiga/randomized-circuits" }
-plonk-hashing = { git = "https://github.com/heliaxdev/ark-plonk/", branch="taiga/randomized-circuits" }
+plonk-core = { git = "https://github.com/heliaxdev/ark-plonk/", features = ["trace"], branch="simon/poseidon-new-bls-curve" }
+plonk-hashing = { git = "https://github.com/heliaxdev/ark-plonk/", branch="simon/poseidon-new-bls-curve" }
 blake2 = "0.9"
 rs_merkle = { git = "https://github.com/heliaxdev/rs-merkle/" } # "0.2.2"
 lazy_static = "1"
@@ -33,8 +31,6 @@ blake2b_simd = "1"
 ark-std = "0.3"
 
 [patch.crates-io]
-ark-bls12-377 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
-ark-ed-on-bls12-377 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
-ark-bw6-761 = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
-ark-pallas = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
-ark-vesta = { git="https://github.com/simonmasson/curves/", branch="new-curve-models" }
+ark-serialize = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }
+ark-ff = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }
+ark-ec = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }

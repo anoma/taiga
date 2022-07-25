@@ -3,19 +3,19 @@
 #![allow(clippy::type_complexity)]
 
 use crate::poseidon::{
-    POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2, POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY4,
+    POSEIDON_HASH_PARAM_BLS12_381_NEW_SCALAR_ARITY2, POSEIDON_HASH_PARAM_BLS12_381_NEW_SCALAR_ARITY4,
     WIDTH_3, WIDTH_5,
 };
-use ark_bls12_377::Fq as Fq377;
-use ark_bls12_377::Fr as Fr377;
+use ark_bls12_381_new::Fq as Fq381_new;
+use ark_bls12_381_new::Fr as Fr381_new;
 use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
 use ark_ec::AffineCurve;
 use ark_ff::*;
 use ark_serialize::CanonicalSerialize;
 use circuit::circuit_parameters::CircuitParameters;
 use plonk_hashing::poseidon::poseidon::{NativeSpec, Poseidon};
-use poseidon::POSEIDON_HASH_PARAM_BLS12_377_BASE_ARITY2;
-use poseidon::POSEIDON_HASH_PARAM_BLS12_377_BASE_ARITY4;
+use poseidon::POSEIDON_HASH_PARAM_BLS12_381_NEW_BASE_ARITY2;
+use poseidon::POSEIDON_HASH_PARAM_BLS12_381_NEW_BASE_ARITY4;
 use rs_merkle::{algorithms::Blake2s, Hasher, MerkleTree};
 
 pub mod action;
@@ -38,11 +38,11 @@ pub trait HashToField: PrimeField {
     fn hash_to_field(x: &[u8]) -> Self;
 }
 
-impl HashToField for Fr377 {
+impl HashToField for Fr381_new {
     fn hash2_to_field(x: Self, y: Self) -> Self {
-        let mut poseidon = Poseidon::<(), NativeSpec<Fr377, WIDTH_3>, WIDTH_3>::new(
+        let mut poseidon = Poseidon::<(), NativeSpec<Fr381_new, WIDTH_3>, WIDTH_3>::new(
             &mut (),
-            &POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2,
+            &POSEIDON_HASH_PARAM_BLS12_381_NEW_SCALAR_ARITY2,
         );
         poseidon.input(x).unwrap();
         poseidon.input(y).unwrap();
@@ -50,9 +50,9 @@ impl HashToField for Fr377 {
     }
 
     fn hash4_to_field(x: Self, y: Self, z: Self, t: Self) -> Self {
-        let mut poseidon = Poseidon::<(), NativeSpec<Fr377, WIDTH_5>, WIDTH_5>::new(
+        let mut poseidon = Poseidon::<(), NativeSpec<Fr381_new, WIDTH_5>, WIDTH_5>::new(
             &mut (),
-            &POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY4,
+            &POSEIDON_HASH_PARAM_BLS12_381_NEW_SCALAR_ARITY4,
         );
         poseidon.input(x).unwrap();
         poseidon.input(y).unwrap();
@@ -68,11 +68,11 @@ impl HashToField for Fr377 {
     }
 }
 
-impl HashToField for Fq377 {
+impl HashToField for Fq381_new {
     fn hash2_to_field(x: Self, y: Self) -> Self {
-        let mut poseidon = Poseidon::<(), NativeSpec<Fq377, WIDTH_3>, WIDTH_3>::new(
+        let mut poseidon = Poseidon::<(), NativeSpec<Fq381_new, WIDTH_3>, WIDTH_3>::new(
             &mut (),
-            &POSEIDON_HASH_PARAM_BLS12_377_BASE_ARITY2,
+            &POSEIDON_HASH_PARAM_BLS12_381_NEW_BASE_ARITY2,
         );
         poseidon.input(x).unwrap();
         poseidon.input(y).unwrap();
@@ -80,9 +80,9 @@ impl HashToField for Fq377 {
     }
 
     fn hash4_to_field(x: Self, y: Self, z: Self, t: Self) -> Self {
-        let mut poseidon = Poseidon::<(), NativeSpec<Fq377, WIDTH_5>, WIDTH_5>::new(
+        let mut poseidon = Poseidon::<(), NativeSpec<Fq381_new, WIDTH_5>, WIDTH_5>::new(
             &mut (),
-            &POSEIDON_HASH_PARAM_BLS12_377_BASE_ARITY4,
+            &POSEIDON_HASH_PARAM_BLS12_381_NEW_BASE_ARITY4,
         );
         poseidon.input(x).unwrap();
         poseidon.input(y).unwrap();

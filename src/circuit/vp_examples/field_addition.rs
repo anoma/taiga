@@ -139,23 +139,23 @@ fn test_field_addition_vp_example() {
     // Expecting vk_blind(out of circuit)
     let mut expect_pi = PublicInputs::new(blinding_circuit_size);
     let q_m = ws_to_te(vk_blind.arithmetic.q_m.0);
-    expect_pi.insert(388, q_m.x);
-    expect_pi.insert(389, q_m.y);
+    expect_pi.insert(392, q_m.x);
+    expect_pi.insert(393, q_m.y);
     let q_l = ws_to_te(vk_blind.arithmetic.q_l.0);
-    expect_pi.insert(774, q_l.x);
-    expect_pi.insert(775, q_l.y);
+    expect_pi.insert(782, q_l.x);
+    expect_pi.insert(783, q_l.y);
     let q_r = ws_to_te(vk_blind.arithmetic.q_r.0);
-    expect_pi.insert(1160, q_r.x);
-    expect_pi.insert(1161, q_r.y);
+    expect_pi.insert(1172, q_r.x);
+    expect_pi.insert(1173, q_r.y);
     let q_o = ws_to_te(vk_blind.arithmetic.q_o.0);
-    expect_pi.insert(1546, q_o.x);
-    expect_pi.insert(1547, q_o.y);
+    expect_pi.insert(1562, q_o.x);
+    expect_pi.insert(1563, q_o.y);
     let q_4 = ws_to_te(vk_blind.arithmetic.q_4.0);
-    expect_pi.insert(1932, q_4.x);
-    expect_pi.insert(1933, q_4.y);
+    expect_pi.insert(1952, q_4.x);
+    expect_pi.insert(1953, q_4.y);
     let q_c = ws_to_te(vk_blind.arithmetic.q_c.0);
-    expect_pi.insert(2318, q_c.x);
-    expect_pi.insert(2319, q_c.y);
+    expect_pi.insert(2342, q_c.x);
+    expect_pi.insert(2343, q_c.y);
 
     assert_eq!(pi, expect_pi);
 

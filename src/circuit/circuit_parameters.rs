@@ -83,15 +83,15 @@ pub trait CircuitParameters: Copy {
 pub struct PairingCircuitParameters {}
 
 impl CircuitParameters for PairingCircuitParameters {
-    type CurveScalarField = ark_bls12_377::Fr;
-    type CurveBaseField = ark_bls12_377::Fq;
-    type Curve = ark_bls12_377::g1::Parameters;
-    type InnerCurveScalarField = ark_ed_on_bls12_377::Fr;
-    type InnerCurve = ark_ed_on_bls12_377::EdwardsParameters;
-    type OuterCurveBaseField = ark_bw6_761::Fq;
-    type OuterCurve = ark_bw6_761::g1::Parameters;
-    type CurvePC = KZG10<ark_bls12_377::Bls12_377>;
-    type OuterCurvePC = KZG10<ark_bw6_761::BW6_761>;
+    type CurveScalarField = ark_bls12_381_new::Fr;
+    type CurveBaseField = ark_bls12_381_new::Fq;
+    type Curve = ark_bls12_381_new::g1::Parameters;
+    type InnerCurveScalarField = ark_ed_on_bls12_381_new::Fr;
+    type InnerCurve = ark_ed_on_bls12_381_new::Parameters;
+    type OuterCurveBaseField = ark_bw6_764_new::Fq;
+    type OuterCurve = ark_bw6_764_new::g1::Parameters;
+    type CurvePC = KZG10<ark_bls12_381_new::Bls12_381New>;
+    type OuterCurvePC = KZG10<ark_bw6_764_new::BW6_764New>;
 
     fn get_inputs(
         desc_vp: &VerifierKey<Self::CurveScalarField, Self::CurvePC>,

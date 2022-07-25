@@ -12,16 +12,16 @@ pub const WIDTH_3: usize = 3;
 pub const WIDTH_5: usize = 5;
 pub const WIDTH_9: usize = 9;
 lazy_static! {
-    pub static ref POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2: PoseidonConstants<ark_bls12_377::Fr> =
+    pub static ref POSEIDON_HASH_PARAM_BLS12_381_NEW_SCALAR_ARITY2: PoseidonConstants<ark_bls12_381_new::Fr> =
         PoseidonConstants::generate::<WIDTH_3>();
-    pub static ref POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY4: PoseidonConstants<ark_bls12_377::Fr> =
+    pub static ref POSEIDON_HASH_PARAM_BLS12_381_NEW_SCALAR_ARITY4: PoseidonConstants<ark_bls12_381_new::Fr> =
         PoseidonConstants::generate::<WIDTH_5>();
 
     // Hashes of bls12_377::BaseField are generated automatically, not tested yet.
     // Especially we need to check the round number generation from the paper.
-    pub static ref POSEIDON_HASH_PARAM_BLS12_377_BASE_ARITY2: PoseidonConstants<ark_bls12_377::Fq> =
+    pub static ref POSEIDON_HASH_PARAM_BLS12_381_NEW_BASE_ARITY2: PoseidonConstants<ark_bls12_381_new::Fq> =
         PoseidonConstants::generate::<WIDTH_3>();
-    pub static ref POSEIDON_HASH_PARAM_BLS12_377_BASE_ARITY4: PoseidonConstants<ark_bls12_377::Fq> =
+    pub static ref POSEIDON_HASH_PARAM_BLS12_381_NEW_BASE_ARITY4: PoseidonConstants<ark_bls12_381_new::Fq> =
         PoseidonConstants::generate::<WIDTH_5>();
 }
 
@@ -58,15 +58,15 @@ fn test_poseidon_circuit_example() {
     use ark_ec::PairingEngine;
     use ark_std::{test_rng, UniformRand};
     use plonk_hashing::poseidon::poseidon::{NativeSpec, PlonkSpec, Poseidon};
-    type E = ark_bls12_377::Bls12_377;
-    type P = ark_ed_on_bls12_377::EdwardsParameters;
+    type E = ark_bls12_381_new::Bls12_381New;
+    type P = ark_ed_on_bls12_381_new::Parameters;
     type Fr = <E as PairingEngine>::Fr;
     use plonk_core::constraint_system::StandardComposer;
 
     let mut rng = test_rng();
     let mut poseidon_native = Poseidon::<(), NativeSpec<Fr, WIDTH_3>, WIDTH_3>::new(
         &mut (),
-        &POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2,
+        &POSEIDON_HASH_PARAM_BLS12_381_NEW_SCALAR_ARITY2,
     );
     let inputs = (0..(WIDTH_3 - 1))
         .map(|_| Fr::rand(&mut rng))
@@ -81,7 +81,7 @@ fn test_poseidon_circuit_example() {
     let inputs_var = inputs.iter().map(|x| c.add_input(*x)).collect::<Vec<_>>();
     let mut poseidon_circuit = Poseidon::<_, PlonkSpec<WIDTH_3>, WIDTH_3>::new(
         &mut c,
-        &POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2,
+        &POSEIDON_HASH_PARAM_BLS12_381_NEW_SCALAR_ARITY2,
     );
     inputs_var.iter().for_each(|x| {
         let _ = poseidon_circuit.input(*x).unwrap();
