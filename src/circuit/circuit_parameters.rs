@@ -1,6 +1,4 @@
-use crate::com;
 use crate::utils::ws_to_te;
-use crate::HashToField;
 use ark_ec::{
     //short_weierstrass_jacobian::GroupAffine as SWGroupAffine,
     SWModelParameters,
@@ -19,8 +17,8 @@ pub trait CircuitParameters: Copy {
     //   Base Field      Fr            Fq
 
     // Curve
-    type CurveScalarField: PrimeField + HashToField;
-    type CurveBaseField: PrimeField + HashToField;
+    type CurveScalarField: PrimeField;
+    type CurveBaseField: PrimeField;
     type Curve: TEModelParameters<
         ScalarField = Self::CurveScalarField,
         BaseField = Self::CurveBaseField,
@@ -40,19 +38,6 @@ pub trait CircuitParameters: Copy {
 
     type CurvePC: HomomorphicCommitment<Self::CurveScalarField>;
     type OuterCurvePC: HomomorphicCommitment<Self::CurveBaseField>;
-
-    // F_q is the scalar field of *Curve*
-    fn com_r(
-        x: &Vec<Self::CurveScalarField>,
-        rand: Self::CurveScalarField,
-    ) -> Self::CurveScalarField {
-        com(x, rand)
-    }
-
-    // F_p is the base field of *Curve*
-    fn com_q(x: &Vec<Self::CurveBaseField>, rand: Self::CurveBaseField) -> Self::CurveBaseField {
-        com(x, rand)
-    }
 
     fn pack_vk(
         vk: &VerifierKey<Self::CurveScalarField, Self::CurvePC>,
