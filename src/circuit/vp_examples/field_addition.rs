@@ -17,7 +17,7 @@ pub struct FieldAdditionValidityPredicate<CP: CircuitParameters> {
     a: CP::CurveScalarField,
     b: CP::CurveScalarField,
     // custom "public" inputs to the VP
-    c: CP::CurveScalarField,
+    pub c: CP::CurveScalarField,
 }
 
 impl<CP> ValidityPredicate<CP> for FieldAdditionValidityPredicate<CP>
