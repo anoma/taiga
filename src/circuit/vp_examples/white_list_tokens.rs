@@ -14,12 +14,12 @@ use plonk_hashing::poseidon::constants::PoseidonConstants;
 // WhiteListTokensValidityPredicate have a custom constraint checking that the received notes come from known senders.
 pub struct WhiteListTokensValidityPredicate<CP: CircuitParameters> {
     // basic "private" inputs to the VP
-    pub input_notes: [Note<CP>; NUM_NOTE],
-    pub output_notes: [Note<CP>; NUM_NOTE],
+    input_notes: [Note<CP>; NUM_NOTE],
+    output_notes: [Note<CP>; NUM_NOTE],
     // custom "private" inputs to the VP
-    pub white_list_tokens: Vec<Token<CP>>,
-    pub mk_root: Node<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>,
-    pub paths: Vec<MerklePath<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>>,
+    white_list_tokens: Vec<Token<CP>>,
+    mk_root: Node<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>,
+    paths: Vec<MerklePath<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>>,
 }
 
 impl<CP> ValidityPredicate<CP> for WhiteListTokensValidityPredicate<CP>

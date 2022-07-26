@@ -18,9 +18,9 @@ use rand::RngCore;
 const BLINDING_PC_NUM: usize = 6;
 
 pub struct BlindingCircuit<CP: CircuitParameters> {
-    pub vp_desc: ValidityPredicateDescription<CP>,
-    pub blinding: Blinding<CP::CurveScalarField>,
-    pub zh: [CP::CurveBaseField; 2],
+    vp_desc: ValidityPredicateDescription<CP>,
+    blinding: Blinding<CP::CurveScalarField>,
+    zh: [CP::CurveBaseField; 2],
 }
 
 impl<CP> Circuit<CP::CurveBaseField, CP::Curve> for BlindingCircuit<CP>
@@ -121,5 +121,9 @@ impl<CP: CircuitParameters> BlindingCircuit<CP> {
             blinding,
             zh,
         })
+    }
+
+    pub fn get_blinding(&self) -> Blinding<CP::CurveScalarField> {
+        self.blinding
     }
 }

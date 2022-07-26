@@ -11,13 +11,13 @@ use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude:
 // in which a, b are private inputs and c is a public input.
 pub struct FieldAdditionValidityPredicate<CP: CircuitParameters> {
     // basic "private" inputs to the VP
-    pub input_notes: [Note<CP>; NUM_NOTE],
-    pub output_notes: [Note<CP>; NUM_NOTE],
+    input_notes: [Note<CP>; NUM_NOTE],
+    output_notes: [Note<CP>; NUM_NOTE],
     // custom "private" inputs to the VP
-    pub a: CP::CurveScalarField,
-    pub b: CP::CurveScalarField,
+    a: CP::CurveScalarField,
+    b: CP::CurveScalarField,
     // custom "public" inputs to the VP
-    pub c: CP::CurveScalarField,
+    c: CP::CurveScalarField,
 }
 
 impl<CP> ValidityPredicate<CP> for FieldAdditionValidityPredicate<CP>
@@ -113,7 +113,7 @@ fn test_field_addition_vp_example() {
 
     // Compile vp(must use compile_with_blinding)
     let (pk_p, vk_blind) = field_addition_vp
-        .compile_with_blinding::<PC>(&vp_setup, &blinding_circuit.blinding)
+        .compile_with_blinding::<PC>(&vp_setup, &blinding_circuit.get_blinding())
         .unwrap();
 
     // VP Prover
