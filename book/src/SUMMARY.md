@@ -1,9 +1,11 @@
 # Summary
 
-- [Introduction](./introduction.md)
-- [Questions](./questions.md)
+- [Overview](./overview.md)
 - [Taiga by example](./taiga-by-example.md)
 - [Specifications](./spec.md)
+- [Keys](./keys.md)
+    - [Orchard](./keys/orchard.md)
+    - [Sapling](./keys/sapling.md)
 - [Implementation tasks](./implementation-tasks.md)
 - [Validity predicates in the context of transparent Anoma](./transparent-anoma.md)
     - [Validity predicate definition](./transparent-anoma/vp-def.md)
