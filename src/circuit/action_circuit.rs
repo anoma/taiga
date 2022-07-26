@@ -7,6 +7,11 @@ use crate::poseidon::WIDTH_3;
 use plonk_core::{circuit::Circuit, constraint_system::StandardComposer};
 use plonk_hashing::poseidon::constants::PoseidonConstants;
 
+pub const ACTION_PUBLIC_INPUT_NF_INDEX: usize = 10781;
+pub const ACTION_PUBLIC_INPUT_ROOT_INDEX: usize = 12530;
+pub const ACTION_PUBLIC_INPUT_CM_INDEX: usize = 19586;
+pub const ACTION_CIRCUIT_SIZE: usize = 1 << 15;
+
 /// Action circuit
 #[derive(Debug, Clone)]
 pub struct ActionCircuit<CP: CircuitParameters> {
@@ -64,7 +69,7 @@ where
         Ok(())
     }
     fn padded_circuit_size(&self) -> usize {
-        1 << 15
+        ACTION_CIRCUIT_SIZE
     }
 }
 
@@ -108,9 +113,9 @@ fn action_circuit_test() {
 
     // Check the public inputs
     let mut expect_pi = PublicInputs::new(action_circuit.padded_circuit_size());
-    expect_pi.insert(10781, action.nf.inner());
-    expect_pi.insert(12530, action.root);
-    expect_pi.insert(19586, action.cm.inner());
+    expect_pi.insert(ACTION_PUBLIC_INPUT_NF_INDEX, action.nf.inner());
+    expect_pi.insert(ACTION_PUBLIC_INPUT_ROOT_INDEX, action.root);
+    expect_pi.insert(ACTION_PUBLIC_INPUT_CM_INDEX, action.cm.inner());
     assert_eq!(pi, expect_pi);
     // Verifier
     let verifier_data = VerifierData::new(vk, expect_pi);

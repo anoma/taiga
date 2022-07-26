@@ -1,78 +1,249 @@
-use crate::nullifier::Nullifier;
-use crate::circuit::validity_predicate::ValidityPredicate;
-use crate::el_gamal::EncryptedNote;
-use crate::{
-    action::Action, add_to_tree, is_in_tree, note::Note, serializable_to_vec, CircuitParameters,
+use crate::action::{Action, ActionInfo};
+use crate::circuit::action_circuit::{
+    ACTION_CIRCUIT_SIZE, ACTION_PUBLIC_INPUT_CM_INDEX, ACTION_PUBLIC_INPUT_NF_INDEX,
+    ACTION_PUBLIC_INPUT_ROOT_INDEX,
 };
-use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
-use rs_merkle::{algorithms::Blake2s, MerkleTree};
+use crate::circuit::blinding_circuit::BlindingCircuit;
+use crate::circuit::circuit_parameters::CircuitParameters;
+use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
+use crate::error::TaigaError;
+use crate::vp_description::ValidityPredicateDescription;
+use ark_poly::univariate::DensePolynomial;
+use ark_poly_commit::PolynomialCommitment;
+use plonk_core::circuit::Circuit;
+use plonk_core::circuit::{verify_proof, VerifierData};
+use plonk_core::proof_system::{pi::PublicInputs, Proof, VerifierKey};
+use rand::RngCore;
 
-pub struct Transaction<'a, CP: CircuitParameters> {
-    //max: usize, // the maximum number of actions/notes for a transaction
-    actions: Vec<Action<CP>>,
-    spent_notes: Vec<(Note<CP>, Nullifier<CP>)>,
-    created_notes: Vec<(Note<CP>, EncryptedNote<CP::InnerCurve>)>,
-    vps: &'a Vec<ValidityPredicate<CP>>,
+pub const NUM_TX_SLICE: usize = NUM_NOTE;
+
+pub struct Transaction<CP: CircuitParameters> {
+    pub action_slices: [ActionSlice<CP>; NUM_TX_SLICE],
+    pub spend_slices: [SpendSlice<CP>; NUM_TX_SLICE],
+    pub output_slices: [OutputSlice<CP>; NUM_TX_SLICE],
 }
 
-impl<'a, CP: CircuitParameters> Transaction<'a, CP> {
-    pub fn new(
-        //max: usize,
-        actions: Vec<Action<CP>>,
-        spent_notes: Vec<(Note<CP>, Nullifier<CP>)>,
-        created_notes: Vec<(Note<CP>, EncryptedNote<CP::InnerCurve>)>,
-        vps: &'a Vec<ValidityPredicate<CP>>,
+pub struct ActionSlice<CP: CircuitParameters> {
+    pub action_proof: Proof<CP::CurveScalarField, CP::CurvePC>,
+    pub action_public: Action<CP>,
+}
+
+pub struct SpendSlice<CP: CircuitParameters> {
+    pub spend_addr_vp: VPCheck<CP>,
+    pub spend_token_vp: VPCheck<CP>,
+}
+
+pub struct OutputSlice<CP: CircuitParameters> {
+    output_addr_vp: VPCheck<CP>,
+    output_token_vp: VPCheck<CP>,
+}
+
+pub struct VPCheck<CP: CircuitParameters> {
+    // VP circuit size
+    pub vp_circuit_size: usize,
+    // VP proof
+    pub vp_proof: Proof<CP::CurveScalarField, CP::CurvePC>,
+    // The public inputs for vp proof
+    // TODO: maybe the PublicInputs<CP::CurveScalarField> should be serialized from Vec<CP::CurveScalarField>, like the action_public in ActionSlice?
+    pub vp_public_inputs: PublicInputs<CP::CurveScalarField>,
+    // The vk of vp is blinded partially, blinded parts can be constructed from blinded_vp_public_inputs.
+    // The unblinded_vp_vk is the unblinded parts.
+    // TODO:
+    pub unblinded_vp_vk: VerifierKey<CP::CurveScalarField, CP::CurvePC>,
+    // blind vp proof
+    pub blind_vp_proof: Proof<CP::CurveBaseField, CP::OuterCurvePC>,
+    // The public inputs for blind vp proof
+    pub blinded_vp_public_inputs: PublicInputs<CP::CurveBaseField>,
+    // TODO:
+    // pub vp_com
+    // pub vp_param
+    // pub vp_memo
+}
+
+impl<CP: CircuitParameters> ActionSlice<CP> {
+    pub fn from_action_info(
+        action_info: ActionInfo<CP>,
+        rng: &mut impl RngCore,
+        setup: &<CP::CurvePC as PolynomialCommitment<
+            CP::CurveScalarField,
+            DensePolynomial<CP::CurveScalarField>,
+        >>::UniversalParams,
     ) -> Self {
-        Self {
-            //max,
-            actions,
-            spent_notes,
-            created_notes,
-            vps,
+        let (action_public, mut action_circuit) = action_info.build(rng).unwrap();
+        // Compile the circuit
+        let (pk_p, vk) = action_circuit.compile::<CP::CurvePC>(setup).unwrap();
+
+        // Prover
+        let (action_proof, pi) = action_circuit
+            .gen_proof::<CP::CurvePC>(setup, pk_p, b"Test")
+            .unwrap();
+
+        // Verifier
+        let verifier_data = VerifierData::new(vk, pi);
+        verify_proof::<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>(
+            setup,
+            verifier_data.key,
+            &action_proof,
+            &verifier_data.pi,
+            b"Test",
+        )
+        .unwrap();
+
+        ActionSlice {
+            action_public,
+            action_proof,
         }
     }
 
-    fn check(&self) {
-        //1. action check
-
-        //2. verify validity predicates;
-        //2.1 todo: update to verification of blinded vps
-        //2.2 todo: add blinding circuit check
-        for vp in self.vps {
-            vp.verify()
-        }
-    }
-
-    pub fn process(
+    pub fn verify(
         &self,
-        nf_tree: &mut MerkleTree<Blake2s>,
-        mt_tree: &mut MerkleTree<Blake2s>,
-        cm_ce_list: &mut Vec<(TEGroupAffine<CP::InnerCurve>, EncryptedNote<CP::InnerCurve>)>,
-    ) {
-        self.check();
-        for i in self.spent_notes.iter() {
-            //1. add nf to the nullifier tree
-            let nullifier_bytes = i.1.to_bytes();
-            if !is_in_tree(&nullifier_bytes, nf_tree) {
-                add_to_tree(&nullifier_bytes, nf_tree);
-            }
+        action_setup: &<CP::CurvePC as PolynomialCommitment<
+            CP::CurveScalarField,
+            DensePolynomial<CP::CurveScalarField>,
+        >>::UniversalParams,
+        action_vk: &VerifierKey<CP::CurveScalarField, CP::CurvePC>,
+    ) -> Result<(), TaigaError> {
+        let mut action_pi = PublicInputs::new(ACTION_CIRCUIT_SIZE);
+        action_pi.insert(ACTION_PUBLIC_INPUT_NF_INDEX, self.action_public.nf.inner());
+        action_pi.insert(ACTION_PUBLIC_INPUT_ROOT_INDEX, self.action_public.root);
+        action_pi.insert(ACTION_PUBLIC_INPUT_CM_INDEX, self.action_public.cm.inner());
+
+        let verifier_data = VerifierData::new(action_vk.clone(), action_pi);
+        verify_proof::<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>(
+            action_setup,
+            verifier_data.key,
+            &self.action_proof,
+            &verifier_data.pi,
+            b"Test",
+        )?;
+        Ok(())
+    }
+}
+
+impl<CP: CircuitParameters> VPCheck<CP> {
+    pub fn build<VP>(
+        vp: &mut VP,
+        vp_setup: &<CP::CurvePC as PolynomialCommitment<
+            CP::CurveScalarField,
+            DensePolynomial<CP::CurveScalarField>,
+        >>::UniversalParams,
+        blinding_setup: &<CP::OuterCurvePC as PolynomialCommitment<
+            CP::CurveBaseField,
+            DensePolynomial<CP::CurveBaseField>,
+        >>::UniversalParams,
+        rng: &mut impl RngCore,
+    ) -> Self
+    where
+        VP: ValidityPredicate<CP>,
+    {
+        let vp_circuit_size = vp.padded_circuit_size();
+        // Generate blinding circuit for vp
+        let vp_desc = ValidityPredicateDescription::from_vp(vp, vp_setup).unwrap();
+        // let vp_desc_compressed = vp_desc.get_compress();
+        let mut blinding_circuit =
+            BlindingCircuit::<CP>::new(rng, vp_desc, vp_setup, vp_circuit_size).unwrap();
+
+        // Compile vp(must use compile_with_blinding)
+        let (pk_p, vk_blind) = vp
+            .compile_with_blinding::<CP::CurvePC>(vp_setup, &blinding_circuit.blinding)
+            .unwrap();
+
+        // VP Prover
+        let (vp_proof, pi) = vp
+            .gen_proof::<CP::CurvePC>(vp_setup, pk_p, b"Test")
+            .unwrap();
+
+        // VP verifier
+        let vp_verifier_data = VerifierData::new(vk_blind.clone(), pi);
+        verify_proof::<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>(
+            vp_setup,
+            vp_verifier_data.key,
+            &vp_proof,
+            &vp_verifier_data.pi,
+            b"Test",
+        )
+        .unwrap();
+
+        // Generate blinding circuit CRS
+        let (pk_p, vk) = blinding_circuit
+            .compile::<CP::OuterCurvePC>(blinding_setup)
+            .unwrap();
+
+        // Blinding Prover
+        let (blind_vp_proof, pi) = blinding_circuit
+            .gen_proof::<CP::OuterCurvePC>(blinding_setup, pk_p, b"Test")
+            .unwrap();
+
+        // Blinding Verifier
+        let blinding_verifier_data = VerifierData::new(vk, pi);
+        verify_proof::<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC>(
+            blinding_setup,
+            blinding_verifier_data.key,
+            &blind_vp_proof,
+            &blinding_verifier_data.pi,
+            b"Test",
+        )
+        .unwrap();
+
+        Self {
+            vp_circuit_size,
+            vp_proof,
+            vp_public_inputs: vp_verifier_data.pi,
+            unblinded_vp_vk: vk_blind,
+            blind_vp_proof,
+            blinded_vp_public_inputs: blinding_verifier_data.pi,
+        }
+    }
+
+    pub fn verify(
+        &self,
+        blind_vp_setup: &<CP::OuterCurvePC as PolynomialCommitment<
+            CP::CurveBaseField,
+            DensePolynomial<CP::CurveBaseField>,
+        >>::UniversalParams,
+        blind_vp_vk: &VerifierKey<CP::CurveBaseField, CP::OuterCurvePC>,
+    ) -> Result<(), TaigaError> {
+        Ok(())
+    }
+}
+
+impl<CP: CircuitParameters> Transaction<CP> {
+    pub fn verify(
+        &self,
+        action_setup: &<CP::CurvePC as PolynomialCommitment<
+            CP::CurveScalarField,
+            DensePolynomial<CP::CurveScalarField>,
+        >>::UniversalParams,
+        action_vk: &VerifierKey<CP::CurveScalarField, CP::CurvePC>,
+        blind_vp_setup: &<CP::OuterCurvePC as PolynomialCommitment<
+            CP::CurveBaseField,
+            DensePolynomial<CP::CurveBaseField>,
+        >>::UniversalParams,
+        blind_vp_vk: &VerifierKey<CP::CurveBaseField, CP::OuterCurvePC>,
+        // ledger state
+        // ledger: &Ledger,
+    ) -> Result<(), TaigaError> {
+        // verify action proof
+        for action in self.action_slices.iter() {
+            action.verify(action_setup, action_vk)?
         }
 
-        for i in self.created_notes.iter() {
-            let cm_bytes = serializable_to_vec(&i.0.commitment());
-            //2. add commitments to the note commitment tree
-            add_to_tree(&cm_bytes, mt_tree);
-
-            //3. add (cm, ce) pair to the list
-            cm_ce_list.push((i.0.commitment(), i.1.clone()));
+        // verify spend vp proof and blind proof
+        for spend in self.spend_slices.iter() {
+            spend.spend_addr_vp.verify(blind_vp_setup, blind_vp_vk)?;
+            spend.spend_token_vp.verify(blind_vp_setup, blind_vp_vk)?;
         }
 
-        //3. recompute rt
-        // commit() method recomputes the root. as we only need to recompute it once,
-        // should we commit just once after all leaves are added to the tree?
-        // or we want to "save" every leaf in case of emergency situation?
-        mt_tree.commit();
-        //assert!(self.actions.len() < self._max);
-        //assert!(self.spent_notes.len() < self._max);
+        // verify output vp proof and blind proof
+        for output in self.output_slices.iter() {
+            output.output_addr_vp.verify(blind_vp_setup, blind_vp_vk)?;
+            output.output_token_vp.verify(blind_vp_setup, blind_vp_vk)?;
+        }
+
+        // check public input consistency(nf, output_cm, com_vp)
+
+        // check ledger state
+
+        Ok(())
     }
 }
