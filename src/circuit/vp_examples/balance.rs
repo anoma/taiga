@@ -15,6 +15,15 @@ pub struct BalanceValidityPredicate<CP: CircuitParameters> {
     output_notes: [Note<CP>; NUM_NOTE],
 }
 
+impl<CP: CircuitParameters> BalanceValidityPredicate<CP> {
+    pub fn new(input_notes: [Note<CP>; NUM_NOTE], output_notes: [Note<CP>; NUM_NOTE]) -> Self {
+        BalanceValidityPredicate {
+            input_notes: input_notes,
+            output_notes: output_notes,
+        }
+    }
+}
+
 impl<CP> ValidityPredicate<CP> for BalanceValidityPredicate<CP>
 where
     CP: CircuitParameters,
@@ -110,7 +119,7 @@ fn test_balance_vp_example() {
 
     // use ark_poly_commit::PolynomialCommitment;
     // use plonk_core::circuit::{verify_proof, VerifierData};
-    
+
     // // Generate CRS
     // let pp = PC::setup(balance_vp.padded_circuit_size(), None, &mut rng).unwrap();
 
