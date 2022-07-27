@@ -1,10 +1,9 @@
-use ark_bls12_381_new::{Fq, g1::self, G1Projective};
+use ark_bls12_381_new::Fq;
 use ark_ec::{
     short_weierstrass_jacobian::GroupAffine as SWGroupAffine,
-    twisted_edwards_extended::GroupAffine as TEGroupAffine, TEModelParameters, ProjectiveCurve,
+    twisted_edwards_extended::GroupAffine as TEGroupAffine,
 };
-use ark_ff::{field_new, BigInteger, One, PrimeField, UniformRand};
-use ark_std::test_rng;
+use ark_ff::{field_new, BigInteger, One, PrimeField};
 
 pub fn bits_to_fields<F: PrimeField>(bits: &[bool]) -> Vec<F> {
     bits.chunks((F::size_in_bits() - 1) as usize)
@@ -47,8 +46,12 @@ pub fn ws_to_te(
 
 #[test]
 fn test_ws_to_te() {
-    // todo test here
-    let mut rng = test_rng();
+    use ark_bls12_381_new::g1::G1Projective;
+    use ark_bls12_381_new::g1;
+    use ark_ec::ProjectiveCurve;
+    use ark_ec::TEModelParameters;
+    use ark_std::UniformRand;
+    let mut rng = ark_std::test_rng();
     for _ in 0..100 {
         let p_ws: SWGroupAffine<g1::Parameters> = G1Projective::rand(&mut rng).into_affine();
         let p_te = ws_to_te(p_ws);

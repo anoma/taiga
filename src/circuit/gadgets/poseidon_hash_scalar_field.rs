@@ -23,10 +23,10 @@ pub fn poseidon_hash_curve_scalar_field_gadget<
         .collect::<Vec<_>>();
 
     // params for poseidon TODO make it const
-    let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
+    let poseidon_hash_param_bls12_381_new_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
     let mut poseidon_circuit = Poseidon::<_, PlonkSpec<WIDTH_3>, WIDTH_3>::new(
         composer,
-        &poseidon_hash_param_bls12_377_scalar_arity2,
+        &poseidon_hash_param_bls12_381_new_scalar_arity2,
     );
     inputs_var.iter().for_each(|x| {
         let _ = poseidon_circuit.input(*x).unwrap();
@@ -51,10 +51,10 @@ fn test_poseidon_gadget() {
     let ω = (0..(WIDTH_3 - 1))
         .map(|_| F::rand(&mut rng))
         .collect::<Vec<_>>();
-    let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
+    let poseidon_hash_param_bls12_381_new_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
     let mut poseidon = Poseidon::<(), NativeSpec<F, WIDTH_3>, WIDTH_3>::new(
         &mut (),
-        &poseidon_hash_param_bls12_377_scalar_arity2,
+        &poseidon_hash_param_bls12_381_new_scalar_arity2,
     );
     ω.iter().for_each(|x| {
         poseidon.input(*x).unwrap();

@@ -17,10 +17,10 @@ pub fn bad_hash_to_curve_gadget<F: PrimeField, P: TEModelParameters<BaseField = 
 ) -> Point<P> {
     // (bad) hash to curve:
     // 1. hash a scalar using poseidon
-    let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
+    let poseidon_hash_param_bls12_381_new_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
     let mut poseidon = Poseidon::<(), NativeSpec<F, WIDTH_3>, WIDTH_3>::new(
         &mut (),
-        &poseidon_hash_param_bls12_377_scalar_arity2,
+        &poseidon_hash_param_bls12_381_new_scalar_arity2,
     );
     private_inputs.iter().for_each(|x| {
         poseidon.input(*x).unwrap();

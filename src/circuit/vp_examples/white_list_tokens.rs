@@ -41,7 +41,7 @@ where
         output_note_variables: &[ValidityPredicateOuputNoteVariables],
     ) -> Result<(), Error> {
         let expected_var = composer.add_input(self.mk_root.inner());
-        let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
+        let poseidon_hash_param_bls12_381_new_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
         for (output_note_variable, path) in output_note_variables.iter().zip(self.paths.clone()) {
             let token_var = output_note_variable.token_addr;
             let root_var = merkle_tree_gadget::<
@@ -52,7 +52,7 @@ where
                 composer,
                 &token_var,
                 &path.get_path(),
-                &poseidon_hash_param_bls12_377_scalar_arity2,
+                &poseidon_hash_param_bls12_381_new_scalar_arity2,
             )
             .unwrap();
             composer.assert_equal(expected_var, root_var);
@@ -115,10 +115,10 @@ fn test_white_list_tokens_vp_example() {
         .map(|v| v.address().unwrap())
         .collect();
 
-    let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
+    let poseidon_hash_param_bls12_381_new_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
     let mk_root =
         MerkleTreeLeafs::<Fr, PoseidonConstants<Fr>>::new(white_list_tokens_to_fields.to_vec())
-            .root(&poseidon_hash_param_bls12_377_scalar_arity2);
+            .root(&poseidon_hash_param_bls12_381_new_scalar_arity2);
 
     let paths: Vec<MerklePath<Fr, PoseidonConstants<Fr>>> = vec![
         MerklePath::build_merkle_path(&white_list_tokens_to_fields, 7),

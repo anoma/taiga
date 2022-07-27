@@ -82,12 +82,11 @@ where
 fn test_balance_vp_example() {
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::token::Token;
+
     type Fr = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;
     type PC = <CP as CircuitParameters>::CurvePC;
-    // use ark_poly_commit::PolynomialCommitment;
     use ark_std::test_rng;
-    // use plonk_core::circuit::{verify_proof, VerifierData};
 
     let mut rng = test_rng();
     let xan = Token::<CP>::new(&mut rng);
@@ -109,6 +108,8 @@ fn test_balance_vp_example() {
     composer.check_circuit_satisfied();
     println!("circuit size of balance_vp: {}", composer.circuit_bound());
 
+    // use ark_poly_commit::PolynomialCommitment;
+    // use plonk_core::circuit::{verify_proof, VerifierData};
     // // Generate CRS
     // let pp = PC::setup(balance_vp.padded_circuit_size(), None, &mut rng).unwrap();
 
