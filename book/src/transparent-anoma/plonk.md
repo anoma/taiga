@@ -1,6 +1,6 @@
 # PLONK in a nutshell
 
-PLONK is a zero-knowledge proof construction based on a polynomial commitment scheme (PCS). In this section, we recall briefly what is a PCS and then describe how PLONK works, from a high level point of view.
+PLONK is a general-purpose zero-knowledge proof system based on a polynomial commitment scheme (PCS). In this section, we recall briefly what is a PCS and then describe how PLONK works, from a high level point of view.
 
 ## Polynomial Commitment Scheme
 
@@ -25,6 +25,6 @@ PLONK uses a polynomimal commitment scheme where the commitment part is homomorp
 
 ## PLONK
 
-PLONK is a way of translating the knowledge of the solution of an arithmetic circuit into a proof. In PLONK, the gates of the circuits are additions and multiplications, but we can compute more complicated gates. In fact, gates are of the form `q_L a + q_R b + q_M ab + q_O c + q_C = 0`, where `a,b,c` is secret and the `q_i` are the public values defining the circuit. Given a circuit of `n` gates, PLONK describes a way to prove the knowledge of `a,b,c` satisfying the circuit by computing some commitment to `a,b,c`, and then opening two polynomials that transalte all the circuit constraints. Thus, one can use any homomorphic PCS in order to commit and open the polynomials. Verifying the proof correspond to verify the two openings. Depending on the PCS choice, some optimizations are possible. For example, we can compute only one PCS verification in KZG, because of the bilinearity of the pairing.
+PLONK is a way of translating the knowledge of the solution of an arithmetic circuit into a proof. In PLONK, the gates of the circuits are additions and multiplications, but we can compute more complicated gates. In fact, gates are of the form `q_L a + q_R b + q_M ab + q_O c + q_C = 0`, where `a,b,c` is secret and the `q_i` are the public values defining the circuit. Given a circuit of `n` gates, PLONK describes a way to prove the knowledge of `a,b,c` satisfying the circuit by computing some commitment to `a,b,c`, and then opening two polynomials that translate all the circuit constraints. Thus, one can use any homomorphic PCS in order to commit and open the polynomials. Verifying the proof correspond to verify the two openings. Depending on the PCS choice, some optimizations are possible. For example, we can compute only one PCS verification in KZG, because of the bilinearity of the pairing.
 
 

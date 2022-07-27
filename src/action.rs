@@ -7,7 +7,7 @@ use crate::nullifier::Nullifier;
 use crate::poseidon::FieldHasher;
 use crate::token::Token;
 use crate::user::{User, UserSendAddress};
-use crate::validity_predicate::MockHashVP;
+use crate::vp_description::ValidityPredicateDescription;
 use ark_ff::UniformRand;
 use rand::RngCore;
 
@@ -25,24 +25,24 @@ pub struct Action<CP: CircuitParameters> {
 }
 
 /// The information to build Action and ActionCircuit.
-#[derive(Copy, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct ActionInfo<CP: CircuitParameters> {
     spend: SpendInfo<CP>,
     output: OutputInfo<CP>,
 }
 
-#[derive(Copy, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct SpendInfo<CP: CircuitParameters> {
     note: Note<CP>,
     auth_path: [(CP::CurveScalarField, bool); TAIGA_COMMITMENT_TREE_DEPTH],
     root: CP::CurveScalarField,
 }
 
-#[derive(Copy, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct OutputInfo<CP: CircuitParameters> {
     addr_send_closed: UserSendAddress<CP>,
-    addr_recv_vp: MockHashVP<CP>,
-    addr_token_vp: MockHashVP<CP>,
+    addr_recv_vp: ValidityPredicateDescription<CP>,
+    addr_token_vp: ValidityPredicateDescription<CP>,
     value: u64,
     data: CP::CurveScalarField,
 }
@@ -124,8 +124,8 @@ impl<CP: CircuitParameters> SpendInfo<CP> {
 impl<CP: CircuitParameters> OutputInfo<CP> {
     pub fn new(
         addr_send_closed: UserSendAddress<CP>,
-        addr_recv_vp: MockHashVP<CP>,
-        addr_token_vp: MockHashVP<CP>,
+        addr_recv_vp: ValidityPredicateDescription<CP>,
+        addr_token_vp: ValidityPredicateDescription<CP>,
         value: u64,
         data: CP::CurveScalarField,
     ) -> Self {
@@ -141,8 +141,8 @@ impl<CP: CircuitParameters> OutputInfo<CP> {
     pub fn dummy(rng: &mut impl RngCore) -> Self {
         use rand::Rng;
         let addr_send_closed = UserSendAddress::<CP>::from_closed(CP::CurveScalarField::rand(rng));
-        let addr_recv_vp = MockHashVP::<CP>::dummy(rng);
-        let addr_token_vp = MockHashVP::<CP>::dummy(rng);
+        let addr_recv_vp = ValidityPredicateDescription::<CP>::dummy(rng);
+        let addr_token_vp = ValidityPredicateDescription::<CP>::dummy(rng);
         let value: u64 = rng.gen();
         let data = CP::CurveScalarField::rand(rng);
         Self {

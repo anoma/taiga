@@ -14,7 +14,7 @@ Creation of new note (but this is not a circuit...)
 Nullify Note1 and Note2
 (what types of circuits are they? Action User Token?)
 
-## Spliting a 2XAN note into 2 1XAN notes
+## Splitting a 2XAN note into 2 1XAN notes
 Creation of a new note of 1XAN
 Creation of a new note of 1XAN
 Nullify the 2XAN note
