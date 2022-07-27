@@ -90,8 +90,6 @@ fn test_white_list_senders_vp_example() {
     type Fr = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;
     type PC = <CP as CircuitParameters>::CurvePC;
-    // use ark_poly_commit::PolynomialCommitment;
-    // use plonk_core::circuit::{verify_proof, VerifierData};
 
     let mut rng = test_rng();
     let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
@@ -144,6 +142,9 @@ fn test_white_list_senders_vp_example() {
         "circuit size of white_list_senders_vp: {}",
         composer.circuit_bound()
     );
+
+    // use ark_poly_commit::PolynomialCommitment;
+    // use plonk_core::circuit::{verify_proof, VerifierData};
 
     // // Generate CRS
     // let pp = PC::setup(white_list_senders_vp.padded_circuit_size(), None, &mut rng).unwrap();

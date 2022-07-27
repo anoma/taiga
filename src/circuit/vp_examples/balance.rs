@@ -110,6 +110,7 @@ fn test_balance_vp_example() {
 
     // use ark_poly_commit::PolynomialCommitment;
     // use plonk_core::circuit::{verify_proof, VerifierData};
+    
     // // Generate CRS
     // let pp = PC::setup(balance_vp.padded_circuit_size(), None, &mut rng).unwrap();
 
