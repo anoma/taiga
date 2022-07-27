@@ -5,7 +5,15 @@ use crate::circuit::integrity::{
     ValidityPredicateOuputNoteVariables,
 };
 use crate::note::Note;
-use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
+use ark_poly::univariate::DensePolynomial;
+use ark_poly_commit::PolynomialCommitment;
+use plonk_core::{
+    circuit::Circuit,
+    constraint_system::StandardComposer,
+    error::to_pc_error,
+    prelude::Error,
+    proof_system::{verifier::Verifier, VerifierKey},
+};
 
 pub trait ValidityPredicate<CP: CircuitParameters>:
     Circuit<CP::CurveScalarField, CP::InnerCurve>
@@ -42,6 +50,27 @@ pub trait ValidityPredicate<CP: CircuitParameters>:
             output_note_variables.push(output_note_var);
         }
         Ok((input_note_variables, output_note_variables))
+    }
+
+    fn get_desc_vp(
+        &mut self,
+        vp_setup: &<CP::CurvePC as PolynomialCommitment<
+            CP::CurveScalarField,
+            DensePolynomial<CP::CurveScalarField>,
+        >>::UniversalParams,
+    ) -> Result<VerifierKey<CP::CurveScalarField, CP::CurvePC>, Error> {
+        let (ck, _) = CP::CurvePC::trim(vp_setup, self.padded_circuit_size(), 0, None)
+            .map_err(to_pc_error::<CP::CurveScalarField, CP::CurvePC>)?;
+        let mut verifier = Verifier::new(b"CircuitCompilation");
+        self.gadget(verifier.mut_cs())?;
+        verifier
+            .cs
+            .public_inputs
+            .update_size(verifier.circuit_bound());
+        verifier.preprocess(&ck)?;
+        Ok(verifier
+            .verifier_key
+            .expect("Unexpected error. Missing VerifierKey in compilation"))
     }
 
     // VP designer should implement the following functions.

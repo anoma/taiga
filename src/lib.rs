@@ -30,7 +30,7 @@ pub mod token;
 pub mod nullifier;
 pub mod user;
 pub mod utils;
-pub mod validity_predicate;
+pub mod vp_description;
 
 pub trait HashToField: PrimeField {
     fn hash2_to_field(x: Self, y: Self) -> Self;

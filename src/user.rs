@@ -2,7 +2,7 @@ use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::error::TaigaError;
 use crate::poseidon::{FieldHasher, WIDTH_5};
 use crate::utils::bits_to_fields;
-use crate::validity_predicate::MockHashVP;
+use crate::vp_description::ValidityPredicateDescription;
 use ark_ff::{BigInteger, PrimeField};
 use blake2b_simd::Params;
 use plonk_hashing::poseidon::constants::PoseidonConstants;
@@ -15,16 +15,19 @@ const PRF_NK_PERSONALIZATION: &[u8; 12] = b"Taiga_PRF_NK";
 pub struct NullifierDerivingKey<F: PrimeField>(F);
 
 /// The user address binded with send vp and received vp.
-#[derive(Copy, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct User<CP: CircuitParameters> {
     pub send_com: UserSendAddress<CP>,
-    pub recv_vp: MockHashVP<CP>,
+    pub recv_vp: ValidityPredicateDescription<CP>,
 }
 
-#[derive(Copy, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub enum UserSendAddress<CP: CircuitParameters> {
     Closed(CP::CurveScalarField),
-    Open(NullifierDerivingKey<CP::CurveScalarField>, MockHashVP<CP>),
+    Open(
+        NullifierDerivingKey<CP::CurveScalarField>,
+        ValidityPredicateDescription<CP>,
+    ),
 }
 
 impl<F: PrimeField> NullifierDerivingKey<F> {
@@ -63,12 +66,12 @@ impl<F: PrimeField> NullifierDerivingKey<F> {
 impl<CP: CircuitParameters> User<CP> {
     pub fn new(rng: &mut impl RngCore) -> Self {
         let nk = NullifierDerivingKey::<CP::CurveScalarField>::rand(rng);
-        let send_vp = MockHashVP::dummy(rng);
+        let send_vp = ValidityPredicateDescription::dummy(rng);
         let send_com = UserSendAddress::<CP>::from_open(nk, send_vp);
         Self {
             send_com,
             // TODO: fix this in future.
-            recv_vp: MockHashVP::dummy(rng),
+            recv_vp: ValidityPredicateDescription::dummy(rng),
         }
     }
 
@@ -92,7 +95,7 @@ impl<CP: CircuitParameters> UserSendAddress<CP> {
     /// Creates an open user send address.
     pub fn from_open(
         nk: NullifierDerivingKey<CP::CurveScalarField>,
-        send_vp: MockHashVP<CP>,
+        send_vp: ValidityPredicateDescription<CP>,
     ) -> Self {
         UserSendAddress::Open(nk, send_vp)
     }
@@ -109,7 +112,7 @@ impl<CP: CircuitParameters> UserSendAddress<CP> {
         }
     }
 
-    pub fn get_send_vp(&self) -> Option<&MockHashVP<CP>> {
+    pub fn get_send_vp(&self) -> Option<&ValidityPredicateDescription<CP>> {
         match self {
             UserSendAddress::Closed(_) => None,
             UserSendAddress::Open(_, send_vp) => Some(send_vp),

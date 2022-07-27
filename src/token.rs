@@ -2,20 +2,20 @@ use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::error::TaigaError;
 use crate::poseidon::{FieldHasher, WIDTH_3};
 use crate::utils::bits_to_fields;
-use crate::validity_predicate::MockHashVP;
+use crate::vp_description::ValidityPredicateDescription;
 use plonk_hashing::poseidon::constants::PoseidonConstants;
 use rand::RngCore;
 
-#[derive(Copy, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Token<CP: CircuitParameters> {
-    pub token_vp: MockHashVP<CP>,
+    pub token_vp: ValidityPredicateDescription<CP>,
 }
 
 impl<CP: CircuitParameters> Token<CP> {
     pub fn new(rng: &mut impl RngCore) -> Self {
         Self {
             // TODO: fix this in future.
-            token_vp: MockHashVP::dummy(rng),
+            token_vp: ValidityPredicateDescription::dummy(rng),
         }
     }
 

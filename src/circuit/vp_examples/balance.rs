@@ -11,8 +11,8 @@ use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude:
 // in which a, b are private inputs and c is a public input.
 pub struct BalanceValidityPredicate<CP: CircuitParameters> {
     // basic "private" inputs to the VP
-    pub input_notes: [Note<CP>; NUM_NOTE],
-    pub output_notes: [Note<CP>; NUM_NOTE],
+    input_notes: [Note<CP>; NUM_NOTE],
+    output_notes: [Note<CP>; NUM_NOTE],
 }
 
 impl<CP> ValidityPredicate<CP> for BalanceValidityPredicate<CP>
@@ -92,9 +92,9 @@ fn test_balance_vp_example() {
     let mut rng = test_rng();
     let xan = Token::<CP>::new(&mut rng);
     // input notes
-    let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_from_token(xan, &mut rng));
+    let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_from_token(xan.clone(), &mut rng));
     // output notes
-    let mut output_notes = input_notes;
+    let mut output_notes = input_notes.clone();
     let tmp = output_notes[0].value;
     output_notes[0].value = output_notes[1].value;
     output_notes[1].value = tmp;

@@ -14,12 +14,12 @@ use plonk_hashing::poseidon::constants::PoseidonConstants;
 // WhiteListSendersValidityPredicate have a custom constraint checking that the received notes come from known senders.
 pub struct WhiteListSendersValidityPredicate<CP: CircuitParameters> {
     // basic "private" inputs to the VP
-    pub input_notes: [Note<CP>; NUM_NOTE],
-    pub output_notes: [Note<CP>; NUM_NOTE],
+    input_notes: [Note<CP>; NUM_NOTE],
+    output_notes: [Note<CP>; NUM_NOTE],
     // custom "private" inputs to the VP
-    pub white_list_senders: Vec<User<CP>>,
-    pub mk_root: Node<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>,
-    pub paths: Vec<MerklePath<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>>,
+    white_list_senders: Vec<User<CP>>,
+    mk_root: Node<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>,
+    paths: Vec<MerklePath<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>>,
 }
 
 impl<CP> ValidityPredicate<CP> for WhiteListSendersValidityPredicate<CP>
@@ -100,13 +100,13 @@ fn test_white_list_senders_vp_example() {
     // white list is a list of user addresses, containing the output notes addresses.
     let white_list_senders: Vec<User<CP>> = vec![
         User::<CP>::new(&mut rng),
-        output_notes[1].user,
+        output_notes[1].user.clone(),
         User::<CP>::new(&mut rng),
         User::<CP>::new(&mut rng),
-        output_notes[3].user,
-        output_notes[2].user,
+        output_notes[3].user.clone(),
+        output_notes[2].user.clone(),
         User::<CP>::new(&mut rng),
-        output_notes[0].user,
+        output_notes[0].user.clone(),
         User::<CP>::new(&mut rng),
         User::<CP>::new(&mut rng),
         User::<CP>::new(&mut rng),

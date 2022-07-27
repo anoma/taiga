@@ -6,11 +6,11 @@ use ark_ec::{
     SWModelParameters,
     TEModelParameters,
 };
-use ark_ff::{BigInteger, PrimeField};
+use ark_ff::PrimeField;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use plonk_core::commitment::{HomomorphicCommitment, KZG10};
-use plonk_core::proof_system::{Blinding, VerifierKey};
+use plonk_core::proof_system::VerifierKey;
 use std::ops::Neg;
 
 pub trait CircuitParameters: Copy {
@@ -54,14 +54,17 @@ pub trait CircuitParameters: Copy {
         com(x, rand)
     }
 
-    fn get_inputs(
-        desc_vp: &VerifierKey<Self::CurveScalarField, Self::CurvePC>,
-        ck: &<Self::CurvePC as PolynomialCommitment<
+    fn pack_vk(
+        vk: &VerifierKey<Self::CurveScalarField, Self::CurvePC>,
+    ) -> Vec<Self::CurveBaseField>;
+
+    fn get_zh(
+        vp_setup: &<Self::CurvePC as PolynomialCommitment<
             Self::CurveScalarField,
             DensePolynomial<Self::CurveScalarField>,
-        >>::CommitterKey,
-        blind: &Blinding<Self::CurveScalarField>,
-    ) -> (Vec<Self::CurveBaseField>, [Self::CurveBaseField; 2]);
+        >>::UniversalParams,
+        vp_circuit_size: usize,
+    ) -> [Self::CurveBaseField; 2];
 }
 
 // // We decided to continue with KZG for now.
@@ -93,38 +96,54 @@ impl CircuitParameters for PairingCircuitParameters {
     type CurvePC = KZG10<ark_bls12_377::Bls12_377>;
     type OuterCurvePC = KZG10<ark_bw6_761::BW6_761>;
 
-    fn get_inputs(
-        desc_vp: &VerifierKey<Self::CurveScalarField, Self::CurvePC>,
-        ck: &<Self::CurvePC as PolynomialCommitment<
+    fn pack_vk(
+        vk: &VerifierKey<Self::CurveScalarField, Self::CurvePC>,
+    ) -> Vec<Self::CurveBaseField> {
+        let com_vec = vec![
+            ws_to_te(vk.arithmetic.q_m.0),
+            ws_to_te(vk.arithmetic.q_l.0),
+            ws_to_te(vk.arithmetic.q_r.0),
+            ws_to_te(vk.arithmetic.q_o.0),
+            ws_to_te(vk.arithmetic.q_4.0),
+            ws_to_te(vk.arithmetic.q_c.0),
+            ws_to_te(vk.arithmetic.q_arith.0),
+            ws_to_te(vk.range_selector_commitment.0),
+            ws_to_te(vk.logic_selector_commitment.0),
+            ws_to_te(vk.fixed_group_add_selector_commitment.0),
+            ws_to_te(vk.variable_group_add_selector_commitment.0),
+            ws_to_te(vk.permutation.left_sigma.0),
+            ws_to_te(vk.permutation.right_sigma.0),
+            ws_to_te(vk.permutation.out_sigma.0),
+            ws_to_te(vk.permutation.fourth_sigma.0),
+            ws_to_te(vk.lookup.q_lookup.0),
+            ws_to_te(vk.lookup.table_1.0),
+            ws_to_te(vk.lookup.table_2.0),
+            ws_to_te(vk.lookup.table_3.0),
+            ws_to_te(vk.lookup.table_4.0),
+        ];
+
+        let mut ret = vec![];
+        com_vec.into_iter().for_each(|v| {
+            ret.push(v.x);
+            ret.push(v.y);
+        });
+        ret
+    }
+
+    fn get_zh(
+        vp_setup: &<Self::CurvePC as PolynomialCommitment<
             Self::CurveScalarField,
             DensePolynomial<Self::CurveScalarField>,
-        >>::CommitterKey,
-        blind: &Blinding<Self::CurveScalarField>,
-    ) -> (Vec<Self::CurveBaseField>, [Self::CurveBaseField; 2]) {
-        let unblinded_qs = vec![
-            (ws_to_te(desc_vp.arithmetic.q_m.0), blind.q_m),
-            (ws_to_te(desc_vp.arithmetic.q_l.0), blind.q_l),
-            (ws_to_te(desc_vp.arithmetic.q_r.0), blind.q_r),
-            (ws_to_te(desc_vp.arithmetic.q_o.0), blind.q_o),
-            (ws_to_te(desc_vp.arithmetic.q_4.0), blind.q_4),
-            (ws_to_te(desc_vp.arithmetic.q_c.0), blind.q_c),
-        ];
+        >>::UniversalParams,
+        vp_circuit_size: usize,
+    ) -> [Self::CurveBaseField; 2] {
+        let (ck, _) = Self::CurvePC::trim(vp_setup, vp_circuit_size, 0, None).unwrap();
 
         // [b * Z_H + q] ?= b *[Z_H] + [q]
         let n = ck.powers_of_g.len();
         let com_g_n = ck.powers_of_g[n - 1];
         let com_g_0 = ck.powers_of_g[0];
         let com_z_h = ws_to_te(com_g_n + com_g_0.neg());
-        let public_inputs = [com_z_h.x, com_z_h.y];
-
-        let mut private_inputs: Vec<Self::CurveBaseField> = vec![];
-        for (q, b) in unblinded_qs {
-            private_inputs.push(q.x);
-            private_inputs.push(q.y);
-            private_inputs.push(Self::CurveBaseField::from_le_bytes_mod_order(
-                &b.into_repr().to_bytes_le(),
-            ));
-        }
-        (private_inputs, public_inputs)
+        [com_z_h.x, com_z_h.y]
     }
 }
