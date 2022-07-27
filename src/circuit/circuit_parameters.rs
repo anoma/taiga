@@ -123,12 +123,11 @@ impl CircuitParameters for PairingCircuitParameters {
         vp_circuit_size: usize,
     ) -> [Self::CurveBaseField; 2] {
         let (ck, _) = Self::CurvePC::trim(vp_setup, vp_circuit_size, 0, None).unwrap();
-
-        // [b * Z_H + q] ?= b *[Z_H] + [q]
         let n = ck.powers_of_g.len();
         let com_g_n = ck.powers_of_g[n - 1];
         let com_g_0 = ck.powers_of_g[0];
-        let com_z_h = ws_to_te(com_g_n + com_g_0.neg());
+        let ws_com_zh = com_g_n + com_g_0.neg();
+        let com_z_h = ws_to_te(ws_com_zh);
         [com_z_h.x, com_z_h.y]
     }
 }
