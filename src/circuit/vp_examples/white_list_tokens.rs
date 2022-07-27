@@ -41,7 +41,8 @@ where
         output_note_variables: &[ValidityPredicateOuputNoteVariables],
     ) -> Result<(), Error> {
         let expected_var = composer.add_input(self.mk_root.inner());
-        let poseidon_hash_param_bls12_381_new_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
+        let poseidon_hash_param_bls12_381_new_scalar_arity2 =
+            PoseidonConstants::generate::<WIDTH_3>();
         for (output_note_variable, path) in output_note_variables.iter().zip(self.paths.clone()) {
             let token_var = output_note_variable.token_addr;
             let root_var = merkle_tree_gadget::<
