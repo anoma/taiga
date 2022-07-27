@@ -40,14 +40,19 @@ pub fn ws_to_te(
     */
     let alpha = -Fq::one();
     let s1 = field_new!(Fq, "611336158540232733028115263714465872671465435137168183916056024884978835858365189946006184892099852878171309395862");
+    // assert_eq!(s1*s1, Fq::from(3));
     let s2 = field_new!(Fq, "1064881461568443305175032400733120695040834941031583268014086210056237636385831065297199936964360836443404508126238");
-    TEGroupAffine::<ark_bls12_381_new::g1::Parameters>::new((p.x-alpha) * s2 / p.y, (p.x-alpha-s1) / (p.x-alpha+s1))
+    // assert_eq!(s2*s2, s1+s1-Fq::from(3));
+    TEGroupAffine::<ark_bls12_381_new::g1::Parameters>::new(
+        (p.x - alpha) * s2 / p.y,
+        (p.x - alpha - s1) / (p.x - alpha + s1),
+    )
 }
 
 #[test]
 fn test_ws_to_te() {
-    use ark_bls12_381_new::g1::G1Projective;
     use ark_bls12_381_new::g1;
+    use ark_bls12_381_new::g1::G1Projective;
     use ark_ec::ProjectiveCurve;
     use ark_ec::TEModelParameters;
     use ark_std::UniformRand;
@@ -59,6 +64,6 @@ fn test_ws_to_te() {
         let y = p_te.y;
         let a = <g1::Parameters as TEModelParameters>::COEFF_A;
         let d = <g1::Parameters as TEModelParameters>::COEFF_D;
-        assert_eq!(a*x*x + y*y, Fq::one() + d * x*x*y*y);
+        assert_eq!(a * x * x + y * y, Fq::one() + d * x * x * y * y);
     }
 }
