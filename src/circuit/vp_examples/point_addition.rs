@@ -75,9 +75,6 @@ fn test_point_addition_vp_example() {
     use rand::rngs::OsRng;
 
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
-    type Fr = <CP as CircuitParameters>::CurveScalarField;
-    type P = <CP as CircuitParameters>::InnerCurve;
-    type PC = <CP as CircuitParameters>::CurvePC;
     type Fq = <CP as CircuitParameters>::CurveBaseField;
     type OP = <CP as CircuitParameters>::Curve;
     type OPC = <CP as CircuitParameters>::OuterCurvePC;
@@ -111,18 +108,4 @@ fn test_point_addition_vp_example() {
 
     let proof = prover.prove(&ck).unwrap();
 
-    // // Verifier
-    // let mut verifier = Verifier::<Fq, OP, OPC>::new(b"demo");
-
-    // // Add gadgets
-    // let composer_ver = verifier.mut_cs();
-    // let var_a_ver = composer_ver.add_affine(a);
-    // let var_b_ver = composer_ver.add_affine(b);
-    // let output_point_ver = point_addition_gadget::<Fq, OP>(composer_ver, var_a_ver, var_b_ver);
-    // composer_ver.assert_equal_public_point(output_point_ver, c);
-
-    // // // Preprocess
-    // verifier.preprocess(&ck).unwrap();
-
-    // assert!(verifier.verify(&proof, &vk, &public_inputs).is_ok());
 }
