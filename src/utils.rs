@@ -22,12 +22,12 @@ pub fn ws_to_te(
     (a and b are coefficients of the curve)
     α = sqrt(x**3+a*x+b)
     s1 = sqrt(3*α**2+a)
-    s2 = sqrt(3*α+2*s1)
-    coeff = (3*α-2*s1)/(3*α+2*s1)
+    s2 = sqrt(-3*α-2*s1)
+    coeff = -(3*α-2*s1)/(3*α+2*s1)
 
     u = (x-α) * s2 / y
     v = (x-α-s1) / (x-α+s1)
-    (u,v) satisfies u**2 + v**2 == 1 + coeff * u**2 * v**2
+    (u,v) satisfies -u**2 + v**2 == 1 + coeff * u**2 * v**2
 
 
     In the case of bls12_381_new:
@@ -41,8 +41,8 @@ pub fn ws_to_te(
     let alpha = -Fq::one();
     let s1 = field_new!(Fq, "611336158540232733028115263714465872671465435137168183916056024884978835858365189946006184892099852878171309395862");
     // assert_eq!(s1*s1, Fq::from(3));
-    let s2 = field_new!(Fq, "1064881461568443305175032400733120695040834941031583268014086210056237636385831065297199936964360836443404508126238");
-    // assert_eq!(s2*s2, s1+s1-Fq::from(3));
+    let s2 = field_new!(Fq, "739268376485527280662589844726117619332416576410002944807887485793777088173705819478992088353054175969921841450415");
+    // assert_eq!(-s2*s2, s1+s1-Fq::from(3));
     TEGroupAffine::<ark_bls12_381_new::g1::Parameters>::new(
         (p.x - alpha) * s2 / p.y,
         (p.x - alpha - s1) / (p.x - alpha + s1),

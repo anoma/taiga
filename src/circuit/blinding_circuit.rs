@@ -67,9 +67,7 @@ where
                 CP::CurveBaseField::from_le_bytes_mod_order(&blind.into_repr().to_bytes_le());
             let b = composer.add_input(blind_convert);
             let b_zh = composer.fixed_base_scalar_mul(b, com_z_h);
-            // let b_zh_add_q = composer.point_addition_gate(q, b_zh);
-            let b_zh_add_q =
-                point_addition_gadget::<CP::CurveBaseField, CP::Curve>(composer, q, b_zh);
+            let b_zh_add_q = composer.point_addition_gate(q, b_zh);
 
             // public blinded point
             composer.public_inputize(b_zh_add_q.x());
@@ -141,57 +139,6 @@ impl<CP: CircuitParameters> BlindingCircuit<CP> {
 }
 
 #[test]
-fn test_check_zh_commitment() {
-    use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
-    type Fr = <CP as CircuitParameters>::CurveScalarField;
-    type Fq = <CP as CircuitParameters>::CurveBaseField;
-    type P = <CP as CircuitParameters>::InnerCurve;
-    type OP = <CP as CircuitParameters>::Curve;
-    type PC = <CP as CircuitParameters>::CurvePC;
-    type OPC = <CP as CircuitParameters>::OuterCurvePC;
-    use ark_std::test_rng;
-
-    let mut rng = test_rng();
-
-    // A balance VP
-    let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
-    let output_notes = input_notes.clone();
-    let mut balance_vp = BalanceValidityPredicate::new(input_notes, output_notes);
-    balance_vp
-        .gadget(&mut StandardComposer::<Fr, P>::new())
-        .unwrap();
-
-    // we blind the VP desc
-    let pp = PC::setup(balance_vp.padded_circuit_size(), None, &mut rng).unwrap();
-    let vp_desc = ValidityPredicateDescription::from_vp(&mut balance_vp, &pp).unwrap();
-
-    // the blinding circuit, containing the random values used to blind
-    let blinding_circuit =
-        BlindingCircuit::<CP>::new(&mut rng, vp_desc, &pp, balance_vp.padded_circuit_size())
-            .unwrap();
-
-    let b_l = blinding_circuit.get_blinding().q_l;
-
-    // verifying key with the blinding
-    let (_, vk_blind) = balance_vp
-        .compile_with_blinding::<PC>(&pp, &blinding_circuit.get_blinding())
-        .unwrap();
-
-    // verifying key without blinding
-    let (_, vk_no_blind) = balance_vp.compile::<PC>(&pp).unwrap();
-
-    // extract both qL commitment
-    let q_l_blind = ws_to_te(vk_blind.arithmetic.q_l.0);
-    let q_l_no_blind = ws_to_te(vk_no_blind.arithmetic.q_l.0);
-
-    let zh = blinding_circuit.zh;
-
-    let com_zh = TEGroupAffine::<OP>::new(zh[0], zh[1]);
-
-    assert_eq!(q_l_blind, q_l_no_blind + com_zh.mul(b_l).into_affine());
-}
-
-#[test]
 fn test_blinding_circuit() {
     // creation of a (balance) VP
     // creation of the corresponding blinding circuit
@@ -244,24 +191,24 @@ fn test_blinding_circuit() {
     // Expecting vk_blind(out of circuit)
     let mut expect_pi = PublicInputs::new(blinding_circuit_size);
     let q_m = ws_to_te(vk_blind.arithmetic.q_m.0);
-    expect_pi.insert(403, q_m.x);
-    expect_pi.insert(404, q_m.y);
+    expect_pi.insert(392, q_m.x);
+    expect_pi.insert(393, q_m.y);
     let q_l = ws_to_te(vk_blind.arithmetic.q_l.0);
-    expect_pi.insert(804, q_l.x);
-    expect_pi.insert(805, q_l.y);
+    expect_pi.insert(782, q_l.x);
+    expect_pi.insert(783, q_l.y);
     let q_r = ws_to_te(vk_blind.arithmetic.q_r.0);
-    expect_pi.insert(1205, q_r.x);
-    expect_pi.insert(1206, q_r.y);
+    expect_pi.insert(1172, q_r.x);
+    expect_pi.insert(1173, q_r.y);
     let q_o = ws_to_te(vk_blind.arithmetic.q_o.0);
-    expect_pi.insert(1606, q_o.x);
-    expect_pi.insert(1607, q_o.y);
+    expect_pi.insert(1562, q_o.x);
+    expect_pi.insert(1563, q_o.y);
     let q_4 = ws_to_te(vk_blind.arithmetic.q_4.0);
-    expect_pi.insert(2007, q_4.x);
-    expect_pi.insert(2008, q_4.y);
+    expect_pi.insert(1952, q_4.x);
+    expect_pi.insert(1953, q_4.y);
     let q_c = ws_to_te(vk_blind.arithmetic.q_c.0);
-    expect_pi.insert(2408, q_c.x);
-    expect_pi.insert(2409, q_c.y);
-    expect_pi.insert(21454, vp_desc_compressed);
+    expect_pi.insert(2342, q_c.x);
+    expect_pi.insert(2343, q_c.y);
+    expect_pi.insert(21388, vp_desc_compressed);
 
     assert_eq!(pi, expect_pi);
 
