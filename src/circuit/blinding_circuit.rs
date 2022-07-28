@@ -1,4 +1,5 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
+use crate::circuit::gadgets::point_addition::point_addition_gadget;
 use crate::circuit::validity_predicate::NUM_NOTE;
 use crate::circuit::vp_examples::balance::BalanceValidityPredicate;
 use crate::note::Note;
@@ -66,7 +67,9 @@ where
                 CP::CurveBaseField::from_le_bytes_mod_order(&blind.into_repr().to_bytes_le());
             let b = composer.add_input(blind_convert);
             let b_zh = composer.fixed_base_scalar_mul(b, com_z_h);
-            let b_zh_add_q = composer.point_addition_gate(q, b_zh);
+            // let b_zh_add_q = composer.point_addition_gate(q, b_zh);
+            let b_zh_add_q =
+                point_addition_gadget::<CP::CurveBaseField, CP::Curve>(composer, q, b_zh);
 
             // public blinded point
             composer.public_inputize(b_zh_add_q.x());
@@ -241,24 +244,24 @@ fn test_blinding_circuit() {
     // Expecting vk_blind(out of circuit)
     let mut expect_pi = PublicInputs::new(blinding_circuit_size);
     let q_m = ws_to_te(vk_blind.arithmetic.q_m.0);
-    expect_pi.insert(392, q_m.x);
-    expect_pi.insert(393, q_m.y);
+    expect_pi.insert(403, q_m.x);
+    expect_pi.insert(404, q_m.y);
     let q_l = ws_to_te(vk_blind.arithmetic.q_l.0);
-    expect_pi.insert(782, q_l.x);
-    expect_pi.insert(783, q_l.y);
+    expect_pi.insert(804, q_l.x);
+    expect_pi.insert(805, q_l.y);
     let q_r = ws_to_te(vk_blind.arithmetic.q_r.0);
-    expect_pi.insert(1172, q_r.x);
-    expect_pi.insert(1173, q_r.y);
+    expect_pi.insert(1205, q_r.x);
+    expect_pi.insert(1206, q_r.y);
     let q_o = ws_to_te(vk_blind.arithmetic.q_o.0);
-    expect_pi.insert(1562, q_o.x);
-    expect_pi.insert(1563, q_o.y);
+    expect_pi.insert(1606, q_o.x);
+    expect_pi.insert(1607, q_o.y);
     let q_4 = ws_to_te(vk_blind.arithmetic.q_4.0);
-    expect_pi.insert(1952, q_4.x);
-    expect_pi.insert(1953, q_4.y);
+    expect_pi.insert(2007, q_4.x);
+    expect_pi.insert(2008, q_4.y);
     let q_c = ws_to_te(vk_blind.arithmetic.q_c.0);
-    expect_pi.insert(2342, q_c.x);
-    expect_pi.insert(2343, q_c.y);
-    expect_pi.insert(21388, vp_desc_compressed);
+    expect_pi.insert(2408, q_c.x);
+    expect_pi.insert(2409, q_c.y);
+    expect_pi.insert(21454, vp_desc_compressed);
 
     assert_eq!(pi, expect_pi);
 

@@ -41,7 +41,8 @@ where
     ) -> Result<(), Error> {
         let var_a = composer.add_affine(self.a);
         let var_b = composer.add_affine(self.b);
-        let var_a_plus_b = point_addition_gadget::<CP>(composer, var_a, var_b);
+        let var_a_plus_b =
+            point_addition_gadget::<CP::CurveScalarField, CP::InnerCurve>(composer, var_a, var_b);
         let var_c = composer.add_affine(self.c);
         composer.assert_equal_point(var_c, var_a_plus_b);
         Ok(())
