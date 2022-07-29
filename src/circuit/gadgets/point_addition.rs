@@ -17,6 +17,7 @@ fn test_point_addition_gadget() {
     use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
     use ark_ec::TEModelParameters;
 
+    // Test over InnerCurve
     type PC = <CP as CircuitParameters>::CurvePC;
     type F = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;
@@ -35,6 +36,29 @@ fn test_point_addition_gadget() {
     let y_var = composer.add_input(y);
     let point_a: Point<P> = Point::new(x_var, y_var);
     let point_b: Point<P> = Point::new(x_var, y_var);
+    let point = composer.point_addition_gate(point_a, point_b);
+    composer.assert_equal_public_point(point, expected_point);
+    composer.check_circuit_satisfied();
+
+    // Test over Curve
+    type Opc = <CP as CircuitParameters>::OuterCurvePC;
+    type Fq = <CP as CircuitParameters>::CurveBaseField;
+    type OP = <CP as CircuitParameters>::Curve;
+
+    // Points
+    let (x, y) = OP::AFFINE_GENERATOR_COEFFS;
+    let generator = TEGroupAffine::<OP>::new(x, y);
+    let expected_point = generator + generator;
+
+    // gadget
+    let mut composer = StandardComposer::<
+        <CP as CircuitParameters>::CurveBaseField,
+        <CP as CircuitParameters>::Curve,
+    >::new();
+    let x_var = composer.add_input(x);
+    let y_var = composer.add_input(y);
+    let point_a: Point<OP> = Point::new(x_var, y_var);
+    let point_b: Point<OP> = Point::new(x_var, y_var);
     let point = composer.point_addition_gate(point_a, point_b);
     composer.assert_equal_public_point(point, expected_point);
     composer.check_circuit_satisfied();
