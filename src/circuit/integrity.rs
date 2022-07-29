@@ -14,26 +14,28 @@ use plonk_hashing::poseidon::{
     poseidon::{PlonkSpec, Poseidon},
 };
 
-pub fn spent_user_address_integrity_circuit<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+use pasta_curves::vesta;
+
+pub fn spent_user_address_integrity_circuit(
+    composer: &mut StandardComposer<vesta::Scalar, CP::InnerCurve>,
     nk: &Variable,
     // convert the vp variables inside, move out if needed.
     send_vp_bytes: &[bool],
     recv_vp_bytes: &[bool],
 ) -> Result<(Variable, Vec<Variable>), Error> {
     // Init poseidon hash gadget.
-    let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+    let poseidon_param: PoseidonConstants<vesta::Scalar> =
         PoseidonConstants::generate::<WIDTH_5>();
 
     // convert send_vp bits to two variable
-    let (mut send_com_fields, send_vp_bits) = bits_to_variables::<CP>(composer, send_vp_bytes);
+    let (mut send_com_fields, send_vp_bits) = bits_to_variables::(composer, send_vp_bytes);
 
     // send_com = Com_r(send_vp_hash || nk)
     send_com_fields.push(*nk);
     let address_send = poseidon_param.circuit_hash(composer, &send_com_fields)?;
 
     // convert recv_vp bits to two variable
-    let (recv_vp, _recv_vp_bits) = bits_to_variables::<CP>(composer, recv_vp_bytes);
+    let (recv_vp, _recv_vp_bits) = bits_to_variables::(composer, recv_vp_bytes);
 
     // generate address variable
     let mut address_vars = vec![address_send];
@@ -43,17 +45,17 @@ pub fn spent_user_address_integrity_circuit<CP: CircuitParameters>(
 }
 
 pub fn output_user_address_integrity_circuit<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+    composer: &mut StandardComposer<vesta::Scalar, CP::InnerCurve>,
     address_send: &Variable,
     // convert the vp variables inside, move out if needed.
     recv_vp_bytes: &[bool],
 ) -> Result<(Variable, Vec<Variable>), Error> {
     // Init poseidon hash gadget.
-    let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+    let poseidon_param: PoseidonConstants<vesta::Scalar> =
         PoseidonConstants::generate::<WIDTH_5>();
 
     // convert recv_vp bits to two variable
-    let (recv_vp, recv_vp_bits) = bits_to_variables::<CP>(composer, recv_vp_bytes);
+    let (recv_vp, recv_vp_bits) = bits_to_variables::(composer, recv_vp_bytes);
 
     // generate address variable
     let mut address_vars = vec![*address_send];
@@ -63,16 +65,16 @@ pub fn output_user_address_integrity_circuit<CP: CircuitParameters>(
 }
 
 pub fn token_integrity_circuit<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+    composer: &mut StandardComposer<vesta::Scalar, CP::InnerCurve>,
     // convert the vp variables inside, move out if needed.
     token_vp_bytes: &[bool],
 ) -> Result<(Variable, Vec<Variable>), Error> {
     // Init poseidon hash gadget.
-    let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+    let poseidon_param: PoseidonConstants<vesta::Scalar> =
         PoseidonConstants::generate::<WIDTH_3>();
 
     // convert token_vp bits to two variable
-    let (token_vp_vars, token_bits_var) = bits_to_variables::<CP>(composer, token_vp_bytes);
+    let (token_vp_vars, token_bits_var) = bits_to_variables::(composer, token_vp_bytes);
 
     // generate address variable
     let token_address =
@@ -82,7 +84,7 @@ pub fn token_integrity_circuit<CP: CircuitParameters>(
 }
 
 pub fn note_commitment_circuit<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+    composer: &mut StandardComposer<vesta::Scalar, CP::InnerCurve>,
     address: &Variable,
     token: &Variable,
     value: &Variable, // To be decided where to constrain the range of value, add the range constraints here first.
@@ -94,12 +96,12 @@ pub fn note_commitment_circuit<CP: CircuitParameters>(
     composer.range_gate(*value, 64);
 
     // psi = prf(rho, rcm)
-    let poseidon_param_3: PoseidonConstants<CP::CurveScalarField> =
+    let poseidon_param_3: PoseidonConstants<vesta::Scalar> =
         PoseidonConstants::generate::<WIDTH_3>();
     let psi = poseidon_param_3.circuit_hash_two(composer, rho, rcm)?;
 
     // cm = crh(address, value, data, rho, psi, rcm, token)
-    let poseidon_param_9: PoseidonConstants<CP::CurveScalarField> =
+    let poseidon_param_9: PoseidonConstants<vesta::Scalar> =
         PoseidonConstants::generate::<WIDTH_9>();
     let mut poseidon_circuit =
         Poseidon::<_, PlonkSpec<WIDTH_9>, WIDTH_9>::new(composer, &poseidon_param_9);
@@ -116,13 +118,13 @@ pub fn note_commitment_circuit<CP: CircuitParameters>(
 
 // cm is a scalar
 pub fn nullifier_circuit<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+    composer: &mut StandardComposer<vesta::Scalar, CP::InnerCurve>,
     nk: &Variable,
     rho: &Variable,
     psi: &Variable,
     cm: &Variable,
 ) -> Result<Variable, Error> {
-    let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+    let poseidon_param: PoseidonConstants<vesta::Scalar> =
         PoseidonConstants::generate::<WIDTH_5>();
     let variavle_vec = vec![*nk, *rho, *psi, *cm];
     let nullifier_variable = poseidon_param.circuit_hash(composer, &variavle_vec)?;
@@ -136,20 +138,20 @@ pub fn nullifier_circuit<CP: CircuitParameters>(
 
 // cm is a point
 // pub fn nullifier_circuit<CP: CircuitParameters>(
-//     composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+//     composer: &mut StandardComposer<vesta::Scalar, CP::InnerCurve>,
 //     nk: &Variable,
 //     rho: &Variable,
 //     psi: &Variable,
 //     cm: &Point<CP::InnerCurve>,
 // ) -> Result<Variable, Error> {
-//     let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+//     let poseidon_param: PoseidonConstants<vesta::Scalar> =
 //         PoseidonConstants::generate::<WIDTH_3>();
 //     let prf_ret = poseidon_param.circuit_hash_two(composer, nk, rho)?;
 
 //     // scalar = prf_nk(rho) + psi
 //     let scalar = composer.arithmetic_gate(|gate| {
 //         gate.witness(prf_ret, *psi, None)
-//             .add(CP::CurveScalarField::one(), CP::CurveScalarField::one())
+//             .add(vesta::Scalar::one(), vesta::Scalar::one())
 //     });
 
 //     // point_scalar = scalar * generator
@@ -168,29 +170,29 @@ pub fn nullifier_circuit<CP: CircuitParameters>(
 // }
 
 // To keep consistent with crate::utils::bytes_to_fields
-// The bits are from unformatted bytes or non-CP::CurveScalarField type.
-// The bits can not be from CP::CurveScalarField, it will have one bit loss.
+// The bits are from unformatted bytes or non-vesta::Scalar type.
+// The bits can not be from vesta::Scalar, it will have one bit loss.
 pub fn bits_to_variables<CP: CircuitParameters>(
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+    composer: &mut StandardComposer<vesta::Scalar, CP::InnerCurve>,
     bits: &[bool],
 ) -> (Vec<Variable>, Vec<Variable>) {
     let bit_variables: Vec<Variable> = bits
         .iter()
-        .map(|bit| composer.add_input(CP::CurveScalarField::from(*bit as u64)))
+        .map(|bit| composer.add_input(vesta::Scalar::from(*bit as u64)))
         .collect();
 
     let scalar_variables = bit_variables
-        .chunks((CP::CurveScalarField::size_in_bits() - 1) as usize)
+        .chunks((vesta::Scalar::size_in_bits() - 1) as usize)
         .map(|elt| {
             let mut accumulator_var = composer.zero_var();
             for (power, bit) in elt.iter().enumerate() {
                 composer.boolean_gate(*bit);
 
-                let two_pow = CP::CurveScalarField::from(2u64).pow([power as u64, 0, 0, 0]);
+                let two_pow = vesta::Scalar::from(2u64).pow([power as u64, 0, 0, 0]);
 
                 accumulator_var = composer.arithmetic_gate(|gate| {
                     gate.witness(*bit, accumulator_var, None)
-                        .add(two_pow, CP::CurveScalarField::one())
+                        .add(two_pow, vesta::Scalar::one())
                 });
             }
             accumulator_var
@@ -225,9 +227,9 @@ pub struct ValidityPredicateOuputNoteVariables {
     pub data: Variable,
 }
 
-pub fn input_note_constraint<CP>(
-    note: &Note<CP>,
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+pub fn input_note_constraint(
+    note: &Note,
+    composer: &mut StandardComposer<vesta::Scalar, CP::InnerCurve>,
 ) -> Result<ValidityPredicateInputNoteVariables, Error>
 where
     CP: CircuitParameters,
@@ -236,7 +238,7 @@ where
     let nk = note.user.send_com.get_nk().unwrap();
     let nk_var = composer.add_input(nk.inner());
     let send_vp = note.user.send_com.get_send_vp().unwrap();
-    let (sender_addr, send_vp_bits) = spent_user_address_integrity_circuit::<CP>(
+    let (sender_addr, send_vp_bits) = spent_user_address_integrity_circuit::(
         composer,
         &nk_var,
         &send_vp.to_bits(),
@@ -245,14 +247,14 @@ where
 
     // check token address
     let (token_addr, token_bits) =
-        token_integrity_circuit::<CP>(composer, &note.token.token_vp.to_bits())?;
+        token_integrity_circuit::(composer, &note.token.token_vp.to_bits())?;
 
     // check note commitment
-    let value_var = composer.add_input(CP::CurveScalarField::from(note.value));
+    let value_var = composer.add_input(vesta::Scalar::from(note.value));
     let data_var = composer.add_input(note.data);
     let rho_var = composer.add_input(note.rho.inner());
     let note_rcm_var = composer.add_input(note.rcm);
-    let (cm_var, psi_var) = note_commitment_circuit::<CP>(
+    let (cm_var, psi_var) = note_commitment_circuit::(
         composer,
         &sender_addr,
         &token_addr,
@@ -262,7 +264,7 @@ where
         &note_rcm_var,
     )?;
 
-    let nf = nullifier_circuit::<CP>(composer, &nk_var, &rho_var, &psi_var, &cm_var)?;
+    let nf = nullifier_circuit::(composer, &nk_var, &rho_var, &psi_var, &cm_var)?;
 
     Ok(ValidityPredicateInputNoteVariables {
         sender_addr,
@@ -277,10 +279,10 @@ where
     })
 }
 
-pub fn output_note_constraint<CP>(
-    note: &Note<CP>,
+pub fn output_note_constraint(
+    note: &Note,
     nf: &Variable,
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+    composer: &mut StandardComposer<vesta::Scalar, CP::InnerCurve>,
 ) -> Result<ValidityPredicateOuputNoteVariables, Error>
 where
     CP: CircuitParameters,
@@ -288,7 +290,7 @@ where
     // check user address
     let addr_send = note.user.send_com.get_closed().unwrap();
     let addr_send_var = composer.add_input(addr_send);
-    let (recipient_addr, recv_vp_bits) = output_user_address_integrity_circuit::<CP>(
+    let (recipient_addr, recv_vp_bits) = output_user_address_integrity_circuit::(
         composer,
         &addr_send_var,
         &note.user.recv_vp.to_bits(),
@@ -296,13 +298,13 @@ where
 
     // check token address
     let (token_addr, token_bits) =
-        token_integrity_circuit::<CP>(composer, &note.token.token_vp.to_bits())?;
+        token_integrity_circuit::(composer, &note.token.token_vp.to_bits())?;
 
     // check and publish note commitment
-    let value_var = composer.add_input(CP::CurveScalarField::from(note.value));
+    let value_var = composer.add_input(vesta::Scalar::from(note.value));
     let data_var = composer.add_input(note.data);
     let note_rcm_var = composer.add_input(note.rcm);
-    let (cm_var, _psi_var) = note_commitment_circuit::<CP>(
+    let (cm_var, _psi_var) = note_commitment_circuit::(
         composer,
         &recipient_addr,
         &token_addr,

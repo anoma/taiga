@@ -9,21 +9,21 @@ use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude:
 
 // BalanceValidityPredicate have a custom constraint with a + b = c,
 // in which a, b are private inputs and c is a public input.
-pub struct BalanceValidityPredicate<CP: CircuitParameters> {
+pub struct BalanceValidityPredicate {
     // basic "private" inputs to the VP
-    input_notes: [Note<CP>; NUM_NOTE],
-    output_notes: [Note<CP>; NUM_NOTE],
+    input_notes: [Note; NUM_NOTE],
+    output_notes: [Note; NUM_NOTE],
 }
 
-impl<CP> ValidityPredicate<CP> for BalanceValidityPredicate<CP>
+impl ValidityPredicate for BalanceValidityPredicate
 where
     CP: CircuitParameters,
 {
-    fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE] {
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
         &self.input_notes
     }
 
-    fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE] {
+    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
         &self.output_notes
     }
 
@@ -46,20 +46,20 @@ where
         let mut balance_input_var = composer.zero_var();
         for note_var in input_note_variables {
             balance_input_var =
-                field_addition_gadget::<CP>(composer, balance_input_var, note_var.value);
+                field_addition_gadget::(composer, balance_input_var, note_var.value);
         }
         // sum of the output note values
         let mut balance_output_var = composer.zero_var();
         for note_var in output_note_variables {
             balance_output_var =
-                field_addition_gadget::<CP>(composer, balance_output_var, note_var.value);
+                field_addition_gadget::(composer, balance_output_var, note_var.value);
         }
         composer.assert_equal(balance_input_var, balance_output_var);
         Ok(())
     }
 }
 
-impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for BalanceValidityPredicate<CP>
+impl Circuit<CP::CurveScalarField, CP::InnerCurve> for BalanceValidityPredicate
 where
     CP: CircuitParameters,
 {
@@ -90,9 +90,9 @@ fn test_balance_vp_example() {
     // use plonk_core::circuit::{verify_proof, VerifierData};
 
     let mut rng = test_rng();
-    let xan = Token::<CP>::new(&mut rng);
+    let xan = Token::::new(&mut rng);
     // input notes
-    let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_from_token(xan.clone(), &mut rng));
+    let input_notes = [(); NUM_NOTE].map(|_| Note::::dummy_from_token(xan.clone(), &mut rng));
     // output notes
     let mut output_notes = input_notes.clone();
     let tmp = output_notes[0].value;

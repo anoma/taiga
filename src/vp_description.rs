@@ -10,32 +10,33 @@ use plonk_hashing::poseidon::{
     poseidon::{NativeSpec, Poseidon},
 };
 use rand::RngCore;
+use pasta_curves::vesta;
 
 // TODO: add vp_param in future.
 #[derive(Debug, Clone)]
-pub enum ValidityPredicateDescription<CP: CircuitParameters> {
+pub enum ValidityPredicateDescription {
     // Pack vk into CurveBaseField array.
-    Packed(Vec<CP::CurveBaseField>),
+    Packed(Vec<vesta::Base>),
     // Compress(Com_q) vk into one CurveBaseField element.
-    Compressed(CP::CurveBaseField),
+    Compressed(vesta::Base),
 }
 
-impl<CP: CircuitParameters> ValidityPredicateDescription<CP> {
+impl<CP: CircuitParameters> ValidityPredicateDescription {
     pub fn from_vp<VP>(
         vp: &mut VP,
         vp_setup: &<CP::CurvePC as PolynomialCommitment<
-            CP::CurveScalarField,
-            DensePolynomial<CP::CurveScalarField>,
+            vesta::Scalar,
+            DensePolynomial<vesta::Scalar>,
         >>::UniversalParams,
     ) -> Result<Self, Error>
     where
-        VP: ValidityPredicate<CP>,
+        VP: ValidityPredicate,
     {
         let vk = vp.get_desc_vp(vp_setup)?;
         Ok(Self::from_vk(&vk))
     }
 
-    pub fn from_vk(vk: &VerifierKey<CP::CurveScalarField, CP::CurvePC>) -> Self {
+    pub fn from_vk(vk: &VerifierKey<vesta::Scalar, CP::CurvePC>) -> Self {
         let vp_desc = CP::pack_vk(vk);
         Self::Packed(vp_desc)
     }

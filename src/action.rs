@@ -10,12 +10,13 @@ use crate::user::{User, UserSendAddress};
 use crate::vp_description::ValidityPredicateDescription;
 use ark_ff::UniformRand;
 use rand::RngCore;
+use pasta_curves::vesta;
 
 /// The action result used in transaction.
 #[derive(Copy, Debug, Clone)]
 pub struct Action<CP: CircuitParameters> {
     /// The root of the note commitment Merkle tree.
-    pub root: CP::CurveScalarField,
+    pub root: vesta::Scalar,
     /// The nullifier of the spend note.
     pub nf: Nullifier<CP>,
     /// The commitment of the output note.
@@ -34,8 +35,8 @@ pub struct ActionInfo<CP: CircuitParameters> {
 #[derive(Debug, Clone)]
 pub struct SpendInfo<CP: CircuitParameters> {
     note: Note<CP>,
-    auth_path: [(CP::CurveScalarField, bool); TAIGA_COMMITMENT_TREE_DEPTH],
-    root: CP::CurveScalarField,
+    auth_path: [(vesta::Scalar, bool); TAIGA_COMMITMENT_TREE_DEPTH],
+    root: vesta::Scalar,
 }
 
 #[derive(Debug, Clone)]
@@ -44,7 +45,7 @@ pub struct OutputInfo<CP: CircuitParameters> {
     addr_recv_vp: ValidityPredicateDescription<CP>,
     addr_token_vp: ValidityPredicateDescription<CP>,
     value: u64,
-    data: CP::CurveScalarField,
+    data: vesta::Scalar,
 }
 
 impl<CP: CircuitParameters> ActionInfo<CP> {
@@ -73,7 +74,7 @@ impl<CP: CircuitParameters> ActionInfo<CP> {
             token_vp: self.output.addr_token_vp,
         };
 
-        let note_rcm = CP::CurveScalarField::rand(rng);
+        let note_rcm = vesta::Scalar::rand(rng);
         let output_note = Note::new(
             user,
             token,
@@ -103,15 +104,15 @@ impl<CP: CircuitParameters> ActionInfo<CP> {
 impl<CP: CircuitParameters> SpendInfo<CP> {
     pub fn new<BH>(
         note: Note<CP>,
-        merkle_path: MerklePath<CP::CurveScalarField, BH>,
+        merkle_path: MerklePath<vesta::Scalar, BH>,
         hasher: &BH,
     ) -> Self
     where
-        BH: FieldHasher<CP::CurveScalarField>,
+        BH: FieldHasher<vesta::Scalar>,
     {
-        let cm_node = Node::<CP::CurveScalarField, BH>::new(note.commitment().unwrap().inner());
+        let cm_node = Node::<vesta::Scalar, BH>::new(note.commitment().unwrap().inner());
         let root = merkle_path.root(cm_node, hasher).unwrap().inner();
-        let auth_path: [(CP::CurveScalarField, bool); TAIGA_COMMITMENT_TREE_DEPTH] =
+        let auth_path: [(vesta::Scalar, bool); TAIGA_COMMITMENT_TREE_DEPTH] =
             merkle_path.get_path().as_slice().try_into().unwrap();
         Self {
             note,
@@ -127,7 +128,7 @@ impl<CP: CircuitParameters> OutputInfo<CP> {
         addr_recv_vp: ValidityPredicateDescription<CP>,
         addr_token_vp: ValidityPredicateDescription<CP>,
         value: u64,
-        data: CP::CurveScalarField,
+        data: vesta::Scalar,
     ) -> Self {
         Self {
             addr_send_closed,
@@ -140,11 +141,11 @@ impl<CP: CircuitParameters> OutputInfo<CP> {
 
     pub fn dummy(rng: &mut impl RngCore) -> Self {
         use rand::Rng;
-        let addr_send_closed = UserSendAddress::<CP>::from_closed(CP::CurveScalarField::rand(rng));
+        let addr_send_closed = UserSendAddress::<CP>::from_closed(vesta::Scalar::rand(rng));
         let addr_recv_vp = ValidityPredicateDescription::<CP>::dummy(rng);
         let addr_token_vp = ValidityPredicateDescription::<CP>::dummy(rng);
         let value: u64 = rng.gen();
-        let data = CP::CurveScalarField::rand(rng);
+        let data = vesta::Scalar::rand(rng);
         Self {
             addr_send_closed,
             addr_recv_vp,

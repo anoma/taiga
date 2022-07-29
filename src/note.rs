@@ -10,40 +10,42 @@ use plonk_hashing::poseidon::{
     poseidon::{NativeSpec, Poseidon},
 };
 use rand::RngCore;
+use pasta_curves::vesta;
 
 /// A note
 #[derive(Debug, Clone)]
-pub struct Note<CP: CircuitParameters> {
+pub struct Note {
     /// Owner of the note
-    pub user: User<CP>,
-    pub token: Token<CP>,
+    pub user: User,
+    pub token: Token,
     pub value: u64,
     /// for NFT or whatever. TODO: to be decided the value format.
-    pub data: CP::CurveScalarField,
+    pub data: vesta::Scalar,
     /// old nullifier. Nonce which is a deterministically computed, unique nonce
-    pub rho: Nullifier<CP>,
+    pub rho: Nullifier,
     /// computed from spent_note_nf using a PRF
-    pub psi: CP::CurveScalarField,
-    pub rcm: CP::CurveScalarField,
+    pub psi: vesta::Scalar,
+    pub rcm: vesta::Scalar,
 }
 
 /// A commitment to a note.
 #[derive(Copy, Debug, Clone)]
-pub struct NoteCommitment<CP: CircuitParameters>(CP::CurveScalarField);
+pub struct NoteCommitment(vesta::Scalar);
 
-impl<CP: CircuitParameters> Note<CP> {
+impl Note {
     pub fn new(
-        user: User<CP>,
-        token: Token<CP>,
+        user: User,
+        token: Token,
         value: u64,
-        rho: Nullifier<CP>,
-        data: CP::CurveScalarField,
-        rcm: CP::CurveScalarField,
+        rho: Nullifier,
+        data: vesta::Scalar,
+        rcm: vesta::Scalar,
     ) -> Self {
+  use halo2_gadgets::poseidon::primitives::{Hash, P128Pow5T3, ConstantLength};
         // Init poseidon param.
-        let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
-            PoseidonConstants::generate::<WIDTH_3>();
-        let psi = poseidon_param.native_hash_two(&rho.inner(), &rcm).unwrap();
+        let poseidon_param =Hash::<vesta::Scalar, P128Pow5T3, ConstantLength<2>>::init();
+     
+        let psi = poseidon_param.hash(&[rho.inner(), rcm]).unwrap();
         Self {
             user,
             token,
@@ -55,21 +57,22 @@ impl<CP: CircuitParameters> Note<CP> {
         }
     }
 
-    pub fn dummy(rng: &mut impl RngCore) -> Self {
+    pub fn dummy<CP: CircuitParameters>(rng: &mut impl RngCore) -> Self {
         use ark_ff::UniformRand;
         use rand::Rng;
+        use halo2_gadgets::poseidon::primitives::{Hash, P128Pow5T3, ConstantLength};
+
 
         let user = User::<CP>::new(rng);
         let token = Token::<CP>::new(rng);
         let value: u64 = rng.gen();
-        let data = CP::CurveScalarField::rand(rng);
-        let rho = Nullifier::new(CP::CurveScalarField::rand(rng));
-        let rcm = CP::CurveScalarField::rand(rng);
+        let data = vesta::Scalar::rand(rng);
+        let rho = Nullifier::new(vesta::Scalar::rand(rng));
+        let rcm = vesta::Scalar::rand(rng);
 
-        // Init poseidon param.
-        let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
-            PoseidonConstants::generate::<WIDTH_3>();
-        let psi = poseidon_param.native_hash_two(&rho.inner(), &rcm).unwrap();
+// Init poseidon param.
+let poseidon_param =Hash::<vesta::Scalar, P128Pow5T3, ConstantLength<2>>::init();
+        let psi = poseidon_param.hash(&[rho.inner(), rcm]).unwrap();
         Self {
             user,
             token,
@@ -81,20 +84,21 @@ impl<CP: CircuitParameters> Note<CP> {
         }
     }
 
-    pub fn dummy_from_token(token: Token<CP>, rng: &mut impl RngCore) -> Note<CP> {
+    pub fn dummy_from_token(token: Token, rng: &mut impl RngCore) -> Note {
         use ark_ff::UniformRand;
         use rand::Rng;
+        use halo2_gadgets::poseidon::primitives::{Hash, P128Pow5T3, ConstantLength};
 
-        let user = User::<CP>::new(rng);
+
+        let user = User::new(rng);
         let value: u64 = rng.gen();
-        let data = CP::CurveScalarField::rand(rng);
-        let rho = Nullifier::new(CP::CurveScalarField::rand(rng));
-        let rcm = CP::CurveScalarField::rand(rng);
+        let data = vesta::Scalar::rand(rng);
+        let rho = Nullifier::new(vesta::Scalar::rand(rng));
+        let rcm = vesta::Scalar::rand(rng);
 
-        // Init poseidon param.
-        let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
-            PoseidonConstants::generate::<WIDTH_3>();
-        let psi = poseidon_param.native_hash_two(&rho.inner(), &rcm).unwrap();
+// Init poseidon param.
+let poseidon_param =Hash::<vesta::Scalar, P128Pow5T3, ConstantLength<2>>::init();
+        let psi = poseidon_param.hash(&[rho.inner(), rcm]).unwrap();
         Self {
             user,
             token,
@@ -106,20 +110,21 @@ impl<CP: CircuitParameters> Note<CP> {
         }
     }
 
-    pub fn dummy_from_user(user: User<CP>, rng: &mut impl RngCore) -> Note<CP> {
+    pub fn dummy_from_user(user: User, rng: &mut impl RngCore) -> Note {
         use ark_ff::UniformRand;
         use rand::Rng;
+        use halo2_gadgets::poseidon::primitives::{Hash, P128Pow5T3, ConstantLength};
 
-        let token = Token::<CP>::new(rng);
+
+        let token = Token::new(rng);
         let value: u64 = rng.gen();
-        let data = CP::CurveScalarField::rand(rng);
-        let rho = Nullifier::new(CP::CurveScalarField::rand(rng));
-        let rcm = CP::CurveScalarField::rand(rng);
+        let data = vesta::Scalar::rand(rng);
+        let rho = Nullifier::new(vesta::Scalar::rand(rng));
+        let rcm = vesta::Scalar::rand(rng);
 
-        // Init poseidon param.
-        let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
-            PoseidonConstants::generate::<WIDTH_3>();
-        let psi = poseidon_param.native_hash_two(&rho.inner(), &rcm).unwrap();
+// Init poseidon param.
+let poseidon_param =Hash::<vesta::Scalar, P128Pow5T3, ConstantLength<2>>::init();
+        let psi = poseidon_param.hash(&[rho.inner(), rcm]).unwrap();
         Self {
             user,
             token,
@@ -136,25 +141,16 @@ impl<CP: CircuitParameters> Note<CP> {
     // If the Commit can't provide enough hiding security(to be verified, we have the same problem in
     // address commit and vp commit), consider using hash_to_curve(pedersen_hash_to_curve used in sapling
     // or Sinsemilla_hash_to_curve used in Orchard) and adding rcm*fixed_generator, which based on DL assumption.
-    pub fn commitment(&self) -> Result<NoteCommitment<CP>, TaigaError> {
+    pub fn commitment(&self) -> Result<NoteCommitment, TaigaError> {
+        use halo2_gadgets::poseidon::primitives::{Hash, P128Pow5T3, ConstantLength};
+
         let user_address = self.user.address()?;
         let token_address = self.token.address()?;
-        let value_filed = CP::CurveScalarField::from(self.value);
+        let value_filed = vesta::Scalar::from(self.value);
 
-        let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
-            PoseidonConstants::generate::<WIDTH_9>();
-        let mut poseidon = Poseidon::<(), NativeSpec<CP::CurveScalarField, WIDTH_9>, WIDTH_9>::new(
-            &mut (),
-            &poseidon_param,
-        );
-        poseidon.input(user_address).unwrap();
-        poseidon.input(token_address).unwrap();
-        poseidon.input(value_filed).unwrap();
-        poseidon.input(self.data).unwrap();
-        poseidon.input(self.rho.inner()).unwrap();
-        poseidon.input(self.psi).unwrap();
-        poseidon.input(self.rcm).unwrap();
-        Ok(NoteCommitment(poseidon.output_hash(&mut ())))
+// Init poseidon param.
+let poseidon_param =Hash::<vesta::Scalar, P128Pow5T3, ConstantLength<9>>::init();
+Ok(NoteCommitment(poseidon_param.hash(& [user_address, token_address, value_filed, self.data, self.rho.inner(), self.psi, self.rcm])))
     }
 
     // temporary interface, remove it after adding the Serialize
@@ -164,8 +160,8 @@ impl<CP: CircuitParameters> Note<CP> {
     }
 }
 
-impl<CP: CircuitParameters> NoteCommitment<CP> {
-    pub fn inner(&self) -> CP::CurveScalarField {
+impl NoteCommitment {
+    pub fn inner(&self) -> vesta::Scalar {
         self.0
     }
 

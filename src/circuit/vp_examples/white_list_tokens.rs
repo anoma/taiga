@@ -14,23 +14,23 @@ use plonk_hashing::poseidon::constants::PoseidonConstants;
 // WhiteListTokensValidityPredicate have a custom constraint checking that the received notes come from known senders.
 pub struct WhiteListTokensValidityPredicate<CP: CircuitParameters> {
     // basic "private" inputs to the VP
-    input_notes: [Note<CP>; NUM_NOTE],
-    output_notes: [Note<CP>; NUM_NOTE],
+    input_notes: [Note; NUM_NOTE],
+    output_notes: [Note; NUM_NOTE],
     // custom "private" inputs to the VP
-    white_list_tokens: Vec<Token<CP>>,
+    white_list_tokens: Vec<Token>,
     mk_root: Node<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>,
     paths: Vec<MerklePath<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>>,
 }
 
-impl<CP> ValidityPredicate<CP> for WhiteListTokensValidityPredicate<CP>
+impl ValidityPredicate for WhiteListTokensValidityPredicate
 where
     CP: CircuitParameters,
 {
-    fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE] {
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
         &self.input_notes
     }
 
-    fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE] {
+    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
         &self.output_notes
     }
 
@@ -61,7 +61,7 @@ where
     }
 }
 
-impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for WhiteListTokensValidityPredicate<CP>
+impl Circuit<CP::CurveScalarField, CP::InnerCurve> for WhiteListTokensValidityPredicate
 where
     CP: CircuitParameters,
 {
@@ -94,20 +94,20 @@ fn test_white_list_tokens_vp_example() {
     // use plonk_core::circuit::{verify_proof, VerifierData};
 
     let mut rng = test_rng();
-    let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
-    let output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
+    let input_notes = [(); NUM_NOTE].map(|_| Note::::dummy(&mut rng));
+    let output_notes = [(); NUM_NOTE].map(|_| Note::::dummy(&mut rng));
 
     // white list is a list of token addresses, containing the output note token addresses.
-    let white_list_tokens: Vec<Token<CP>> = vec![
-        Token::<CP>::new(&mut rng),
+    let white_list_tokens: Vec<Token> = vec![
+        Token::::new(&mut rng),
         output_notes[1].token.clone(),
-        Token::<CP>::new(&mut rng),
-        Token::<CP>::new(&mut rng),
+        Token::::new(&mut rng),
+        Token::::new(&mut rng),
         output_notes[3].token.clone(),
         output_notes[2].token.clone(),
-        Token::<CP>::new(&mut rng),
+        Token::::new(&mut rng),
         output_notes[0].token.clone(),
-        Token::<CP>::new(&mut rng),
+        Token::::new(&mut rng),
     ];
 
     let white_list_tokens_to_fields: Vec<Fr> = white_list_tokens

@@ -1,33 +1,34 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::note::NoteCommitment;
-use crate::poseidon::{FieldHasher, WIDTH_5};
+use crate::poseidon::{FieldHasher, WIDTH_5, self};
 use crate::user::NullifierDerivingKey;
 use ark_ff::{BigInteger, PrimeField};
 use plonk_hashing::poseidon::constants::PoseidonConstants;
 
+use pasta_curves::vesta;
 /// The unique nullifier.
 #[derive(Copy, Debug, Clone)]
-pub struct Nullifier<CP: CircuitParameters>(CP::CurveScalarField);
+pub struct Nullifier(vesta::Scalar);
 
-impl<CP: CircuitParameters> Nullifier<CP> {
+impl Nullifier {
     // for test
-    pub fn new(nf: CP::CurveScalarField) -> Self {
+    pub fn new(nf: vesta::Scalar) -> Self {
         Self(nf)
     }
 
     // cm is a point
     // // $nf =Extract_P([PRF_{nk}(\rho) = \psi \ mod \ q] * K + cm)$
     // pub fn derive_native(
-    //     nk: &NullifierDerivingKey<CP::CurveScalarField>,
-    //     rho: &CP::CurveScalarField,
-    //     psi: &CP::CurveScalarField,
+    //     nk: &NullifierDerivingKey<vesta::Scalar>,
+    //     rho: &vesta::Scalar,
+    //     psi: &vesta::Scalar,
     //     cm: &TEGroupAffine<CP::InnerCurve>,
     // ) -> Self {
     //     // Init poseidon param.
-    //     let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+    //     let poseidon_param: PoseidonConstants<vesta::Scalar> =
     //         PoseidonConstants::generate::<WIDTH_3>();
     //     let prf_nk_rho = poseidon_param.native_hash_two(&nk.inner(), rho).unwrap();
-    //     // This requires CP::CurveScalarField is smaller than CP::InnerCurveScalarField
+    //     // This requires vesta::Scalar is smaller than CP::InnerCurveScalarField
     //     let scalar_repr = (prf_nk_rho + psi).into_repr();
     //     let scalar = CP::InnerCurveScalarField::from_le_bytes_mod_order(&scalar_repr.to_bytes_le());
 
@@ -42,16 +43,16 @@ impl<CP: CircuitParameters> Nullifier<CP> {
     // cm is a scalar
     // nf = CRH(nk, rho, psi, cm)
     pub fn derive_native(
-        nk: &NullifierDerivingKey<CP::CurveScalarField>,
-        rho: &Nullifier<CP>, // Old nullifier
-        psi: &CP::CurveScalarField,
-        cm: &NoteCommitment<CP>,
+        nk: &NullifierDerivingKey<vesta::Scalar>,
+        rho: &Nullifier, // Old nullifier
+        psi: &vesta::Scalar,
+        cm: &NoteCommitment,
     ) -> Self {
+        use halo2_gadgets::poseidon::primitives::{Hash, P128Pow5T3, ConstantLength};
         // Init poseidon param.
-        let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
-            PoseidonConstants::generate::<WIDTH_5>();
+        let poseidon_param =Hash::<vesta::Scalar, P128Pow5T3, ConstantLength<3>>::init();
         let scalar_vec = vec![nk.inner(), rho.inner(), *psi, cm.inner()];
-        let nf = poseidon_param.native_hash(&scalar_vec).unwrap();
+        let nf = poseidon_param.hash(&scalar_vec).unwrap();
 
         Nullifier(nf)
     }
@@ -61,10 +62,10 @@ impl<CP: CircuitParameters> Nullifier<CP> {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Self {
-        Self(CP::CurveScalarField::from_le_bytes_mod_order(bytes))
+        Self(vesta::Scalar::from_le_bytes_mod_order(bytes))
     }
 
-    pub fn inner(&self) -> CP::CurveScalarField {
+    pub fn inner(&self) -> vesta::Scalar {
         self.0
     }
 }

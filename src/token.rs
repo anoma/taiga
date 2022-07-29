@@ -5,13 +5,14 @@ use crate::utils::bits_to_fields;
 use crate::vp_description::ValidityPredicateDescription;
 use plonk_hashing::poseidon::constants::PoseidonConstants;
 use rand::RngCore;
+use pasta_curves::vesta;
 
 #[derive(Debug, Clone)]
-pub struct Token<CP: CircuitParameters> {
-    pub token_vp: ValidityPredicateDescription<CP>,
+pub struct Token{
+    pub token_vp: ValidityPredicateDescription,
 }
 
-impl<CP: CircuitParameters> Token<CP> {
+impl Token{
     pub fn new(rng: &mut impl RngCore) -> Self {
         Self {
             // TODO: fix this in future.
@@ -19,12 +20,12 @@ impl<CP: CircuitParameters> Token<CP> {
         }
     }
 
-    pub fn address(&self) -> Result<CP::CurveScalarField, TaigaError> {
+    pub fn address(&self) -> Result<vesta::Scalar, TaigaError> {
         // Init poseidon param.
-        let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+        let poseidon_param: PoseidonConstants<vesta::Scalar> =
             PoseidonConstants::generate::<WIDTH_3>();
 
-        let address_fields = bits_to_fields::<CP::CurveScalarField>(&self.token_vp.to_bits());
+        let address_fields = bits_to_fields::<vesta::Scalar>(&self.token_vp.to_bits());
         poseidon_param.native_hash_two(&address_fields[0], &address_fields[1])
     }
 }

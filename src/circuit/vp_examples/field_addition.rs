@@ -11,8 +11,8 @@ use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude:
 // in which a, b are private inputs and c is a public input.
 pub struct FieldAdditionValidityPredicate<CP: CircuitParameters> {
     // basic "private" inputs to the VP
-    input_notes: [Note<CP>; NUM_NOTE],
-    output_notes: [Note<CP>; NUM_NOTE],
+    input_notes: [Note; NUM_NOTE],
+    output_notes: [Note; NUM_NOTE],
     // custom "private" inputs to the VP
     a: CP::CurveScalarField,
     b: CP::CurveScalarField,
@@ -20,15 +20,15 @@ pub struct FieldAdditionValidityPredicate<CP: CircuitParameters> {
     pub c: CP::CurveScalarField,
 }
 
-impl<CP> ValidityPredicate<CP> for FieldAdditionValidityPredicate<CP>
+impl ValidityPredicate for FieldAdditionValidityPredicate
 where
     CP: CircuitParameters,
 {
-    fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE] {
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
         &self.input_notes
     }
 
-    fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE] {
+    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
         &self.output_notes
     }
 
@@ -40,14 +40,14 @@ where
     ) -> Result<(), Error> {
         let var_a = composer.add_input(self.a);
         let var_b = composer.add_input(self.b);
-        let var_a_plus_b = field_addition_gadget::<CP>(composer, var_a, var_b);
+        let var_a_plus_b = field_addition_gadget::(composer, var_a, var_b);
         let var_c = composer.add_input(self.c);
         composer.assert_equal(var_c, var_a_plus_b);
         Ok(())
     }
 }
 
-impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for FieldAdditionValidityPredicate<CP>
+impl Circuit<CP::CurveScalarField, CP::InnerCurve> for FieldAdditionValidityPredicate
 where
     CP: CircuitParameters,
 {
@@ -84,8 +84,8 @@ fn test_field_addition_vp_example() {
     use plonk_core::proof_system::pi::PublicInputs;
 
     let mut rng = test_rng();
-    let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
-    let output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
+    let input_notes = [(); NUM_NOTE].map(|_| Note::::dummy(&mut rng));
+    let output_notes = [(); NUM_NOTE].map(|_| Note::::dummy(&mut rng));
     let a = Fr::rand(&mut rng);
     let b = Fr::rand(&mut rng);
     let c = a + b;
@@ -103,7 +103,7 @@ fn test_field_addition_vp_example() {
     // Generate blinding circuit for vp
     let vp_desc = ValidityPredicateDescription::from_vp(&mut field_addition_vp, &vp_setup).unwrap();
     let vp_desc_compressed = vp_desc.get_compress();
-    let mut blinding_circuit = BlindingCircuit::<CP>::new(
+    let mut blinding_circuit = BlindingCircuit::::new(
         &mut rng,
         vp_desc,
         &vp_setup,

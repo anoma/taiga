@@ -14,23 +14,23 @@ use plonk_hashing::poseidon::constants::PoseidonConstants;
 // WhiteListSendersValidityPredicate have a custom constraint checking that the received notes come from known senders.
 pub struct WhiteListSendersValidityPredicate<CP: CircuitParameters> {
     // basic "private" inputs to the VP
-    input_notes: [Note<CP>; NUM_NOTE],
-    output_notes: [Note<CP>; NUM_NOTE],
+    input_notes: [Note; NUM_NOTE],
+    output_notes: [Note; NUM_NOTE],
     // custom "private" inputs to the VP
-    white_list_senders: Vec<User<CP>>,
+    white_list_senders: Vec<User>,
     mk_root: Node<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>,
     paths: Vec<MerklePath<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>>,
 }
 
-impl<CP> ValidityPredicate<CP> for WhiteListSendersValidityPredicate<CP>
+impl ValidityPredicate for WhiteListSendersValidityPredicate
 where
     CP: CircuitParameters,
 {
-    fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE] {
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
         &self.input_notes
     }
 
-    fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE] {
+    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
         &self.output_notes
     }
 
@@ -61,7 +61,7 @@ where
     }
 }
 
-impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for WhiteListSendersValidityPredicate<CP>
+impl Circuit<CP::CurveScalarField, CP::InnerCurve> for WhiteListSendersValidityPredicate
 where
     CP: CircuitParameters,
 {
@@ -94,22 +94,22 @@ fn test_white_list_senders_vp_example() {
     // use plonk_core::circuit::{verify_proof, VerifierData};
 
     let mut rng = test_rng();
-    let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
-    let output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
+    let input_notes = [(); NUM_NOTE].map(|_| Note::::dummy(&mut rng));
+    let output_notes = [(); NUM_NOTE].map(|_| Note::::dummy(&mut rng));
 
     // white list is a list of user addresses, containing the output notes addresses.
-    let white_list_senders: Vec<User<CP>> = vec![
-        User::<CP>::new(&mut rng),
+    let white_list_senders: Vec<User> = vec![
+        User::::new(&mut rng),
         output_notes[1].user.clone(),
-        User::<CP>::new(&mut rng),
-        User::<CP>::new(&mut rng),
+        User::::new(&mut rng),
+        User::::new(&mut rng),
         output_notes[3].user.clone(),
         output_notes[2].user.clone(),
-        User::<CP>::new(&mut rng),
+        User::::new(&mut rng),
         output_notes[0].user.clone(),
-        User::<CP>::new(&mut rng),
-        User::<CP>::new(&mut rng),
-        User::<CP>::new(&mut rng),
+        User::::new(&mut rng),
+        User::::new(&mut rng),
+        User::::new(&mut rng),
     ];
 
     let white_list_senders_to_fields: Vec<Fr> = white_list_senders
