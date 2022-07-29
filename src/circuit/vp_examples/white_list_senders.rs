@@ -87,7 +87,6 @@ fn test_white_list_senders_vp_example() {
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::merkle_tree::MerkleTreeLeafs;
     use crate::poseidon::WIDTH_3;
-    use ark_poly_commit::PolynomialCommitment;
     use ark_std::test_rng;
     use plonk_core::circuit::{verify_proof, VerifierData};
 
@@ -148,7 +147,7 @@ fn test_white_list_senders_vp_example() {
     );
 
     // Generate CRS
-    let pp = PC::setup(white_list_senders_vp.padded_circuit_size(), None, &mut rng).unwrap();
+    let pp = CP::get_pc_setup_params(white_list_senders_vp.padded_circuit_size());
 
     // Compile the circuit
     let (pk_p, vk) = white_list_senders_vp.compile::<PC>(&pp).unwrap();

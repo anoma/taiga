@@ -17,15 +17,15 @@ pub const ACTION_PUBLIC_INPUT_CM_INDEX: usize = 19586;
 lazy_static! {
     pub static ref PC_SETUP_MAP: HashMap<
         usize,
-        <KZG10<ark_bls12_377::Bls12_377> as PolynomialCommitment<
-            ark_bls12_377::Fr,
-            DensePolynomial<ark_bls12_377::Fr>,
+        <KZG10<ark_bls12_381_new::Bls12_381New> as PolynomialCommitment<
+            ark_bls12_381_new::Fr,
+            DensePolynomial<ark_bls12_381_new::Fr>,
         >>::UniversalParams,
     > = {
         let mut m = HashMap::new();
         for circuit_size in &[CIRCUIT_SIZE_2_15, CIRCUIT_SIZE_2_16, CIRCUIT_SIZE_2_17] {
             let setup =
-                KZG10::<ark_bls12_377::Bls12_377>::setup(*circuit_size, None, &mut OsRng).unwrap();
+                KZG10::<ark_bls12_381_new::Bls12_381New>::setup(*circuit_size, None, &mut OsRng).unwrap();
             m.insert(*circuit_size, setup);
         }
         m
@@ -35,15 +35,15 @@ lazy_static! {
 lazy_static! {
     pub static ref OPC_SETUP_MAP: HashMap<
         usize,
-        <KZG10<ark_bw6_761::BW6_761> as PolynomialCommitment<
-            ark_bw6_761::Fr,
-            DensePolynomial<ark_bw6_761::Fr>,
+        <KZG10<ark_bw6_764_new::BW6_764New> as PolynomialCommitment<
+            ark_bw6_764_new::Fr,
+            DensePolynomial<ark_bw6_764_new::Fr>,
         >>::UniversalParams,
     > = {
         let mut m = HashMap::new();
         // for circuit_size in &[CIRCUIT_SIZE_2_15] {
             let setup =
-                KZG10::<ark_bw6_761::BW6_761>::setup(CIRCUIT_SIZE_2_15, None, &mut OsRng).unwrap();
+                KZG10::<ark_bw6_764_new::BW6_764New>::setup(CIRCUIT_SIZE_2_15, None, &mut OsRng).unwrap();
             m.insert(CIRCUIT_SIZE_2_15, setup);
         // }
         m

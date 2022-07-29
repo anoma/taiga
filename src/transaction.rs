@@ -1,4 +1,5 @@
-use crate::action::{Action, ActionInfo};
+use crate::action::Action;
+use crate::circuit::action_circuit::ActionCircuit;
 use crate::circuit::blinding_circuit::BlindingCircuit;
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
@@ -61,22 +62,16 @@ pub struct VPCheck<CP: CircuitParameters> {
 }
 
 impl<CP: CircuitParameters> ActionSlice<CP> {
-    pub fn from_action_info(
-        action_info: ActionInfo<CP>,
-        rng: &mut impl RngCore,
-        setup: &<CP::CurvePC as PolynomialCommitment<
-            CP::CurveScalarField,
-            DensePolynomial<CP::CurveScalarField>,
-        >>::UniversalParams,
-    ) -> Self {
-        let (action_public, mut action_circuit) = action_info.build(rng).unwrap();
+    pub fn build(
+        action_public: Action<CP>,
+        action_circuit: &mut ActionCircuit<CP>,
+    ) -> Result<Self, TaigaError> {
+        let setup = CP::get_pc_setup_params(ACTION_CIRCUIT_SIZE);
         // Compile the circuit
-        let (pk_p, vk) = action_circuit.compile::<CP::CurvePC>(setup).unwrap();
+        let (pk_p, vk) = action_circuit.compile::<CP::CurvePC>(setup)?;
 
         // Prover
-        let (action_proof, pi) = action_circuit
-            .gen_proof::<CP::CurvePC>(setup, pk_p, b"Test")
-            .unwrap();
+        let (action_proof, pi) = action_circuit.gen_proof::<CP::CurvePC>(setup, pk_p, b"Test")?;
 
         // Verifier
         let verifier_data = VerifierData::new(vk, pi);
@@ -86,13 +81,12 @@ impl<CP: CircuitParameters> ActionSlice<CP> {
             &action_proof,
             &verifier_data.pi,
             b"Test",
-        )
-        .unwrap();
+        )?;
 
-        ActionSlice {
+        Ok(Self {
             action_public,
             action_proof,
-        }
+        })
     }
 
     pub fn verify(
@@ -125,26 +119,23 @@ impl<CP: CircuitParameters> VPCheck<CP> {
             DensePolynomial<CP::CurveScalarField>,
         >>::UniversalParams,
         rng: &mut impl RngCore,
-    ) -> Self
+    ) -> Result<Self, TaigaError>
     where
         VP: ValidityPredicate<CP>,
     {
         let vp_circuit_size = vp.padded_circuit_size();
         // Generate blinding circuit for vp
-        let vp_desc = ValidityPredicateDescription::from_vp(vp, vp_setup).unwrap();
+        let vp_desc = ValidityPredicateDescription::from_vp(vp, vp_setup)?;
         // let vp_desc_compressed = vp_desc.get_compress();
         let mut blinding_circuit =
-            BlindingCircuit::<CP>::new(rng, vp_desc, vp_setup, vp_circuit_size).unwrap();
+            BlindingCircuit::<CP>::new(rng, vp_desc, vp_setup, vp_circuit_size)?;
 
         // Compile vp(must use compile_with_blinding)
-        let (pk_p, vk_blind) = vp
-            .compile_with_blinding::<CP::CurvePC>(vp_setup, &blinding_circuit.blinding)
-            .unwrap();
+        let (pk_p, vk_blind) =
+            vp.compile_with_blinding::<CP::CurvePC>(vp_setup, &blinding_circuit.get_blinding())?;
 
         // VP Prover
-        let (vp_proof, pi) = vp
-            .gen_proof::<CP::CurvePC>(vp_setup, pk_p, b"Test")
-            .unwrap();
+        let (vp_proof, pi) = vp.gen_proof::<CP::CurvePC>(vp_setup, pk_p, b"Test")?;
 
         // VP verifier
         let vp_verifier_data = VerifierData::new(vk_blind.clone(), pi);
@@ -154,19 +145,15 @@ impl<CP: CircuitParameters> VPCheck<CP> {
             &vp_proof,
             &vp_verifier_data.pi,
             b"Test",
-        )
-        .unwrap();
+        )?;
 
         // Generate blinding circuit CRS
         let blinding_setup = CP::get_opc_setup_params(BLINDING_CIRCUIT_SIZE);
-        let (pk_p, vk) = blinding_circuit
-            .compile::<CP::OuterCurvePC>(blinding_setup)
-            .unwrap();
+        let (pk_p, vk) = blinding_circuit.compile::<CP::OuterCurvePC>(blinding_setup)?;
 
         // Blinding Prover
-        let (blind_vp_proof, pi) = blinding_circuit
-            .gen_proof::<CP::OuterCurvePC>(blinding_setup, pk_p, b"Test")
-            .unwrap();
+        let (blind_vp_proof, pi) =
+            blinding_circuit.gen_proof::<CP::OuterCurvePC>(blinding_setup, pk_p, b"Test")?;
 
         // Blinding Verifier
         let blinding_verifier_data = VerifierData::new(vk, pi);
@@ -176,17 +163,16 @@ impl<CP: CircuitParameters> VPCheck<CP> {
             &blind_vp_proof,
             &blinding_verifier_data.pi,
             b"Test",
-        )
-        .unwrap();
+        )?;
 
-        Self {
+        Ok(Self {
             vp_circuit_size,
             vp_proof,
             vp_public_inputs: vp_verifier_data.pi,
             unblinded_vp_vk: vk_blind,
             blind_vp_proof,
             blinded_vp_public_inputs: blinding_verifier_data.pi,
-        }
+        })
     }
 
     pub fn verify(

@@ -76,7 +76,6 @@ fn test_field_addition_vp_example() {
     type Fq = <CP as CircuitParameters>::CurveBaseField;
     type OP = <CP as CircuitParameters>::Curve;
     type Opc = <CP as CircuitParameters>::OuterCurvePC;
-    use ark_poly_commit::PolynomialCommitment;
     use ark_std::{test_rng, UniformRand};
     use plonk_core::circuit::{verify_proof, VerifierData};
 
@@ -95,20 +94,20 @@ fn test_field_addition_vp_example() {
     };
 
     // Generate vp CRS
-    let vp_setup = PC::setup(field_addition_vp.padded_circuit_size(), None, &mut rng).unwrap();
+    let vp_setup = CP::get_pc_setup_params(field_addition_vp.padded_circuit_size());
 
     // Compile vp(must use compile_with_blinding)
     let (pk_p, vk_blind) = field_addition_vp.compile::<PC>(&vp_setup).unwrap();
 
     // VP Prover
     let (proof, pi) = field_addition_vp
-        .gen_proof::<PC>(&vp_setup, pk_p, b"Test")
+        .gen_proof::<PC>(vp_setup, pk_p, b"Test")
         .unwrap();
 
     // VP verifier
     let verifier_data = VerifierData::new(vk_blind, pi);
     verify_proof::<Fr, P, PC>(
-        &vp_setup,
+        vp_setup,
         verifier_data.key,
         &proof,
         &verifier_data.pi,
