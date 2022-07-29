@@ -18,8 +18,8 @@ ark-bw6-764-new = { git="https://github.com/simonmasson/curves/", branch="new-pa
 merlin = { version = "3.0", default-features = false }
 rand = "0.8.4"
 sha2 = "0.10.1"
-plonk-core = { git = "https://github.com/heliaxdev/ark-plonk/", features = ["trace"], branch="simon/poseidon-new-bls-curve" }
-plonk-hashing = { git = "https://github.com/heliaxdev/ark-plonk/", branch="simon/poseidon-new-bls-curve" }
+plonk-core = { git = "https://github.com/heliaxdev/ark-plonk/", features = ["trace"], branch="taiga/randomized-circuits" }
+plonk-hashing = { git = "https://github.com/heliaxdev/ark-plonk/", branch="taiga/randomized-circuits" }
 blake2 = "0.9"
 rs_merkle = { git = "https://github.com/heliaxdev/rs-merkle/" } # "0.2.2"
 lazy_static = "1"
