@@ -149,7 +149,7 @@ fn test_blinding_circuit() {
     type P = <CP as CircuitParameters>::InnerCurve;
     type OP = <CP as CircuitParameters>::Curve;
     type PC = <CP as CircuitParameters>::CurvePC;
-    type OPC = <CP as CircuitParameters>::OuterCurvePC;
+    type Opc = <CP as CircuitParameters>::OuterCurvePC;
     use ark_std::test_rng;
 
     let mut rng = test_rng();
@@ -178,13 +178,13 @@ fn test_blinding_circuit() {
         .unwrap();
 
     let blinding_circuit_size = blinding_circuit.padded_circuit_size();
-    let pp_blind = OPC::setup(blinding_circuit_size, None, &mut rng).unwrap();
+    let pp_blind = Opc::setup(blinding_circuit_size, None, &mut rng).unwrap();
 
-    let (pk_p, vk) = blinding_circuit.compile::<OPC>(&pp_blind).unwrap();
+    let (pk_p, vk) = blinding_circuit.compile::<Opc>(&pp_blind).unwrap();
 
     // Blinding Prover
     let (proof, pi) = blinding_circuit
-        .gen_proof::<OPC>(&pp_blind, pk_p, b"Test")
+        .gen_proof::<Opc>(&pp_blind, pk_p, b"Test")
         .unwrap();
 
     // Expecting vk_blind(out of circuit)
@@ -213,7 +213,7 @@ fn test_blinding_circuit() {
 
     // Blinding Verifier
     let verifier_data = VerifierData::new(vk, pi);
-    verify_proof::<Fq, OP, OPC>(
+    verify_proof::<Fq, OP, Opc>(
         &pp_blind,
         verifier_data.key,
         &proof,

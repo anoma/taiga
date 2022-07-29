@@ -110,7 +110,7 @@ fn test_point_addition_vp_example() {
         .unwrap();
 
     // VP verifier
-    let verifier_data = VerifierData::new(vk_blind.clone(), pi);
+    let verifier_data = VerifierData::new(vk_blind, pi);
     verify_proof::<Fr, P, PC>(
         &vp_setup,
         verifier_data.key,

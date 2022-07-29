@@ -18,8 +18,8 @@ pub struct BalanceValidityPredicate<CP: CircuitParameters> {
 impl<CP: CircuitParameters> BalanceValidityPredicate<CP> {
     pub fn new(input_notes: [Note<CP>; NUM_NOTE], output_notes: [Note<CP>; NUM_NOTE]) -> Self {
         BalanceValidityPredicate {
-            input_notes: input_notes,
-            output_notes: output_notes,
+            input_notes,
+            output_notes,
         }
     }
 }
