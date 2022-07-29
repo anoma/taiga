@@ -1,16 +1,12 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::gadgets::merkle_tree::merkle_tree_gadget;
 use crate::circuit::integrity::{input_note_constraint, output_note_constraint};
+use crate::constant::ACTION_CIRCUIT_SIZE;
 use crate::merkle_tree::TAIGA_COMMITMENT_TREE_DEPTH;
 use crate::note::Note;
 use crate::poseidon::WIDTH_3;
 use plonk_core::{circuit::Circuit, constraint_system::StandardComposer};
 use plonk_hashing::poseidon::constants::PoseidonConstants;
-
-pub const ACTION_PUBLIC_INPUT_NF_INDEX: usize = 10781;
-pub const ACTION_PUBLIC_INPUT_ROOT_INDEX: usize = 12530;
-pub const ACTION_PUBLIC_INPUT_CM_INDEX: usize = 19586;
-pub const ACTION_CIRCUIT_SIZE: usize = 1 << 15;
 
 /// Action circuit
 #[derive(Debug, Clone)]
@@ -80,6 +76,9 @@ fn action_circuit_test() {
     type P = <CP as CircuitParameters>::InnerCurve;
     type PC = <CP as CircuitParameters>::CurvePC;
     use crate::action::*;
+    use crate::constant::{
+        ACTION_PUBLIC_INPUT_CM_INDEX, ACTION_PUBLIC_INPUT_NF_INDEX, ACTION_PUBLIC_INPUT_ROOT_INDEX,
+    };
     use crate::merkle_tree::MerklePath;
     use crate::poseidon::POSEIDON_HASH_PARAM_BLS12_381_NEW_SCALAR_ARITY2;
     use ark_poly_commit::PolynomialCommitment;

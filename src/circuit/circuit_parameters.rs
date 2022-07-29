@@ -1,3 +1,4 @@
+use crate::constant::{OPC_SETUP_MAP, PC_SETUP_MAP};
 use crate::utils::ws_to_te;
 use ark_ec::{
     //short_weierstrass_jacobian::GroupAffine as SWGroupAffine,
@@ -50,6 +51,20 @@ pub trait CircuitParameters: Copy {
         >>::UniversalParams,
         vp_circuit_size: usize,
     ) -> [Self::CurveBaseField; 2];
+
+    fn get_pc_setup_params<'staitc>(
+        circuit_size: usize,
+    ) -> &'staitc <Self::CurvePC as PolynomialCommitment<
+        Self::CurveScalarField,
+        DensePolynomial<Self::CurveScalarField>,
+    >>::UniversalParams;
+
+    fn get_opc_setup_params<'staitc>(
+        circuit_size: usize,
+    ) -> &'staitc <Self::OuterCurvePC as PolynomialCommitment<
+        Self::CurveBaseField,
+        DensePolynomial<Self::CurveBaseField>,
+    >>::UniversalParams;
 }
 
 // // We decided to continue with KZG for now.
@@ -129,5 +144,23 @@ impl CircuitParameters for PairingCircuitParameters {
         let ws_com_zh = com_g_n + com_g_0.neg();
         let com_z_h = ws_to_te(ws_com_zh);
         [com_z_h.x, com_z_h.y]
+    }
+
+    fn get_pc_setup_params<'staitc>(
+        circuit_size: usize,
+    ) -> &'staitc <Self::CurvePC as PolynomialCommitment<
+        Self::CurveScalarField,
+        DensePolynomial<Self::CurveScalarField>,
+    >>::UniversalParams {
+        PC_SETUP_MAP.get(&circuit_size).unwrap()
+    }
+
+    fn get_opc_setup_params<'staitc>(
+        circuit_size: usize,
+    ) -> &'staitc <Self::OuterCurvePC as PolynomialCommitment<
+        Self::CurveBaseField,
+        DensePolynomial<Self::CurveBaseField>,
+    >>::UniversalParams {
+        OPC_SETUP_MAP.get(&circuit_size).unwrap()
     }
 }

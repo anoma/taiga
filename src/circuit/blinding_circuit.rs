@@ -1,4 +1,5 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
+use crate::constant::BLINDING_CIRCUIT_SIZE;
 use crate::poseidon::WIDTH_9;
 use crate::vp_description::ValidityPredicateDescription;
 use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
@@ -101,7 +102,7 @@ where
     }
 
     fn padded_circuit_size(&self) -> usize {
-        1 << 15
+        BLINDING_CIRCUIT_SIZE
     }
 }
 
