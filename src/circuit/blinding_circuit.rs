@@ -1,19 +1,11 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
-use crate::circuit::gadgets::point_addition::point_addition_gadget;
-use crate::circuit::validity_predicate::NUM_NOTE;
-use crate::circuit::vp_examples::balance::BalanceValidityPredicate;
-use crate::note::Note;
 use crate::poseidon::WIDTH_9;
-use crate::utils::ws_to_te;
 use crate::vp_description::ValidityPredicateDescription;
 use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
-use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ff::UniformRand;
 use ark_ff::{BigInteger, PrimeField};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
-use plonk_core::circuit::{verify_proof, VerifierData};
-use plonk_core::proof_system::pi::PublicInputs;
 
 use plonk_core::{
     circuit::Circuit, constraint_system::StandardComposer, prelude::Error, prelude::Variable,
@@ -145,6 +137,13 @@ fn test_blinding_circuit() {
     // checking the blinding circuit
 
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
+    use crate::circuit::validity_predicate::NUM_NOTE;
+    use crate::circuit::vp_examples::balance::BalanceValidityPredicate;
+    use crate::note::Note;
+    use crate::utils::ws_to_te;
+    use crate::vp_description::ValidityPredicateDescription;
+    use plonk_core::circuit::{verify_proof, VerifierData};
+    use plonk_core::proof_system::pi::PublicInputs;
     type Fr = <CP as CircuitParameters>::CurveScalarField;
     type Fq = <CP as CircuitParameters>::CurveBaseField;
     type P = <CP as CircuitParameters>::InnerCurve;
