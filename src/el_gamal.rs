@@ -126,10 +126,10 @@ impl<C: TEModelParameters> EncryptionKey<C> {
 
 #[test]
 fn test_el_gamal() {
-    use ark_pallas::PallasParameters;
+    use ark_bls12_381_new::g1::Parameters;
 
     let mut rng = rand::thread_rng();
-    let dk = DecryptionKey::<PallasParameters>::new(&mut rng);
+    let dk = DecryptionKey::<Parameters>::new(&mut rng);
     let ek = dk.encryption_key();
 
     let msg = "JeMAppelleSimon.................".as_bytes();

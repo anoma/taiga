@@ -15,6 +15,15 @@ pub struct BalanceValidityPredicate<CP: CircuitParameters> {
     output_notes: [Note<CP>; NUM_NOTE],
 }
 
+impl<CP: CircuitParameters> BalanceValidityPredicate<CP> {
+    pub fn new(input_notes: [Note<CP>; NUM_NOTE], output_notes: [Note<CP>; NUM_NOTE]) -> Self {
+        BalanceValidityPredicate {
+            input_notes,
+            output_notes,
+        }
+    }
+}
+
 impl<CP> ValidityPredicate<CP> for BalanceValidityPredicate<CP>
 where
     CP: CircuitParameters,
@@ -78,16 +87,16 @@ where
     }
 }
 
+#[ignore]
 #[test]
 fn test_balance_vp_example() {
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::token::Token;
+
     type Fr = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;
     type PC = <CP as CircuitParameters>::CurvePC;
-    // use ark_poly_commit::PolynomialCommitment;
     use ark_std::test_rng;
-    // use plonk_core::circuit::{verify_proof, VerifierData};
 
     let mut rng = test_rng();
     let xan = Token::<CP>::new(&mut rng);
@@ -109,16 +118,19 @@ fn test_balance_vp_example() {
     composer.check_circuit_satisfied();
     println!("circuit size of balance_vp: {}", composer.circuit_bound());
 
-    // // Generate CRS
-    // let pp = PC::setup(balance_vp.padded_circuit_size(), None, &mut rng).unwrap();
+    use ark_poly_commit::PolynomialCommitment;
+    use plonk_core::circuit::{verify_proof, VerifierData};
 
-    // // Compile the circuit
-    // let (pk_p, vk) = balance_vp.compile::<PC>(&pp).unwrap();
+    // Generate CRS
+    let pp = PC::setup(balance_vp.padded_circuit_size(), None, &mut rng).unwrap();
 
-    // // Prover
-    // let (proof, pi) = balance_vp.gen_proof::<PC>(&pp, pk_p, b"Test").unwrap();
+    // Compile the circuit
+    let (pk_p, vk) = balance_vp.compile::<PC>(&pp).unwrap();
 
-    // // Verifier
-    // let verifier_data = VerifierData::new(vk, pi);
-    // verify_proof::<Fr, P, PC>(&pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
+    // Prover
+    let (proof, pi) = balance_vp.gen_proof::<PC>(&pp, pk_p, b"Test").unwrap();
+
+    // Verifier
+    let verifier_data = VerifierData::new(vk, pi);
+    verify_proof::<Fr, P, PC>(&pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
 }

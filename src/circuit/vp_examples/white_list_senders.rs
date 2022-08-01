@@ -41,7 +41,8 @@ where
         output_note_variables: &[ValidityPredicateOuputNoteVariables],
     ) -> Result<(), Error> {
         let expected_var = composer.add_input(self.mk_root.inner());
-        let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
+        let poseidon_hash_param_bls12_381_new_scalar_arity2 =
+            PoseidonConstants::generate::<WIDTH_3>();
         for (output_note_variable, path) in output_note_variables.iter().zip(self.paths.clone()) {
             let owner_var = output_note_variable.recipient_addr;
             let root_var = merkle_tree_gadget::<
@@ -52,7 +53,7 @@ where
                 composer,
                 &owner_var,
                 &path.get_path(),
-                &poseidon_hash_param_bls12_377_scalar_arity2,
+                &poseidon_hash_param_bls12_381_new_scalar_arity2,
             )
             .unwrap();
             composer.assert_equal(expected_var, root_var);
@@ -80,18 +81,19 @@ where
     }
 }
 
+#[ignore]
 #[test]
 fn test_white_list_senders_vp_example() {
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::merkle_tree::MerkleTreeLeafs;
     use crate::poseidon::WIDTH_3;
+    use ark_poly_commit::PolynomialCommitment;
     use ark_std::test_rng;
+    use plonk_core::circuit::{verify_proof, VerifierData};
 
     type Fr = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;
     type PC = <CP as CircuitParameters>::CurvePC;
-    // use ark_poly_commit::PolynomialCommitment;
-    // use plonk_core::circuit::{verify_proof, VerifierData};
 
     let mut rng = test_rng();
     let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
@@ -117,10 +119,10 @@ fn test_white_list_senders_vp_example() {
         .map(|v| v.address().unwrap())
         .collect();
 
-    let poseidon_hash_param_bls12_377_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
+    let poseidon_hash_param_bls12_381_new_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
     let mk_root =
         MerkleTreeLeafs::<Fr, PoseidonConstants<Fr>>::new(white_list_senders_to_fields.to_vec())
-            .root(&poseidon_hash_param_bls12_377_scalar_arity2);
+            .root(&poseidon_hash_param_bls12_381_new_scalar_arity2);
 
     let paths: Vec<MerklePath<Fr, PoseidonConstants<Fr>>> = vec![
         MerklePath::build_merkle_path(&white_list_senders_to_fields, 7),
@@ -145,18 +147,18 @@ fn test_white_list_senders_vp_example() {
         composer.circuit_bound()
     );
 
-    // // Generate CRS
-    // let pp = PC::setup(white_list_senders_vp.padded_circuit_size(), None, &mut rng).unwrap();
+    // Generate CRS
+    let pp = PC::setup(white_list_senders_vp.padded_circuit_size(), None, &mut rng).unwrap();
 
-    // // Compile the circuit
-    // let (pk_p, vk) = white_list_senders_vp.compile::<PC>(&pp).unwrap();
+    // Compile the circuit
+    let (pk_p, vk) = white_list_senders_vp.compile::<PC>(&pp).unwrap();
 
-    // // Prover
-    // let (proof, pi) = white_list_senders_vp
-    //     .gen_proof::<PC>(&pp, pk_p, b"Test")
-    //     .unwrap();
+    // Prover
+    let (proof, pi) = white_list_senders_vp
+        .gen_proof::<PC>(&pp, pk_p, b"Test")
+        .unwrap();
 
-    // // Verifier
-    // let verifier_data = VerifierData::new(vk, pi);
-    // verify_proof::<Fr, P, PC>(&pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
+    // Verifier
+    let verifier_data = VerifierData::new(vk, pi);
+    verify_proof::<Fr, P, PC>(&pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
 }
