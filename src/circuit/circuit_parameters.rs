@@ -71,15 +71,15 @@ pub trait CircuitParameters: Copy {
 pub struct PairingCircuitParameters {}
 
 impl CircuitParameters for PairingCircuitParameters {
-    type CurveScalarField = ark_bls12_377::Fr;
-    type CurveBaseField = ark_bls12_377::Fq;
-    type Curve = ark_bls12_377::g1::Parameters;
-    type InnerCurveScalarField = ark_ed_on_bls12_377::Fr;
-    type InnerCurve = ark_ed_on_bls12_377::EdwardsParameters;
-    type OuterCurveBaseField = ark_bw6_761::Fq;
-    type OuterCurve = ark_bw6_761::g1::Parameters;
-    type CurvePC = KZG10<ark_bls12_377::Bls12_377>;
-    type OuterCurvePC = KZG10<ark_bw6_761::BW6_761>;
+    type CurveScalarField = ark_bls12_381_new::Fr;
+    type CurveBaseField = ark_bls12_381_new::Fq;
+    type Curve = ark_bls12_381_new::g1::Parameters;
+    type InnerCurveScalarField = ark_ed_on_bls12_381_new::Fr;
+    type InnerCurve = ark_ed_on_bls12_381_new::Parameters;
+    type OuterCurveBaseField = ark_bw6_764_new::Fq;
+    type OuterCurve = ark_bw6_764_new::g1::Parameters;
+    type CurvePC = KZG10<ark_bls12_381_new::Bls12_381New>;
+    type OuterCurvePC = KZG10<ark_bw6_764_new::BW6_764New>;
 
     fn pack_vk(
         vk: &VerifierKey<Self::CurveScalarField, Self::CurvePC>,
@@ -123,12 +123,11 @@ impl CircuitParameters for PairingCircuitParameters {
         vp_circuit_size: usize,
     ) -> [Self::CurveBaseField; 2] {
         let (ck, _) = Self::CurvePC::trim(vp_setup, vp_circuit_size, 0, None).unwrap();
-
-        // [b * Z_H + q] ?= b *[Z_H] + [q]
         let n = ck.powers_of_g.len();
         let com_g_n = ck.powers_of_g[n - 1];
         let com_g_0 = ck.powers_of_g[0];
-        let com_z_h = ws_to_te(com_g_n + com_g_0.neg());
+        let ws_com_zh = com_g_n + com_g_0.neg();
+        let com_z_h = ws_to_te(ws_com_zh);
         [com_z_h.x, com_z_h.y]
     }
 }

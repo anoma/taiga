@@ -49,7 +49,7 @@ fn test_merkle_circuit() {
     use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters};
     use crate::merkle_tree::TAIGA_COMMITMENT_TREE_DEPTH;
     use crate::merkle_tree::{MerklePath, Node};
-    use crate::poseidon::POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2;
+    use crate::poseidon::POSEIDON_HASH_PARAM_BLS12_381_NEW_SCALAR_ARITY2;
     type Fr = <PairingCircuitParameters as CircuitParameters>::CurveScalarField;
     type P = <PairingCircuitParameters as CircuitParameters>::InnerCurve;
     use ark_std::test_rng;
@@ -63,7 +63,7 @@ fn test_merkle_circuit() {
     let expected = merkle_path
         .root(
             cur_leaf.clone(),
-            &POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2,
+            &POSEIDON_HASH_PARAM_BLS12_381_NEW_SCALAR_ARITY2,
         )
         .unwrap();
 
@@ -73,7 +73,7 @@ fn test_merkle_circuit() {
         &mut composer,
         &commitment,
         &merkle_path.get_path(),
-        &POSEIDON_HASH_PARAM_BLS12_377_SCALAR_ARITY2,
+        &POSEIDON_HASH_PARAM_BLS12_381_NEW_SCALAR_ARITY2,
     )
     .unwrap();
     composer.check_circuit_satisfied();

@@ -1,26 +1,27 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
-use crate::circuit::gadgets::field_addition::field_addition_gadget;
+use crate::circuit::gadgets::point_addition::point_addition_gadget;
 use crate::circuit::integrity::{
     ValidityPredicateInputNoteVariables, ValidityPredicateOuputNoteVariables,
 };
 use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
 use crate::note::Note;
+use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
 use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
 
-// FieldAdditionValidityPredicate have a custom constraint with a + b = c,
+// PointAdditionValidityPredicate have a custom constraint with a + b = c,
 // in which a, b are private inputs and c is a public input.
-pub struct FieldAdditionValidityPredicate<CP: CircuitParameters> {
+pub struct PointAdditionValidityPredicate<CP: CircuitParameters> {
     // basic "private" inputs to the VP
     input_notes: [Note<CP>; NUM_NOTE],
     output_notes: [Note<CP>; NUM_NOTE],
     // custom "private" inputs to the VP
-    a: CP::CurveScalarField,
-    b: CP::CurveScalarField,
+    a: TEGroupAffine<CP::InnerCurve>,
+    b: TEGroupAffine<CP::InnerCurve>,
     // custom "public" inputs to the VP
-    pub c: CP::CurveScalarField,
+    pub c: TEGroupAffine<CP::InnerCurve>,
 }
 
-impl<CP> ValidityPredicate<CP> for FieldAdditionValidityPredicate<CP>
+impl<CP> ValidityPredicate<CP> for PointAdditionValidityPredicate<CP>
 where
     CP: CircuitParameters,
 {
@@ -38,16 +39,16 @@ where
         _input_note_variables: &[ValidityPredicateInputNoteVariables],
         _output_note_variables: &[ValidityPredicateOuputNoteVariables],
     ) -> Result<(), Error> {
-        let var_a = composer.add_input(self.a);
-        let var_b = composer.add_input(self.b);
-        let var_a_plus_b = field_addition_gadget::<CP>(composer, var_a, var_b);
-        let var_c = composer.add_input(self.c);
-        composer.assert_equal(var_c, var_a_plus_b);
+        let var_a = composer.add_affine(self.a);
+        let var_b = composer.add_affine(self.b);
+        let var_a_plus_b =
+            point_addition_gadget::<CP::CurveScalarField, CP::InnerCurve>(composer, var_a, var_b);
+        composer.assert_equal_public_point(var_a_plus_b, self.c);
         Ok(())
     }
 }
 
-impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for FieldAdditionValidityPredicate<CP>
+impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for PointAdditionValidityPredicate<CP>
 where
     CP: CircuitParameters,
 {
@@ -68,7 +69,7 @@ where
 
 #[ignore]
 #[test]
-fn test_field_addition_vp_example() {
+fn test_point_addition_vp_example() {
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     type Fr = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;
@@ -76,17 +77,21 @@ fn test_field_addition_vp_example() {
     type Fq = <CP as CircuitParameters>::CurveBaseField;
     type OP = <CP as CircuitParameters>::Curve;
     type Opc = <CP as CircuitParameters>::OuterCurvePC;
+    use ark_ec::TEModelParameters;
     use ark_poly_commit::PolynomialCommitment;
-    use ark_std::{test_rng, UniformRand};
+    use ark_std::test_rng;
     use plonk_core::circuit::{verify_proof, VerifierData};
 
+    // (useless) notes
     let mut rng = test_rng();
     let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
     let output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
-    let a = Fr::rand(&mut rng);
-    let b = Fr::rand(&mut rng);
+
+    let (x, y) = P::AFFINE_GENERATOR_COEFFS;
+    let a = TEGroupAffine::<P>::new(x, y);
+    let b = TEGroupAffine::<P>::new(x, y);
     let c = a + b;
-    let mut field_addition_vp = FieldAdditionValidityPredicate {
+    let mut point_addition_vp = PointAdditionValidityPredicate {
         input_notes,
         output_notes,
         a,
@@ -95,13 +100,13 @@ fn test_field_addition_vp_example() {
     };
 
     // Generate vp CRS
-    let vp_setup = PC::setup(field_addition_vp.padded_circuit_size(), None, &mut rng).unwrap();
+    let vp_setup = PC::setup(point_addition_vp.padded_circuit_size(), None, &mut rng).unwrap();
 
     // Compile vp(must use compile_with_blinding)
-    let (pk_p, vk_blind) = field_addition_vp.compile::<PC>(&vp_setup).unwrap();
+    let (pk_p, vk_blind) = point_addition_vp.compile::<PC>(&vp_setup).unwrap();
 
     // VP Prover
-    let (proof, pi) = field_addition_vp
+    let (proof, pi) = point_addition_vp
         .gen_proof::<PC>(&vp_setup, pk_p, b"Test")
         .unwrap();
 
