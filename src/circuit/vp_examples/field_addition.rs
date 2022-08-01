@@ -66,6 +66,7 @@ where
     }
 }
 
+#[ignore]
 #[test]
 fn test_field_addition_vp_example() {
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;

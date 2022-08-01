@@ -130,6 +130,7 @@ impl<CP: CircuitParameters> BlindingCircuit<CP> {
     }
 }
 
+#[ignore]
 #[test]
 fn test_blinding_circuit() {
     // creation of a (balance) VP

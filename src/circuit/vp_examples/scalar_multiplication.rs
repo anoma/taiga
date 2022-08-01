@@ -65,6 +65,7 @@ where
     }
 }
 
+#[ignore]
 #[test]
 fn test_scalar_multiplication_vp_example() {
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;

@@ -87,6 +87,7 @@ where
     }
 }
 
+#[ignore]
 #[test]
 fn test_balance_vp_example() {
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
@@ -117,19 +118,19 @@ fn test_balance_vp_example() {
     composer.check_circuit_satisfied();
     println!("circuit size of balance_vp: {}", composer.circuit_bound());
 
-    // use ark_poly_commit::PolynomialCommitment;
-    // use plonk_core::circuit::{verify_proof, VerifierData};
+    use ark_poly_commit::PolynomialCommitment;
+    use plonk_core::circuit::{verify_proof, VerifierData};
 
-    // // Generate CRS
-    // let pp = PC::setup(balance_vp.padded_circuit_size(), None, &mut rng).unwrap();
+    // Generate CRS
+    let pp = PC::setup(balance_vp.padded_circuit_size(), None, &mut rng).unwrap();
 
-    // // Compile the circuit
-    // let (pk_p, vk) = balance_vp.compile::<PC>(&pp).unwrap();
+    // Compile the circuit
+    let (pk_p, vk) = balance_vp.compile::<PC>(&pp).unwrap();
 
-    // // Prover
-    // let (proof, pi) = balance_vp.gen_proof::<PC>(&pp, pk_p, b"Test").unwrap();
+    // Prover
+    let (proof, pi) = balance_vp.gen_proof::<PC>(&pp, pk_p, b"Test").unwrap();
 
-    // // Verifier
-    // let verifier_data = VerifierData::new(vk, pi);
-    // verify_proof::<Fr, P, PC>(&pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
+    // Verifier
+    let verifier_data = VerifierData::new(vk, pi);
+    verify_proof::<Fr, P, PC>(&pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
 }

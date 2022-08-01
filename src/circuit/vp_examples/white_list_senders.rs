@@ -81,12 +81,15 @@ where
     }
 }
 
+#[ignore]
 #[test]
 fn test_white_list_senders_vp_example() {
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::merkle_tree::MerkleTreeLeafs;
     use crate::poseidon::WIDTH_3;
+    use ark_poly_commit::PolynomialCommitment;
     use ark_std::test_rng;
+    use plonk_core::circuit::{verify_proof, VerifierData};
 
     type Fr = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;
@@ -144,21 +147,18 @@ fn test_white_list_senders_vp_example() {
         composer.circuit_bound()
     );
 
-    // use ark_poly_commit::PolynomialCommitment;
-    // use plonk_core::circuit::{verify_proof, VerifierData};
+    // Generate CRS
+    let pp = PC::setup(white_list_senders_vp.padded_circuit_size(), None, &mut rng).unwrap();
 
-    // // Generate CRS
-    // let pp = PC::setup(white_list_senders_vp.padded_circuit_size(), None, &mut rng).unwrap();
+    // Compile the circuit
+    let (pk_p, vk) = white_list_senders_vp.compile::<PC>(&pp).unwrap();
 
-    // // Compile the circuit
-    // let (pk_p, vk) = white_list_senders_vp.compile::<PC>(&pp).unwrap();
+    // Prover
+    let (proof, pi) = white_list_senders_vp
+        .gen_proof::<PC>(&pp, pk_p, b"Test")
+        .unwrap();
 
-    // // Prover
-    // let (proof, pi) = white_list_senders_vp
-    //     .gen_proof::<PC>(&pp, pk_p, b"Test")
-    //     .unwrap();
-
-    // // Verifier
-    // let verifier_data = VerifierData::new(vk, pi);
-    // verify_proof::<Fr, P, PC>(&pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
+    // Verifier
+    let verifier_data = VerifierData::new(vk, pi);
+    verify_proof::<Fr, P, PC>(&pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
 }
