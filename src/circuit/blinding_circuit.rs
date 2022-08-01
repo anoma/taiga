@@ -1,4 +1,5 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
+use crate::circuit::vp_examples::field_addition::FieldAdditionValidityPredicate;
 use crate::constant::BLINDING_CIRCUIT_SIZE;
 use crate::poseidon::WIDTH_9;
 use crate::vp_description::ValidityPredicateDescription;
@@ -128,6 +129,21 @@ impl<CP: CircuitParameters> BlindingCircuit<CP> {
 
     pub fn get_blinding(&self) -> Blinding<CP::CurveScalarField> {
         self.blinding
+    }
+
+    pub fn dummy(rng: &mut impl RngCore) -> Self {
+        let blinding = Blinding::<CP::CurveScalarField>::rand(rng);
+        let mut dummy_vp = FieldAdditionValidityPredicate::<CP>::dummy(rng);
+        let vp_circuit_size = dummy_vp.padded_circuit_size();
+        let vp_setup = CP::get_pc_setup_params(vp_circuit_size);
+        let vp_desc = ValidityPredicateDescription::from_vp(&mut dummy_vp, vp_setup).unwrap();
+        let zh = CP::get_zh(vp_setup, vp_circuit_size);
+
+        Self {
+            vp_desc,
+            blinding,
+            zh,
+        }
     }
 }
 

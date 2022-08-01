@@ -1,4 +1,4 @@
-use crate::constant::{OPC_SETUP_MAP, PC_SETUP_MAP};
+use crate::constant::{ACTION_KEY, BLIND_VP_KEY, OPC_SETUP_MAP, PC_SETUP_MAP};
 use crate::utils::ws_to_te;
 use ark_ec::{
     //short_weierstrass_jacobian::GroupAffine as SWGroupAffine,
@@ -9,7 +9,7 @@ use ark_ff::PrimeField;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use plonk_core::commitment::{HomomorphicCommitment, KZG10};
-use plonk_core::proof_system::VerifierKey;
+use plonk_core::proof_system::{ProverKey, VerifierKey};
 use std::ops::Neg;
 
 pub trait CircuitParameters: Copy {
@@ -65,6 +65,11 @@ pub trait CircuitParameters: Copy {
         Self::CurveBaseField,
         DensePolynomial<Self::CurveBaseField>,
     >>::UniversalParams;
+
+    fn get_action_pk<'staitc>() -> &'staitc ProverKey<Self::CurveScalarField>;
+    fn get_action_vk<'staitc>() -> &'staitc VerifierKey<Self::CurveScalarField, Self::CurvePC>;
+    fn get_blind_vp_pk<'staitc>() -> &'staitc ProverKey<Self::CurveBaseField>;
+    fn get_blind_vp_vk<'staitc>() -> &'staitc VerifierKey<Self::CurveBaseField, Self::OuterCurvePC>;
 }
 
 // // We decided to continue with KZG for now.
@@ -162,5 +167,19 @@ impl CircuitParameters for PairingCircuitParameters {
         DensePolynomial<Self::CurveBaseField>,
     >>::UniversalParams {
         OPC_SETUP_MAP.get(&circuit_size).unwrap()
+    }
+
+    fn get_action_pk<'staitc>() -> &'staitc ProverKey<Self::CurveScalarField> {
+        &ACTION_KEY.0
+    }
+    fn get_action_vk<'staitc>() -> &'staitc VerifierKey<Self::CurveScalarField, Self::CurvePC> {
+        &ACTION_KEY.1
+    }
+    fn get_blind_vp_pk<'staitc>() -> &'staitc ProverKey<Self::CurveBaseField> {
+        &BLIND_VP_KEY.0
+    }
+    fn get_blind_vp_vk<'staitc>() -> &'staitc VerifierKey<Self::CurveBaseField, Self::OuterCurvePC>
+    {
+        &BLIND_VP_KEY.1
     }
 }

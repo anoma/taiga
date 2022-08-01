@@ -5,7 +5,9 @@ use crate::circuit::integrity::{
 };
 use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
 use crate::note::Note;
+use ark_ff::UniformRand;
 use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
+use rand::RngCore;
 
 // FieldAdditionValidityPredicate have a custom constraint with a + b = c,
 // in which a, b are private inputs and c is a public input.
@@ -18,6 +20,40 @@ pub struct FieldAdditionValidityPredicate<CP: CircuitParameters> {
     b: CP::CurveScalarField,
     // custom "public" inputs to the VP
     pub c: CP::CurveScalarField,
+}
+
+impl<CP: CircuitParameters> FieldAdditionValidityPredicate<CP> {
+    pub fn new(
+        input_notes: [Note<CP>; NUM_NOTE],
+        output_notes: [Note<CP>; NUM_NOTE],
+        rng: &mut impl RngCore,
+    ) -> Self {
+        let a = CP::CurveScalarField::rand(rng);
+        let b = CP::CurveScalarField::rand(rng);
+        let c = a + b;
+        Self {
+            input_notes,
+            output_notes,
+            a,
+            b,
+            c,
+        }
+    }
+
+    pub fn dummy(rng: &mut impl RngCore) -> Self {
+        let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(rng));
+        let output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(rng));
+        let a = CP::CurveScalarField::rand(rng);
+        let b = CP::CurveScalarField::rand(rng);
+        let c = a + b;
+        Self {
+            input_notes,
+            output_notes,
+            a,
+            b,
+            c,
+        }
+    }
 }
 
 impl<CP> ValidityPredicate<CP> for FieldAdditionValidityPredicate<CP>
