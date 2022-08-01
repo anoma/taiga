@@ -116,3 +116,70 @@ fn test_field_addition_vp_example() {
     )
     .unwrap();
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct AdditionCircuit<CP: CircuitParameters> {
+    a: CP::CurveScalarField,
+    b: CP::CurveScalarField,
+    pub c: CP::CurveScalarField,
+}
+
+impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for AdditionCircuit<CP>
+where
+    CP: CircuitParameters,
+{
+    const CIRCUIT_ID: [u8; 32] = [0x00; 32];
+
+    // Default implementation
+    fn gadget(
+        &mut self,
+        composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+    ) -> Result<(), Error> {
+        let var_a = composer.add_input(self.a);
+        let var_b = composer.add_input(self.b);
+        let var_c = composer.add_input(self.c);
+        // add a gate for the addition
+        let var_a_plus_b = field_addition_gadget::<CP>(composer, var_a, var_b);
+        // // check that a + b == c
+        composer.assert_equal(var_c, var_a_plus_b);
+        composer.check_circuit_satisfied();
+        Ok(())
+    }
+
+    fn padded_circuit_size(&self) -> usize {
+        1 << 5
+    }
+}
+
+#[test]
+fn test_circuit_example() {
+    use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
+    type F = <CP as CircuitParameters>::CurveScalarField;
+    type P = <CP as CircuitParameters>::InnerCurve;
+    type PC = <CP as CircuitParameters>::CurvePC;
+    use ark_poly_commit::PolynomialCommitment;
+    use ark_std::{test_rng, UniformRand};
+    use plonk_core::circuit::{verify_proof, VerifierData};
+
+    let mut rng = test_rng();
+    let a = F::rand(&mut rng);
+    let b = F::rand(&mut rng);
+    let c = a + b;
+
+    // Circuit
+    let mut circuit = AdditionCircuit::<CP> { a, b, c };
+
+    // Setup
+    let setup = PC::setup(circuit.padded_circuit_size(), None, &mut rng).unwrap();
+
+    // Verifier key
+    let (pk, vk) = circuit.compile::<PC>(&setup).unwrap();
+
+    // VP Prover
+    let (pi, public_inputs) = circuit.gen_proof::<PC>(&setup, pk, b"Test").unwrap();
+
+    // VP verifier
+    let verifier_data = VerifierData::new(vk, public_inputs);
+    verify_proof::<F, P, PC>(&setup, verifier_data.key, &pi, &verifier_data.pi, b"Test").unwrap();
+}

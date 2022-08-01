@@ -6,4 +6,5 @@
 - [Tokens](./tokens.md)
 - [Notes](./notes.md)
 - [Full privacy](./privacy.md)
+- [Implementation choices](./technical-details.md)
 - [Conclusion](./conclusion.md)
