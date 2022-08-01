@@ -1,5 +1,4 @@
 [book]
-authors = ["Simon Masson", "Alberto Centelles"]
 language = "en"
 multilingual = false
 src = "src"

@@ -1,10 +1,12 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::gadgets::field_addition::field_addition_gadget;
+use crate::circuit::gadgets::trivial::trivial_gadget;
 use crate::circuit::integrity::{
     ValidityPredicateInputNoteVariables, ValidityPredicateOuputNoteVariables,
 };
 use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
 use crate::note::Note;
+use crate::poseidon::WIDTH_3;
 use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
 
 // FieldAdditionValidityPredicate have a custom constraint with a + b = c,
@@ -139,16 +141,17 @@ where
         let var_a = composer.add_input(self.a);
         let var_b = composer.add_input(self.b);
         let var_c = composer.add_input(self.c);
+
         // add a gate for the addition
         let var_a_plus_b = field_addition_gadget::<CP>(composer, var_a, var_b);
-        // // check that a + b == c
-        composer.assert_equal(var_c, var_a_plus_b);
+
+        composer.assert_equal(var_a_plus_b, var_c);
         composer.check_circuit_satisfied();
         Ok(())
     }
 
     fn padded_circuit_size(&self) -> usize {
-        1 << 5
+        1 << 3
     }
 }
 
@@ -173,13 +176,13 @@ fn test_circuit_example() {
     // Setup
     let setup = PC::setup(circuit.padded_circuit_size(), None, &mut rng).unwrap();
 
-    // Verifier key
+    // Prover and verifier key
     let (pk, vk) = circuit.compile::<PC>(&setup).unwrap();
 
-    // VP Prover
+    // Proof computation
     let (pi, public_inputs) = circuit.gen_proof::<PC>(&setup, pk, b"Test").unwrap();
 
-    // VP verifier
+    // Proof verification
     let verifier_data = VerifierData::new(vk, public_inputs);
     verify_proof::<F, P, PC>(&setup, verifier_data.key, &pi, &verifier_data.pi, b"Test").unwrap();
 }
