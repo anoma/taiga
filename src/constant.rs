@@ -30,7 +30,8 @@ lazy_static! {
         let mut m = HashMap::new();
         for circuit_size in &[CIRCUIT_SIZE_2_15, CIRCUIT_SIZE_2_16, CIRCUIT_SIZE_2_17] {
             let setup =
-                KZG10::<ark_bls12_381_new::Bls12_381New>::setup(*circuit_size, None, &mut OsRng).unwrap();
+                KZG10::<ark_bls12_381_new::Bls12_381New>::setup(*circuit_size, None, &mut OsRng)
+                    .unwrap();
             m.insert(*circuit_size, setup);
         }
         m
@@ -58,13 +59,13 @@ lazy_static! {
 lazy_static! {
     pub static ref ACTION_KEY: (ProverKey<ark_bls12_381_new::Fr>, VerifierKey<ark_bls12_381_new::Fr, KZG10<ark_bls12_381_new::Bls12_381New>>) = {
         let action_info = ActionInfo::<PairingCircuitParameters>::dummy(&mut OsRng);
-    let (_action, mut action_circuit) = action_info.build(&mut OsRng).unwrap();
+        let (_action, mut action_circuit) = action_info.build(&mut OsRng).unwrap();
 
-    // Generate CRS
-    let pp = PC_SETUP_MAP.get(&ACTION_CIRCUIT_SIZE).unwrap();
+        // Generate CRS
+        let pp = PC_SETUP_MAP.get(&ACTION_CIRCUIT_SIZE).unwrap();
 
-    // Compile the circuit
-    action_circuit.compile::<KZG10<ark_bls12_381_new::Bls12_381New>>(pp).unwrap()
+        // Compile the circuit
+        action_circuit.compile::<KZG10<ark_bls12_381_new::Bls12_381New>>(pp).unwrap()
     };
 }
 

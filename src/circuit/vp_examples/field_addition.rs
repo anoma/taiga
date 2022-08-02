@@ -133,7 +133,7 @@ fn test_field_addition_vp_example() {
     let vp_setup = CP::get_pc_setup_params(field_addition_vp.padded_circuit_size());
 
     // Compile vp(must use compile_with_blinding)
-    let (pk_p, vk_blind) = field_addition_vp.compile::<PC>(&vp_setup).unwrap();
+    let (pk_p, vk_blind) = field_addition_vp.compile::<PC>(vp_setup).unwrap();
 
     // VP Prover
     let (proof, pi) = field_addition_vp

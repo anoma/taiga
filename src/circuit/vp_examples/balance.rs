@@ -122,12 +122,12 @@ fn test_balance_vp_example() {
     let pp = CP::get_pc_setup_params(balance_vp.padded_circuit_size());
 
     // Compile the circuit
-    let (pk_p, vk) = balance_vp.compile::<PC>(&pp).unwrap();
+    let (pk_p, vk) = balance_vp.compile::<PC>(pp).unwrap();
 
     // Prover
-    let (proof, pi) = balance_vp.gen_proof::<PC>(&pp, pk_p, b"Test").unwrap();
+    let (proof, pi) = balance_vp.gen_proof::<PC>(pp, pk_p, b"Test").unwrap();
 
     // Verifier
     let verifier_data = VerifierData::new(vk, pi);
-    verify_proof::<Fr, P, PC>(&pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
+    verify_proof::<Fr, P, PC>(pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
 }
