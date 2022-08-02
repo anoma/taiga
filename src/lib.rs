@@ -18,3 +18,5 @@ pub mod vp_description;
 
 // #[cfg(test)]
 // pub mod tests;
+
+pub mod doc_test_simple_example;

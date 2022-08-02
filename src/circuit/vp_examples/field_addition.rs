@@ -1,12 +1,10 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::gadgets::field_addition::field_addition_gadget;
-use crate::circuit::gadgets::trivial::trivial_gadget;
 use crate::circuit::integrity::{
     ValidityPredicateInputNoteVariables, ValidityPredicateOuputNoteVariables,
 };
 use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
 use crate::note::Note;
-use crate::poseidon::WIDTH_3;
 use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
 
 // FieldAdditionValidityPredicate have a custom constraint with a + b = c,
@@ -117,72 +115,4 @@ fn test_field_addition_vp_example() {
         b"Test",
     )
     .unwrap();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct AdditionCircuit<CP: CircuitParameters> {
-    a: CP::CurveScalarField,
-    b: CP::CurveScalarField,
-    pub c: CP::CurveScalarField,
-}
-
-impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for AdditionCircuit<CP>
-where
-    CP: CircuitParameters,
-{
-    const CIRCUIT_ID: [u8; 32] = [0x00; 32];
-
-    // Default implementation
-    fn gadget(
-        &mut self,
-        composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-    ) -> Result<(), Error> {
-        let var_a = composer.add_input(self.a);
-        let var_b = composer.add_input(self.b);
-        let var_c = composer.add_input(self.c);
-
-        // add a gate for the addition
-        let var_a_plus_b = field_addition_gadget::<CP>(composer, var_a, var_b);
-
-        composer.assert_equal(var_a_plus_b, var_c);
-        composer.check_circuit_satisfied();
-        Ok(())
-    }
-
-    fn padded_circuit_size(&self) -> usize {
-        1 << 3
-    }
-}
-
-#[test]
-fn test_circuit_example() {
-    use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
-    type F = <CP as CircuitParameters>::CurveScalarField;
-    type P = <CP as CircuitParameters>::InnerCurve;
-    type PC = <CP as CircuitParameters>::CurvePC;
-    use ark_poly_commit::PolynomialCommitment;
-    use ark_std::{test_rng, UniformRand};
-    use plonk_core::circuit::{verify_proof, VerifierData};
-
-    let mut rng = test_rng();
-    let a = F::rand(&mut rng);
-    let b = F::rand(&mut rng);
-    let c = a + b;
-
-    // Circuit
-    let mut circuit = AdditionCircuit::<CP> { a, b, c };
-
-    // Setup
-    let setup = PC::setup(circuit.padded_circuit_size(), None, &mut rng).unwrap();
-
-    // Prover and verifier key
-    let (pk, vk) = circuit.compile::<PC>(&setup).unwrap();
-
-    // Proof computation
-    let (pi, public_inputs) = circuit.gen_proof::<PC>(&setup, pk, b"Test").unwrap();
-
-    // Proof verification
-    let verifier_data = VerifierData::new(vk, public_inputs);
-    verify_proof::<F, P, PC>(&setup, verifier_data.key, &pi, &verifier_data.pi, b"Test").unwrap();
 }

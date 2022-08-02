@@ -6,6 +6,10 @@ title = "Taiga documentation"
 
 [output.html]
 
+[output.html.playground]
+copyable = false
+runnable = false
+
 [output.katex]
 
 [preprocessor.katex]
