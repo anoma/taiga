@@ -112,22 +112,11 @@ fn test_field_addition_vp_example() {
     type Fq = <CP as CircuitParameters>::CurveBaseField;
     type OP = <CP as CircuitParameters>::Curve;
     type Opc = <CP as CircuitParameters>::OuterCurvePC;
-    use ark_std::{test_rng, UniformRand};
+    use ark_std::test_rng;
     use plonk_core::circuit::{verify_proof, VerifierData};
 
     let mut rng = test_rng();
-    let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
-    let output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
-    let a = Fr::rand(&mut rng);
-    let b = Fr::rand(&mut rng);
-    let c = a + b;
-    let mut field_addition_vp = FieldAdditionValidityPredicate {
-        input_notes,
-        output_notes,
-        a,
-        b,
-        c,
-    };
+    let mut field_addition_vp = FieldAdditionValidityPredicate::<CP>::dummy(&mut rng);
 
     // Generate vp CRS
     let vp_setup = CP::get_pc_setup_params(field_addition_vp.padded_circuit_size());

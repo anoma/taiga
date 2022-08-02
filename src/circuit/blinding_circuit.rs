@@ -181,28 +181,29 @@ fn test_blinding_circuit() {
         .unwrap();
 
     // we blind the VP desc
-    let pp = PC::setup(balance_vp.padded_circuit_size(), None, &mut rng).unwrap();
-    let vp_desc = ValidityPredicateDescription::from_vp(&mut balance_vp, &pp).unwrap();
+    let pp = CP::get_pc_setup_params(balance_vp.padded_circuit_size());
+    let vp_desc = ValidityPredicateDescription::from_vp(&mut balance_vp, pp).unwrap();
     let vp_desc_compressed = vp_desc.get_compress();
 
     // the blinding circuit, containing the random values used to blind
     let mut blinding_circuit =
-        BlindingCircuit::<CP>::new(&mut rng, vp_desc, &pp, balance_vp.padded_circuit_size())
+        BlindingCircuit::<CP>::new(&mut rng, vp_desc, pp, balance_vp.padded_circuit_size())
             .unwrap();
 
     // verifying key with the blinding
     let (_, vk_blind) = balance_vp
-        .compile_with_blinding::<PC>(&pp, &blinding_circuit.get_blinding())
+        .compile_with_blinding::<PC>(pp, &blinding_circuit.get_blinding())
         .unwrap();
 
     let blinding_circuit_size = blinding_circuit.padded_circuit_size();
-    let pp_blind = Opc::setup(blinding_circuit_size, None, &mut rng).unwrap();
+    let pp_blind = CP::get_opc_setup_params(blinding_circuit_size);
 
-    let (pk_p, vk) = blinding_circuit.compile::<Opc>(&pp_blind).unwrap();
+    let pk_p = CP::get_blind_vp_pk();
+    let vk = CP::get_blind_vp_vk();
 
     // Blinding Prover
     let (proof, pi) = blinding_circuit
-        .gen_proof::<Opc>(&pp_blind, pk_p, b"Test")
+        .gen_proof::<Opc>(pp_blind, pk_p.clone(), b"Test")
         .unwrap();
 
     // Expecting vk_blind(out of circuit)
@@ -230,9 +231,9 @@ fn test_blinding_circuit() {
     assert_eq!(pi, expect_pi);
 
     // Blinding Verifier
-    let verifier_data = VerifierData::new(vk, pi);
+    let verifier_data = VerifierData::new(vk.clone(), pi);
     verify_proof::<Fq, OP, Opc>(
-        &pp_blind,
+        pp_blind,
         verifier_data.key,
         &proof,
         &verifier_data.pi,
