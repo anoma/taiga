@@ -279,6 +279,7 @@ impl<CP: CircuitParameters> Transaction<CP> {
     }
 }
 
+#[ignore]
 #[test]
 fn test_tx() {
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
