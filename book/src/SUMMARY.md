@@ -2,7 +2,7 @@
 
 - [Overview](./overview.md)
 - [Zero-knowledge proofs](./zk-proofs.md)
-- [Tokens](./tokens.md)
+- [Tokens](token.md)
 - [Users](./users.md)
 - [Notes](./notes.md)
 - [Full privacy](./privacy.md)
