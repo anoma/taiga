@@ -1,7 +1,7 @@
 # Summary
 
 - [Overview](./overview.md)
-- [Zero-knowledge proofs](./zk-proofs.md)
+- [Validity predicates](./validity-predicates.md)
 - [Tokens](token.md)
 - [Users](./users.md)
 - [Notes](./notes.md)
