@@ -2,9 +2,11 @@
 
 - [Overview](./overview.md)
 - [Zero-knowledge proofs](./zk-proofs.md)
-- [Users](./users.md)
 - [Tokens](./tokens.md)
+- [Users](./users.md)
 - [Notes](./notes.md)
 - [Full privacy](./privacy.md)
 - [Implementation choices](./technical-details.md)
+- [Transaction timings](./timings.md)
 - [Conclusion](./conclusion.md)
+

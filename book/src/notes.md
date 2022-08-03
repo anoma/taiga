@@ -1,5 +1,26 @@
 # Notes
 
+* Note contains: owner address, token address, value, nullifier (open or closed), randomness (for the note commitment below)
+* Note are committed for privacy. It commits to all the data inside a note.
+* When a note is spent:
+    * a proof of the sendVP is verified against a `SendVK`.
+    * a proof of the tokenVP is verified against a `TokenVK`.
+    * the nullifier is computed using `nk`.
+    * the note commitment is open with all the data inside.
+    * we bind the owner address to `SendVK` and `nk`.
+    * we bind the token address to `TokenVK`.
+* When a note is created:
+    * a proof of the RecvVP is verified against `RecvVK`.
+    * a proof of the tokenVP is verified against a `TokenVK`.
+    * the address of the new note owner is computed using `RecvVK`
+    * the address of the new note token is computed using `TokenVK`.
+    * we create the note commitment using the data above (and other things like `rcm`, etc).
+
+
+-----
+
+
+
 Notes contains more informations than users and tokens:
 * An owner which is a user,
 * A token type,

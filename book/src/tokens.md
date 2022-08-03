@@ -1,5 +1,14 @@
 # Tokens
 
-A token has a structure similar to a user. During a transaction, the token provides a proof for its rules together with the corresponding verifying key. As for users, this verifying key is binded to the token identity using the address: a commitment to the verifying key.
+In Anoma, each token defines its own rules for transactions involving it. Rules are set in a validity predicate `Token_VP`, providing a set of constraints that needs to hold in regards to the token involved in a transaction before a note can be spent or created.
 
-In conclusion, during a transaction, the token provides a proof for the token VP with the corresponding verifying key, and a proof that this later verifying key opens the token address provided as a public input.
+The verification a `Token_VP` proof requires a verifier key `Token_VK`: Users check that `Verify(Token_π, Token_VK)` returns `True`.
+
+In order to bind this verification to the actual note token type, we need an identification of the token. The address of a token is a commitment to its verifying key: `Token_Address = Com(Token_VK)`. Binding `Token_VK` to the token type of a note corresponds to opening the address commitment.
+
+**Example.** We consider the token XAN, whose `Token_VP` is a white list of allowed sending users [Alice, Bob and Charlie]. Suppose that Alice has a note of 1XAN. The note has a token type (or address) which is a commitment to the `XAN_VK`. When Alice wants to spend her note, XAN produces a proof `π` corresponding to the check that Alice is in the white list, and users of Taiga can check that:
+* `Verify(π, XAN_VK)` is true,
+* `XAN_VK` opens the Alice's note token address.
+
+In practice, this second step will be done using another ZK proof, and Alice simply verify two ZK proofs.
+For privacy, we will see that additional proofs are required.
