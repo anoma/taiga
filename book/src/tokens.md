@@ -25,10 +25,13 @@ pub struct TrivialValidityPredicate<CP: CircuitParameters> {
 ```
 Our `TrivialValidityPredicate` needs to implement `Circuit` and `ValidityPredicate`:
 ```rust
-// We implement the (empty) circuit corresponding to this VP
-impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for TrivialValidityPredicate<CP>
-where
-    CP: CircuitParameters,
+impl<CP: CircuitParameters> ValidityPredicate<CP> for TrivialValidityPredicate<CP>
+{
+    fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE] {&self.input_notes}
+    fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE] {&self.output_notes}
+}
+
+impl<CP: CircuitParameters> Circuit<CP::CurveScalarField, CP::InnerCurve> for TrivialValidityPredicate<CP>
 {
     const CIRCUIT_ID: [u8; 32] = [0x00; 32];
 
@@ -41,37 +44,11 @@ where
         Ok(())
     }
 
-    fn padded_circuit_size(&self) -> usize {
-        1 << 2
-    }
-}
-
-// We implement the ValidityPredicate trait
-impl<CP> ValidityPredicate<CP> for TrivialValidityPredicate<CP>
-where
-    CP: CircuitParameters,
-{
-    fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE] {
-        &self.input_notes
-    }
-
-    fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE] {
-        &self.output_notes
-    }
-
-    fn custom_constraints(
-        &self,
-        _composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-        _input_note_variables: &[ValidityPredicateInputNoteVariables],
-        _output_note_variables: &[ValidityPredicateOutputNoteVariables],
-    ) -> Result<(), Error> {
-        Ok(())
-    }
+    fn padded_circuit_size(&self) -> usize { 4 }
 }
 ```
 From this VP, we can create a token and compute its address:
 ```rust
-use ark_std::test_rng;
 use crate::token::Token;
 use crate::circuit::validity_predicate::NUM_NOTE;
 use crate::note::Note; 
@@ -82,7 +59,7 @@ use ark_poly_commit::PolynomialCommitment;
 type Fr = <CP as CircuitParameters>::CurveScalarField;
 type PC = <CP as CircuitParameters>::CurvePC;
 
-let mut rng = test_rng();
+let mut rng = ark_std::test_rng();
 let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
 let output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
 
