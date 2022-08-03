@@ -78,8 +78,10 @@ pub trait ValidityPredicate<CP: CircuitParameters>:
     fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE];
     fn custom_constraints(
         &self,
-        composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-        input_note_variables: &[ValidityPredicateInputNoteVariables],
-        output_note_variables: &[ValidityPredicateOutputNoteVariables],
-    ) -> Result<(), Error>;
+        _composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+        _input_note_variables: &[ValidityPredicateInputNoteVariables],
+        _output_note_variables: &[ValidityPredicateOutputNoteVariables],
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
