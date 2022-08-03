@@ -402,7 +402,7 @@ mod test {
 
         // Test token integrity
         // Create a token
-        let token = Token::<PairingCircuitParameters>::new(&mut rng);
+        let token = Token::<PairingCircuitParameters>::dummy(&mut rng);
 
         let (token_var, _) = token_integrity_circuit::<PairingCircuitParameters>(
             &mut composer,

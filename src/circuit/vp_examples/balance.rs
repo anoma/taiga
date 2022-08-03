@@ -99,7 +99,7 @@ fn test_balance_vp_example() {
     use ark_std::test_rng;
 
     let mut rng = test_rng();
-    let xan = Token::<CP>::new(&mut rng);
+    let xan = Token::<CP>::dummy(&mut rng);
     // input notes
     let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_from_token(xan.clone(), &mut rng));
     // output notes
