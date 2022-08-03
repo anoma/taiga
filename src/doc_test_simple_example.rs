@@ -77,10 +77,9 @@ fn test_circuit_example() {
 
 use crate::circuit::validity_predicate::NUM_NOTE;
 use crate::note::Note;
-use crate::vp_description::ValidityPredicateDescription;
 use crate::circuit::validity_predicate::ValidityPredicate;
 use crate::circuit::integrity::ValidityPredicateInputNoteVariables;
-use crate::circuit::integrity::ValidityPredicateOuputNoteVariables;
+use crate::circuit::integrity::ValidityPredicateOutputNoteVariables;
 
 pub struct TrivialValidityPredicate<CP: CircuitParameters> {
     input_notes: [Note<CP>; NUM_NOTE],
@@ -103,11 +102,12 @@ where
         &self,
         _composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
         _input_note_variables: &[ValidityPredicateInputNoteVariables],
-        _output_note_variables: &[ValidityPredicateOuputNoteVariables],
+        _output_note_variables: &[ValidityPredicateOutputNoteVariables],
     ) -> Result<(), Error> {
         Ok(())
     }
 }
+
 impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for TrivialValidityPredicate<CP>
 where
     CP: CircuitParameters,
@@ -124,7 +124,7 @@ where
     }
 
     fn padded_circuit_size(&self) -> usize {
-        1 << 3
+        1 << 2
     }
 }
 
@@ -135,9 +135,11 @@ fn test_token_creation() {
     use crate::circuit::validity_predicate::NUM_NOTE;
     use crate::note::Note; 
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
+    use crate::vp_description::ValidityPredicateDescription;
+    use ark_poly_commit::PolynomialCommitment;
+
     type Fr = <CP as CircuitParameters>::CurveScalarField;
     type PC = <CP as CircuitParameters>::CurvePC;
-    use ark_poly_commit::PolynomialCommitment;
 
     let mut rng = test_rng();
     let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
@@ -148,13 +150,11 @@ fn test_token_creation() {
         output_notes,
     };
 
-    // Generate vp CRS
     let vp_setup = PC::setup(vp.padded_circuit_size(), None, &mut rng).unwrap();
     let desc_vp = ValidityPredicateDescription::from_vp(&mut vp, &vp_setup).unwrap();
 
     let tok = Token::<CP>::new(desc_vp);
 
-    // Compile vp(must use compile_with_blinding)
-    let (pk, vk) = vp.compile::<PC>(&vp_setup).unwrap();
+    let _tok_addr = tok.address().unwrap();
 
 }
