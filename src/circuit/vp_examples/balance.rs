@@ -1,7 +1,7 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::gadgets::field_addition::field_addition_gadget;
 use crate::circuit::integrity::{
-    ValidityPredicateInputNoteVariables, ValidityPredicateOuputNoteVariables,
+    ValidityPredicateInputNoteVariables, ValidityPredicateOutputNoteVariables,
 };
 use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
 use crate::note::Note;
@@ -40,7 +40,7 @@ where
         &self,
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
         input_note_variables: &[ValidityPredicateInputNoteVariables],
-        output_note_variables: &[ValidityPredicateOuputNoteVariables],
+        output_note_variables: &[ValidityPredicateOutputNoteVariables],
     ) -> Result<(), Error> {
         // check that all notes use the same token
         let var_token = input_note_variables[0].token_addr;
