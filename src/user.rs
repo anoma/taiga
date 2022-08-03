@@ -64,17 +64,13 @@ impl<F: PrimeField> NullifierDerivingKey<F> {
 }
 
 impl<CP: CircuitParameters> User<CP> {
-
     pub fn new(
         send_vp: ValidityPredicateDescription<CP>,
         recv_vp: ValidityPredicateDescription<CP>,
-        nk: NullifierDerivingKey<CP::CurveScalarField>
+        nk: NullifierDerivingKey<CP::CurveScalarField>,
     ) -> Self {
         let send_com = UserSendAddress::<CP>::from_open(nk, send_vp);
-        Self {
-            send_com,
-            recv_vp,
-        }
+        Self { send_com, recv_vp }
     }
 
     pub fn dummy(rng: &mut impl RngCore) -> Self {
