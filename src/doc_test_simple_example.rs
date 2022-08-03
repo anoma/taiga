@@ -78,8 +78,6 @@ fn test_circuit_example() {
 use crate::circuit::validity_predicate::ValidityPredicate;
 use crate::circuit::validity_predicate::NUM_NOTE;
 use crate::note::Note;
-use crate::nullifier::Nullifier;
-use crate::user::NullifierDerivingKey;
 
 pub struct TrivialValidityPredicate<CP: CircuitParameters> {
     input_notes: [Note<CP>; NUM_NOTE],
@@ -151,6 +149,7 @@ fn test_user_creation() {
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::circuit::validity_predicate::NUM_NOTE;
     use crate::note::Note;
+    use crate::user::NullifierDerivingKey;
     use crate::user::User;
     use crate::vp_description::ValidityPredicateDescription;
     use ark_poly_commit::PolynomialCommitment;
@@ -186,7 +185,9 @@ fn test_note_creation() {
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::circuit::validity_predicate::NUM_NOTE;
     use crate::note::Note;
+    use crate::nullifier::Nullifier;
     use crate::token::Token;
+    use crate::user::NullifierDerivingKey;
     use crate::user::User;
     use crate::vp_description::ValidityPredicateDescription;
     use ark_ff::UniformRand;
