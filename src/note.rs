@@ -59,7 +59,7 @@ impl<CP: CircuitParameters> Note<CP> {
         use ark_ff::UniformRand;
         use rand::Rng;
 
-        let user = User::<CP>::new(rng);
+        let user = User::<CP>::dummy(rng);
         let token = Token::<CP>::dummy(rng);
         let value: u64 = rng.gen();
         let data = CP::CurveScalarField::rand(rng);
@@ -85,7 +85,7 @@ impl<CP: CircuitParameters> Note<CP> {
         use ark_ff::UniformRand;
         use rand::Rng;
 
-        let user = User::<CP>::new(rng);
+        let user = User::<CP>::dummy(rng);
         let value: u64 = rng.gen();
         let data = CP::CurveScalarField::rand(rng);
         let rho = Nullifier::new(CP::CurveScalarField::rand(rng));

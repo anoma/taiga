@@ -191,7 +191,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         // user addresses
         let addresses: Vec<F> = (0..4)
-            .map(|_| User::<CP>::new(&mut rng).address().unwrap())
+            .map(|_| User::<CP>::dummy(&mut rng).address().unwrap())
             .collect();
 
         let position = 1;
@@ -220,7 +220,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         // user addresses
         let addresses: Vec<F> = (0..8)
-            .map(|_| User::<CP>::new(&mut rng).address().unwrap())
+            .map(|_| User::<CP>::dummy(&mut rng).address().unwrap())
             .collect();
 
         let position = 4;
@@ -257,7 +257,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         // user addresses
         let addresses: Vec<F> = (0..5)
-            .map(|_| User::<CP>::new(&mut rng).address().unwrap())
+            .map(|_| User::<CP>::dummy(&mut rng).address().unwrap())
             .collect();
 
         let pow2_addresses = add_remaining_addresses(&addresses);
@@ -271,7 +271,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         // user addresses
         let addresses: Vec<F> = (0..9)
-            .map(|_| User::<CP>::new(&mut rng).address().unwrap())
+            .map(|_| User::<CP>::dummy(&mut rng).address().unwrap())
             .collect();
 
         let pow2_addresses = add_remaining_addresses(&addresses);
@@ -286,7 +286,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         // user addresses
         let addresses: Vec<F> = (0..8)
-            .map(|_| User::<CP>::new(&mut rng).address().unwrap())
+            .map(|_| User::<CP>::dummy(&mut rng).address().unwrap())
             .collect();
 
         let pow2_addresses = add_remaining_addresses(&addresses);
@@ -300,7 +300,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         // user addresses
         let addresses: Vec<F> = (0..5)
-            .map(|_| User::<CP>::new(&mut rng).address().unwrap())
+            .map(|_| User::<CP>::dummy(&mut rng).address().unwrap())
             .collect();
 
         let completed_addresses = add_remaining_addresses(&addresses);

@@ -101,17 +101,17 @@ fn test_white_list_senders_vp_example() {
 
     // white list is a list of user addresses, containing the output notes addresses.
     let white_list_senders: Vec<User<CP>> = vec![
-        User::<CP>::new(&mut rng),
+        User::<CP>::dummy(&mut rng),
         output_notes[1].user.clone(),
-        User::<CP>::new(&mut rng),
-        User::<CP>::new(&mut rng),
+        User::<CP>::dummy(&mut rng),
+        User::<CP>::dummy(&mut rng),
         output_notes[3].user.clone(),
         output_notes[2].user.clone(),
-        User::<CP>::new(&mut rng),
+        User::<CP>::dummy(&mut rng),
         output_notes[0].user.clone(),
-        User::<CP>::new(&mut rng),
-        User::<CP>::new(&mut rng),
-        User::<CP>::new(&mut rng),
+        User::<CP>::dummy(&mut rng),
+        User::<CP>::dummy(&mut rng),
+        User::<CP>::dummy(&mut rng),
     ];
 
     let white_list_senders_to_fields: Vec<Fr> = white_list_senders

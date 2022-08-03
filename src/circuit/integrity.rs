@@ -383,7 +383,7 @@ mod test {
 
         // Test user address integrity
         // Create a user
-        let user = User::<PairingCircuitParameters>::new(&mut rng);
+        let user = User::<PairingCircuitParameters>::dummy(&mut rng);
 
         let nk = user.send_com.get_nk().unwrap();
         let nk_var = composer.add_input(nk.inner());

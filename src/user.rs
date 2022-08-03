@@ -64,7 +64,20 @@ impl<F: PrimeField> NullifierDerivingKey<F> {
 }
 
 impl<CP: CircuitParameters> User<CP> {
-    pub fn new(rng: &mut impl RngCore) -> Self {
+
+    pub fn new(
+        send_vp: ValidityPredicateDescription<CP>,
+        recv_vp: ValidityPredicateDescription<CP>,
+        nk: NullifierDerivingKey<CP::CurveScalarField>
+    ) -> Self {
+        let send_com = UserSendAddress::<CP>::from_open(nk, send_vp);
+        Self {
+            send_com,
+            recv_vp,
+        }
+    }
+
+    pub fn dummy(rng: &mut impl RngCore) -> Self {
         let nk = NullifierDerivingKey::<CP::CurveScalarField>::rand(rng);
         let send_vp = ValidityPredicateDescription::dummy(rng);
         let send_com = UserSendAddress::<CP>::from_open(nk, send_vp);
@@ -139,6 +152,6 @@ impl<CP: CircuitParameters> UserSendAddress<CP> {
 #[test]
 fn test_user_address_computation() {
     let mut rng = ark_std::test_rng();
-    let u = User::<crate::circuit::circuit_parameters::PairingCircuitParameters>::new(&mut rng);
+    let u = User::<crate::circuit::circuit_parameters::PairingCircuitParameters>::dummy(&mut rng);
     u.address().unwrap();
 }
