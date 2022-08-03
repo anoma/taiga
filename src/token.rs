@@ -13,9 +13,11 @@ pub struct Token<CP: CircuitParameters> {
 
 impl<CP: CircuitParameters> Token<CP> {
     pub fn new(token_vp_description: ValidityPredicateDescription<CP>) -> Self {
-        Self{ token_vp: token_vp_description }
+        Self {
+            token_vp: token_vp_description,
+        }
     }
-    
+
     pub fn dummy(rng: &mut impl RngCore) -> Self {
         Self {
             // TODO: fix this in future.
@@ -36,6 +38,7 @@ impl<CP: CircuitParameters> Token<CP> {
 #[test]
 fn token_address_computation() {
     let mut rng = ark_std::test_rng();
-    let xan = Token::<crate::circuit::circuit_parameters::PairingCircuitParameters>::dummy(&mut rng);
+    let xan =
+        Token::<crate::circuit::circuit_parameters::PairingCircuitParameters>::dummy(&mut rng);
     xan.address().unwrap();
 }
