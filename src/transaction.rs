@@ -107,15 +107,13 @@ impl<CP: CircuitParameters> ActionSlice<CP> {
         })
     }
 
-    pub fn verify(
-        &self,
-        action_vk: &VerifierKey<CP::CurveScalarField, CP::CurvePC>,
-    ) -> Result<(), TaigaError> {
+    pub fn verify(&self) -> Result<(), TaigaError> {
         let mut action_pi = PublicInputs::new(ACTION_CIRCUIT_SIZE);
         action_pi.insert(ACTION_PUBLIC_INPUT_NF_INDEX, self.action_public.nf.inner());
         action_pi.insert(ACTION_PUBLIC_INPUT_ROOT_INDEX, self.action_public.root);
         action_pi.insert(ACTION_PUBLIC_INPUT_CM_INDEX, self.action_public.cm.inner());
 
+        let action_vk = CP::get_action_vk();
         let verifier_data = VerifierData::new(action_vk.clone(), action_pi);
         let action_setup = CP::get_pc_setup_params(ACTION_CIRCUIT_SIZE);
         verify_proof::<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>(
@@ -192,11 +190,7 @@ impl<CP: CircuitParameters> VPCheck<CP> {
         })
     }
 
-    pub fn verify(
-        &self,
-        // TODO: blind_vp_setup and blind_vp_vk are fixed parameters, make it a static const later.
-        blind_vp_vk: &VerifierKey<CP::CurveBaseField, CP::OuterCurvePC>,
-    ) -> Result<(), TaigaError> {
+    pub fn verify(&self) -> Result<(), TaigaError> {
         // verify vp proof
         let vp_setup = CP::get_pc_setup_params(self.vp_circuit_size);
         let vp_verifier_data =
@@ -211,6 +205,7 @@ impl<CP: CircuitParameters> VPCheck<CP> {
 
         // verify blind proof
         let blind_vp_setup = CP::get_opc_setup_params(BLINDING_CIRCUIT_SIZE);
+        let blind_vp_vk = CP::get_blind_vp_vk();
         let blinding_verifier_data =
             VerifierData::new(blind_vp_vk.clone(), self.blinded_vp_public_inputs.clone());
         verify_proof::<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC>(
@@ -251,23 +246,21 @@ impl<CP: CircuitParameters> Transaction<CP> {
         // ledger state
         // ledger: &Ledger,
     ) -> Result<(), TaigaError> {
-        let action_vk = CP::get_action_vk();
-        let blind_vp_vk = CP::get_blind_vp_vk();
         // verify action proof
         for action in self.action_slices.iter() {
-            action.verify(action_vk)?
+            action.verify()?
         }
 
         // verify spend vp proof and blind proof
         for spend in self.spend_slices.iter() {
-            spend.spend_addr_vp.verify(blind_vp_vk)?;
-            spend.spend_token_vp.verify(blind_vp_vk)?;
+            spend.spend_addr_vp.verify()?;
+            spend.spend_token_vp.verify()?;
         }
 
         // verify output vp proof and blind proof
         for output in self.output_slices.iter() {
-            output.output_addr_vp.verify(blind_vp_vk)?;
-            output.output_token_vp.verify(blind_vp_vk)?;
+            output.output_addr_vp.verify()?;
+            output.output_token_vp.verify()?;
         }
 
         // check public input consistency(nf, output_cm, com_vp) among action, vp, vp blind.
@@ -309,19 +302,19 @@ fn test_tx() {
         .map(|action| ActionSlice::<CP>::build(action.0, &mut action.1).unwrap())
         .collect();
 
-    // Get input notes from action circuit
-    let input_notes: [Note<CP>; NUM_NOTE] = [
-        actions[0].1.spend_note.clone(),
-        actions[1].1.spend_note.clone(),
-        actions[2].1.spend_note.clone(),
-        actions[3].1.spend_note.clone(),
-    ];
-    let output_notes: [Note<CP>; NUM_NOTE] = [
-        actions[0].1.output_note.clone(),
-        actions[1].1.output_note.clone(),
-        actions[2].1.output_note.clone(),
-        actions[3].1.output_note.clone(),
-    ];
+    // Collect input notes from actions
+    let input_notes_vec: Vec<Note<CP>> = actions
+        .iter()
+        .map(|action| action.1.spend_note.clone())
+        .collect();
+    let input_notes: [Note<CP>; NUM_NOTE] = input_notes_vec.try_into().unwrap();
+
+    // Collect output notes from actions
+    let output_notes_vec: Vec<Note<CP>> = actions
+        .iter()
+        .map(|action| action.1.output_note.clone())
+        .collect();
+    let output_notes: [Note<CP>; NUM_NOTE] = output_notes_vec.try_into().unwrap();
 
     let mut spend_slices = vec![];
     let mut output_slices = vec![];
