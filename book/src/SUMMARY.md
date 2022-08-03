@@ -4,9 +4,9 @@
 - [Zero-knowledge proofs](./zk-proofs.md)
 - [Tokens](token.md)
 - [Users](./users.md)
-- [Notes](note.md)
-- [Full privacy](./privacy.md)
-- [Implementation choices](./technical-details.md)
-- [Transaction timings](./timings.md)
+- [Notes](./notes.md)
+- [Action](./action.md)
+- [Blinding](./blinding.md)
+- [Benchmarks](./timings.md)
 - [Conclusion](./conclusion.md)
 

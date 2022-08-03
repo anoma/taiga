@@ -22,8 +22,14 @@ pub trait ValidityPredicate<CP: CircuitParameters>:
     fn gadget_vp(
         &mut self,
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+        input_notes: &[Note<CP>; NUM_NOTE],
+        output_notes: &[Note<CP>; NUM_NOTE],
     ) -> Result<(), Error> {
-        let (input_note_variables, output_note_variables) = self.basic_constraints(composer)?;
+        let (input_note_variables, output_note_variables) = self.basic_constraints(
+            composer,
+            input_notes,
+            output_notes,
+        )?;
         self.custom_constraints(composer, &input_note_variables, &output_note_variables)
     }
 
@@ -31,6 +37,8 @@ pub trait ValidityPredicate<CP: CircuitParameters>:
     fn basic_constraints(
         &self,
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+        input_notes: &[Note<CP>; NUM_NOTE],
+        output_notes: &[Note<CP>; NUM_NOTE],
     ) -> Result<
         (
             Vec<ValidityPredicateInputNoteVariables>,
@@ -38,8 +46,6 @@ pub trait ValidityPredicate<CP: CircuitParameters>:
         ),
         Error,
     > {
-        let input_notes = self.get_input_notes();
-        let output_notes = self.get_output_notes();
         let mut input_note_variables = vec![];
         let mut output_note_variables = vec![];
         for i in 0..NUM_NOTE {
@@ -73,9 +79,7 @@ pub trait ValidityPredicate<CP: CircuitParameters>:
             .expect("Unexpected error. Missing VerifierKey in compilation"))
     }
 
-    // VP designer should implement the following functions.
-    fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE];
-    fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE];
+    // VP designer should implement the following function
     fn custom_constraints(
         &self,
         _composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,

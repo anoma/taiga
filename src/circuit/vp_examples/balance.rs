@@ -28,13 +28,6 @@ impl<CP> ValidityPredicate<CP> for BalanceValidityPredicate<CP>
 where
     CP: CircuitParameters,
 {
-    fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE] {
-        &self.input_notes
-    }
-
-    fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE] {
-        &self.output_notes
-    }
 
     fn custom_constraints(
         &self,
@@ -79,7 +72,7 @@ where
         &mut self,
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
     ) -> Result<(), Error> {
-        self.gadget_vp(composer)
+        self.gadget_vp(composer, &self.input_notes, &self.output_notes)
     }
 
     fn padded_circuit_size(&self) -> usize {
