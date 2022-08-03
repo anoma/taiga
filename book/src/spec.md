@@ -91,22 +91,6 @@ TODO: Should we use `fulldesc_vp` in place of `desc_vp`?
 
 - `VPCom(desc_vp; rcm_com_vp) := Com( Com_q(desc_vp), rcm_com_vp)`
 
-### Token (types)
-
-Encodes: token vp
-```
-token_address = Com_r(Com_q(desc_vp_token))
-```
-
-where:
-
-|Variable/Function|Type||
-|-|-|-|
-|`token_address` | $\mathbb F_r$ element | hash of the token vp description|
-
-The token VP description is hashed into $\mathbb F_q$ and then $\mathbb F_r$.
-The outer hash is not useful in terms of security but simplify the circuits involving the token address.
-
 ### User
 
 ```
