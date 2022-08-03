@@ -84,7 +84,15 @@ pub struct TrivialValidityPredicate<CP: CircuitParameters> {
     output_notes: [Note<CP>; NUM_NOTE],
 }
 
-impl<CP: CircuitParameters> ValidityPredicate<CP> for TrivialValidityPredicate<CP> {}
+impl<CP: CircuitParameters> ValidityPredicate<CP> for TrivialValidityPredicate<CP> {
+    fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE] {
+        &self.input_notes
+    }
+
+    fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE] {
+        &self.output_notes
+    }
+}
 
 impl<CP: CircuitParameters> Circuit<CP::CurveScalarField, CP::InnerCurve>
     for TrivialValidityPredicate<CP>
