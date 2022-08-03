@@ -17,43 +17,14 @@ Each token is identified by an address that is derived from its verifier key `to
 
 ### Example
 ##### Create a token
-In order to create a token, we need `tokenVP`. Let's create a trivial `tokenVP` that doesn't check any constraints on input or output notes and returns `Ok()`.
-:
+In order to create a token, we need `tokenVP`. Let's use the `TrivialValidityPredicate` created in the [previous section](./validity-predicates.md):
 ```rust
-pub struct TrivialValidityPredicate<CP: CircuitParameters> {
-    input_notes: [Note<CP>; NUM_NOTE],
-    output_notes: [Note<CP>; NUM_NOTE],
-}
-```
-The `tokenVP` code is defined by implementing the `Circuit` trait:
-
-```
-impl<CP: CircuitParameters> Circuit<CP::CurveScalarField, CP::InnerCurve> for TrivialValidityPredicate<CP>
-{
-    ...
-    
-    fn gadget(
-        &mut self,
-        _composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-    ) -> Result<(), Error> {
-        // do nothing and return Ok()
-        Ok(())
-    }
-   ... 
-}
-```
-
-Using this tokenVP, we can create a token and compute its address:
-```
-...
-
 let mut token_vp = TrivialValidityPredicate::<CP> {
 	input_notes,
 	output_notes,
 };
 
 // transform the VP into short form 
-let vp_setup = PC::setup(vp.padded_circuit_size(), None, &mut rng).unwrap();
 let desc_vp = ValidityPredicateDescription::from_vp(&mut vp, &vp_setup).unwrap();
 
 let token = Token::<CP>::new(desc_vp);

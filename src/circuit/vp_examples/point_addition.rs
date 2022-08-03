@@ -25,7 +25,6 @@ impl<CP> ValidityPredicate<CP> for PointAdditionValidityPredicate<CP>
 where
     CP: CircuitParameters,
 {
-
     fn custom_constraints(
         &self,
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,

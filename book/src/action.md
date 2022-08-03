@@ -19,7 +19,4 @@ When a note is created, proofs are also binded with its fields and the note comm
 
 TODO diagram of this with arrows for bindings.
 
-In practice, this bindings are done with openings of the different address commitments. These openings are done with a privacy 
-
- bind the XAN VP proof to the note token type.
-We call action the 
+In practice, this bindings are done with openings of the different address commitments. These commitments are open in a private way using (again) zero-knowledge proofs. The verifier keys of the token and user VPs still leak private information and we use a blinding technique to get full privacy in Taiga.

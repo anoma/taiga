@@ -2,7 +2,7 @@
 
 `Note` is an immutable object that represents a unit of value of a certain token. Each note has an [owner](), a [token]() type, and a value:
 
-```
+```rust
 pub struct Note<CP: CircuitParameters> {
 	pub owner: User<CP>,
 	pub token: Token<CP>,
@@ -29,7 +29,7 @@ Each created note exists in a public merkle tree `CMtree` of notes. To keep the 
 #### Note structure
 The full description of the note structure is
 
-```
+```rust
 pub struct Note<CP: CircuitParameters> {
 	pub owner: User<CP>,
 	pub token: Token<CP>,
@@ -49,7 +49,7 @@ pub struct Note<CP: CircuitParameters> {
 #### Dummy notes
 Dummy notes might be useful to keep the the amount of notes constant and hide the actual amount of notes in a tx.
 
-```
+```rust
 let spend_note = Note::<CP>::dummy(&mut rng);
 ```
 

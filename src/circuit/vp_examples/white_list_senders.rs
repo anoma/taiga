@@ -26,7 +26,6 @@ impl<CP> ValidityPredicate<CP> for WhiteListSendersValidityPredicate<CP>
 where
     CP: CircuitParameters,
 {
-
     fn custom_constraints(
         &self,
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
@@ -67,7 +66,6 @@ where
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
     ) -> Result<(), Error> {
         self.gadget_vp(composer, &self.input_notes, &self.output_notes)
-
     }
 
     fn padded_circuit_size(&self) -> usize {

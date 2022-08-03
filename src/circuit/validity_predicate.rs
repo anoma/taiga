@@ -25,11 +25,8 @@ pub trait ValidityPredicate<CP: CircuitParameters>:
         input_notes: &[Note<CP>; NUM_NOTE],
         output_notes: &[Note<CP>; NUM_NOTE],
     ) -> Result<(), Error> {
-        let (input_note_variables, output_note_variables) = self.basic_constraints(
-            composer,
-            input_notes,
-            output_notes,
-        )?;
+        let (input_note_variables, output_note_variables) =
+            self.basic_constraints(composer, input_notes, output_notes)?;
         self.custom_constraints(composer, &input_note_variables, &output_note_variables)
     }
 
