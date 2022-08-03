@@ -1,26 +1,46 @@
-# Tokens
+# Token
 
-In Anoma, each token defines its own rules for transactions involving it. Rules are set in a validity predicate `Token_VP`, providing a set of constraints that needs to hold in regards to the token involved in a transaction before a note can be spent or created.
+`Token` define the type of note (e.g. XAN, ETH, BTC). Each token is identified by an address `tokenAddress` (the same way as user address identifies a user) and has its own VP `tokenVP`.
 
-The verification a `Token_VP` proof requires a verifier key `Token_VK`: Users check that `Verify(Token_π, Token_VK)` returns `True`.
+### Token VP
+Each token has its own VP `tokenVP` that defines the conditions on which the token can be sent/received/etc (e.g. whitelist VP that only allows using the token a specified set of users). As with other VPs, it is required that the `tokenVP` of the tokens involved in a tx evaluated to `true`.
 
-In order to bind this verification to the actual note token type, we need an identification of the token. The address of a token is a commitment to its verifying key: `Token_Address = Com(Token_VK)`. Binding `Token_VK` to the token type of a note corresponds to opening the address commitment.
+In Taiga, VPs are shielded, so instead of showing that `tokenVP` evaluates to `true` publicly, a ZK proof is created. To make sure that `tokenVP`  evaluates to `true`, an observer can verify the proof using  a verifier key `tokenVK`:
+`verify(tokenVP_proof, tokenVK) = True`
 
-### Example.
-We consider the token XAN, whose `Token_VP` is a white list of allowed sending users [Alice, Bob and Charlie]. Suppose that Alice has a note of 1XAN. The note has a token type (or address) which is a commitment to the `XAN_VK`. When Alice wants to spend her note, XAN produces a proof `π` corresponding to the check that Alice is in the white list, and users of Taiga can check that:
-* `Verify(π, XAN_VK)` is true,
-* `XAN_VK` opens the Alice's note token address.
-
-In practice, this second step will be done using another ZK proof, and Alice simply verify two ZK proofs.
-For privacy, we will see that additional proofs are required.
+### Token Address
+Each token is identified by an address that is derived from its verifier key `tokenVK`:
+`tokenAddress = Com(tokenVK)`
 
 
-### Specification of the token address.
-The token address encodes the token validity predicate verifier key.
+### Example
+##### Create a token
+TODO: fix the `Token::new` implementation
+TODO: explain the args (maybe)
+TODO: mention that currently it doesn't work really
+TODO: mention the `address()` maybe
+
 ```
-Token_Address = Com_r(Com_q(Token_VK))
+Token::<CP>::new(token_name, 
+				 &public_parameters
+				 token_VP, 
+				 &mut rng)
 ```
-The VK is committed into $\mathbb F_q$ and then $\mathbb F_r$.
-* The inner commitment is used for privacy concerns (see the blinding section),
-* The outer commitment lets us map `Token_Address` in $\mathbb F_r$ in order to simplify circuits.
 
+Or use a func: `spawn_token` from `taiga/src/tests.rs` for dummy tokens with trivial VPs
+
+```
+let t = spawn_token::<CP>(token_name)
+```
+
+And create a note of token `T` later (see [here]() to learn more about notes):
+```
+let note = Note::<CP>::new(
+user.address(),
+t.address(),
+value,
+...
+)
+```
+
+TODO: describe what else you can do with notes (if anything)
