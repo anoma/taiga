@@ -25,7 +25,7 @@ let mut token_vp = TrivialValidityPredicate::<CP> {
 };
 
 // transform the VP into short form 
-let desc_vp = ValidityPredicateDescription::from_vp(&mut vp, &vp_setup).unwrap();
+let desc_vp = ValidityPredicateDescription::from_vp(&mut token_vp, &vp_setup).unwrap();
 
 let token = Token::<CP>::new(desc_vp);
 let token_address = token.address().unwrap();

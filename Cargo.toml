@@ -26,6 +26,7 @@ lazy_static = "1"
 derivative = { version = "2", features = ["use_core"] }
 thiserror = "1"
 blake2b_simd = "1"
+ark-std = "0.3"
 
 [dev-dependencies]
 ark-std = "0.3"
