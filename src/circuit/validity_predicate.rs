@@ -81,5 +81,7 @@ pub trait ValidityPredicate<CP: CircuitParameters>:
         _composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
         _input_note_variables: &[ValidityPredicateInputNoteVariables],
         _output_note_variables: &[ValidityPredicateOutputNoteVariables],
-    ) -> Result<(), Error> { Ok(()) }
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }

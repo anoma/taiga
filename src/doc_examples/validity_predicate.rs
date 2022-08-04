@@ -40,6 +40,15 @@ impl<CP: CircuitParameters> Circuit<CP::CurveScalarField, CP::InnerCurve>
     }
 }
 
+impl<CP: CircuitParameters> TrivialValidityPredicate<CP> {
+    pub fn new(input_notes: [Note<CP>; NUM_NOTE], output_notes: [Note<CP>; NUM_NOTE]) -> Self {
+        Self {
+            input_notes,
+            output_notes,
+        }
+    }
+}
+
 #[test]
 fn test_vp_creation() {
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;

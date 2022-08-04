@@ -46,7 +46,7 @@ let mut vp = TrivialValidityPredicate::<CP> { input_notes, output_notes };
 let vp_setup = PC::setup(vp.padded_circuit_size(), None, &mut rng).unwrap();
 
 // proving and verifying keys
-let (pk, vk) = field_addition_vp.compile::<PC>(&vp_setup).unwrap();
+let (pk, vk) = vp.compile::<PC>(&vp_setup).unwrap();
 
 // proof
 let (proof, public_inputs) = vp.gen_proof::<PC>(&vp_setup, pk, b"Test").unwrap();
@@ -62,12 +62,10 @@ verify_proof::<Fr, P, PC>(
 ).unwrap();
 ```
 
-This example can be run with [this file](../../src/doc_test_simple_example.rs) or with the command line
+This example can be run with [this file](../../src/doc_examples/validity_predicate.rs) or with the command line
 ```
-cargo test test_vp_example
+cargo test doc_examples::validity_predicate::test_vp_creation
 ```
-
-TODO CODE SIMON
 
 ## Validity predicates in Taiga
 Validity predicates are the main ingredients of Taiga:

@@ -46,6 +46,36 @@ pub struct Note<CP: CircuitParameters> {
 - `rho`  and `psi` are the values used to compute the note's nullifier
 - `rcm` is randomness used to compute the commitment `cm`
 
+
+#### Creationg a note
+We provide an example of creation of a note from the structure we already defined (token, user):
+```rust
+// ...
+// we use the code of the previous sections
+// ...
+
+// token and user
+let desc_vp_token = ValidityPredicateDescription::from_vp(&mut vp, &vp_setup).unwrap();
+let desc_vp_send = desc_vp_token.clone();
+let desc_vp_recv = desc_vp_send.clone();
+
+let tok = Token::<CP>::new(desc_vp_token);
+let alice = User::<CP>::new(
+	desc_vp_send,
+	desc_vp_recv,
+	NullifierDerivingKey::<Fr>::rand(&mut rng),
+);
+// note
+let nf = Nullifier::<CP>::new(Fr::rand(&mut rng));
+let note = Note::<CP>::new(alice, tok, 12, nf, Fr::rand(&mut rng), Fr::rand(&mut rng));
+
+let _note_commitment = note.commitment();
+```
+This example can be run from [this file](../../src/doc_examples/note.rs) with the command:
+```
+cargo test doc_examples::note::test_note_creation
+```
+
 #### Dummy notes
 Dummy notes might be useful to keep the the amount of notes constant and hide the actual amount of notes in a tx.
 
