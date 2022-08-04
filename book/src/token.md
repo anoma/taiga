@@ -30,6 +30,10 @@ let desc_vp = ValidityPredicateDescription::from_vp(&mut vp, &vp_setup).unwrap()
 let token = Token::<CP>::new(desc_vp);
 let token_address = token.address().unwrap();
 ```
+This example is reproducible with [this file](../../src/doc_examples/token.rs) or with the command
+```
+cargo test doc_examples::token::test_token_creation
+```
 
 #### Dummy token
 
