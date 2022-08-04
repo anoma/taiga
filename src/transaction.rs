@@ -289,7 +289,7 @@ fn test_tx() {
 
     let mut rng = test_rng();
 
-    // Create action info
+    // Construct action infos
     let mut actions: Vec<(Action<CP>, ActionCircuit<CP>)> = (0..NUM_TX_SLICE)
         .map(|_| {
             let action_info = ActionInfo::<CP>::dummy(&mut rng);
@@ -297,6 +297,7 @@ fn test_tx() {
         })
         .collect();
 
+    // Generate action proofs
     let action_slices: Vec<ActionSlice<CP>> = actions
         .iter_mut()
         .map(|action| ActionSlice::<CP>::build(action.0, &mut action.1).unwrap())
@@ -316,6 +317,7 @@ fn test_tx() {
         .collect();
     let output_notes: [Note<CP>; NUM_NOTE] = output_notes_vec.try_into().unwrap();
 
+    // Construct VPs and generate VP proofs and blind VP proofs
     let mut spend_slices = vec![];
     let mut output_slices = vec![];
     for _action_index in 0..NUM_TX_SLICE {
@@ -352,6 +354,7 @@ fn test_tx() {
         output_slices.push(output_slice);
     }
 
+    // Construct a tx
     let tx = Transaction::<CP>::new(action_slices, spend_slices, output_slices);
-    tx.verify().expect("slice with incorrect length");
+    tx.verify().unwrap();
 }
