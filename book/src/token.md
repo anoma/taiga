@@ -39,8 +39,12 @@ cargo test doc_examples::token::test_token_creation
 
 It is also possible to create a dummy token without VP:
 
-`let token = Token::<CP>::dummy(&mut rng)`
+```rust
+let token = Token::<CP>::dummy(&mut rng)
+```
 
 Using this token, we can create a [dummy note](./notes.md) of a specific token (all other fields are random):
 
-`let note = Note::<CP>::dummy_from_token(token, rng)`
+```rust
+let note = Note::<CP>::dummy_from_token(token, rng)
+```
