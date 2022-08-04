@@ -68,3 +68,14 @@ The transaction(with NUM_NOTE = 2) includes 2 action proofs, 8 vp proofs and 8 v
 * Proofs generation parallelization
 * Circuit improvement, e.g. basic gadgets improvement, local data refinement, etc
 * Proof system improvement, e.g. change to Halo2, use accumulation or aggregation.
+
+
+# TODO Lists
+* An implementation of Blake2 gadget for vp commitment in vp circuit and blind vp circuit [#56](https://github.com/anoma/taiga/issues/56). Now we had a dusk/plonk implementation version from Joshua, and we need to adapt it to zk-garage/plonkup.
+* A poseidon implementation for `MainCurve::BaseField`. We had an implementation for MainCurve::ScalarField, and we need to fix the parameters generation for  `MainCurve::BaseField`.
+* A verifiable encryption circuit [#7](https://github.com/anoma/taiga/issues/7).
+* More useful vp examples [#5](https://github.com/anoma/taiga/issues/5)
+* Define the `vp_param` and `vp_memo` in vp.
+* Ledger integrity [#6](https://github.com/anoma/taiga/issues/6), e.g. CommitmentTree implementation, interface with ledger etc.
+* Fix partially blinding vp.
+* Switch to halo2 proof system.
