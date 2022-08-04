@@ -1,20 +1,27 @@
 # Validity predicates
 
-Validity predicates are constrains defined by entities of Taiga in order to approve transactions. Examples of constrains can be a white list of allowed senders of notes, or a lower bound on the amount for the received notes.
+Validity predicates are constrains defined by entities of Taiga in order to approve transactions. Examples of constrains can be a white list of allowed senders of notes, or a lower bound on the amount of received notes.
 
 From the constrains and a given transaction, a user (or a token) produces a zero-knowledge proof for allowing the transaction. A user can verifiy the proof against a verifier key, computed from the constrains. Verifying a proof leads to a boolean and transactions are validated if and only if all the proofs pass the verification.
 
+```
+TODO Add a diagram:
+constrains -----------> VK------------
+                |                     |------> True/False
+                |                     |
+tx-------------------> proof----------
+```
 
 ## Example
 
-We give an example of a very simple validity predicate that actually does not check any constrains on the notes:
+We define a first validity predicate. It has fields corresponding to the input and output notes of the transaction.
 ```rust
 pub struct TrivialValidityPredicate<CP: CircuitParameters> {
     input_notes: [Note<CP>; NUM_NOTE],
     output_notes: [Note<CP>; NUM_NOTE],
 }
 ```
-We implement the (empty) circuit corresponding to the VP in order to be able to compute proofs.
+We begin with a very simple VP that actually does not check any constrain on the notes:
 ```rust
 impl<CP: CircuitParameters> Circuit<CP::CurveScalarField, CP::InnerCurve> for TrivialValidityPredicate<CP>
 {
@@ -30,12 +37,21 @@ impl<CP: CircuitParameters> Circuit<CP::CurveScalarField, CP::InnerCurve> for Tr
    ... 
 }
 ```
-From this gadget representing the circuit, we can create a proof and verify it with the verifier key:
+From this gadget representing the circuit, we can compute a proof and verify it with the verifier key:
 ```rust
+// creation of the VP
 let mut vp = TrivialValidityPredicate::<CP> { input_notes, output_notes };
+
+// setup of the proof system
 let vp_setup = PC::setup(vp.padded_circuit_size(), None, &mut rng).unwrap();
+
+// proving and verifying keys
 let (pk, vk) = field_addition_vp.compile::<PC>(&vp_setup).unwrap();
+
+// proof
 let (proof, public_inputs) = vp.gen_proof::<PC>(&vp_setup, pk, b"Test").unwrap();
+
+// verification
 let verifier_data = VerifierData::new(vk, public_inputs);
 verify_proof::<Fr, P, PC>(
     &vp_setup,

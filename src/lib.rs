@@ -4,6 +4,7 @@
 
 pub mod action;
 pub mod circuit;
+pub mod doc_examples;
 pub mod el_gamal;
 pub mod error;
 pub mod merkle_tree;
@@ -18,5 +19,3 @@ pub mod vp_description;
 
 // #[cfg(test)]
 // pub mod tests;
-
-pub mod doc_test_simple_example;

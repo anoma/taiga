@@ -7,6 +7,6 @@
 - [Notes](./notes.md)
 - [Action](./action.md)
 - [Blinding](./blinding.md)
-- [Benchmarks](./timings.md)
+- [Transaction](./transaction.md)
 - [Conclusion](./conclusion.md)
 
