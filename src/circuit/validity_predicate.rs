@@ -2,7 +2,7 @@ pub const NUM_NOTE: usize = 4;
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::integrity::{
     input_note_constraint, output_note_constraint, ValidityPredicateInputNoteVariables,
-    ValidityPredicateOuputNoteVariables,
+    ValidityPredicateOutputNoteVariables,
 };
 use crate::note::Note;
 use ark_poly::univariate::DensePolynomial;
@@ -34,7 +34,7 @@ pub trait ValidityPredicate<CP: CircuitParameters>:
     ) -> Result<
         (
             Vec<ValidityPredicateInputNoteVariables>,
-            Vec<ValidityPredicateOuputNoteVariables>,
+            Vec<ValidityPredicateOutputNoteVariables>,
         ),
         Error,
     > {
@@ -78,8 +78,10 @@ pub trait ValidityPredicate<CP: CircuitParameters>:
     fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE];
     fn custom_constraints(
         &self,
-        composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-        input_note_variables: &[ValidityPredicateInputNoteVariables],
-        output_note_variables: &[ValidityPredicateOuputNoteVariables],
-    ) -> Result<(), Error>;
+        _composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+        _input_note_variables: &[ValidityPredicateInputNoteVariables],
+        _output_note_variables: &[ValidityPredicateOutputNoteVariables],
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
