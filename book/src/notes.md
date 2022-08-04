@@ -48,7 +48,8 @@ pub struct Note<CP: CircuitParameters> {
 
 
 #### Creationg a note
-We provide an example of creation of a note from the structure we already defined (token, user):
+TODO: add a hyperlink to the existing code 
+We provide an example of creation of a note from the structure we have already defined for [Token]() and [User]():
 ```rust
 // ...
 // we use the code of the previous sections
