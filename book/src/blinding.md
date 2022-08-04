@@ -27,3 +27,35 @@ vk--------> blinded_vk-----> proof of blinding
       com_vk---------------> proof of opening
 ```
 This blinding is done for user's `sendVK` and `recVK` as well as for `tokenVK`.
+
+## Example of blinding proof
+First, we create a blinding circuit structure including the random values used for blinding:
+```rust
+let mut blinding_circuit =
+      BlindingCircuit::<CP>::new(&mut rng, vp_desc, &pp, vp.padded_circuit_size()).unwrap();
+```
+As for `sendVP`, `recVP` and `TokenVP` proofs, we need a setup and prover/verifier keys:
+```rust
+let (pk_blind, vk_blind) = vp
+      .compile_with_blinding::<PC>(&pp, &blinding_circuit.get_blinding())
+      .unwrap();
+let pp_blind = Opc::setup(blinding_circuit.padded_circuit_size(), None, &mut rng).unwrap();
+```
+From that, we can generate the blinding proof. Note that this is a bit expensive in practice:
+```rust
+let (proof, public_inputs) = blinding_circuit
+      .gen_proof::<Opc>(&pp_blind, pk_p, b"Test")
+      .unwrap();
+```
+From a proof, the verifier can check the public inputs against the blinded verifier key `vk_blind` (see [here](doc_examples/blinding.rs)), and verifiy the proof:
+```rust
+let verifier_data = VerifierData::new(vk, public_inputs);
+verify_proof::<Fq, OP, Opc>(
+    &pp_blind,
+    verifier_data.key,
+    &proof,
+    &verifier_data.pi,
+    b"Test",
+)
+.unwrap();
+```
