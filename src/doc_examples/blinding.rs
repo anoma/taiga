@@ -52,7 +52,6 @@ fn test_blinding_circuit() {
         .gen_proof::<Opc>(&pp_blind, pk_p, b"Test")
         .unwrap();
 
-
     //
     // this is very expensive and needs to be adapted
     //
