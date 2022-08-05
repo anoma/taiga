@@ -1,6 +1,6 @@
 # Note
 
-`Note` is an immutable object that represents a unit of value of a certain token. Each note has an [owner](), a [token]() type, and a value:
+`Note` is an immutable object that represents a unit of value of a certain token. Each note has an [owner](users.md), a [token](token.md) type, and a value:
 
 ```rust
 pub struct Note<CP: CircuitParameters> {
@@ -20,7 +20,7 @@ As the notes are immutable, sending a note (transfering the ownership) means **d
 To send a note, the owner needs to prove the ownership which is done by revealing note's nullifier `nf`.  The nullifier is only known to the owner of the note and revealing it destroys the note. All revealed nullifiers are stored in a public nullifier tree `NFtree` to make sure none of the notes are spent twice.
 
 ##### Proving ownership in ZK
-All of the notes are kept shielded and created notes are sent to users in an encrypted form. To keep the notes shielded, ZK proofs are used. Using ZK proof, one can prove the ownership without revealing the note itself (see [Action circuit]()).
+All of the notes are kept shielded and created notes are sent to users in an encrypted form. To keep the notes shielded, ZK proofs are used. Using ZK proof, one can prove the ownership without revealing the note itself (see [Action circuit](action.md)).
 
 #### The commitment tree
 
@@ -72,7 +72,7 @@ let note = Note::<CP>::new(alice, tok, 12, nf, Fr::rand(&mut rng), Fr::rand(&mut
 
 let _note_commitment = note.commitment();
 ```
-This example can be run from [this file](../../src/doc_examples/note.rs) with the command:
+This example can be run from [this file](https://github.com/anoma/taiga/blob/main/src/doc_examples/note.rs) with the command:
 ```
 cargo test doc_examples::note::test_note_creation
 ```

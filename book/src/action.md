@@ -26,7 +26,7 @@ To create a note, the user also needs to prove the right to do so. `TokenVP` mus
 
 ![img_2.png](img/action_img_2.png)
 
-To see a more detailed description of the action circuit checks, see the [specification](./spec.md). See also the [action implementation](?) and the [action circuit implementation](?) for more details.
+To see a more detailed description of the action circuit checks, see the [specification](./spec.md). See also the [action implementation](https://github.com/anoma/taiga/blob/main/src/action.rs) and the [action circuit implementation](https://github.com/anoma/taiga/blob/main/src/circuit/action_circuit.rs) for more details.
 
 To ensure full privacy, we use [blinding](./blinding.md) to hide the verifier keys.
 

@@ -1,8 +1,8 @@
 # Users of Taiga
 
-Similarly to the token case, users have validity predicates for defining rules when sending and receiving notes. These two VPs are called `Send_VP` and `Rec_VP` and only one of them is used whether if a note is spent or created. In the same way as for `TokenVP`, a proof `π` is verified against a `Send_VK` (or `Rec_VK`) and this verifier key needs to be binded to the owner of the note. 
+Similarly to the token case, users have validity predicates for defining rules when sending and receiving notes. These two VPs are called `Send_VP` and `Rec_VP` and only one of them is used whether if a note is spent or created. In the same way as for `TokenVP`, a proof `π` is verified against a `Send_VK` (or `Rec_VK`) and this verifier key needs to be binded to the owner of the note.
 
-Spending a note also requires nullifying the note so that it cannot be spent anymore. We use the same construction as Orchard, where a nullifier is derived from a nullifier key. Each user has a nullifier key that also needs to be binded to the note sender address.
+Spending a note also requires nullifying the note so that it cannot be double-spent. We use the same construction as Orchard, where a nullifier is derived from a nullifier key. Each user has a nullifier key that also needs to be binded to the note sender address.
 
 In consequence, the user address is split into:
 * A commitment to `Send_VK` and the nullifier key,
