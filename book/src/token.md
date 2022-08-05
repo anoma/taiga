@@ -50,3 +50,5 @@ Using this token, we can create a [dummy note](./notes.md) of a specific token (
 ```rust
 let note = Note::<CP>::dummy_from_token(token, rng)
 ```
+
+Next: [User](./users.md)

@@ -47,3 +47,5 @@ Alice is a user of Taiga with validity predicates defined as follows:
 This example is reproducible with [this file](../../src/doc_examples/user.rs) or with the command
 
 `cargo test doc_examples::user::test_token_creation`
+
+Next: [Note](./notes.md)

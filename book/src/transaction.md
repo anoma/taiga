@@ -114,3 +114,5 @@ This code is reproducible with [this file](https://github.com/anoma/taiga/blob/m
 ```
 cargo test --release test_tx_example
 ```
+
+Next: [performance & conclusion](./conclusion.md)

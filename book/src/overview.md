@@ -16,3 +16,6 @@ Taiga is a shielded protocol for bartering on Anoma, leveraging the value of val
 * Full zero-knowledge privacy, including of asset type and VP circuits
 * Performance benefits from using PLONK arithmetization, including lookups
 * Potential for scalability via recursion or composition, or to remove requirement for trusted setup.
+
+
+Next: [Validity predicates](./validity-predicates.md)

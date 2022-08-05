@@ -67,3 +67,4 @@ This example can be run with [this file](https://github.com/anoma/taiga/blob/mai
 ```
 cargo test doc_examples::validity_predicate::test_vp_creation
 ```
+Next: [Token](./token.md)

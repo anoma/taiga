@@ -30,3 +30,4 @@ To see a more detailed description of the action circuit checks, see the [specif
 
 To ensure full privacy, we use [blinding](./blinding.md) to hide the verifier keys.
 
+Next: [blinding](./blinding.md)
