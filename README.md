@@ -4,8 +4,9 @@ Taiga is a framework for generalized shielded state transitions. This repository
 
 ## Specs
 
-- [how Taiga works (with code examples)](./book/src/SUMMARY.md)
-- [cryptographic details of Taiga](./book/src/spec.md)
+- [How Taiga works (with code examples)](./book/src/SUMMARY.md)
+- [Cryptographic details of Taiga](./book/src/spec.md)
+- [Current performance details](./book/src/conclusion.md)
 
 ### Proving system
 
