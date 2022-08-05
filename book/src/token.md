@@ -17,17 +17,19 @@ Each token is identified by an address that is derived from its verifier key `to
 
 ### Example
 ##### Create a token
-In order to create a token, we need `token_VP`. Let's use the `TrivialValidityPredicate` created in the [previous section](./validity-predicates.md):
+In order to create a token, we need `token_VP`. Let's use the `TrivialValidityPredicate` (see [more](./validity-predicates.md)):
 ```rust
 let mut token_vp = TrivialValidityPredicate::<CP> {
 	input_notes,
 	output_notes,
 };
 
-// transform the VP into short form 
+// transform the VP into a short form 
 let desc_vp = ValidityPredicateDescription::from_vp(&mut token_vp, &vp_setup).unwrap();
 
 let token = Token::<CP>::new(desc_vp);
+
+//token address can be used to create notes of that token;
 let token_address = token.address().unwrap();
 ```
 This example is reproducible with [this file](https://github.com/anoma/taiga/blob/main/src/doc_examples/token.rs) or with the command
