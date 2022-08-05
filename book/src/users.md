@@ -5,7 +5,7 @@
 ### Validity predicates
 Each user has validity predicates that authorize spending and receiving notes. Validity predicates that authorize sending notes are called `SendVP`, and validity predicates that authorize receiving notes are called `RecvVP`.
 
-These VP check that input and output notes of the tx satisfy certain constraints. When a user wants to spend a note, the satisfaction of their `SendVP` is required. Similarly, to receive a note, user's `RecvVP` must be satisfied.
+These VPs check that input and output notes of the transactions satisfy certain constraints. When a user wants to spend a note, the satisfaction of his `SendVP` is required. Similarly, to receive a note, user's `RecvVP` must be satisfied.
 
 As VPs are shielded in Taiga, instead of showing that the VPs of the user evaluate to true publicly, ZK proofs are created. An observer can verify these proofs (using the verifier key).
 
@@ -24,23 +24,23 @@ Alice is a user of Taiga with validity predicates defined as follows:
 
 ```rust
     ...
-    // compose the VPs with the methods defined earlier;
-    // check ../../doc_examples/users.rs to see the defined methods;
+    // compose the VPs with the methods defined earlier
+    // check ../../doc_examples/users.rs to see the defined methods
     let mut send_vp = SendVP::<CP>::new(send_input_notes, send_output_notes);
     let mut recv_vp = ReceiveVP::<CP>::new(receive_input_notes, receive_output_notes);
 
-    //transform VPs into a different form
+    // transform VPs into a different form
     let desc_vp_send = ValidityPredicateDescription::from_vp(&mut send_vp, &vp_setup).unwrap();
     let desc_vp_recv = ValidityPredicateDescription::from_vp(&mut receive_vp, &vp_setup).unwrap();
 
     let alice = User::<CP>::new(
-        desc_vp_send, //SendVP
-        desc_vp_recv, //RecvVP
-        NullifierDerivingKey::<Fr>::rand(&mut rng), //nullifier key
+        desc_vp_send, // SendVP
+        desc_vp_recv, // RecvVP
+        NullifierDerivingKey::<Fr>::rand(&mut rng), // nullifier key
     );
 
-    // compute the address;
-    // it can be used to send notes to Alice;
+    // compute the address
+    // it can be used to send notes to Alice
     let _alice_addr = alice.address().unwrap();
 ```
 
