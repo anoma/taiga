@@ -1,49 +1,49 @@
-# Users of Taiga
+# User
 
-Similarly to the token case, users have associated validity predicates for sending and receiving notes, called $Send_{VP}$ and $Rec_{VP}$, respectively. In the same way as for $Token_{VP}$, a proof $\pi$ is verified against a $Send_{VK}$ (or $Rec_{VK}$) and this verifier key needs to be binded to the owner of the note. 
+`User` in Taiga can own, send and receive notes. Each user has an **address** that identifies them, **validity predicates** that authorize their actions, and **keys** that are used to derive parameters.
 
-Spending a note also requires nullifying the note so that it cannot be double-spent. We use the same construction as Orchard, where a nullifier is derived from a nullifier key. Each user has a nullifier key that also needs to be binded to the note sender address.
+### Validity predicates
+Each user has validity predicates that authorize spending and receiving notes. Validity predicates that authorize sending notes are called `sendVP`, and validity predicates that authorize receiving notes are called `recvVP`.
 
-In consequence, the user address is split into:
-* A commitment to $Send_{VK}$ and the nullifier key,
-* A commitment to $Rec_{VK}$.
-The final address is an outer commitment to these two inner commitments: 
+These VP check that input and output notes of the tx satisfy certain constraints. When a user wants to spend a note, the satisfaction of their `sendVP` is required. Similarly, to receive a note, user's `recvVP` must be satisfied.
 
-    $Address_{user}$ = Com(Com($Send_{VK}$, $User_{NK}$, Com($Rec_{VK}$)).
+As VPs are shielded in Taiga, instead of showing that the VPs of the user evaluate to true publicly, ZK proofs are created. An observer can verify these proofs (using the verifier key).
+
+### User keys
+Each user has a set of keys that allows to authorize various actions or generate parameters. One of such keys is a nullifier key `nk` used to compute [note nullifiers](./notes.md) that are necessary to spend notes.
+
+### User address
+
+Each user has an address that allows others to send assets to the user. Address is derived from user's `sendVP`, `recvVP`, and `nk`.
 
 ### Example
 
-Alice is a user of Taiga and defined her two validity predicates:
-* $Send_{VP}$ is a check on the amount of her spent: she does not want to send more than 3XAN at a time.
-* $Rec_{VP}$ is a check on the amount she received: she does not want to receive notes of less than 0.1XAN.
-
-When she sends a note of $2$ XAN, she creates a proof $Send_π$ that can be verified against $Send_{VK}$, computes the nullifier of the spent note using $Alice_{NK}$, and a binding proof that $Send_{VK}$ and $Alice_{NK}$ open the spent note owner (Alice) address.
+Alice is a user of Taiga with validity predicates defined as follows:
+* `send_VP` is a check on the amount of her spent: she does not want to send more than 3XAN at a time.
+* `recv_VP` is a check on the amount she receives: she does not want to receive notes of less than 0.1XAN.
 
 ```rust
+    ...
+    // compose the VPs with the methods defined earlier;
+    // check ../../doc_examples/users.rs to see the defined methods;
     let mut send_vp = SendVP::<CP>::new(send_input_notes, send_output_notes);
-    let mut receive_vp = ReceiveVP::<CP>::new(receive_input_notes, receive_output_notes);
+    let mut recv_vp = ReceiveVP::<CP>::new(receive_input_notes, receive_output_notes);
 
+    //transform VPs into a different form
     let desc_vp_send = ValidityPredicateDescription::from_vp(&mut send_vp, &vp_setup).unwrap();
     let desc_vp_recv = ValidityPredicateDescription::from_vp(&mut receive_vp, &vp_setup).unwrap();
 
     let alice = User::<CP>::new(
-        desc_vp_send,
-        desc_vp_recv,
-        NullifierDerivingKey::<Fr>::rand(&mut rng),
+        desc_vp_send, //sendVP
+        desc_vp_recv, //recvVP
+        NullifierDerivingKey::<Fr>::rand(&mut rng), //nullifier key
     );
+
+    // compute the address;
+    // it can be used to send notes to Alice;
+    let _alice_addr = alice.address().unwrap();
 ```
+
 This example is reproducible with [this file](../../src/doc_examples/user.rs) or with the command
-```
-cargo test doc_examples::user::test_token_creation
-```
 
-
-### Specification of the user address
-
-The user address encodes the sending and receiving validity predicate verifier keys and the nullifier key.
-
-$Address_{User} = Com_r(Com_r(Com_q(Send_{VK}) || User_{NK}) || Com_q(Rec_{VK}))$
-
-* Sending and receiving verifier keys are commited into $\mathbb F_q$ for privacy and efficiency concerns.
-* The commitment to $Send_{VK}$ is committed into $\mathbb F_r$ together with the nullifier key in order to bind the nullifier computation with the spent note owner address.
-* The outer commitment binds the spent note user address with the verifying keys used for $Send_{π}$ and $Rec_{π}$.
+`cargo test doc_examples::user::test_token_creation`
