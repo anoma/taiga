@@ -1,5 +1,8 @@
 #[test]
 fn test_blinding_circuit() {
+    use plonk_core::prelude::{VerifierData, verify_proof};
+    use plonk_core::proof_system::pi::PublicInputs;
+    use crate::utils::ws_to_te;
     use crate::circuit::blinding_circuit::BlindingCircuit;
     use crate::circuit::circuit_parameters::CircuitParameters;
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
@@ -35,7 +38,7 @@ fn test_blinding_circuit() {
     // we blind the VP desc
     let pp = PC::setup(vp.padded_circuit_size(), None, &mut rng).unwrap();
     let vp_desc = ValidityPredicateDescription::from_vp(&mut vp, &pp).unwrap();
-    let _vp_desc_compressed = vp_desc.get_compress();
+    let vp_desc_compressed = vp_desc.get_compress();
 
     // the blinding circuit, containing the random values used to blind
     let mut blinding_circuit =
