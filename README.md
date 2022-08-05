@@ -15,9 +15,9 @@ Currently we use these parameters to generate proofs:
 |||
 |-|-|
 |Proving system|ZK-garage PLONK|
-|Inner Curve|ed_on_bls12_377|
-|Main Curve |bls12_377|
-|Outer Curve|bw6_761|
+|Inner Curve|`ed_on_bls12_381_new`|
+|Main Curve |`bls12_381_new`|
+|Outer Curve|`bw6_764_new`|
 
 Note that the current choice is not final and might change. 
     
