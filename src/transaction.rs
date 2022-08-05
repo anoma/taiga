@@ -84,15 +84,15 @@ impl<CP: CircuitParameters> ActionSlice<CP> {
     ) -> Result<Self, TaigaError> {
         let setup = CP::get_pc_setup_params(ACTION_CIRCUIT_SIZE);
         // Compile the circuit
-        let pk_p = CP::get_action_pk();
+        let pk = CP::get_action_pk();
         let vk = CP::get_action_vk();
 
         // Prover
-        let (action_proof, pi) =
-            action_circuit.gen_proof::<CP::CurvePC>(setup, pk_p.clone(), b"Test")?;
+        let (action_proof, action_public_input) =
+            action_circuit.gen_proof::<CP::CurvePC>(setup, pk.clone(), b"Test")?;
 
         // Verifier
-        let verifier_data = VerifierData::new(vk.clone(), pi);
+        let verifier_data = VerifierData::new(vk.clone(), action_public_input);
         verify_proof::<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>(
             setup,
             verifier_data.key,
@@ -142,14 +142,14 @@ impl<CP: CircuitParameters> VPCheck<CP> {
             BlindingCircuit::<CP>::new(rng, vp_desc, vp_setup, vp_circuit_size)?;
 
         // Compile vp(must use compile_with_blinding)
-        let (pk_p, vk_blind) =
+        let (pk, vk_blind) =
             vp.compile_with_blinding::<CP::CurvePC>(vp_setup, &blinding_circuit.get_blinding())?;
 
         // VP Prover
-        let (vp_proof, pi) = vp.gen_proof::<CP::CurvePC>(vp_setup, pk_p, b"Test")?;
+        let (vp_proof, vp_public_input) = vp.gen_proof::<CP::CurvePC>(vp_setup, pk, b"Test")?;
 
         // VP verifier
-        let vp_verifier_data = VerifierData::new(vk_blind.clone(), pi);
+        let vp_verifier_data = VerifierData::new(vk_blind.clone(), vp_public_input);
         verify_proof::<CP::CurveScalarField, CP::InnerCurve, CP::CurvePC>(
             vp_setup,
             vp_verifier_data.key,
@@ -160,18 +160,15 @@ impl<CP: CircuitParameters> VPCheck<CP> {
 
         // Generate blinding circuit CRS
         let blinding_setup = CP::get_opc_setup_params(BLINDING_CIRCUIT_SIZE);
-        let pk_p = CP::get_blind_vp_pk();
+        let pk = CP::get_blind_vp_pk();
         let vk = CP::get_blind_vp_vk();
 
         // Blinding Prover
-        let (blind_vp_proof, pi) = blinding_circuit.gen_proof::<CP::OuterCurvePC>(
-            blinding_setup,
-            pk_p.clone(),
-            b"Test",
-        )?;
+        let (blind_vp_proof, blind_vp_public_input) =
+            blinding_circuit.gen_proof::<CP::OuterCurvePC>(blinding_setup, pk.clone(), b"Test")?;
 
         // Blinding Verifier
-        let blinding_verifier_data = VerifierData::new(vk.clone(), pi);
+        let blinding_verifier_data = VerifierData::new(vk.clone(), blind_vp_public_input);
         verify_proof::<CP::CurveBaseField, CP::Curve, CP::OuterCurvePC>(
             blinding_setup,
             blinding_verifier_data.key,

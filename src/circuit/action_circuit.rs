@@ -91,21 +91,21 @@ fn action_circuit_test() {
     let pp = CP::get_pc_setup_params(ACTION_CIRCUIT_SIZE);
 
     // Compile the circuit
-    let pk_p = CP::get_action_pk();
+    let pk = CP::get_action_pk();
     let vk = CP::get_action_vk();
 
     // Prover
-    let (proof, pi) = action_circuit
-        .gen_proof::<PC>(pp, pk_p.clone(), b"Test")
+    let (proof, action_public_input) = action_circuit
+        .gen_proof::<PC>(pp, pk.clone(), b"Test")
         .unwrap();
 
     // Check the public inputs
-    let mut expect_pi = PublicInputs::new(action_circuit.padded_circuit_size());
-    expect_pi.insert(ACTION_PUBLIC_INPUT_NF_INDEX, action.nf.inner());
-    expect_pi.insert(ACTION_PUBLIC_INPUT_ROOT_INDEX, action.root);
-    expect_pi.insert(ACTION_PUBLIC_INPUT_CM_INDEX, action.cm.inner());
-    assert_eq!(pi, expect_pi);
+    let mut expect_public_input = PublicInputs::new(action_circuit.padded_circuit_size());
+    expect_public_input.insert(ACTION_PUBLIC_INPUT_NF_INDEX, action.nf.inner());
+    expect_public_input.insert(ACTION_PUBLIC_INPUT_ROOT_INDEX, action.root);
+    expect_public_input.insert(ACTION_PUBLIC_INPUT_CM_INDEX, action.cm.inner());
+    assert_eq!(action_public_input, expect_public_input);
     // Verifier
-    let verifier_data = VerifierData::new(vk.clone(), expect_pi);
+    let verifier_data = VerifierData::new(vk.clone(), expect_public_input);
     verify_proof::<Fr, P, PC>(pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
 }

@@ -198,40 +198,40 @@ fn test_blinding_circuit() {
     let blinding_circuit_size = blinding_circuit.padded_circuit_size();
     let pp_blind = CP::get_opc_setup_params(blinding_circuit_size);
 
-    let pk_p = CP::get_blind_vp_pk();
+    let pk = CP::get_blind_vp_pk();
     let vk = CP::get_blind_vp_vk();
 
     // Blinding Prover
-    let (proof, pi) = blinding_circuit
-        .gen_proof::<Opc>(pp_blind, pk_p.clone(), b"Test")
+    let (proof, blinding_public_input) = blinding_circuit
+        .gen_proof::<Opc>(pp_blind, pk.clone(), b"Test")
         .unwrap();
 
     // Expecting vk_blind(out of circuit)
-    let mut expect_pi = PublicInputs::new(blinding_circuit_size);
+    let mut expect_public_input = PublicInputs::new(blinding_circuit_size);
     let q_m = ws_to_te(vk_blind.arithmetic.q_m.0);
-    expect_pi.insert(392, q_m.x);
-    expect_pi.insert(393, q_m.y);
+    expect_public_input.insert(392, q_m.x);
+    expect_public_input.insert(393, q_m.y);
     let q_l = ws_to_te(vk_blind.arithmetic.q_l.0);
-    expect_pi.insert(782, q_l.x);
-    expect_pi.insert(783, q_l.y);
+    expect_public_input.insert(782, q_l.x);
+    expect_public_input.insert(783, q_l.y);
     let q_r = ws_to_te(vk_blind.arithmetic.q_r.0);
-    expect_pi.insert(1172, q_r.x);
-    expect_pi.insert(1173, q_r.y);
+    expect_public_input.insert(1172, q_r.x);
+    expect_public_input.insert(1173, q_r.y);
     let q_o = ws_to_te(vk_blind.arithmetic.q_o.0);
-    expect_pi.insert(1562, q_o.x);
-    expect_pi.insert(1563, q_o.y);
+    expect_public_input.insert(1562, q_o.x);
+    expect_public_input.insert(1563, q_o.y);
     let q_4 = ws_to_te(vk_blind.arithmetic.q_4.0);
-    expect_pi.insert(1952, q_4.x);
-    expect_pi.insert(1953, q_4.y);
+    expect_public_input.insert(1952, q_4.x);
+    expect_public_input.insert(1953, q_4.y);
     let q_c = ws_to_te(vk_blind.arithmetic.q_c.0);
-    expect_pi.insert(2342, q_c.x);
-    expect_pi.insert(2343, q_c.y);
-    expect_pi.insert(21388, vp_desc_compressed);
+    expect_public_input.insert(2342, q_c.x);
+    expect_public_input.insert(2343, q_c.y);
+    expect_public_input.insert(21388, vp_desc_compressed);
 
-    assert_eq!(pi, expect_pi);
+    assert_eq!(blinding_public_input, expect_public_input);
 
     // Blinding Verifier
-    let verifier_data = VerifierData::new(vk.clone(), pi);
+    let verifier_data = VerifierData::new(vk.clone(), blinding_public_input);
     verify_proof::<Fq, OP, Opc>(
         pp_blind,
         verifier_data.key,
