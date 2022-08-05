@@ -1,5 +1,4 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
-use crate::circuit::gadgets::field_addition::field_addition_gadget;
 use crate::circuit::integrity::{
     token_integrity_circuit, ValidityPredicateInputNoteVariables,
     ValidityPredicateOutputNoteVariables,
@@ -41,7 +40,7 @@ where
         &self,
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
         input_note_variables: &[ValidityPredicateInputNoteVariables],
-        output_note_variables: &[ValidityPredicateOutputNoteVariables],
+        _output_note_variables: &[ValidityPredicateOutputNoteVariables],
     ) -> Result<(), Error> {
         // * Alice does not want to send more than 3 XAN at a time.
         let mut rng = ark_std::test_rng();
@@ -111,7 +110,7 @@ where
         &self,
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
         input_note_variables: &[ValidityPredicateInputNoteVariables],
-        output_note_variables: &[ValidityPredicateOutputNoteVariables],
+        _output_note_variables: &[ValidityPredicateOutputNoteVariables],
     ) -> Result<(), Error> {
         // * Alice does not want to send more than 3 XAN at a time.
         let mut rng = ark_std::test_rng();
@@ -157,7 +156,6 @@ fn test_user_creation() {
     use crate::circuit::circuit_parameters::CircuitParameters;
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::circuit::validity_predicate::NUM_NOTE;
-    use crate::doc_examples::validity_predicate::TrivialValidityPredicate;
     use crate::note::Note;
     use crate::user::NullifierDerivingKey;
     use crate::user::User;
