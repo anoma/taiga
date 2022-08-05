@@ -84,3 +84,4 @@ Dummy notes might be useful to keep the the amount of notes constant and hide th
 let spend_note = Note::<CP>::dummy(&mut rng);
 ```
 
+Next: [action](./action.md)

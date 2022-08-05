@@ -29,14 +29,13 @@ impl<CP: CircuitParameters> Circuit<CP::CurveScalarField, CP::InnerCurve>
     // Default implementation
     fn gadget(
         &mut self,
-        _composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+        composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
     ) -> Result<(), Error> {
-        // nothing
-        Ok(())
+        self.gadget_vp(composer)
     }
 
     fn padded_circuit_size(&self) -> usize {
-        4
+        1 << 17
     }
 }
 
@@ -49,12 +48,12 @@ impl<CP: CircuitParameters> TrivialValidityPredicate<CP> {
     }
 }
 
+#[ignore]
 #[test]
 fn test_vp_creation() {
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::circuit::validity_predicate::NUM_NOTE;
     use crate::note::Note;
-    use ark_poly_commit::PolynomialCommitment;
     use ark_std::test_rng;
     use plonk_core::prelude::{verify_proof, VerifierData};
 
@@ -67,24 +66,21 @@ fn test_vp_creation() {
     let output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
 
     // creation of the VP
-    let mut vp = TrivialValidityPredicate::<CP> {
-        input_notes,
-        output_notes,
-    };
+    let mut vp = TrivialValidityPredicate::<CP>::new(input_notes, output_notes);
 
     // setup of the proof system
-    let vp_setup = PC::setup(vp.padded_circuit_size(), None, &mut rng).unwrap();
+    let vp_setup = CP::get_pc_setup_params(vp.padded_circuit_size());
 
     // proving and verifying keys
-    let (pk, vk) = vp.compile::<PC>(&vp_setup).unwrap();
+    let (pk, vk) = vp.compile::<PC>(vp_setup).unwrap();
 
     // proof
-    let (proof, public_inputs) = vp.gen_proof::<PC>(&vp_setup, pk, b"Test").unwrap();
+    let (proof, public_inputs) = vp.gen_proof::<PC>(vp_setup, pk, b"Test").unwrap();
 
     // verification
     let verifier_data = VerifierData::new(vk, public_inputs);
     verify_proof::<Fr, P, PC>(
-        &vp_setup,
+        vp_setup,
         verifier_data.key,
         &proof,
         &verifier_data.pi,

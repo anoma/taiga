@@ -1,6 +1,6 @@
-# Summary
+# Taiga
 
-- [Overview](./overview.md)
+- [Taiga overview](./overview.md)
 - [Validity predicates](./validity-predicates.md)
 - [Tokens](token.md)
 - [Users](./users.md)
@@ -8,4 +8,4 @@
 - [Action](./action.md)
 - [Blinding](./blinding.md)
 - [Transaction](./transaction.md)
-- [Conclusion](./conclusion.md)
+- [Performance & conclusion](./conclusion.md)

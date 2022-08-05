@@ -22,7 +22,7 @@ First, we create a blinding circuit structure including the random values used f
 let mut blinding_circuit =
       BlindingCircuit::<CP>::new(&mut rng, vp_desc, &pp, vp.padded_circuit_size()).unwrap();
 ```
-As for `send_VP`, `recv_VP` and `token_VP` proofs, we need a setup and prover/verifier keys:
+As for `SendVP`, `RecvVP` and `TokVP` proofs, we need a setup and prover/verifier keys:
 ```rust
 let (pk_blind, vk_blind) = vp
       .compile_with_blinding::<PC>(&pp, &blinding_circuit.get_blinding())
@@ -47,3 +47,5 @@ verify_proof::<Fq, OP, Opc>(
 )
 .unwrap();
 ```
+
+Next: [transaction](./transaction.md)
