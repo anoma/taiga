@@ -66,11 +66,18 @@ fn test_circuit_example() {
     // Prover and verifier key
     let (pk, vk) = Circuit::<F, P>::compile::<PC>(&mut circuit, &setup).unwrap();
     // Proof computation
-    let (pi, public_inputs) =
+    let (proof, public_inputs) =
         Circuit::<F, P>::gen_proof::<PC>(&mut circuit, &setup, pk, b"Test").unwrap();
     // Proof verification
     let verifier_data = VerifierData::new(vk, public_inputs);
-    verify_proof::<F, P, PC>(&setup, verifier_data.key, &pi, &verifier_data.pi, b"Test").unwrap();
+    verify_proof::<F, P, PC>(
+        &setup,
+        verifier_data.key,
+        &proof,
+        &verifier_data.pi,
+        b"Test",
+    )
+    .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////

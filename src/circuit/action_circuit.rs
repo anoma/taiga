@@ -1,6 +1,7 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::gadgets::merkle_tree::merkle_tree_gadget;
 use crate::circuit::integrity::{input_note_constraint, output_note_constraint};
+use crate::constant::ACTION_CIRCUIT_SIZE;
 use crate::merkle_tree::TAIGA_COMMITMENT_TREE_DEPTH;
 use crate::note::Note;
 use crate::poseidon::WIDTH_3;
@@ -64,7 +65,7 @@ where
         Ok(())
     }
     fn padded_circuit_size(&self) -> usize {
-        1 << 15
+        ACTION_CIRCUIT_SIZE
     }
 }
 
@@ -75,44 +76,36 @@ fn action_circuit_test() {
     type P = <CP as CircuitParameters>::InnerCurve;
     type PC = <CP as CircuitParameters>::CurvePC;
     use crate::action::*;
-    use crate::merkle_tree::MerklePath;
-    use crate::poseidon::POSEIDON_HASH_PARAM_BLS12_381_NEW_SCALAR_ARITY2;
-    use ark_poly_commit::PolynomialCommitment;
+    use crate::constant::{
+        ACTION_PUBLIC_INPUT_CM_INDEX, ACTION_PUBLIC_INPUT_NF_INDEX, ACTION_PUBLIC_INPUT_ROOT_INDEX,
+    };
     use ark_std::test_rng;
     use plonk_core::circuit::{verify_proof, VerifierData};
     use plonk_core::proof_system::pi::PublicInputs;
 
     let mut rng = test_rng();
-    let spend_note = Note::<CP>::dummy(&mut rng);
-    let merkle_path =
-        MerklePath::<Fr, PoseidonConstants<Fr>>::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-    let spend_info = SpendInfo::<CP>::new(
-        spend_note,
-        merkle_path,
-        &POSEIDON_HASH_PARAM_BLS12_381_NEW_SCALAR_ARITY2,
-    );
-
-    let output_info = OutputInfo::<CP>::dummy(&mut rng);
-
-    let action_info = ActionInfo::<CP>::new(spend_info, output_info);
+    let action_info = ActionInfo::<CP>::dummy(&mut rng);
     let (action, mut action_circuit) = action_info.build(&mut rng).unwrap();
 
     // Generate CRS
-    let pp = PC::setup(action_circuit.padded_circuit_size(), None, &mut rng).unwrap();
+    let pp = CP::get_pc_setup_params(ACTION_CIRCUIT_SIZE);
 
     // Compile the circuit
-    let (pk_p, vk) = action_circuit.compile::<PC>(&pp).unwrap();
+    let pk = CP::get_action_pk();
+    let vk = CP::get_action_vk();
 
     // Prover
-    let (proof, pi) = action_circuit.gen_proof::<PC>(&pp, pk_p, b"Test").unwrap();
+    let (proof, action_public_input) = action_circuit
+        .gen_proof::<PC>(pp, pk.clone(), b"Test")
+        .unwrap();
 
     // Check the public inputs
-    let mut expect_pi = PublicInputs::new(action_circuit.padded_circuit_size());
-    expect_pi.insert(10781, action.nf.inner());
-    expect_pi.insert(12530, action.root);
-    expect_pi.insert(19586, action.cm.inner());
-    assert_eq!(pi, expect_pi);
+    let mut expect_public_input = PublicInputs::new(action_circuit.padded_circuit_size());
+    expect_public_input.insert(ACTION_PUBLIC_INPUT_NF_INDEX, action.nf.inner());
+    expect_public_input.insert(ACTION_PUBLIC_INPUT_ROOT_INDEX, action.root);
+    expect_public_input.insert(ACTION_PUBLIC_INPUT_CM_INDEX, action.cm.inner());
+    assert_eq!(action_public_input, expect_public_input);
     // Verifier
-    let verifier_data = VerifierData::new(vk, expect_pi);
-    verify_proof::<Fr, P, PC>(&pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
+    let verifier_data = VerifierData::new(vk.clone(), expect_public_input);
+    verify_proof::<Fr, P, PC>(pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
 }

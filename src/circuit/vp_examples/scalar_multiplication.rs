@@ -107,15 +107,15 @@ fn test_scalar_multiplication_vp_example() {
     .unwrap();
 
     // Compile vp(must use compile_with_blinding)
-    let (pk_p, vk_blind) = scalar_multiplication_vp.compile::<PC>(&vp_setup).unwrap();
+    let (pk, vk_blind) = scalar_multiplication_vp.compile::<PC>(&vp_setup).unwrap();
 
     // VP Prover
-    let (proof, pi) = scalar_multiplication_vp
-        .gen_proof::<PC>(&vp_setup, pk_p, b"Test")
+    let (proof, public_input) = scalar_multiplication_vp
+        .gen_proof::<PC>(&vp_setup, pk, b"Test")
         .unwrap();
 
     // VP verifier
-    let verifier_data = VerifierData::new(vk_blind, pi);
+    let verifier_data = VerifierData::new(vk_blind, public_input);
     verify_proof::<Fr, P, PC>(
         &vp_setup,
         verifier_data.key,
