@@ -6,11 +6,8 @@ fn test_blinding_circuit() {
     use crate::circuit::validity_predicate::NUM_NOTE;
     use crate::doc_examples::validity_predicate::TrivialValidityPredicate;
     use crate::note::Note;
-    use crate::utils::ws_to_te;
     use crate::vp_description::ValidityPredicateDescription;
-    use plonk_core::circuit::{verify_proof, VerifierData};
     use plonk_core::prelude::Circuit;
-    use plonk_core::proof_system::pi::PublicInputs;
     type Fr = <CP as CircuitParameters>::CurveScalarField;
     type Fq = <CP as CircuitParameters>::CurveBaseField;
     type P = <CP as CircuitParameters>::InnerCurve;
@@ -31,24 +28,24 @@ fn test_blinding_circuit() {
     // we blind the VP desc
     let pp = PC::setup(vp.padded_circuit_size(), None, &mut rng).unwrap();
     let vp_desc = ValidityPredicateDescription::from_vp(&mut vp, &pp).unwrap();
-    let vp_desc_compressed = vp_desc.get_compress();
+    let _vp_desc_compressed = vp_desc.get_compress();
 
     // the blinding circuit, containing the random values used to blind
     let mut blinding_circuit =
         BlindingCircuit::<CP>::new(&mut rng, vp_desc, &pp, vp.padded_circuit_size()).unwrap();
 
     // verifying key with the blinding
-    let (_, vk_blind) = vp
+    let (_, _vk_blind) = vp
         .compile_with_blinding::<PC>(&pp, &blinding_circuit.get_blinding())
         .unwrap();
 
     let blinding_circuit_size = blinding_circuit.padded_circuit_size();
     let pp_blind = Opc::setup(blinding_circuit_size, None, &mut rng).unwrap();
 
-    let (pk_p, vk) = blinding_circuit.compile::<Opc>(&pp_blind).unwrap();
+    let (pk_p, _vk) = blinding_circuit.compile::<Opc>(&pp_blind).unwrap();
 
     // Blinding Prover
-    let (proof, pi) = blinding_circuit
+    let (_proof, _pi) = blinding_circuit
         .gen_proof::<Opc>(&pp_blind, pk_p, b"Test")
         .unwrap();
 
