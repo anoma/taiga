@@ -9,4 +9,3 @@
 - [Blinding](./blinding.md)
 - [Transaction](./transaction.md)
 - [Conclusion](./conclusion.md)
-

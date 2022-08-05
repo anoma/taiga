@@ -50,7 +50,7 @@ impl<F: PrimeField, BH: FieldHasher<F>> MerkleTreeLeafs<F, BH> {
 }
 
 /// A path from a position in a particular commitment tree to the root of that tree.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MerklePath<F: PrimeField, BH: FieldHasher<F>> {
     auth_path: Vec<(Node<F, BH>, bool)>,
 }

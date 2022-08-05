@@ -4,11 +4,12 @@ use crate::error::TaigaError;
 use crate::merkle_tree::{MerklePath, Node, TAIGA_COMMITMENT_TREE_DEPTH};
 use crate::note::{Note, NoteCommitment};
 use crate::nullifier::Nullifier;
-use crate::poseidon::FieldHasher;
+use crate::poseidon::{FieldHasher, WIDTH_3};
 use crate::token::Token;
 use crate::user::{User, UserSendAddress};
 use crate::vp_description::ValidityPredicateDescription;
 use ark_ff::UniformRand;
+use plonk_hashing::poseidon::constants::PoseidonConstants;
 use rand::RngCore;
 
 /// The action result used in transaction.
@@ -50,6 +51,22 @@ pub struct OutputInfo<CP: CircuitParameters> {
 impl<CP: CircuitParameters> ActionInfo<CP> {
     pub fn new(spend: SpendInfo<CP>, output: OutputInfo<CP>) -> Self {
         Self { spend, output }
+    }
+
+    pub fn dummy(rng: &mut impl RngCore) -> Self {
+        let spend_note = Note::<CP>::dummy(rng);
+        let merkle_path =
+            MerklePath::<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>::dummy(
+                rng,
+                TAIGA_COMMITMENT_TREE_DEPTH,
+            );
+        let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
+            PoseidonConstants::generate::<WIDTH_3>();
+        let spend_info = SpendInfo::<CP>::new(spend_note, merkle_path, &poseidon_param);
+
+        let output_info = OutputInfo::<CP>::dummy(rng);
+
+        ActionInfo::<CP>::new(spend_info, output_info)
     }
 
     pub fn build(

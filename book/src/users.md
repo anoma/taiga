@@ -2,7 +2,7 @@
 
 Similarly to the token case, users have associated validity predicates for sending and receiving notes, called $Send_{VP}$ and $Rec_{VP}$, respectively. In the same way as for $Token_{VP}$, a proof $\pi$ is verified against a $Send_{VK}$ (or $Rec_{VK}$) and this verifier key needs to be binded to the owner of the note. 
 
-Spending a note also requires nullifying the note so that it cannot be spent anymore. We use the same construction as Orchard, where a nullifier is derived from a nullifier key. Each user has a nullifier key that also needs to be binded to the note sender address.
+Spending a note also requires nullifying the note so that it cannot be double-spent. We use the same construction as Orchard, where a nullifier is derived from a nullifier key. Each user has a nullifier key that also needs to be binded to the note sender address.
 
 In consequence, the user address is split into:
 * A commitment to $Send_{VK}$ and the nullifier key,

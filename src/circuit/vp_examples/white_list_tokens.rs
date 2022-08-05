@@ -84,7 +84,6 @@ where
 #[ignore]
 #[test]
 fn test_white_list_tokens_vp_example() {
-    use ark_poly_commit::PolynomialCommitment;
     use plonk_core::circuit::{verify_proof, VerifierData};
 
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
@@ -146,17 +145,17 @@ fn test_white_list_tokens_vp_example() {
     );
 
     // Generate CRS
-    let pp = PC::setup(white_list_tokens_vp.padded_circuit_size(), None, &mut rng).unwrap();
+    let pp = CP::get_pc_setup_params(white_list_tokens_vp.padded_circuit_size());
 
     // Compile the circuit
-    let (pk_p, vk) = white_list_tokens_vp.compile::<PC>(&pp).unwrap();
+    let (pk, vk) = white_list_tokens_vp.compile::<PC>(pp).unwrap();
 
     // Prover
-    let (proof, pi) = white_list_tokens_vp
-        .gen_proof::<PC>(&pp, pk_p, b"Test")
+    let (proof, public_input) = white_list_tokens_vp
+        .gen_proof::<PC>(pp, pk, b"Test")
         .unwrap();
 
     // Verifier
-    let verifier_data = VerifierData::new(vk, pi);
-    verify_proof::<Fr, P, PC>(&pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
+    let verifier_data = VerifierData::new(vk, public_input);
+    verify_proof::<Fr, P, PC>(pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
 }
