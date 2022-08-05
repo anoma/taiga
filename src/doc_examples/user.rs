@@ -1,5 +1,4 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
-<<<<<<< HEAD
 use crate::circuit::integrity::{
     token_integrity_circuit, ValidityPredicateInputNoteVariables,
     ValidityPredicateOutputNoteVariables,
@@ -9,18 +8,6 @@ use crate::note::Note;
 use crate::token::Token;
 use ark_std;
 use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
-=======
-use crate::circuit::gadgets::field_addition::field_addition_gadget;
-use crate::circuit::integrity::{
-    token_integrity_circuit,
-    ValidityPredicateInputNoteVariables, ValidityPredicateOutputNoteVariables,
-};
-use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
-use crate::note::Note;
-use crate::token::{Token};
-use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
-use ark_std;
->>>>>>> 3d447a8 (Resolve conflict)
 
 pub struct SendVP<CP: CircuitParameters> {
     // basic "private" inputs to the VP
@@ -53,24 +40,15 @@ where
         &self,
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
         input_note_variables: &[ValidityPredicateInputNoteVariables],
-<<<<<<< HEAD
         _output_note_variables: &[ValidityPredicateOutputNoteVariables],
-=======
-        output_note_variables: &[ValidityPredicateOutputNoteVariables],
->>>>>>> 3d447a8 (Resolve conflict)
     ) -> Result<(), Error> {
         // * Alice does not want to send more than 3 XAN at a time.
         let mut rng = ark_std::test_rng();
         let xan_token =
             Token::<crate::circuit::circuit_parameters::PairingCircuitParameters>::dummy(&mut rng);
 
-<<<<<<< HEAD
         let (xan_address_var, _) =
             token_integrity_circuit::<CP>(composer, &xan_token.token_vp.to_bits())?;
-=======
-        
-        let (xan_address_var, _) = token_integrity_circuit::<CP>(composer, &xan_token.token_vp.to_bits())?;
->>>>>>> 3d447a8 (Resolve conflict)
 
         // Check that the token of all the notes of token XAN are less than 3 XAN
         for note_var in input_note_variables {
@@ -101,10 +79,6 @@ where
     }
 }
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 3d447a8 (Resolve conflict)
 pub struct ReceiveVP<CP: CircuitParameters> {
     // basic "private" inputs to the VP
     input_notes: [Note<CP>; NUM_NOTE],
@@ -136,24 +110,15 @@ where
         &self,
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
         input_note_variables: &[ValidityPredicateInputNoteVariables],
-<<<<<<< HEAD
         _output_note_variables: &[ValidityPredicateOutputNoteVariables],
-=======
-        output_note_variables: &[ValidityPredicateOutputNoteVariables],
->>>>>>> 3d447a8 (Resolve conflict)
     ) -> Result<(), Error> {
         // * Alice does not want to send more than 3 XAN at a time.
         let mut rng = ark_std::test_rng();
         let xan_token =
             Token::<crate::circuit::circuit_parameters::PairingCircuitParameters>::dummy(&mut rng);
 
-<<<<<<< HEAD
         let (xan_address_var, _) =
             token_integrity_circuit::<CP>(composer, &xan_token.token_vp.to_bits())?;
-=======
-        
-        let (xan_address_var, _) = token_integrity_circuit::<CP>(composer, &xan_token.token_vp.to_bits())?;
->>>>>>> 3d447a8 (Resolve conflict)
 
         // Check that the token of all the notes of token XAN are less than 3 XAN
         for note_var in input_note_variables {

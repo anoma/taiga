@@ -1,15 +1,15 @@
 #[test]
 fn test_blinding_circuit() {
-    use plonk_core::prelude::{VerifierData, verify_proof};
-    use plonk_core::proof_system::pi::PublicInputs;
-    use crate::utils::ws_to_te;
     use crate::circuit::blinding_circuit::BlindingCircuit;
     use crate::circuit::circuit_parameters::CircuitParameters;
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::circuit::validity_predicate::NUM_NOTE;
     use crate::note::Note;
+    use crate::utils::ws_to_te;
     use crate::vp_description::ValidityPredicateDescription;
     use plonk_core::prelude::Circuit;
+    use plonk_core::prelude::{verify_proof, VerifierData};
+    use plonk_core::proof_system::pi::PublicInputs;
     type Fr = <CP as CircuitParameters>::CurveScalarField;
     type Fq = <CP as CircuitParameters>::CurveBaseField;
     type P = <CP as CircuitParameters>::InnerCurve;
