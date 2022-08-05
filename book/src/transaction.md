@@ -110,7 +110,7 @@ In addition, this verification checks the consistency of the public inputs from 
 tx.verify(ledger_status)?;
 ```
 
-This code is reproducible with [this file](link) with the following command:
+This code is reproducible with [this file](https://github.com/anoma/taiga/blob/main/src/doc_examples/transaction.rs) with the following command:
 ```
-cargo test todo
+cargo test --release test_tx_example
 ```

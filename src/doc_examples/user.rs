@@ -149,6 +149,7 @@ where
     }
 }
 
+#[ignore]
 #[test]
 fn test_user_creation() {
     use plonk_core::prelude::Circuit;
@@ -160,7 +161,6 @@ fn test_user_creation() {
     use crate::user::NullifierDerivingKey;
     use crate::user::User;
     use crate::vp_description::ValidityPredicateDescription;
-    use ark_poly_commit::PolynomialCommitment;
     use ark_std::test_rng;
 
     type Fr = <CP as CircuitParameters>::CurveScalarField;
@@ -176,10 +176,10 @@ fn test_user_creation() {
     let receive_output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
     let mut receive_vp = ReceiveVP::<CP>::new(receive_input_notes, receive_output_notes);
 
-    let vp_setup = PC::setup(send_vp.padded_circuit_size(), None, &mut rng).unwrap();
+    let vp_setup = CP::get_pc_setup_params(send_vp.padded_circuit_size());
 
-    let desc_vp_send = ValidityPredicateDescription::from_vp(&mut send_vp, &vp_setup).unwrap();
-    let desc_vp_recv = ValidityPredicateDescription::from_vp(&mut receive_vp, &vp_setup).unwrap();
+    let desc_vp_send = ValidityPredicateDescription::from_vp(&mut send_vp, vp_setup).unwrap();
+    let desc_vp_recv = ValidityPredicateDescription::from_vp(&mut receive_vp, vp_setup).unwrap();
 
     let alice = User::<CP>::new(
         desc_vp_send,
