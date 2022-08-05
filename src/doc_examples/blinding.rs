@@ -4,7 +4,6 @@ fn test_blinding_circuit() {
     use crate::circuit::circuit_parameters::CircuitParameters;
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::circuit::validity_predicate::NUM_NOTE;
-    use crate::doc_examples::validity_predicate::TrivialValidityPredicate;
     use crate::note::Note;
     use crate::utils::ws_to_te;
     use crate::vp_description::ValidityPredicateDescription;
@@ -22,11 +21,19 @@ fn test_blinding_circuit() {
 
     let mut rng = test_rng();
 
-    // A balance VP
     let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
     let output_notes = input_notes.clone();
 
-    let mut vp = TrivialValidityPredicate::<CP>::new(input_notes, output_notes);
+    //
+    // This VP works, with BalanceVP
+    // Commenting the line 33-36 and uncommenting the line 32 make it bug (public inputs do not match).
+    //
+
+    // let mut vp = crate::doc_examples::validity_predicate::TrivialValidityPredicate::<CP>::new(input_notes, output_notes);
+    let mut vp = crate::circuit::vp_examples::balance::BalanceValidityPredicate::<CP>::new(
+        input_notes,
+        output_notes,
+    );
 
     // we blind the VP desc
     let pp = PC::setup(vp.padded_circuit_size(), None, &mut rng).unwrap();
@@ -37,7 +44,7 @@ fn test_blinding_circuit() {
     let mut blinding_circuit =
         BlindingCircuit::<CP>::new(&mut rng, vp_desc, &pp, vp.padded_circuit_size()).unwrap();
 
-    // verifying key with the blinding
+    // vp verifying key with the blinding
     let (_, vk_blinded) = vp
         .compile_with_blinding::<PC>(&pp, &blinding_circuit.get_blinding())
         .unwrap();
@@ -51,10 +58,6 @@ fn test_blinding_circuit() {
     let (proof, public_inputs) = blinding_circuit
         .gen_proof::<Opc>(&pp_blind, pk_blinding, b"Test")
         .unwrap();
-
-    //
-    // this is not working yet
-    //
 
     // Expecting vk_blind(out of circuit)
     let mut expected_public_inputs = PublicInputs::new(blinding_circuit.padded_circuit_size());
