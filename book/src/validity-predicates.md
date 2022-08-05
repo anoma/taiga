@@ -5,7 +5,7 @@ A **validity predicate** (VP) is a piece of code that authorizes transactions by
 Examples of such constraints would be a white list VP that allows only specific users to send notes to the VP owner, or a lower bound VP that restricts the smallest amount of asset that can be received.
 
 ### Validity predicates in Taiga
-Currently, every user in Taiga [has two VPs](./users.md): one that authorizes spending notes (`sendVP`), and one that authorizes receiving notes (`recvVP`). [Tokens](./token.md) in Taiga also have validity predicates, and spending or receiving a note of a particular token requires satisfying the `tokenVP`.
+Currently, every user in Taiga [has two VPs](./users.md): one that authorizes spending notes (`SendVP`), and one that authorizes receiving notes (`RecvVP`). [Tokens](./token.md) in Taiga also have validity predicates, and spending or receiving a note of a particular token requires satisfying the `TokenVP`.
 
 ### Shielded VPs
 For each transaction, it must be proven that all of the VPs of parties and tokens involved are satisfied. To preserve privacy, ZK proofs are used. The transaction is authorized only if all of the produced proofs are verified successfully.

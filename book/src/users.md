@@ -3,9 +3,9 @@
 `User` in Taiga can own, send and receive notes. Each user has an **address** that identifies them, **validity predicates** that authorize their actions, and **keys** that are used to derive parameters.
 
 ### Validity predicates
-Each user has validity predicates that authorize spending and receiving notes. Validity predicates that authorize sending notes are called `sendVP`, and validity predicates that authorize receiving notes are called `recvVP`.
+Each user has validity predicates that authorize spending and receiving notes. Validity predicates that authorize sending notes are called `SendVP`, and validity predicates that authorize receiving notes are called `RecvVP`.
 
-These VP check that input and output notes of the tx satisfy certain constraints. When a user wants to spend a note, the satisfaction of their `sendVP` is required. Similarly, to receive a note, user's `recvVP` must be satisfied.
+These VP check that input and output notes of the tx satisfy certain constraints. When a user wants to spend a note, the satisfaction of their `SendVP` is required. Similarly, to receive a note, user's `RecvVP` must be satisfied.
 
 As VPs are shielded in Taiga, instead of showing that the VPs of the user evaluate to true publicly, ZK proofs are created. An observer can verify these proofs (using the verifier key).
 
@@ -14,7 +14,7 @@ Each user has a set of keys that allows to authorize various actions or generate
 
 ### User address
 
-Each user has an address that allows others to send assets to the user. Address is derived from user's `sendVP`, `recvVP`, and `nk`.
+Each user has an address that allows others to send assets to the user. Address is derived from user's `SendVP`, `RecvVP`, and `nk`.
 
 ### Example
 
@@ -34,8 +34,8 @@ Alice is a user of Taiga with validity predicates defined as follows:
     let desc_vp_recv = ValidityPredicateDescription::from_vp(&mut receive_vp, &vp_setup).unwrap();
 
     let alice = User::<CP>::new(
-        desc_vp_send, //sendVP
-        desc_vp_recv, //recvVP
+        desc_vp_send, //SendVP
+        desc_vp_recv, //RecvVP
         NullifierDerivingKey::<Fr>::rand(&mut rng), //nullifier key
     );
 
