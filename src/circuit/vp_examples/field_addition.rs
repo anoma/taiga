@@ -1,7 +1,7 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::gadgets::field_addition::field_addition_gadget;
 use crate::circuit::integrity::{
-    ValidityPredicateInputNoteVariables, ValidityPredicateOuputNoteVariables,
+    ValidityPredicateInputNoteVariables, ValidityPredicateOutputNoteVariables,
 };
 use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
 use crate::note::Note;
@@ -72,7 +72,7 @@ where
         &self,
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
         _input_note_variables: &[ValidityPredicateInputNoteVariables],
-        _output_note_variables: &[ValidityPredicateOuputNoteVariables],
+        _output_note_variables: &[ValidityPredicateOutputNoteVariables],
     ) -> Result<(), Error> {
         let var_a = composer.add_input(self.a);
         let var_b = composer.add_input(self.b);

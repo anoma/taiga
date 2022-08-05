@@ -91,51 +91,6 @@ TODO: Should we use `fulldesc_vp` in place of `desc_vp`?
 
 - `VPCom(desc_vp; rcm_com_vp) := Com( Com_q(desc_vp), rcm_com_vp)`
 
-### Token (types)
-
-Encodes: token vp
-```
-token_address = Com_r(Com_q(desc_vp_token))
-```
-
-where:
-
-|Variable/Function|Type||
-|-|-|-|
-|`token_address` | $\mathbb F_r$ element | hash of the token vp description|
-
-The token VP description is hashed into $\mathbb F_q$ and then $\mathbb F_r$.
-The outer hash is not useful in terms of security but simplify the circuits involving the token address.
-
-### User
-
-```
-send_vp_hash = Com_q(desc_vp_addr_send)
-send_com = Com_r(send_vp_hash || nk)
-recv_vp_hash = Com_q(desc_vp_addr_recv)
-user_address = Com_r(send_com || recv_vp_hash)
-```
-
-where:
-
-|Variable/Function|Type||
-|-|-|-|
-|`nk`| $\mathbb{F}_r$| nullifier key for generating a nullifier|
-|`send_vp_hash`| $\mathbb F_q$ bits | hash of send vp description|
-|`recv_vp_hash` | $\mathbb F_q$ bits | hash of receive vp description|
-|`user_address`| $\mathbb F_r$ | address encoding `nk`, `send_vp_hash`, `recv_vp_hash`|
-|`Com_r`| $[\mathbb F_r] \to \mathbb F_r$ | Poseidon hash with four input field elements|
-
-* Sending a note requires opening a `user_address` to  `send_vp_hash`, which requires additional knowledge of nullifier key `nk`. This opening is efficient over $\mathbb{F}_r$.
-* Receiving a note requires opening a `user_address` to `recv_vp_hash`. This opening is efficient over $\mathbb{F}_r$
-* `Com_q(desc_vp_{send,recv})` are re-used inside ActionCircuit in deriving `addr_com_vp`.
-
-To guarantee the compatibility of `addr_com_vp` constraints in ActionCircuit and VPBlindCircuit, `Com_q(desc_vp_addr_{send,recv})` over $\mathbb{F}_q$ are converted to bits.
-
-In address integrity circuit, the bits of `Com_q(desc_vp_{send,recv})` are converted to $\mathbb{F}_r$ element(s).
-
-> When using `bls12-317` as $E_M$, the bits of one $\mathbb{F}_q$ are converted to two $\mathbb{F}_r$.
-
 
 ### Note
 

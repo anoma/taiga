@@ -1,7 +1,7 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::gadgets::merkle_tree::merkle_tree_gadget;
 use crate::circuit::integrity::{
-    ValidityPredicateInputNoteVariables, ValidityPredicateOuputNoteVariables,
+    ValidityPredicateInputNoteVariables, ValidityPredicateOutputNoteVariables,
 };
 use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
 use crate::merkle_tree::{MerklePath, Node};
@@ -38,7 +38,7 @@ where
         &self,
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
         _input_note_variables: &[ValidityPredicateInputNoteVariables],
-        output_note_variables: &[ValidityPredicateOuputNoteVariables],
+        output_note_variables: &[ValidityPredicateOutputNoteVariables],
     ) -> Result<(), Error> {
         let expected_var = composer.add_input(self.mk_root.inner());
         let poseidon_hash_param_bls12_381_new_scalar_arity2 =
@@ -101,15 +101,15 @@ fn test_white_list_tokens_vp_example() {
 
     // white list is a list of token addresses, containing the output note token addresses.
     let white_list_tokens: Vec<Token<CP>> = vec![
-        Token::<CP>::new(&mut rng),
+        Token::<CP>::dummy(&mut rng),
         output_notes[1].token.clone(),
-        Token::<CP>::new(&mut rng),
-        Token::<CP>::new(&mut rng),
+        Token::<CP>::dummy(&mut rng),
+        Token::<CP>::dummy(&mut rng),
         output_notes[3].token.clone(),
         output_notes[2].token.clone(),
-        Token::<CP>::new(&mut rng),
+        Token::<CP>::dummy(&mut rng),
         output_notes[0].token.clone(),
-        Token::<CP>::new(&mut rng),
+        Token::<CP>::dummy(&mut rng),
     ];
 
     let white_list_tokens_to_fields: Vec<Fr> = white_list_tokens

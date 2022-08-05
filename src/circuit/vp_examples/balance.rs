@@ -1,7 +1,7 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::gadgets::field_addition::field_addition_gadget;
 use crate::circuit::integrity::{
-    ValidityPredicateInputNoteVariables, ValidityPredicateOuputNoteVariables,
+    ValidityPredicateInputNoteVariables, ValidityPredicateOutputNoteVariables,
 };
 use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
 use crate::note::Note;
@@ -40,7 +40,7 @@ where
         &self,
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
         input_note_variables: &[ValidityPredicateInputNoteVariables],
-        output_note_variables: &[ValidityPredicateOuputNoteVariables],
+        output_note_variables: &[ValidityPredicateOutputNoteVariables],
     ) -> Result<(), Error> {
         // check that all notes use the same token
         let var_token = input_note_variables[0].token_addr;
@@ -99,7 +99,7 @@ fn test_balance_vp_example() {
     use ark_std::test_rng;
 
     let mut rng = test_rng();
-    let xan = Token::<CP>::new(&mut rng);
+    let xan = Token::<CP>::dummy(&mut rng);
     // input notes
     let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_from_token(xan.clone(), &mut rng));
     // output notes

@@ -216,7 +216,7 @@ pub struct ValidityPredicateInputNoteVariables {
 }
 
 // FIXME: It includes all the variables in output note, maybe it's not necessary.
-pub struct ValidityPredicateOuputNoteVariables {
+pub struct ValidityPredicateOutputNoteVariables {
     pub recipient_addr: Variable,
     pub recv_vp_bits: Vec<Variable>,
     pub token_addr: Variable,
@@ -281,7 +281,7 @@ pub fn output_note_constraint<CP>(
     note: &Note<CP>,
     nf: &Variable,
     composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-) -> Result<ValidityPredicateOuputNoteVariables, Error>
+) -> Result<ValidityPredicateOutputNoteVariables, Error>
 where
     CP: CircuitParameters,
 {
@@ -314,7 +314,7 @@ where
 
     composer.public_inputize(&cm_var);
 
-    Ok(ValidityPredicateOuputNoteVariables {
+    Ok(ValidityPredicateOutputNoteVariables {
         recipient_addr,
         recv_vp_bits,
         token_addr,
@@ -383,7 +383,7 @@ mod test {
 
         // Test user address integrity
         // Create a user
-        let user = User::<PairingCircuitParameters>::new(&mut rng);
+        let user = User::<PairingCircuitParameters>::dummy(&mut rng);
 
         let nk = user.send_com.get_nk().unwrap();
         let nk_var = composer.add_input(nk.inner());
@@ -402,7 +402,7 @@ mod test {
 
         // Test token integrity
         // Create a token
-        let token = Token::<PairingCircuitParameters>::new(&mut rng);
+        let token = Token::<PairingCircuitParameters>::dummy(&mut rng);
 
         let (token_var, _) = token_integrity_circuit::<PairingCircuitParameters>(
             &mut composer,

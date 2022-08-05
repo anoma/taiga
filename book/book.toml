@@ -1,11 +1,14 @@
 [book]
-authors = ["Simon Masson", "Alberto Centelles"]
 language = "en"
 multilingual = false
 src = "src"
 title = "Taiga documentation"
 
 [output.html]
+
+[output.html.playground]
+copyable = false
+runnable = false
 
 [output.katex]
 
