@@ -8,6 +8,8 @@ We presented the different structures needed to build a transaction in Taiga. Th
 * The blinding proof that enables full privacy of VP,
 * The transaction description that enables spending and creating notes by verifying the different proofs.
 
+For a technical overview of Taiga, see the [technical specification](spec.md).
+
 In practice, the performance of our current implementation heavily depends on the size of the circuits, but also the number of proofs.
 
 ## Performance
