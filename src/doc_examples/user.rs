@@ -1,14 +1,14 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::gadgets::field_addition::field_addition_gadget;
 use crate::circuit::integrity::{
-    token_integrity_circuit,
-    ValidityPredicateInputNoteVariables, ValidityPredicateOutputNoteVariables,
+    token_integrity_circuit, ValidityPredicateInputNoteVariables,
+    ValidityPredicateOutputNoteVariables,
 };
 use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
 use crate::note::Note;
-use crate::token::{Token};
-use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
+use crate::token::Token;
 use ark_std;
+use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
 
 pub struct SendVP<CP: CircuitParameters> {
     // basic "private" inputs to the VP
@@ -48,8 +48,8 @@ where
         let xan_token =
             Token::<crate::circuit::circuit_parameters::PairingCircuitParameters>::dummy(&mut rng);
 
-        
-        let (xan_address_var, _) = token_integrity_circuit::<CP>(composer, &xan_token.token_vp.to_bits())?;
+        let (xan_address_var, _) =
+            token_integrity_circuit::<CP>(composer, &xan_token.token_vp.to_bits())?;
 
         // Check that the token of all the notes of token XAN are less than 3 XAN
         for note_var in input_note_variables {
@@ -79,7 +79,6 @@ where
         1 << 17
     }
 }
-
 
 pub struct ReceiveVP<CP: CircuitParameters> {
     // basic "private" inputs to the VP
@@ -119,8 +118,8 @@ where
         let xan_token =
             Token::<crate::circuit::circuit_parameters::PairingCircuitParameters>::dummy(&mut rng);
 
-        
-        let (xan_address_var, _) = token_integrity_circuit::<CP>(composer, &xan_token.token_vp.to_bits())?;
+        let (xan_address_var, _) =
+            token_integrity_circuit::<CP>(composer, &xan_token.token_vp.to_bits())?;
 
         // Check that the token of all the notes of token XAN are less than 3 XAN
         for note_var in input_note_variables {
@@ -150,7 +149,6 @@ where
         1 << 17
     }
 }
-
 
 #[test]
 fn test_user_creation() {
