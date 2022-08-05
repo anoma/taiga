@@ -7,13 +7,13 @@ A transaction includes the proofs corresponding to the spending of input notes a
 
 In our current implementation version, there are four input notes and four output notes in each transaction.
 An action transfer contains one input note and one output note.
-Each input note has one `SendVP` and one `TokenVP`. Each output note has one `Rec_VP` and one `TokenVP`. Every validity predicate is blinded as described [here](blinding.md), leading to a blinding proof.
+Each input note has one `send_VP` and one `token_VP`. Each output note has one `recv_VP` and one `token_VP`. Every validity predicate is blinded as described [here](blinding.md), leading to a blinding proof.
 Therefore, a transaction includes:
 * Four action proofs for the binding described [here](action.md),
-* Four `SendVP` proofs corresponding to the four input notes owner addresses,
-* Four `TokenVP` proofs corresponding to the four input note token types,
-* Four `Rec_VP` proofs corresponding to the four output note owner addresses,
-* Four `TokenVP` proofs correspdonding to the four output note token types.
+* Four `send_VP` proofs corresponding to the four input notes owner addresses,
+* Four `token_VP` proofs corresponding to the four input note token types,
+* Four `recv_VP` proofs corresponding to the four output note owner addresses,
+* Four `token_VP` proofs correspdonding to the four output note token types.
 * Sixteen blinding proofs for the 16 previous proofs.
 
 ![](img/taiga_tx.png)

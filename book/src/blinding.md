@@ -13,8 +13,8 @@ In this way, a verifier does not require the private verifier key to check the p
 
 ![img_3.png](img/blinding_img_3.png)
 
-The blinding technique is used to protect `sendVK`, `recVK`, and `tokenVK`.
-This blinding is done for user's `sendVK` and `recVK` as well as for `tokenVK`.
+The blinding technique is used to protect `send_VK`, `recv_VK`, and `token_VK`.
+This blinding is done for user's `send_VK` and `recv_VK` as well as for `token_VK`.
 
 ## Example of blinding proof
 First, we create a blinding circuit structure including the random values used for blinding:
@@ -22,7 +22,7 @@ First, we create a blinding circuit structure including the random values used f
 let mut blinding_circuit =
       BlindingCircuit::<CP>::new(&mut rng, vp_desc, &pp, vp.padded_circuit_size()).unwrap();
 ```
-As for `sendVP`, `recVP` and `TokenVP` proofs, we need a setup and prover/verifier keys:
+As for `send_VP`, `recv_VP` and `token_VP` proofs, we need a setup and prover/verifier keys:
 ```rust
 let (pk_blind, vk_blind) = vp
       .compile_with_blinding::<PC>(&pp, &blinding_circuit.get_blinding())
