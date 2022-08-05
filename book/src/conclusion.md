@@ -35,7 +35,7 @@ Customizable VPs will have different number of gates. We provide here the benchm
 |Prove|17s|
 |Verify|14ms|
 
-### Performance of a transaction for `NUM_NOTE=4`
+### Performance of a transaction
 
 From the previous benchmarks, we can perform a full transaction with different numbers of notes:
 * With `NUM_NOTE = 4`, a transaction includes 4 action proofs, 16 VP proofs and 16 blinding proofs:
