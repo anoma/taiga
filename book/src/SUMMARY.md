@@ -1,7 +1,6 @@
 # Taiga
 
-
-- [Taiga verview](./overview.md)
+- [Taiga overview](./overview.md)
 - [Validity predicates](./validity-predicates.md)
 - [Tokens](token.md)
 - [Users](./users.md)
