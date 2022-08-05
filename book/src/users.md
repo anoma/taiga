@@ -19,8 +19,8 @@ Each user has an address that allows others to send assets to the user. Address 
 ### Example
 
 Alice is a user of Taiga with validity predicates defined as follows:
-* `send_VP` is a check on the amount of her spent: she does not want to send more than 3XAN at a time.
-* `recv_VP` is a check on the amount she receives: she does not want to receive notes of less than 0.1XAN.
+* `SendVP` is a check on the amount of her spent: she does not want to send more than 3XAN at a time.
+* `RecvVP` is a check on the amount she receives: she does not want to receive notes of less than 0.1XAN.
 
 ```rust
     ...

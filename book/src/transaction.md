@@ -9,8 +9,8 @@ In our current implementation version, there are four input notes and four outpu
 
 ## Action Transfer
 An action transfer spends an input note and creates an output note. To do so, it verifies:
-* one `SendVP` proof and one `TokenVP` proof corresponding to an input note,
-* one `RecvVP` proof and one `TokenVP` proof corresponding to an output note,
+* one `SendVP` proof and one `TokVP` proof corresponding to an input note,
+* one `RecvVP` proof and one `TokVP` proof corresponding to an output note,
 * one action proof corresponding to the integrity of the owner and token addresses of the two notes,
 * that the input note already exists and is not spent,
 * the output note encryption.
@@ -19,12 +19,12 @@ The details of the action transfer can be found [here](src/transaction.rs).
 
 ## Proofs of a transaction
 A transaction includes several proofs for the different VPs and for the actions and the blinding proofs.
-In this current implementation, we set `NUM_NOTE=4` for the number of input and output notes. Moreover, for we are interested in the `SendVP` and the `TokenVP` of input notes and `RecvVP` and `TokenVP` of output notes. Finally, every validity predicate is blinded as described [here](blinding.md), leading to a blinding proof.
+In this current implementation, we set `NUM_NOTE=4` for the number of input and output notes. Moreover, for we are interested in the `SendVP` and the `TokVP` of input notes and `RecvVP` and `TokVP` of output notes. Finally, every validity predicate is blinded as described [here](blinding.md), leading to a blinding proof.
 Therefore, a transaction includes:
 * Four `SendVP` proofs corresponding to the four input notes owner constraints,
-* Four `TokenVP` proofs corresponding to the four input note token constraints,
+* Four `TokVP` proofs corresponding to the four input note token constraints,
 * Four `RecvVP` proofs corresponding to the four output note owner constraints,
-* Four `TokenVP` proofs correspdonding to the four output note token constraints.
+* Four `TokVP` proofs correspdonding to the four output note token constraints.
 * Sixteen blinding proofs for the 16 previous proofs,
 * Four action proofs for binding the 16 first proofs of this list to the actual input and output note owner and token addresses, as described [here](action.md).
 
