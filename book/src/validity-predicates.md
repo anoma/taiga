@@ -8,7 +8,7 @@ Taiga validity predicates are intended to be the private version of Anoma's tran
 
 ### Validity predicates in Taiga
 
-Taiga uses a PLONK-based zero knowledge proof system, and validity predicates are given as (PLONK arithmetizations)[https://zcash.github.io/halo2/concepts/arithmetization.html], which is a table of cells with polynomial constraints. For privacy of which validity predicate is used inside of a transaction, all Taiga validity predicates must share the same PLONK configuration (which can be thought of as the set of "gates" available). Different validity predicates are created by specifying the *selectors*.
+Taiga uses a PLONK-based zero knowledge proof system, and validity predicates are given as [PLONK arithmetizations](https://zcash.github.io/halo2/concepts/arithmetization.html), which is a table of cells with polynomial constraints. For privacy of which validity predicate is used inside of a transaction, all Taiga validity predicates must share the same PLONK configuration (which can be thought of as the set of "gates" available). Different validity predicates are created by specifying the *selectors*.
 
 #### State model in Taiga
 
@@ -26,7 +26,7 @@ The validity predicate configuration includes the following "gates" in the PLONK
 
 Even though Taiga does not have *accounts*, it does have *addresses*. Each note is associated with one *user address* and one *token address*. Intuitively, a note belongs to the user address and is of a type given by the token address.
 
-Currently, every user in Taiga [has two VPs](./users.md): one that authorizes spending notes (`SendVP`), and one that authorizes receiving notes (`RecvVP`). [Tokens](./token.md) in Taiga also have validity predicates, and spending or receiving a note of a particular token requires satisfying the `TokVP`.
+Currently, every [user](./users.md) in Taiga has two VPs: one that authorizes spending notes (`SendVP`), and one that authorizes receiving notes (`RecvVP`). [Tokens](./token.md) in Taiga also have validity predicates, and spending or receiving a note of a particular token requires satisfying the `TokVP`.
 
 ### Shielded VPs
 For each transaction, it must be proven that all of the VPs of parties and tokens involved are satisfied. To preserve privacy, ZK proofs are used. The transaction is authorized only if all of the produced proofs are verified successfully.
