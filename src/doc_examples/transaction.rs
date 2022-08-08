@@ -1,4 +1,4 @@
-// #[ignore]
+#[ignore]
 #[test]
 fn test_tx_example() {
     use crate::action::Action;
