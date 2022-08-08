@@ -76,7 +76,7 @@ impl<CP: CircuitParameters> ValidityPredicateDescription<CP> {
                 //     poseidon.input(*x).unwrap();
                 // }
 
-                // Compress blinded elements in vp
+                // Compress x-coordinate blinded elements in vp
                 v.iter().step_by(2).for_each(|e| {
                     poseidon.input(*e).unwrap();
                 });
