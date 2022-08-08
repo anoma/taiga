@@ -22,7 +22,7 @@ pub fn field_addition_gadget<CP: CircuitParameters>(
 
 #[test]
 fn test_field_addition_gadget() {
-    use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters as CP};
+    use crate::circuit::circuit_parameters::{CircuitParameters, HaloCircuitParameters as CP};
     use plonk_core::constraint_system::StandardComposer;
 
     let a = <CP as CircuitParameters>::CurveScalarField::from(2u64);

@@ -86,7 +86,7 @@ where
 fn test_white_list_tokens_vp_example() {
     use plonk_core::circuit::{verify_proof, VerifierData};
 
-    use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
+    use crate::circuit::circuit_parameters::HaloCircuitParameters as CP;
     use crate::merkle_tree::MerkleTreeLeafs;
     use crate::poseidon::WIDTH_3;
     use ark_std::test_rng;

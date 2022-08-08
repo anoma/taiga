@@ -90,7 +90,7 @@ where
 #[ignore]
 #[test]
 fn test_balance_vp_example() {
-    use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
+    use crate::circuit::circuit_parameters::HaloCircuitParameters as CP;
     use crate::token::Token;
     use plonk_core::circuit::{verify_proof, VerifierData};
     type Fr = <CP as CircuitParameters>::CurveScalarField;

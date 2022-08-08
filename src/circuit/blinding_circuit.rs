@@ -154,7 +154,7 @@ fn test_blinding_circuit() {
     // creation of the corresponding blinding circuit
     // checking the blinding circuit
 
-    use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
+    use crate::circuit::circuit_parameters::HaloCircuitParameters as CP;
     use crate::circuit::validity_predicate::NUM_NOTE;
     use crate::circuit::vp_examples::balance::BalanceValidityPredicate;
     use crate::note::Note;

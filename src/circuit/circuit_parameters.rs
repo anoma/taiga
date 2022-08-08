@@ -5,12 +5,16 @@ use ark_ec::{
     SWModelParameters,
     TEModelParameters,
 };
-use ark_ff::PrimeField;
+//use ark_ff::PrimeField;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 use plonk_core::commitment::{HomomorphicCommitment, KZG10};
 use plonk_core::proof_system::{ProverKey, VerifierKey};
 use std::ops::Neg;
+
+use ff::PrimeField;
+use pasta_curves::{pallas, vesta};
+
 
 pub trait CircuitParameters: Copy {
     //               Inner Curve     Curve    Outer Curve
@@ -20,23 +24,16 @@ pub trait CircuitParameters: Copy {
     // Curve
     type CurveScalarField: PrimeField;
     type CurveBaseField: PrimeField;
-    type Curve: TEModelParameters<
-        ScalarField = Self::CurveScalarField,
-        BaseField = Self::CurveBaseField,
-    >;
+    
+    type Curve: group::Curve;
+    
     // Inner curve
     type InnerCurveScalarField: PrimeField;
-    type InnerCurve: TEModelParameters<
-        ScalarField = Self::InnerCurveScalarField,
-        BaseField = Self::CurveScalarField,
-    >;
+    type InnerCurve: group::Curve;
     // Outer curve
     type OuterCurveBaseField: PrimeField;
-    type OuterCurve: SWModelParameters<
-        ScalarField = Self::CurveBaseField,
-        BaseField = Self::OuterCurveBaseField,
-    >;
-
+    type OuterCurve: group::Curve;
+/* 
     type CurvePC: HomomorphicCommitment<Self::CurveScalarField>;
     type OuterCurvePC: HomomorphicCommitment<Self::CurveBaseField>;
 
@@ -70,6 +67,7 @@ pub trait CircuitParameters: Copy {
     fn get_action_vk<'staitc>() -> &'staitc VerifierKey<Self::CurveScalarField, Self::CurvePC>;
     fn get_blind_vp_pk<'staitc>() -> &'staitc ProverKey<Self::CurveBaseField>;
     fn get_blind_vp_vk<'staitc>() -> &'staitc VerifierKey<Self::CurveBaseField, Self::OuterCurvePC>;
+*/
 }
 
 // // We decided to continue with KZG for now.
@@ -88,16 +86,17 @@ pub trait CircuitParameters: Copy {
 // }
 
 #[derive(Copy, Debug, Clone)]
-pub struct PairingCircuitParameters {}
+pub struct HaloCircuitParameters {}
 
-impl CircuitParameters for PairingCircuitParameters {
-    type CurveScalarField = ark_bls12_381_new::Fr;
-    type CurveBaseField = ark_bls12_381_new::Fq;
-    type Curve = ark_bls12_381_new::g1::Parameters;
-    type InnerCurveScalarField = ark_ed_on_bls12_381_new::Fr;
-    type InnerCurve = ark_ed_on_bls12_381_new::Parameters;
-    type OuterCurveBaseField = ark_bw6_764_new::Fq;
-    type OuterCurve = ark_bw6_764_new::g1::Parameters;
+impl CircuitParameters for HaloCircuitParameters {
+    type CurveScalarField = vesta::Scalar;
+    type CurveBaseField = vesta::Base;
+    type Curve = vesta::Affine;
+    type InnerCurveScalarField = pallas::Scalar;
+    type InnerCurve = pallas::Affine;
+    type OuterCurveBaseField = pallas::Base;
+    type OuterCurve = pallas::Affine;
+    /*
     type CurvePC = KZG10<ark_bls12_381_new::Bls12_381New>;
     type OuterCurvePC = KZG10<ark_bw6_764_new::BW6_764New>;
 
@@ -182,4 +181,5 @@ impl CircuitParameters for PairingCircuitParameters {
     {
         &BLIND_VP_KEY.1
     }
+    */
 }

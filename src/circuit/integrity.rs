@@ -1,10 +1,12 @@
 // The interfaces may not be perfectly defined, the caller can refine them if needed.
 
-use crate::circuit::{circuit_parameters::CircuitParameters, gadgets::hash::FieldHasherGadget};
+use crate::circuit::{circuit_parameters::CircuitParameters, load_value::*};
 // use crate::error::TaigaError;
 use crate::note::Note;
 use crate::poseidon::{WIDTH_3, WIDTH_5, WIDTH_9};
 use ark_ff::{Field, One, PrimeField};
+use halo2_proofs::circuit::{Layouter, AssignedCell,};
+use halo2_proofs::plonk::{Column, Advice};
 use plonk_core::{
     constraint_system::StandardComposer,
     prelude::{Error, Variable},
@@ -227,17 +229,20 @@ pub struct ValidityPredicateOutputNoteVariables {
 
 pub fn input_note_constraint<CP>(
     note: &Note<CP>,
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+    advice_column: &Column<Advice>,
+    mut layouter: impl Layouter<CP::CurveScalarField>,
 ) -> Result<ValidityPredicateInputNoteVariables, Error>
 where
     CP: CircuitParameters,
 {
     // check user address
     let nk = note.user.send_com.get_nk().unwrap();
-    let nk_var = composer.add_input(nk.inner());
+    let nk_var = load_private(advice_column, layouter, nk.inner());
+
     let send_vp = note.user.send_com.get_send_vp().unwrap();
+
     let (sender_addr, send_vp_bits) = spent_user_address_integrity_circuit::<CP>(
-        composer,
+        layouter,
         &nk_var,
         &send_vp.to_bits(),
         &note.user.recv_vp.to_bits(),
@@ -245,15 +250,15 @@ where
 
     // check token address
     let (token_addr, token_bits) =
-        token_integrity_circuit::<CP>(composer, &note.token.token_vp.to_bits())?;
+        token_integrity_circuit::<CP>(layouter, &note.token.token_vp.to_bits())?;
 
     // check note commitment
-    let value_var = composer.add_input(CP::CurveScalarField::from(note.value));
-    let data_var = composer.add_input(note.data);
-    let rho_var = composer.add_input(note.rho.inner());
-    let note_rcm_var = composer.add_input(note.rcm);
+    let value_var = load_private(advice_column, layouter, CP::CurveScalarField::from(note.value));
+    let data_var = load_private(advice_column, layouter,note.data);
+    let rho_var = load_private(advice_column, layouter,note.rho.inner());
+    let note_rcm_var = load_private(advice_column, layouter,note.rcm);
     let (cm_var, psi_var) = note_commitment_circuit::<CP>(
-        composer,
+        layouter,
         &sender_addr,
         &token_addr,
         &value_var,
@@ -262,7 +267,7 @@ where
         &note_rcm_var,
     )?;
 
-    let nf = nullifier_circuit::<CP>(composer, &nk_var, &rho_var, &psi_var, &cm_var)?;
+    let nf = nullifier_circuit::<CP>(layouter, &nk_var, &rho_var, &psi_var, &cm_var)?;
 
     Ok(ValidityPredicateInputNoteVariables {
         sender_addr,
@@ -280,30 +285,31 @@ where
 pub fn output_note_constraint<CP>(
     note: &Note<CP>,
     nf: &Variable,
-    composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
+    advice_column: &Column<Advice>,
+    mut layouter: impl Layouter<CP::CurveScalarField>,
 ) -> Result<ValidityPredicateOutputNoteVariables, Error>
 where
     CP: CircuitParameters,
 {
     // check user address
     let addr_send = note.user.send_com.get_closed().unwrap();
-    let addr_send_var = composer.add_input(addr_send);
+    let addr_send_var = load_private(advice_column, layouter,addr_send);
     let (recipient_addr, recv_vp_bits) = output_user_address_integrity_circuit::<CP>(
-        composer,
+        layouter,
         &addr_send_var,
         &note.user.recv_vp.to_bits(),
     )?;
 
     // check token address
     let (token_addr, token_bits) =
-        token_integrity_circuit::<CP>(composer, &note.token.token_vp.to_bits())?;
+        token_integrity_circuit::<CP>(layouter, &note.token.token_vp.to_bits())?;
 
     // check and publish note commitment
-    let value_var = composer.add_input(CP::CurveScalarField::from(note.value));
-    let data_var = composer.add_input(note.data);
-    let note_rcm_var = composer.add_input(note.rcm);
+    let value_var = load_private(advice_column, layouter,CP::CurveScalarField::from(note.value));
+    let data_var = load_private(advice_column, layouter,note.data);
+    let note_rcm_var = load_private(advice_column, layouter,note.rcm);
     let (cm_var, _psi_var) = note_commitment_circuit::<CP>(
-        composer,
+        layouter,
         &recipient_addr,
         &token_addr,
         &value_var,
@@ -312,7 +318,7 @@ where
         &note_rcm_var,
     )?;
 
-    composer.public_inputize(&cm_var);
+    layouter.public_inputize(&cm_var);
 
     Ok(ValidityPredicateOutputNoteVariables {
         recipient_addr,
@@ -325,10 +331,10 @@ where
 }
 
 mod test {
-    use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters};
-    type Fr = <PairingCircuitParameters as CircuitParameters>::CurveScalarField;
-    type P = <PairingCircuitParameters as CircuitParameters>::InnerCurve;
-    type Fq = <PairingCircuitParameters as CircuitParameters>::CurveBaseField;
+    use crate::circuit::circuit_parameters::{CircuitParameters, HaloCircuitParameters};
+    type Fr = <HaloCircuitParameters as CircuitParameters>::CurveScalarField;
+    type P = <HaloCircuitParameters as CircuitParameters>::InnerCurve;
+    type Fq = <HaloCircuitParameters as CircuitParameters>::CurveBaseField;
 
     #[test]
     fn test_bits_to_variables() {
@@ -345,7 +351,7 @@ mod test {
         // inside-circuit convert
         let mut composer = StandardComposer::<Fr, P>::new();
         let (target_var, _) =
-            bits_to_variables::<PairingCircuitParameters>(&mut composer, &src_scalar_bits);
+            bits_to_variables::<HaloCircuitParameters>(&mut composer, &src_scalar_bits);
         composer.check_circuit_satisfied();
 
         println!(
@@ -383,12 +389,12 @@ mod test {
 
         // Test user address integrity
         // Create a user
-        let user = User::<PairingCircuitParameters>::dummy(&mut rng);
+        let user = User::<HaloCircuitParameters>::dummy(&mut rng);
 
         let nk = user.send_com.get_nk().unwrap();
         let nk_var = composer.add_input(nk.inner());
         let send_vp = user.send_com.get_send_vp().unwrap();
-        let (address_var, _) = spent_user_address_integrity_circuit::<PairingCircuitParameters>(
+        let (address_var, _) = spent_user_address_integrity_circuit::<HaloCircuitParameters>(
             &mut composer,
             &nk_var,
             &send_vp.to_bits(),
@@ -402,9 +408,9 @@ mod test {
 
         // Test token integrity
         // Create a token
-        let token = Token::<PairingCircuitParameters>::dummy(&mut rng);
+        let token = Token::<HaloCircuitParameters>::dummy(&mut rng);
 
-        let (token_var, _) = token_integrity_circuit::<PairingCircuitParameters>(
+        let (token_var, _) = token_integrity_circuit::<HaloCircuitParameters>(
             &mut composer,
             &token.token_vp.to_bits(),
         )
@@ -427,7 +433,7 @@ mod test {
         let rho_var = composer.add_input(note.rho.inner());
         let note_rcm_var = composer.add_input(note.rcm);
 
-        let (cm_var, psi_var) = note_commitment_circuit::<PairingCircuitParameters>(
+        let (cm_var, psi_var) = note_commitment_circuit::<HaloCircuitParameters>(
             &mut composer,
             &address_var,
             &token_var,
@@ -444,10 +450,10 @@ mod test {
         composer.check_circuit_satisfied();
 
         // Test nullifier
-        let expect_nf = Nullifier::<PairingCircuitParameters>::derive_native(
+        let expect_nf = Nullifier::<HaloCircuitParameters>::derive_native(
             &nk, &note.rho, &note.psi, &expect_cm,
         );
-        let nullifier_variable = nullifier_circuit::<PairingCircuitParameters>(
+        let nullifier_variable = nullifier_circuit::<HaloCircuitParameters>(
             &mut composer,
             &nk_var,
             &rho_var,

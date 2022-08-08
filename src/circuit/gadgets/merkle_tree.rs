@@ -1,44 +1,58 @@
-use crate::circuit::gadgets::hash::FieldHasherGadget;
+use crate::circuit::{gadgets::hash::FieldHasherGadget, load_value::load_private};
 use ark_ec::TEModelParameters;
-use ark_ff::PrimeField;
+use ff::PrimeField;
 use plonk_core::{
-    constraint_system::StandardComposer,
-    prelude::{Error, Variable},
+    //constraint_system::StandardComposer,
+    //prelude::{Error, Variable},
 };
+
+use halo2_gadgets::{poseidon::{self, primitives::P128Pow5T3}, utilities::cond_swap::CondSwapChip};
+use halo2_proofs::{
+    arithmetic::FieldExt,
+    circuit::{AssignedCell, Chip, Layouter, Region, SimpleFloorPlanner, Value},
+    plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Fixed, Instance, Selector},
+    poly::Rotation,
+};
+use pasta_curves::vesta;
 
 /// A Merkle Tree Gadget takes leaf node variable, authorization path to the
 /// root and the FieldHasherGadget, then returns the merkle root variable.
 pub fn merkle_tree_gadget<
     F: PrimeField,
-    P: TEModelParameters<BaseField = F>,
-    BHG: FieldHasherGadget<F, P>,
+    //P: TEModelParameters<BaseField = F>,
+    //BHG: FieldHasherGadget<F, P>,
 >(
-    composer: &mut StandardComposer<F, P>,
-    cur_leaf: &Variable,
+    mut layouter: impl Layouter<F>,
+    advice_column: &Column<Advice>,
+    cur_leaf: &AssignedCell<F,F>,
     auth_path: &[(F, bool)],
-    hash_gadget: &BHG,
-) -> Result<Variable, Error> {
+    hash_gadget: &poseidon::Pow5Chip<F, 3 ,2>,
+    cond_swap: &CondSwapChip<F>,
+) -> Result<AssignedCell<F,F>, Error> {
     let mut cur = *cur_leaf;
 
     // Ascend the merkle tree authentication path
     for e in auth_path.iter() {
         // Determines if the current subtree is the "right" leaf at this
         // depth of the tree.
-        let cur_is_right = match e.1 {
-            false => composer.add_input(F::zero()),
-            true => composer.add_input(F::one()),
-        };
+        /*let cur_is_right = match e.1 {
+            false => load_private(advice_column, layouter, F::zero()), 
+            true => load_private(advice_column, layouter,F::one()),
+        };*/
 
         // Witness the authentication path element adjacent
         // at this depth.
-        let path_element = composer.add_input(e.0);
+        // let path_element = load_private(advice_column, layouter,e.0);
 
         // Swap the two if the current subtree is on the right
-        let ul = composer.conditional_select(cur_is_right, path_element, cur);
-        let ur = composer.conditional_select(cur_is_right, cur, path_element);
+        //let ul = composer.conditional_select(cur_is_right, path_element, cur);
+        //let ur = composer.conditional_select(cur_is_right, cur, path_element);
+
+        let (ur, ul) = cond_swap.swap(layouter.namespace(|| "swap"), cur, e.0 ,e.1);
 
         // Compute the new subtree value
-        cur = hash_gadget.circuit_hash_two(composer, &ul, &ur)?;
+        let poseidon_state = poseidon::Hash::init(hash_gadget, layouter);
+        cur = poseidon_state.hash(layouter, [ul, ur])?;
     }
 
     Ok(cur)
@@ -46,14 +60,14 @@ pub fn merkle_tree_gadget<
 
 #[test]
 fn test_merkle_circuit() {
-    use crate::circuit::circuit_parameters::{CircuitParameters, PairingCircuitParameters};
+    use crate::circuit::circuit_parameters::{CircuitParameters, HaloCircuitParameters};
     use crate::merkle_tree::TAIGA_COMMITMENT_TREE_DEPTH;
     use crate::merkle_tree::{MerklePath, Node};
     use crate::poseidon::POSEIDON_HASH_PARAM_BLS12_381_NEW_SCALAR_ARITY2;
-    type Fr = <PairingCircuitParameters as CircuitParameters>::CurveScalarField;
-    type P = <PairingCircuitParameters as CircuitParameters>::InnerCurve;
+    type Fr = <HaloCircuitParameters as CircuitParameters>::CurveScalarField;
+    type P = <HaloCircuitParameters as CircuitParameters>::InnerCurve;
     use ark_std::test_rng;
-    use plonk_hashing::poseidon::constants::PoseidonConstants;
+    //use plonk_hashing::poseidon::constants::PoseidonConstants;
 
     let mut rng = test_rng();
     let merkle_path =
@@ -68,9 +82,10 @@ fn test_merkle_circuit() {
         .unwrap();
 
     let mut composer = StandardComposer::<Fr, P>::new();
-    let commitment = composer.add_input(cur_leaf.inner());
+    let commitment = load_private(advice_column, layouter,cur_leaf.inner());
     let root = merkle_tree_gadget::<Fr, P, PoseidonConstants<Fr>>(
-        &mut composer,
+        layouter,
+        advice_column,
         &commitment,
         &merkle_path.get_path(),
         &POSEIDON_HASH_PARAM_BLS12_381_NEW_SCALAR_ARITY2,

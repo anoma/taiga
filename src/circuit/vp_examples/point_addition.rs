@@ -70,7 +70,7 @@ where
 #[ignore]
 #[test]
 fn test_point_addition_vp_example() {
-    use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
+    use crate::circuit::circuit_parameters::HaloCircuitParameters as CP;
     type Fr = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;
     type PC = <CP as CircuitParameters>::CurvePC;
