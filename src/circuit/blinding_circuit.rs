@@ -87,7 +87,7 @@ where
         //     poseidon_circuit.input(*v).unwrap();
         // }
 
-        // Compress blinded elements in vp
+        // Compress x-coordinate blinded elements in vp
         vp_desc.iter().step_by(2).for_each(|e| {
             let var = composer.add_input(*e);
             poseidon_circuit.input(var).unwrap();
