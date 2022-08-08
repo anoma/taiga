@@ -72,7 +72,7 @@ fn test_blinding_circuit_example() {
     let q_c = ws_to_te(vk_blinded.arithmetic.q_c.0);
     expected_public_inputs.insert(2342, q_c.x);
     expected_public_inputs.insert(2343, q_c.y);
-    expected_public_inputs.insert(21388, vp_desc_compressed);
+    expected_public_inputs.insert(5518, vp_desc_compressed);
 
     assert_eq!(public_inputs, expected_public_inputs);
 

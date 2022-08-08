@@ -1,6 +1,6 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::vp_examples::field_addition::FieldAdditionValidityPredicate;
-use crate::constant::BLINDING_CIRCUIT_SIZE;
+use crate::constant::{BLINDING_CIRCUIT_SIZE, BLIND_ELEMENTS_NUM};
 use crate::poseidon::WIDTH_9;
 use crate::vp_description::ValidityPredicateDescription;
 use ark_ec::twisted_edwards_extended::GroupAffine as TEGroupAffine;
@@ -10,15 +10,13 @@ use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 
 use plonk_core::{
-    circuit::Circuit, constraint_system::StandardComposer, prelude::Error, prelude::Variable,
-    proof_system::Blinding,
+    circuit::Circuit, constraint_system::StandardComposer, prelude::Error, proof_system::Blinding,
 };
 use plonk_hashing::poseidon::{
     constants::PoseidonConstants,
     poseidon::{PlonkSpec, Poseidon},
 };
 use rand::RngCore;
-const BLINDING_PC_NUM: usize = 6;
 
 pub struct BlindingCircuit<CP: CircuitParameters> {
     vp_desc: ValidityPredicateDescription<CP>,
@@ -48,14 +46,11 @@ where
             self.blinding.q_4,
             self.blinding.q_c,
         ];
-        assert_eq!(blind_vec.len(), BLINDING_PC_NUM);
+        assert_eq!(blind_vec.len(), BLIND_ELEMENTS_NUM);
         let vp_desc = self.vp_desc.get_pack().unwrap();
 
         // Constrain vp blinding
-        for (point, blind) in vp_desc[0..2 * BLINDING_PC_NUM]
-            .chunks(2)
-            .zip(blind_vec.iter())
-        {
+        for (point, blind) in vp_desc.chunks(2).zip(blind_vec.iter()) {
             let q = composer.add_affine(TEGroupAffine::<CP::Curve>::new(point[0], point[1]));
             let blind_convert =
                 CP::CurveBaseField::from_le_bytes_mod_order(&blind.into_repr().to_bytes_le());
@@ -74,22 +69,29 @@ where
         let mut poseidon_circuit =
             Poseidon::<_, PlonkSpec<WIDTH_9>, WIDTH_9>::new(composer, &poseidon_param_9);
 
-        let hash_vec = vp_desc
-            .chunks_exact(8)
-            .map(|chunk| {
-                poseidon_circuit.reset(composer);
-                for x in chunk.iter() {
-                    let var = composer.add_input(*x);
-                    poseidon_circuit.input(var).unwrap();
-                }
-                poseidon_circuit.output_hash(composer)
-            })
-            .collect::<Vec<Variable>>();
+        // Compress all elements in vp
+        // let hash_vec = vp_desc
+        //     .chunks_exact(8)
+        //     .map(|chunk| {
+        //         poseidon_circuit.reset(composer);
+        //         for x in chunk.iter() {
+        //             let var = composer.add_input(*x);
+        //             poseidon_circuit.input(var).unwrap();
+        //         }
+        //         poseidon_circuit.output_hash(composer)
+        //     })
+        //     .collect::<Vec<Variable>>();
 
-        poseidon_circuit.reset(composer);
-        for v in hash_vec.iter() {
-            poseidon_circuit.input(*v).unwrap();
-        }
+        // poseidon_circuit.reset(composer);
+        // for v in hash_vec.iter() {
+        //     poseidon_circuit.input(*v).unwrap();
+        // }
+
+        // Compress blinded elements in vp
+        vp_desc.iter().step_by(2).for_each(|e| {
+            let var = composer.add_input(*e);
+            poseidon_circuit.input(var).unwrap();
+        });
         let compressed_vp_desc = poseidon_circuit.output_hash(composer);
 
         // public compressed_vp_desc for test, remove it when implemented com_vp.
@@ -147,7 +149,6 @@ impl<CP: CircuitParameters> BlindingCircuit<CP> {
     }
 }
 
-#[ignore]
 #[test]
 fn test_blinding_circuit() {
     // creation of a (balance) VP
@@ -226,7 +227,7 @@ fn test_blinding_circuit() {
     let q_c = ws_to_te(vk_blind.arithmetic.q_c.0);
     expect_public_input.insert(2342, q_c.x);
     expect_public_input.insert(2343, q_c.y);
-    expect_public_input.insert(21388, vp_desc_compressed);
+    expect_public_input.insert(5518, vp_desc_compressed);
 
     assert_eq!(blinding_public_input, expect_public_input);
 

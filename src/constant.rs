@@ -10,14 +10,16 @@ use plonk_core::proof_system::{ProverKey, VerifierKey};
 use rand_core::OsRng;
 use std::collections::HashMap;
 
+pub const CIRCUIT_SIZE_2_13: usize = 1 << 13;
 pub const CIRCUIT_SIZE_2_15: usize = 1 << 15;
 pub const CIRCUIT_SIZE_2_16: usize = 1 << 16;
 pub const CIRCUIT_SIZE_2_17: usize = 1 << 17;
-pub const BLINDING_CIRCUIT_SIZE: usize = CIRCUIT_SIZE_2_15;
+pub const BLINDING_CIRCUIT_SIZE: usize = CIRCUIT_SIZE_2_13;
 pub const ACTION_CIRCUIT_SIZE: usize = CIRCUIT_SIZE_2_15;
 pub const ACTION_PUBLIC_INPUT_NF_INDEX: usize = 10781;
 pub const ACTION_PUBLIC_INPUT_ROOT_INDEX: usize = 12530;
 pub const ACTION_PUBLIC_INPUT_CM_INDEX: usize = 19586;
+pub const BLIND_ELEMENTS_NUM: usize = 6;
 
 lazy_static! {
     pub static ref PC_SETUP_MAP: HashMap<
@@ -47,10 +49,10 @@ lazy_static! {
         >>::UniversalParams,
     > = {
         let mut m = HashMap::new();
-        // for circuit_size in &[CIRCUIT_SIZE_2_15] {
+        // for circuit_size in &[CIRCUIT_SIZE_2_13] {
             let setup =
-                KZG10::<ark_bw6_764_new::BW6_764New>::setup(CIRCUIT_SIZE_2_15, None, &mut OsRng).unwrap();
-            m.insert(CIRCUIT_SIZE_2_15, setup);
+                KZG10::<ark_bw6_764_new::BW6_764New>::setup(CIRCUIT_SIZE_2_13, None, &mut OsRng).unwrap();
+            m.insert(CIRCUIT_SIZE_2_13, setup);
         // }
         m
     };

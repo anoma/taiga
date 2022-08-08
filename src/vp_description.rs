@@ -1,5 +1,6 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::validity_predicate::ValidityPredicate;
+use crate::constant::BLIND_ELEMENTS_NUM;
 use crate::poseidon::WIDTH_9;
 use ark_ff::{BigInteger, PrimeField, UniformRand};
 use ark_poly::univariate::DensePolynomial;
@@ -50,7 +51,7 @@ impl<CP: CircuitParameters> ValidityPredicateDescription<CP> {
     pub fn get_compress(&self) -> CP::CurveBaseField {
         match self {
             ValidityPredicateDescription::Packed(v) => {
-                assert_eq!(v.len(), 40);
+                assert_eq!(v.len(), BLIND_ELEMENTS_NUM * 2);
                 let poseidon_param: PoseidonConstants<CP::CurveBaseField> =
                     PoseidonConstants::generate::<WIDTH_9>();
                 let mut poseidon =
@@ -58,21 +59,27 @@ impl<CP: CircuitParameters> ValidityPredicateDescription<CP> {
                         &mut (),
                         &poseidon_param,
                     );
-                let hash_vec = v
-                    .chunks_exact(8)
-                    .map(|chunk| {
-                        poseidon.reset(&mut ());
-                        for x in chunk.iter() {
-                            poseidon.input(*x).unwrap();
-                        }
-                        poseidon.output_hash(&mut ())
-                    })
-                    .collect::<Vec<CP::CurveBaseField>>();
+                // Compress all elements in vp
+                // let hash_vec = v
+                //     .chunks_exact(8)
+                //     .map(|chunk| {
+                //         poseidon.reset(&mut ());
+                //         for x in chunk.iter() {
+                //             poseidon.input(*x).unwrap();
+                //         }
+                //         poseidon.output_hash(&mut ())
+                //     })
+                //     .collect::<Vec<CP::CurveBaseField>>();
 
-                poseidon.reset(&mut ());
-                for x in hash_vec.iter() {
-                    poseidon.input(*x).unwrap();
-                }
+                // poseidon.reset(&mut ());
+                // for x in hash_vec.iter() {
+                //     poseidon.input(*x).unwrap();
+                // }
+
+                // Compress blinded elements in vp
+                v.iter().step_by(2).for_each(|e| {
+                    poseidon.input(*e).unwrap();
+                });
                 poseidon.output_hash(&mut ())
             }
             ValidityPredicateDescription::Compressed(v) => *v,
