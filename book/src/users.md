@@ -1,23 +1,23 @@
 # Users of Taiga
 
-Similarly to the token case, users have associated validity predicates for sending and receiving notes, called $Send_{VP}$ and $Rec_{VP}$, respectively. In the same way as for $Token_{VP}$, a proof $\pi$ is verified against a $Send_{VK}$ (or $Rec_{VK}$) and this verifier key needs to be binded to the owner of the note. 
+Similarly to the token case, users have associated validity predicates for sending and receiving notes, called $VP_{Send}$ and $VP_{Rec}$, respectively. In the same way as for $VP_{Token}$, a proof $\pi$ is verified against a $VK_{Send}$ (or $VK_{Rec}$) and this verifier key needs to be binded to the owner of the note. 
 
 Spending a note also requires nullifying the note so that it cannot be spent anymore. We use the same construction as Orchard, where a nullifier is derived from a nullifier key. Each user has a nullifier key that also needs to be binded to the note sender address.
 
 In consequence, the user address is split into:
-* A commitment to $Send_{VK}$ and the nullifier key,
-* A commitment to $Rec_{VK}$.
+* A commitment to $VK_{Send}$ and the nullifier key,
+* A commitment to $VK_{Rec}$.
 The final address is an outer commitment to these two inner commitments: 
 
-    $Address_{user}$ = Com(Com($Send_{VK}$, $User_{NK}$, Com($Rec_{VK}$)).
+    $Address_{user}$ = Com(Com($VK_{Send}$, $NK_{User}$, Com($VK_{Rec}$)).
 
 ### Example
 
 Alice is a user of Taiga and defined her two validity predicates:
 * $Send_{VP}$ is a check on the amount of her spent: she does not want to send more than 3XAN at a time.
-* $Rec_{VP}$ is a check on the amount she received: she does not want to receive notes of less than 0.1XAN.
+* $VP_{Rec}$ is a check on the amount she received: she does not want to receive notes of less than 0.1XAN.
 
-When she sends a note of $2$ XAN, she creates a proof $Send_π$ that can be verified against $Send_{VK}$, computes the nullifier of the spent note using $Alice_{NK}$, and a binding proof that $Send_{VK}$ and $Alice_{NK}$ open the spent note owner (Alice) address.
+When she sends a note of $2$ XAN, she creates a proof $Send_π$ that can be verified against $VK_{Send}$, computes the nullifier of the spent note using $NK_{Alice}$, and a binding proof that $VK_{Send}$ and $NK_{Alice}$ open the spent note owner (Alice) address.
 
 ```rust
     let mut send_vp = SendVP::<CP>::new(send_input_notes, send_output_notes);
@@ -42,8 +42,8 @@ cargo test doc_examples::user::test_token_creation
 
 The user address encodes the sending and receiving validity predicate verifier keys and the nullifier key.
 
-$Address_{User} = Com_r(Com_r(Com_q(Send_{VK}) || User_{NK}) || Com_q(Rec_{VK}))$
+$Address_{User} = Com_r(Com_r(Com_q(VK_{Send}) || NK_{User}) || Com_q(VK_{Rec}))$
 
 * Sending and receiving verifier keys are commited into $\mathbb F_q$ for privacy and efficiency concerns.
-* The commitment to $Send_{VK}$ is committed into $\mathbb F_r$ together with the nullifier key in order to bind the nullifier computation with the spent note owner address.
-* The outer commitment binds the spent note user address with the verifying keys used for $Send_{π}$ and $Rec_{π}$.
+* The commitment to $VK_{Send}$ is committed into $\mathbb F_r$ together with the nullifier key in order to bind the nullifier computation with the spent note owner address.
+* The outer commitment binds the spent note user address with the verifying keys used for $\pi_{Send}$ and $\pi_{Rec}$.
