@@ -55,6 +55,8 @@ fn test_scalar_multiplication_gadget() {
     composer_prover.assert_equal_public_point(point, expected_point);
     composer_prover.check_circuit_satisfied();
 
+    println!("Circuit size for fixed base scalar multiplication: {}", composer_prover.circuit_bound());
+
     // Preprocess circuit
     prover.preprocess(&ck).unwrap();
 
