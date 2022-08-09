@@ -8,4 +8,5 @@
 - [Action](./action.md)
 - [Blinding](./blinding.md)
 - [Transaction](./transaction.md)
-- [Performance & conclusion](./conclusion.md)
+- [Performance](./conclusion.md)
+- [Specification](./spec.md)

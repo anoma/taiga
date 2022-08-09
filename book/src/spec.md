@@ -1,4 +1,4 @@
-# Taiga Spec Working Draft
+# Specification
 
 To be edited as design changes. Please make changes as necessary. Keep it **concise** and **precise**.
 
