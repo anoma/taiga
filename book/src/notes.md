@@ -24,7 +24,7 @@ All of the notes are kept shielded and created notes are sent to users in an enc
 
 #### The commitment tree
 
-Each created note exists in a public merkle tree `CMtree` of notes. To keep the notes schielded, the tree contains note commitments `cm` instead of the notes themselves. This tree is called a note commitment tree.
+Each created note exists in a public merkle tree `CMtree` of notes. To keep the notes shielded, the tree contains note commitments `cm` instead of the notes themselves. This tree is called a note commitment tree.
 
 #### Note structure
 The full description of the note structure is
@@ -48,7 +48,7 @@ pub struct Note<CP: CircuitParameters> {
 
 
 #### Creationg a note
-TODO: add a hyperlink to the existing code 
+TODO: add a hyperlink to the existing code
 We provide an example of creation of a note from the structure we have already defined for [Token]() and [User]():
 ```rust
 // ...
@@ -78,7 +78,7 @@ cargo test doc_examples::note::test_note_creation
 ```
 
 #### Dummy notes
-Dummy notes might be useful to keep the the amount of notes constant and hide the actual amount of notes in a tx.
+Dummy notes might be useful to keep the amount of notes constant and hide the actual amount of notes in a tx.
 
 ```rust
 let spend_note = Note::<CP>::dummy(&mut rng);
