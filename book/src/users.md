@@ -15,7 +15,7 @@ The final address is an outer commitment to these two inner commitments:
 
 Alice is a user of Taiga and defined her two validity predicates:
 * $Send_{VP}$ is a check on the amount of her spent: she does not want to send more than 3XAN at a time.
-* $VP_{Rec}$ is a check on the amount she received: she does not want to receive notes of less than 0.1XAN.
+* $VP_{Rec}$ is a check on the amount she received: she does not want to receive notes of less than 1XAN.
 
 When she sends a note of $2$ XAN, she creates a proof $Send_π$ that can be verified against $VK_{Send}$, computes the nullifier of the spent note using $NK_{Alice}$, and a binding proof that $VK_{Send}$ and $NK_{Alice}$ open the spent note owner (Alice) address.
 

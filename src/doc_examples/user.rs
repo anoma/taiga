@@ -9,6 +9,7 @@ use crate::note::Note;
 use crate::token::{Token};
 use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
 use ark_std;
+use ark_ff::One;
 
 pub struct SendVP<CP: CircuitParameters> {
     // basic "private" inputs to the VP
@@ -43,18 +44,26 @@ where
         input_note_variables: &[ValidityPredicateInputNoteVariables],
         output_note_variables: &[ValidityPredicateOutputNoteVariables],
     ) -> Result<(), Error> {
+
         // * Alice does not want to send more than 3 XAN at a time.
         let mut rng = ark_std::test_rng();
         let xan_token =
             Token::<crate::circuit::circuit_parameters::PairingCircuitParameters>::dummy(&mut rng);
 
+
         
         let (xan_address_var, _) = token_integrity_circuit::<CP>(composer, &xan_token.token_vp.to_bits())?;
 
-        // Check that the token of all the notes of token XAN are less than 3 XAN
+        // * Check that the token of all the notes of token XAN are less than 3 XAN
         for note_var in input_note_variables {
             composer.assert_equal(note_var.token_addr, xan_address_var);
-            // TODO: Check that the note value is less than 3
+            let x = note_var.value;
+            let y = composer.add_input(CP::CurveScalarField::from(4u64) / CP::CurveScalarField::from(3u64));
+            let output = composer.arithmetic_gate(|gate| {
+                gate.witness(x, y, None)
+                    .mul(CP::CurveScalarField::one())
+            });
+            composer.range_gate(output, 2);
         }
 
         Ok(())
@@ -114,18 +123,25 @@ where
         input_note_variables: &[ValidityPredicateInputNoteVariables],
         output_note_variables: &[ValidityPredicateOutputNoteVariables],
     ) -> Result<(), Error> {
-        // * Alice does not want to send more than 3 XAN at a time.
+        // * Alice does not want to receive less than 1 XAN at a time.
         let mut rng = ark_std::test_rng();
         let xan_token =
             Token::<crate::circuit::circuit_parameters::PairingCircuitParameters>::dummy(&mut rng);
 
+
         
         let (xan_address_var, _) = token_integrity_circuit::<CP>(composer, &xan_token.token_vp.to_bits())?;
 
-        // Check that the token of all the notes of token XAN are less than 3 XAN
+        // * Check that the token of all the notes of token XAN are less than 1 XAN
         for note_var in input_note_variables {
             composer.assert_equal(note_var.token_addr, xan_address_var);
-            // TODO: Check that the note value is less than 3
+            let x = note_var.value;
+            let y = composer.add_input(CP::CurveScalarField::from(2u64));
+            let output = composer.arithmetic_gate(|gate| {
+                gate.witness(x, y, None)
+                    .mul(CP::CurveScalarField::one())
+            });
+            composer.range_gate(output, 1);
         }
 
         Ok(())
