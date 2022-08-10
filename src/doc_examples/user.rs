@@ -136,12 +136,12 @@ where
         for note_var in input_note_variables {
             composer.assert_equal(note_var.token_addr, xan_address_var);
             let x = note_var.value;
-            let y = composer.add_input(CP::CurveScalarField::from(2u64));
+            let y = composer.add_input(CP::CurveScalarField::from(4u64));
             let output = composer.arithmetic_gate(|gate| {
                 gate.witness(x, y, None)
                     .mul(CP::CurveScalarField::one())
             });
-            composer.range_gate(output, 1);
+            composer.range_gate(output, 2);
         }
 
         Ok(())
