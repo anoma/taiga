@@ -170,8 +170,6 @@ where
 
 #[test]
 fn test_user_creation() {
-    use plonk_core::prelude::Circuit;
-
     use crate::circuit::circuit_parameters::CircuitParameters;
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::circuit::validity_predicate::NUM_NOTE;
@@ -182,18 +180,20 @@ fn test_user_creation() {
     use crate::vp_description::ValidityPredicateDescription;
     use ark_poly_commit::PolynomialCommitment;
     use ark_std::test_rng;
+    use plonk_core::circuit::{verify_proof, VerifierData, Circuit};
 
     type Fr = <CP as CircuitParameters>::CurveScalarField;
+    type P = <CP as CircuitParameters>::InnerCurve;
     type PC = <CP as CircuitParameters>::CurvePC;
 
     let mut rng = test_rng();
-    let send_input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
-    let send_output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
+    let send_input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_of_range(&mut rng, 3));
+    let send_output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_of_range(&mut rng, 3));
 
     let mut send_vp = SendVP::<CP>::new(send_input_notes, send_output_notes);
 
-    let receive_input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
-    let receive_output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
+    let receive_input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_of_range(&mut rng, 1));
+    let receive_output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_of_range(&mut rng, 1));
     let mut receive_vp = ReceiveVP::<CP>::new(receive_input_notes, receive_output_notes);
 
     let vp_setup = PC::setup(send_vp.padded_circuit_size(), None, &mut rng).unwrap();
@@ -201,10 +201,56 @@ fn test_user_creation() {
     let desc_vp_send = ValidityPredicateDescription::from_vp(&mut send_vp, &vp_setup).unwrap();
     let desc_vp_recv = ValidityPredicateDescription::from_vp(&mut receive_vp, &vp_setup).unwrap();
 
+    // * Create user
     let alice = User::<CP>::new(
         desc_vp_send,
         desc_vp_recv,
         NullifierDerivingKey::<Fr>::rand(&mut rng),
     );
     let _alice_addr = alice.address().unwrap();
+
+    // * Test validity predicates
+    // Generate vp CRS
+    let vp_setup = PC::setup(send_vp.padded_circuit_size(), None, &mut rng).unwrap();
+
+    // * Test send vp
+    // Compile vp
+    let (pk_p, vk_blind) = send_vp.compile::<PC>(&vp_setup).unwrap();
+
+    // VP Prover
+    let (proof, pi) = send_vp
+        .gen_proof::<PC>(&vp_setup, pk_p, b"Test")
+        .unwrap();
+
+    // VP verifier
+    let verifier_data = VerifierData::new(vk_blind, pi);
+    verify_proof::<Fr, P, PC>(
+        &vp_setup,
+        verifier_data.key,
+        &proof,
+        &verifier_data.pi,
+        b"Test",
+    )
+    .unwrap();
+
+    // * Test receive vp
+    // Compile vp
+    let (pk_p, vk_blind) = receive_vp.compile::<PC>(&vp_setup).unwrap();
+
+    // VP Prover
+    let (proof, pi) = receive_vp
+        .gen_proof::<PC>(&vp_setup, pk_p, b"Test")
+        .unwrap();
+
+    // VP verifier
+    let verifier_data = VerifierData::new(vk_blind, pi);
+    verify_proof::<Fr, P, PC>(
+        &vp_setup,
+        verifier_data.key,
+        &proof,
+        &verifier_data.pi,
+        b"Test",
+    )
+    .unwrap();
+
 }
