@@ -1,6 +1,6 @@
+#[ignore]
 #[test]
 fn test_token_creation() {
-    use ark_poly_commit::PolynomialCommitment;
     use ark_std::test_rng;
     use plonk_core::prelude::Circuit;
 
@@ -21,8 +21,8 @@ fn test_token_creation() {
 
     let mut vp = TrivialValidityPredicate::<CP>::new(input_notes, output_notes);
 
-    let vp_setup = PC::setup(vp.padded_circuit_size(), None, &mut rng).unwrap();
-    let desc_vp = ValidityPredicateDescription::from_vp(&mut vp, &vp_setup).unwrap();
+    let vp_setup = CP::get_pc_setup_params(vp.padded_circuit_size());
+    let desc_vp = ValidityPredicateDescription::from_vp(&mut vp, vp_setup).unwrap();
 
     let tok = Token::<CP>::new(desc_vp);
 

@@ -1,8 +1,9 @@
-# Users of Taiga
+# User
 
 Similarly to the token case, users have associated validity predicates for sending and receiving notes, called $VP_{Send}$ and $VP_{Rec}$, respectively. In the same way as for $VP_{Token}$, a proof $\pi$ is verified against a $VK_{Send}$ (or $VK_{Rec}$) and this verifier key needs to be binded to the owner of the note. 
 
-Spending a note also requires nullifying the note so that it cannot be spent anymore. We use the same construction as Orchard, where a nullifier is derived from a nullifier key. Each user has a nullifier key that also needs to be binded to the note sender address.
+### Validity predicates
+Each user has validity predicates that authorize spending and receiving notes. Validity predicates that authorize sending notes are called `SendVP`, and validity predicates that authorize receiving notes are called `RecvVP`.
 
 In consequence, the user address is split into:
 * A commitment to $VK_{Send}$ and the nullifier key,

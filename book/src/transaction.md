@@ -5,49 +5,41 @@ The structure `Transaction` defines all the information needed to be executed on
 Once a transaction is executed successfully (i.e. verified), the ledger status will be transfered.
 A transaction includes the proofs corresponding to the spending of input notes and the creation of output notes.
 
-In our current implementation version, there are four input notes and four output notes in each transaction.
-An action transfer contains one input note and one output note.
-Each input note has one `SendVP` and one `TokenVP`. Each output note has one `RecVP` and one `TokenVP`. Every validity predicate is blinded as described [here](blinding.md), leading to a blinding proof.
+In our current implementation version, there are four input notes and four output notes in each transaction. A transaction is split into *action transfers*.
+
+## Action Transfer
+An action transfer spends an input note and creates an output note. To do so, it verifies:
+* one `SendVP` proof and one `TokVP` proof corresponding to an input note,
+* one `RecvVP` proof and one `TokVP` proof corresponding to an output note,
+* one action proof corresponding to the integrity of the owner and token addresses of the two notes,
+* that the input note already exists and is not spent,
+* the output note encryption.
+
+The details of the action transfer can be found [here](src/transaction.rs).
+
+## Proofs of a transaction
+A transaction includes several proofs for the different VPs and for the actions and the blinding proofs.
+In this current implementation, we set `NUM_NOTE=4` for the number of input and output notes. Moreover, for we are interested in the `SendVP` and the `TokVP` of input notes and `RecvVP` and `TokVP` of output notes. Finally, every validity predicate is blinded as described [here](blinding.md), leading to a blinding proof.
 Therefore, a transaction includes:
-* Four action proofs for the binding described [here](action.md),
-* Four `SendVP` proofs corresponding to the four input notes owner addresses,
-* Four `TokenVP` proofs corresponding to the four input note token types,
-* Four `RecVP` proofs corresponding to the four output note owner addresses,
-* Four `TokenVP` proofs correspdonding to the four output note token types.
-* Sixteen blinding proofs for the 16 previous proofs.
+* Four `SendVP` proofs corresponding to the four input notes owner constraints,
+* Four `TokVP` proofs corresponding to the four input note token constraints,
+* Four `RecvVP` proofs corresponding to the four output note owner constraints,
+* Four `TokVP` proofs correspdonding to the four output note token constraints.
+* Sixteen blinding proofs for the 16 previous proofs,
+* Four action proofs for binding the 16 first proofs of this list to the actual input and output note owner and token addresses, as described [here](action.md).
 
 ![](img/taiga_tx.png)
 
-## Action Transfer Description
-Each `Action Transfer` spends an input note and creates an output note(could be dummy notes). The `Action Proof` constrains the integrity of the notes, existence of input note on the `CommitTree`, the verifiable encryption of output note, and the vp commitments.
 
-TODO: add a link to the details
+## How to build a transaction
+Building a Taiga transaction is flexible: a transaction can be created from different [users](link) and splitted into several phases. In general, we can build a transaction as the following procedures:
+1. Create `Actions`,
+2. Collect all the (input and output) notes from the actions as local data for VPs,
+3. Create user and token validity predicates,
+4. Generate the blinding proofs,
+5. Build the full transaction.
 
-The detail can be found here.
-
-## Validity Predicate Description
-There are two types of `Validity Predicate` so far, i.e., user vp(sender vp and recipient vp) and token vp. The `Validity Predicate` takes in local data(the notes in the tx) and custom data(vp defined data). And the `Validity Predicate Proof` describes basic constraints(the notes integrity) and custom constraints(vp defined).
-
-TODO: add a link to the details
-
-The detail can be found here.
-
-## Validity Predicate Blinding Description
-To preserve the privacy of vp, we blind the vp description and generate a blind proof for each vp.
-
-TODO: add a link to the details
-
-The detail can be found here.
-
-## How to construct a transaction
-It's very flexible to construct a Taiga Transaction. A Transaction can be created from different users(roles) and splitted into several phases. In general, we can construct a transaction as the following procedures.
-1. Construct the `Actions`.
-2. Collect all the notes(input and output) from `Actions` as local data for VPs.
-3. Construct `user VPs` and `token VPs`.
-4. Generate `blind VP proofs`.
-5. Construct a full transaction.
-
-A transaction construction example:
+The following example build a transaction following this procedure:
 ```rust
 // Construct action infos
 let mut actions: Vec<(Action<CP>, ActionCircuit<CP>)> = (0..NUM_TX_SLICE)
@@ -111,10 +103,16 @@ for _action_index in 0..NUM_TX_SLICE {
 // Construct a tx
 let tx = Transaction::<CP>::new(action_slices, spend_slices, output_slices);
 ```
-
-## How to verify a transaction
-In transaction verification, it verifies the action proofs, vp proofs and blind vp proofs. In addition, it checks the consistency of public inputs from above proofs and the ledger status(root existence, nf non-existence, etc).
+This transaction `tx` can be verified, meaning that the VPs, action and blinding proofs are checked.
+In addition, this verification checks the consistency of the public inputs from the above proofs and the ledger status (root existence, nullifier non-existence, etc.).
 ```rust
 // Tx verification
 tx.verify(ledger_status)?;
 ```
+
+This code is reproducible with [this file](https://github.com/anoma/taiga/blob/main/src/doc_examples/transaction.rs) with the following command:
+```
+cargo test --release test_tx_example
+```
+
+Next: [performance & conclusion](./conclusion.md)

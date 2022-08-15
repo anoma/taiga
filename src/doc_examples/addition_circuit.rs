@@ -2,8 +2,6 @@ use ark_ec::TEModelParameters;
 use ark_ff::PrimeField;
 use plonk_core::prelude::{Circuit, Error, StandardComposer};
 
-use crate::circuit::circuit_parameters::CircuitParameters;
-
 pub struct AdditionCircuit<F: PrimeField> {
     a: F,
     b: F,
@@ -38,6 +36,7 @@ where
     }
 }
 
+#[ignore]
 #[test]
 fn test_circuit_example() {
     use crate::circuit::circuit_parameters::CircuitParameters;
@@ -66,61 +65,30 @@ fn test_circuit_example() {
     // Prover and verifier key
     let (pk, vk) = Circuit::<F, P>::compile::<PC>(&mut circuit, &setup).unwrap();
     // Proof computation
-    let (pi, public_inputs) =
+    let (proof, public_inputs) =
         Circuit::<F, P>::gen_proof::<PC>(&mut circuit, &setup, pk, b"Test").unwrap();
     // Proof verification
     let verifier_data = VerifierData::new(vk, public_inputs);
-    verify_proof::<F, P, PC>(&setup, verifier_data.key, &pi, &verifier_data.pi, b"Test").unwrap();
+    verify_proof::<F, P, PC>(
+        &setup,
+        verifier_data.key,
+        &proof,
+        &verifier_data.pi,
+        b"Test",
+    )
+    .unwrap();
 }
 
-/////////////////////////////////////////////////////////////////
-
-use crate::circuit::validity_predicate::ValidityPredicate;
-use crate::circuit::validity_predicate::NUM_NOTE;
-use crate::note::Note;
-
-pub struct TrivialValidityPredicate<CP: CircuitParameters> {
-    input_notes: [Note<CP>; NUM_NOTE],
-    output_notes: [Note<CP>; NUM_NOTE],
-}
-
-impl<CP: CircuitParameters> ValidityPredicate<CP> for TrivialValidityPredicate<CP> {
-    fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE] {
-        &self.input_notes
-    }
-
-    fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE] {
-        &self.output_notes
-    }
-}
-
-impl<CP: CircuitParameters> Circuit<CP::CurveScalarField, CP::InnerCurve>
-    for TrivialValidityPredicate<CP>
-{
-    const CIRCUIT_ID: [u8; 32] = [0x00; 32];
-
-    // Default implementation
-    fn gadget(
-        &mut self,
-        _composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-    ) -> Result<(), Error> {
-        // nothing
-        Ok(())
-    }
-
-    fn padded_circuit_size(&self) -> usize {
-        4
-    }
-}
-
+#[ignore]
 #[test]
 fn test_token_creation() {
+    use crate::circuit::circuit_parameters::CircuitParameters;
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::circuit::validity_predicate::NUM_NOTE;
+    use crate::doc_examples::validity_predicate::TrivialValidityPredicate;
     use crate::note::Note;
     use crate::token::Token;
     use crate::vp_description::ValidityPredicateDescription;
-    use ark_poly_commit::PolynomialCommitment;
     use ark_std::test_rng;
 
     type Fr = <CP as CircuitParameters>::CurveScalarField;
@@ -130,13 +98,10 @@ fn test_token_creation() {
     let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
     let output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
 
-    let mut vp = TrivialValidityPredicate::<CP> {
-        input_notes,
-        output_notes,
-    };
+    let mut vp = TrivialValidityPredicate::<CP>::new(input_notes, output_notes);
 
-    let vp_setup = PC::setup(vp.padded_circuit_size(), None, &mut rng).unwrap();
-    let desc_vp = ValidityPredicateDescription::from_vp(&mut vp, &vp_setup).unwrap();
+    let vp_setup = CP::get_pc_setup_params(vp.padded_circuit_size());
+    let desc_vp = ValidityPredicateDescription::from_vp(&mut vp, vp_setup).unwrap();
 
     let tok = Token::<CP>::new(desc_vp);
 
@@ -145,15 +110,17 @@ fn test_token_creation() {
 
 ///////////////////////////////////////////////////////////////////////
 
+#[ignore]
 #[test]
 fn test_user_creation() {
+    use crate::circuit::circuit_parameters::CircuitParameters;
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::circuit::validity_predicate::NUM_NOTE;
+    use crate::doc_examples::validity_predicate::TrivialValidityPredicate;
     use crate::note::Note;
     use crate::user::NullifierDerivingKey;
     use crate::user::User;
     use crate::vp_description::ValidityPredicateDescription;
-    use ark_poly_commit::PolynomialCommitment;
     use ark_std::test_rng;
 
     type Fr = <CP as CircuitParameters>::CurveScalarField;
@@ -163,14 +130,11 @@ fn test_user_creation() {
     let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
     let output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
 
-    let mut vp = TrivialValidityPredicate::<CP> {
-        input_notes,
-        output_notes,
-    };
+    let mut vp = TrivialValidityPredicate::<CP>::new(input_notes, output_notes);
 
-    let vp_setup = PC::setup(vp.padded_circuit_size(), None, &mut rng).unwrap();
+    let vp_setup = CP::get_pc_setup_params(vp.padded_circuit_size());
 
-    let desc_vp_send = ValidityPredicateDescription::from_vp(&mut vp, &vp_setup).unwrap();
+    let desc_vp_send = ValidityPredicateDescription::from_vp(&mut vp, vp_setup).unwrap();
     let desc_vp_recv = desc_vp_send.clone();
 
     let alice = User::<CP>::new(
@@ -181,10 +145,13 @@ fn test_user_creation() {
     let _alice_addr = alice.address().unwrap();
 }
 
+#[ignore]
 #[test]
 fn test_note_creation() {
+    use crate::circuit::circuit_parameters::CircuitParameters;
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::circuit::validity_predicate::NUM_NOTE;
+    use crate::doc_examples::validity_predicate::TrivialValidityPredicate;
     use crate::note::Note;
     use crate::nullifier::Nullifier;
     use crate::token::Token;
@@ -192,7 +159,6 @@ fn test_note_creation() {
     use crate::user::User;
     use crate::vp_description::ValidityPredicateDescription;
     use ark_ff::UniformRand;
-    use ark_poly_commit::PolynomialCommitment;
     use ark_std::test_rng;
 
     type Fr = <CP as CircuitParameters>::CurveScalarField;
@@ -202,15 +168,12 @@ fn test_note_creation() {
     let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
     let output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
 
-    let mut vp = TrivialValidityPredicate::<CP> {
-        input_notes,
-        output_notes,
-    };
+    let mut vp = TrivialValidityPredicate::<CP>::new(input_notes, output_notes);
 
-    let vp_setup = PC::setup(vp.padded_circuit_size(), None, &mut rng).unwrap();
+    let vp_setup = CP::get_pc_setup_params(vp.padded_circuit_size());
 
     // token and user
-    let desc_vp_token = ValidityPredicateDescription::from_vp(&mut vp, &vp_setup).unwrap();
+    let desc_vp_token = ValidityPredicateDescription::from_vp(&mut vp, vp_setup).unwrap();
     let desc_vp_send = desc_vp_token.clone();
     let desc_vp_recv = desc_vp_send.clone();
 

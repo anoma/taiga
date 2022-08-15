@@ -23,11 +23,11 @@ jobs:
         with:
           command: test
           args: --all-features --verbose --release --all
-      - name: Run slow tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all-features --verbose --release --all -- --ignored
+      # - name: Run slow tests
+      #   uses: actions-rs/cargo@v1
+      #   with:
+      #     command: test
+      #     args: --all-features --verbose --release --all -- --ignored
 
   # build:
   #   name: Build target ${{ matrix.target }}

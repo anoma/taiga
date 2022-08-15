@@ -1,32 +1,85 @@
 # Validity predicates
 
-Validity predicates are constrains defined by entities of Taiga in order to approve transactions. Examples of constrains can be a white list of allowed senders of notes, or a lower bound on the amount of received notes.
+A **validity predicate** (VP) is a piece of code that authorizes transactions by checking its input and output notes. In order to be authorized, a transaction must satisfy all of the constraints of VPs of parties involved.
 
-From the constrains and a given transaction, a user (or a token) produces a zero-knowledge proof for allowing the transaction. A user can verifiy the proof against a verifier key, computed from the constrains. Verifying a proof leads to a boolean and transactions are validated if and only if all the proofs pass the verification.
+Examples of such constraints would be a white list VP that allows only specific users to send notes to the VP owner, or a lower bound VP that restricts the smallest amount of asset that can be received.
 
-```
-TODO Add a diagram:
-constrains -----------> VK------------
-                |                     |------> True/False
-                |                     |
-tx-------------------> proof----------
-```
+Taiga validity predicates are intended to be the private version of Anoma's transparent validity predicates. Similarly, Taiga VPs take as input stored state prior and posterior to a transaction execution and either authorize the state change or reject it. Unlike transparent VPs, which execute as WASM, Taiga VPs execute in a zero-knowledge proof/arithmetic circuit model of computation. Because of vastly different nature of the execution model, there are some differences between transparent and Taiga VPs, even if they have similar goals.
+
+### Validity predicates in Taiga
+
+Taiga uses a PLONK-based zero knowledge proof system, and validity predicates are given as [PLONK arithmetizations](https://zcash.github.io/halo2/concepts/arithmetization.html), which is a table of cells with polynomial constraints. For privacy of which validity predicate is used inside of a transaction, all Taiga validity predicates must share the same PLONK configuration (which can be thought of as the set of "gates" available). Different validity predicates are created by specifying the *selectors*.
+
+#### State model in Taiga
+
+Unlike transparent Anoma, which operates on an account model, Taiga uses a note based model. In an account model, each account has associated state which is stored in a database, and updated according to that account's validity predicate. In the note model, however, state is sharded into an append-only set of *note commitments* and revealed *nullifiers*. Each note has exactly one associated nullifier, and the current state of the Taiga is the subset of notes whose nullifiers are not yet revealed, called unspent notes. The Action/Execute circuit, together with the transaction verifier, ensure that the Taiga state is consistent.
+
+### PLONK circuit configuration for validity predicates in Taiga
+
+The validity predicate configuration includes the following "gates" in the PLONK configuration:
+
+* Field addition/multiplication
+* Elliptic curve addition and scalar multiplication
+* Poseidon hash
+
+#### Addresses
+
+Even though Taiga does not have *accounts*, it does have *addresses*. Each note is associated with one *user address* and one *token address*. Intuitively, a note belongs to the user address and is of a type given by the token address.
+
+Currently, every [user](./users.md) in Taiga has two VPs: one that authorizes spending notes (`SendVP`), and one that authorizes receiving notes (`RecvVP`). [Tokens](./token.md) in Taiga also have validity predicates, and spending or receiving a note of a particular token requires satisfying the `TokVP`.
+
+### Shielded VPs
+For each transaction, it must be proven that all of the VPs of parties and tokens involved are satisfied. To preserve privacy, ZK proofs are used. The transaction is authorized only if all of the produced proofs are verified successfully.
+
+![img.png](img/vp_img.png)
+
+### Transactions
+
+Informally, transactions take a private subset of unspent notes from the Taiga note set, publicly reveal their nullifiers, and reveal a new set of note commitments to add to the Taiga note set. The Action/Execute circuit verifies consistency of this state transition, but does not check directly its validity. Instead, the validity predicate circuits must check the validity of the state transition. The following VPs are called:
+
+* The spending VP for every spent note
+* The token VP for every spent and created note
+* The receiving VP for every created note
+
+Each VP is called *once* per transaction, even if it is checking multiple *notes*. In addition, VPs are given all notes in the transaction as input, whether or not that note is associated with that *token type* or *user address*.
+
+### VP interface
+
+For privacy and efficiency, all VPs must share the same *public input interface*. VPs may have different *private* inputs.
+
+#### Public Inputs
+
+* $\{nf_i\}$, the set of revealed nullifiers in the transaction
+* $\{cm_i\}$, the set of new notes created in the transaction
+* $e$, the current Taiga epoch (used for time-tracking)
+
+TODO: This might include a public key as well
+
+#### Typical private inputs
+
+While not required, most validity predicates will take a few typical private inputs:
+
+* $\{(address, token, v, data, rho, psi, rcm)_i\}$ for each spent note in the transaction
+* $\{(address, token, v, data, rho, psi, rcm)_j\}$ for each created note in the transaction
+
+The validity predicate must verify (via standardized logic) that the contents of each note match the public $\{nf_i\}$ and $\{cm_i\}$.
 
 ## Example
 
-We define a first validity predicate. It has fields corresponding to the input and output notes of the transaction.
+Every validity predicate structure has input and output notes of the transaction as the local data (to be checked against the constraints).
 ```rust
 pub struct TrivialValidityPredicate<CP: CircuitParameters> {
     input_notes: [Note<CP>; NUM_NOTE],
     output_notes: [Note<CP>; NUM_NOTE],
 }
 ```
-We begin with a very simple VP that actually does not check any constrain on the notes:
+Let's define a trivial VP that checks nothing and returns true:
 ```rust
 impl<CP: CircuitParameters> Circuit<CP::CurveScalarField, CP::InnerCurve> for TrivialValidityPredicate<CP>
 {
     ...
     
+    //the VP constraints are defined here
     fn gadget(
         &mut self,
         _composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
@@ -37,7 +90,7 @@ impl<CP: CircuitParameters> Circuit<CP::CurveScalarField, CP::InnerCurve> for Tr
    ... 
 }
 ```
-From this gadget representing the circuit, we can compute a proof and verify it with the verifier key:
+From this gadget representing the VP constraints, we can compute the VP proof and verify it:
 ```rust
 // creation of the VP
 let mut vp = TrivialValidityPredicate::<CP> { input_notes, output_notes };
@@ -45,13 +98,13 @@ let mut vp = TrivialValidityPredicate::<CP> { input_notes, output_notes };
 // setup of the proof system
 let vp_setup = PC::setup(vp.padded_circuit_size(), None, &mut rng).unwrap();
 
-// proving and verifying keys
+// compute proving and verifying keys
 let (pk, vk) = vp.compile::<PC>(&vp_setup).unwrap();
 
-// proof
+// generate the proof
 let (proof, public_inputs) = vp.gen_proof::<PC>(&vp_setup, pk, b"Test").unwrap();
 
-// verification
+// verify the proof to make sure the VP is satisfied
 let verifier_data = VerifierData::new(vk, public_inputs);
 verify_proof::<Fr, P, PC>(
     &vp_setup,
@@ -62,12 +115,8 @@ verify_proof::<Fr, P, PC>(
 ).unwrap();
 ```
 
-This example can be run with [this file](../../src/doc_examples/validity_predicate.rs) or with the command line
+This example can be run with [this file](https://github.com/anoma/taiga/blob/main/src/doc_examples/validity_predicate.rs) or with the command line
 ```
 cargo test doc_examples::validity_predicate::test_vp_creation
 ```
-
-## Validity predicates in Taiga
-Validity predicates are the main ingredients of Taiga:
-* Users and tokens can provide their own rules for the transaction. A user defines rules for sending and receiving notes. As an example, a receiving VP could be a check that the sent notes contains at least 3 tokens.
-* Binding notes, users and tokens is done using commitments. We use the same kind of circuits in order to prove the bindings and for getting full privacy. We will investigate further these definitions in the next sections.
+Next: [Token](./token.md)
