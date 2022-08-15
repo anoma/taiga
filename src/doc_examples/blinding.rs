@@ -18,8 +18,8 @@ fn test_blinding_circuit_example() {
     type PC = <CP as CircuitParameters>::CurvePC;
     type Opc = <CP as CircuitParameters>::OuterCurvePC;
     use crate::doc_examples::validity_predicate::TrivialValidityPredicate;
-    use ark_std::test_rng;
     use ark_poly_commit::PolynomialCommitment;
+    use ark_std::test_rng;
 
     let mut rng = test_rng();
 
@@ -40,8 +40,8 @@ fn test_blinding_circuit_example() {
 
     // verifying key with the blinding
     let (_, vk_blinded) = vp
-    .compile_with_blinding::<PC>(&pp, &blinding_circuit.get_blinding())
-    .unwrap();
+        .compile_with_blinding::<PC>(&pp, &blinding_circuit.get_blinding())
+        .unwrap();
 
     let pp_blind = Opc::setup(blinding_circuit.padded_circuit_size(), None, &mut rng).unwrap();
 

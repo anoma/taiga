@@ -140,7 +140,8 @@ where
         for note_var in input_note_variables {
             println!(
                 "note_token: {:?}, token: {:?}",
-                note_var.token_addr, xan_address_var);
+                note_var.token_addr, xan_address_var
+            );
             composer.assert_equal(note_var.token_addr, xan_address_var);
             let x = note_var.value;
             let zero = composer.zero_var();
@@ -156,11 +157,9 @@ where
     }
 }
 
-
 impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for ReceiveVP<CP>
-        where
-            CP: CircuitParameters, 
-            
+where
+    CP: CircuitParameters,
 {
     const CIRCUIT_ID: [u8; 32] = [0x00; 32];
 
@@ -177,7 +176,6 @@ impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for ReceiveVP<CP>
     }
 }
 
-
 #[test]
 fn test_user_creation() {
     use crate::circuit::circuit_parameters::CircuitParameters;
@@ -187,9 +185,9 @@ fn test_user_creation() {
     use crate::user::NullifierDerivingKey;
     use crate::user::User;
     use crate::vp_description::ValidityPredicateDescription;
+    use ark_poly_commit::PolynomialCommitment;
     use ark_std::test_rng;
     use plonk_core::circuit::{verify_proof, Circuit, VerifierData};
-    use ark_poly_commit::PolynomialCommitment;
 
     type Fr = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;
