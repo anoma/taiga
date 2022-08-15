@@ -1,5 +1,5 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
-use crate::circuit::gadgets::field_addition::field_addition_gadget;
+
 use crate::circuit::integrity::{
     token_integrity_circuit, ValidityPredicateInputNoteVariables,
     ValidityPredicateOutputNoteVariables,
@@ -7,7 +7,7 @@ use crate::circuit::integrity::{
 use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
 use crate::note::Note;
 use crate::token::Token;
-use ark_ff::One;
+
 use ark_ff::Zero;
 use ark_std;
 use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
@@ -43,7 +43,7 @@ where
         &self,
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
         input_note_variables: &[ValidityPredicateInputNoteVariables],
-        output_note_variables: &[ValidityPredicateOutputNoteVariables],
+        _output_note_variables: &[ValidityPredicateOutputNoteVariables],
     ) -> Result<(), Error> {
         // * Alice does not want to send more than 3 XAN at a time.
         let mut rng = ark_std::test_rng();
@@ -126,7 +126,7 @@ where
         &self,
         composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
         input_note_variables: &[ValidityPredicateInputNoteVariables],
-        output_note_variables: &[ValidityPredicateOutputNoteVariables],
+        _output_note_variables: &[ValidityPredicateOutputNoteVariables],
     ) -> Result<(), Error> {
         // * Alice does not want to receive less than 1 XAN at a time.
         let mut rng = ark_std::test_rng();
@@ -187,7 +187,7 @@ fn test_user_creation() {
     use crate::vp_description::ValidityPredicateDescription;
     use ark_poly_commit::PolynomialCommitment;
     use ark_std::test_rng;
-    use plonk_core::circuit::{verify_proof, Circuit, VerifierData};
+    use plonk_core::circuit::{Circuit};
 
     type Fr = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;

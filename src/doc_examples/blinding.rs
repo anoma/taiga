@@ -39,17 +39,17 @@ fn test_blinding_circuit_example() {
         BlindingCircuit::<CP>::new(&mut rng, vp_desc, pp, vp.padded_circuit_size()).unwrap();
 
     // verifying key with the blinding
-    let (_, vk_blinded) = vp
-        .compile_with_blinding::<PC>(&pp, &blinding_circuit.get_blinding())
+    let (_, _vk_blinded) = vp
+        .compile_with_blinding::<PC>(pp, &blinding_circuit.get_blinding())
         .unwrap();
 
     let pp_blind = Opc::setup(blinding_circuit.padded_circuit_size(), None, &mut rng).unwrap();
 
     // prover and verifier key for the blinding proof
-    let (pk_blinding, vk_blinding) = blinding_circuit.compile::<Opc>(&pp_blind).unwrap();
+    let (pk_blinding, _vk_blinding) = blinding_circuit.compile::<Opc>(&pp_blind).unwrap();
 
     // Blinding Prover
-    let (proof, public_inputs) = blinding_circuit
+    let (_proof, _public_inputs) = blinding_circuit
         .gen_proof::<Opc>(&pp_blind, pk_blinding, b"Test")
         .unwrap();
 
