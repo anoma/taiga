@@ -133,22 +133,22 @@ where
         let xan_token =
             Token::<crate::circuit::circuit_parameters::PairingCircuitParameters>::dummy(&mut rng);
 
-
-        
         let (xan_address_var, _) = token_integrity_circuit::<CP>(composer, &xan_token.token_vp.to_bits())?;
 
         // * Check that the token of all the notes of token XAN are less than 1 XAN
-        // for note_var in input_note_variables {
-        //     composer.assert_equal(note_var.token_addr, xan_address_var);
-        //     let x = note_var.value;
-        //     let y = composer.add_input(CP::CurveScalarField::from(4u64));
-        //     let output = composer.arithmetic_gate(|gate| {
-        //         gate.witness(x, y, None)
-        //             .mul(CP::CurveScalarField::one())
-        //     });
-        //     composer.range_gate(output, 2);
-        // }
-
+        for note_var in input_note_variables {
+        println!("note_token: {:?}, token: {:?}", note_var.token_addr, xan_address_var);
+        composer.assert_equal(note_var.token_addr, xan_address_var);
+        let x = note_var.value;
+        let zero = composer.zero_var();
+        let factor = CP::CurveScalarField::from(4u64);
+        println!("x: {:?}", x);
+        let output = composer.arithmetic_gate(|gate| {
+            gate.witness(x, zero, None)
+                .add(factor, CP::CurveScalarField::zero())
+        });
+        composer.range_gate(output, 2);
+        }
         Ok(())
     }
 }
@@ -215,6 +215,6 @@ fn test_user_creation() {
         desc_vp_recv,
         NullifierDerivingKey::<Fr>::rand(&mut rng),
     );
-    let _alice_addr = alice.address().unwrap()
+    let _alice_addr = alice.address().unwrap();
 
 }
