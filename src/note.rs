@@ -81,12 +81,11 @@ impl<CP: CircuitParameters> Note<CP> {
         }
     }
 
-    pub fn dummy_of_range(rng: &mut impl RngCore, max: u64) -> Self {
+    pub fn dummy_of_range(token: Token<CP>, rng: &mut impl RngCore, max: u64) -> Self {
         use ark_ff::UniformRand;
         use rand::Rng;
 
         let user = User::<CP>::dummy(rng);
-        let token = Token::<CP>::dummy(rng);
         let value: u64 = rng.gen_range(0..=max);
         let data = CP::CurveScalarField::rand(rng);
         let rho = Nullifier::new(CP::CurveScalarField::rand(rng));

@@ -10,6 +10,7 @@ use crate::token::{Token};
 use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
 use ark_std;
 use ark_ff::One;
+use ark_ff::Zero;
 
 pub struct SendVP<CP: CircuitParameters> {
     // basic "private" inputs to the VP
@@ -55,13 +56,17 @@ where
         let (xan_address_var, _) = token_integrity_circuit::<CP>(composer, &xan_token.token_vp.to_bits())?;
 
         // * Check that the token of all the notes of token XAN are less than 3 XAN
+        // TODO: Look up a gadget in composer.rs that output a bit for checking an if statement
         for note_var in input_note_variables {
+            println!("note_token: {:?}, token: {:?}", note_var.token_addr, xan_address_var);
             composer.assert_equal(note_var.token_addr, xan_address_var);
             let x = note_var.value;
-            let y = composer.add_input(CP::CurveScalarField::from(4u64) / CP::CurveScalarField::from(3u64));
+            let zero = composer.zero_var();
+            let factor = CP::CurveScalarField::from(4u64) / CP::CurveScalarField::from(3u64);
+            println!("x: {:?}", x);
             let output = composer.arithmetic_gate(|gate| {
-                gate.witness(x, y, None)
-                    .mul(CP::CurveScalarField::one())
+                gate.witness(x, zero, None)
+                    .add(factor, CP::CurveScalarField::zero())
             });
             composer.range_gate(output, 2);
         }
@@ -133,16 +138,16 @@ where
         let (xan_address_var, _) = token_integrity_circuit::<CP>(composer, &xan_token.token_vp.to_bits())?;
 
         // * Check that the token of all the notes of token XAN are less than 1 XAN
-        for note_var in input_note_variables {
-            composer.assert_equal(note_var.token_addr, xan_address_var);
-            let x = note_var.value;
-            let y = composer.add_input(CP::CurveScalarField::from(4u64));
-            let output = composer.arithmetic_gate(|gate| {
-                gate.witness(x, y, None)
-                    .mul(CP::CurveScalarField::one())
-            });
-            composer.range_gate(output, 2);
-        }
+        // for note_var in input_note_variables {
+        //     composer.assert_equal(note_var.token_addr, xan_address_var);
+        //     let x = note_var.value;
+        //     let y = composer.add_input(CP::CurveScalarField::from(4u64));
+        //     let output = composer.arithmetic_gate(|gate| {
+        //         gate.witness(x, y, None)
+        //             .mul(CP::CurveScalarField::one())
+        //     });
+        //     composer.range_gate(output, 2);
+        // }
 
         Ok(())
     }
@@ -163,6 +168,7 @@ where
     }
 
     fn padded_circuit_size(&self) -> usize {
+        // TODO: Why does it fail with eg. 2^10?
         1 << 17
     }
 }
@@ -187,15 +193,17 @@ fn test_user_creation() {
     type PC = <CP as CircuitParameters>::CurvePC;
 
     let mut rng = test_rng();
-    let send_input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_of_range(&mut rng, 3));
-    let send_output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_of_range(&mut rng, 3));
+    let xan = Token::<CP>::dummy(&mut rng);
+    let send_input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_of_range(xan.clone(), &mut rng,  3));
+    let send_output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_of_range(xan.clone(), &mut rng, 3));
 
     let mut send_vp = SendVP::<CP>::new(send_input_notes, send_output_notes);
 
-    let receive_input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_of_range(&mut rng, 1));
-    let receive_output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_of_range(&mut rng, 1));
+    let receive_input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_of_range(xan.clone(), &mut rng, 1));
+    let receive_output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_of_range(xan.clone(), &mut rng, 1));
     let mut receive_vp = ReceiveVP::<CP>::new(receive_input_notes, receive_output_notes);
 
+    // TODO: Run a setup. Export it to a file. Import it.
     let vp_setup = PC::setup(send_vp.padded_circuit_size(), None, &mut rng).unwrap();
 
     let desc_vp_send = ValidityPredicateDescription::from_vp(&mut send_vp, &vp_setup).unwrap();
@@ -207,50 +215,6 @@ fn test_user_creation() {
         desc_vp_recv,
         NullifierDerivingKey::<Fr>::rand(&mut rng),
     );
-    let _alice_addr = alice.address().unwrap();
-
-    // * Test validity predicates
-    // Generate vp CRS
-    let vp_setup = PC::setup(send_vp.padded_circuit_size(), None, &mut rng).unwrap();
-
-    // * Test send vp
-    // Compile vp
-    let (pk_p, vk_blind) = send_vp.compile::<PC>(&vp_setup).unwrap();
-
-    // VP Prover
-    let (proof, pi) = send_vp
-        .gen_proof::<PC>(&vp_setup, pk_p, b"Test")
-        .unwrap();
-
-    // VP verifier
-    let verifier_data = VerifierData::new(vk_blind, pi);
-    verify_proof::<Fr, P, PC>(
-        &vp_setup,
-        verifier_data.key,
-        &proof,
-        &verifier_data.pi,
-        b"Test",
-    )
-    .unwrap();
-
-    // * Test receive vp
-    // Compile vp
-    let (pk_p, vk_blind) = receive_vp.compile::<PC>(&vp_setup).unwrap();
-
-    // VP Prover
-    let (proof, pi) = receive_vp
-        .gen_proof::<PC>(&vp_setup, pk_p, b"Test")
-        .unwrap();
-
-    // VP verifier
-    let verifier_data = VerifierData::new(vk_blind, pi);
-    verify_proof::<Fr, P, PC>(
-        &vp_setup,
-        verifier_data.key,
-        &proof,
-        &verifier_data.pi,
-        b"Test",
-    )
-    .unwrap();
+    let _alice_addr = alice.address().unwrap()
 
 }
