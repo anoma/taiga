@@ -3,7 +3,18 @@
 Similarly to the token case, users have associated validity predicates for sending and receiving notes, called $VP_{Send}$ and $VP_{Rec}$, respectively. In the same way as for $VP_{Token}$, a proof $\pi$ is verified against a $VK_{Send}$ (or $VK_{Rec}$) and this verifier key needs to be binded to the owner of the note. 
 
 ### Validity predicates
-Each user has validity predicates that authorize spending and receiving notes. Validity predicates that authorize sending notes are called `SendVP`, and validity predicates that authorize receiving notes are called `RecvVP`.
+Each user has validity predicates that authorize spending and receiving notes. Validity predicates that authorize sending notes are called $VK_{Send}$, and validity predicates that authorize receiving notes are called $VK_{Rec}$.
+
+These VPs check that input and output notes of the transactions satisfy certain constraints. When a user wants to spend a note, the satisfaction of his $VK_{Send}$ is required. Similarly, to receive a note, user's $VK_{Rec}$ must be satisfied.
+
+As VPs are shielded in Taiga, instead of showing that the VPs of the user evaluate to true publicly, ZK proofs are created. An observer can verify these proofs (using the verifier key).
+
+### User keys
+Each user has a set of keys that allows to authorize various actions or generate parameters. One of such keys is a nullifier key `nk` used to compute [note nullifiers](./notes.md) that are necessary to spend notes.
+
+### User address
+
+Each user has an address that allows others to send assets to the user. Address is derived from user's `SendVP`, `RecvVP`, and `nk`.
 
 In consequence, the user address is split into:
 * A commitment to $VK_{Send}$ and the nullifier key,
@@ -21,6 +32,8 @@ Alice is a user of Taiga and defined her two validity predicates:
 When she sends a note of $2$ XAN, she creates a proof $Send_π$ that can be verified against $VK_{Send}$, computes the nullifier of the spent note using $NK_{Alice}$, and a binding proof that $VK_{Send}$ and $NK_{Alice}$ open the spent note owner (Alice) address.
 
 ```rust
+    // compose the VPs with the methods defined earlier
+    // check ../../doc_examples/users.rs to see the defined methods
     let mut send_vp = SendVP::<CP>::new(send_input_notes, send_output_notes);
     let mut receive_vp = ReceiveVP::<CP>::new(receive_input_notes, receive_output_notes);
 
@@ -48,3 +61,5 @@ $Address_{User} = Com_r(Com_r(Com_q(VK_{Send}) || NK_{User}) || Com_q(VK_{Rec}))
 * Sending and receiving verifier keys are commited into $\mathbb F_q$ for privacy and efficiency concerns.
 * The commitment to $VK_{Send}$ is committed into $\mathbb F_r$ together with the nullifier key in order to bind the nullifier computation with the spent note owner address.
 * The outer commitment binds the spent note user address with the verifying keys used for $\pi_{Send}$ and $\pi_{Rec}$.
+
+Next: [Note](./notes.md)
