@@ -187,7 +187,7 @@ fn test_user_creation() {
     use crate::vp_description::ValidityPredicateDescription;
     use ark_poly_commit::PolynomialCommitment;
     use ark_std::test_rng;
-    use plonk_core::circuit::{Circuit};
+    use plonk_core::circuit::Circuit;
 
     type Fr = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;
