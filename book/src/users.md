@@ -5,7 +5,7 @@ Similarly to the token case, users have associated validity predicates for sendi
 That is, a `User` in Taiga can own, send and receive notes. Each user has an **address** that identifies them, **validity predicates** that authorize their actions, and **keys** that are used to derive parameters.
 
 ### Validity predicates
-Each user has validity predicates that authorize spending and receiving notes. Validity predicates that authorize sending notes are called $VK_{Send}$, and validity predicates that authorize receiving notes are called $VK_{Rec}$.
+Each user has validity predicates that authorize spending and receiving notes. Validity predicates that authorize sending notes are called $VP_{Send}$, and validity predicates that authorize receiving notes are called $VP_{Rec}$.
 
 These VPs check that input and output notes of the transactions satisfy certain constraints. When a user wants to spend a note, the satisfaction of his $VK_{Send}$ is required. Similarly, to receive a note, user's $VK_{Rec}$ must be satisfied.
 
