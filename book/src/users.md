@@ -7,7 +7,7 @@ That is, a `User` in Taiga can own, send and receive notes. Each user has an **a
 ### Validity predicates
 Each user has validity predicates that authorize spending and receiving notes. Validity predicates that authorize sending notes are called $VP_{Send}$, and validity predicates that authorize receiving notes are called $VP_{Rec}$.
 
-These VPs check that input and output notes of the transactions satisfy certain constraints. When a user wants to spend a note, the satisfaction of his $VK_{Send}$ is required. Similarly, to receive a note, user's $VK_{Rec}$ must be satisfied.
+These VPs check that input and output notes of the transactions satisfy certain constraints. When a user wants to spend a note, the satisfaction of his $VP_{Send}$ is required. Similarly, to receive a note, user's $VP_{Rec}$ must be satisfied.
 
 As VPs are shielded in Taiga, instead of showing that the VPs of the user evaluate to true publicly, ZK proofs are created. An observer can verify these proofs (using the verifier key).
 
