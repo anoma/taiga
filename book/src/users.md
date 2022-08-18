@@ -1,6 +1,6 @@
 # User
 
-Similarly to the token case, users have associated validity predicates for sending and receiving notes, called $VP_{Send}$ and $VP_{Rec}$, respectively. In the same way as for $VP_{Token}$, a proof $\pi$ is verified against a $VK_{Send}$ (or $VK_{Rec}$) and this verifier key needs to be binded to the owner of the note. 
+Similarly to the token case, users have associated validity predicates for sending and receiving notes, called $VP_{Send}$ and $VP_{Rec}$, respectively. In the same way as for $VP_{Token}$, a proof $\pi$ is verified against a $VP_{Send}$ (or $VP_{Rec}$) and this verifier key needs to be binded to the owner of the note. 
 
 That is, a `User` in Taiga can own, send and receive notes. Each user has an **address** that identifies them, **validity predicates** that authorize their actions, and **keys** that are used to derive parameters.
 
