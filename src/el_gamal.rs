@@ -124,18 +124,29 @@ impl<C: TEModelParameters> EncryptionKey<C> {
     }
 }
 
-#[test]
-fn test_el_gamal() {
-    use ark_bls12_381_new::g1::Parameters;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
 
-    let mut rng = rand::thread_rng();
-    let dk = DecryptionKey::<Parameters>::new(&mut rng);
-    let ek = dk.encryption_key();
+    proptest! {
+        #[test]
+        fn test_el_gamal(msg in any::<String>()) {
+            use ark_bls12_381_new::g1::Parameters;
 
-    let msg = "JeMAppelleSimon.................".as_bytes();
+            let mut rng = rand::thread_rng();
+            let dk = DecryptionKey::<Parameters>::new(&mut rng);
+            let ek = dk.encryption_key();
 
-    let ciph = ek.encrypt(msg, &mut rng);
-    let plain = dk.decrypt(ciph);
-    // would not work if msg.len() %32 != 0 because there are zeros at the end of the decryption
-    assert_eq!(msg, plain);
+            let msg = msg.as_bytes();
+            let ciph = ek.encrypt(msg, &mut rng);
+            let plain_with_zeros = dk.decrypt(ciph);
+
+            // remove trailing zeros
+            let mut plain : Vec<u8> = plain_with_zeros.into_iter().rev().skip_while(|&x| x == 0).collect();
+            plain.reverse();
+
+            prop_assert_eq!(msg, plain);
+        }
+    }
 }

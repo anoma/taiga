@@ -30,6 +30,7 @@ rand_core = {version = "0.6", default-features=false, features = ["getrandom"] }
 
 [dev-dependencies]
 ark-std = "0.3"
+proptest = "1.0.0"
 
 [patch.crates-io]
 ark-serialize = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }
