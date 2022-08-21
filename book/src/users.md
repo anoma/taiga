@@ -16,7 +16,7 @@ Each user has a set of keys that allows to authorize various actions or generate
 
 ### User address
 
-Each user has an address that allows others to send assets to the user. Address is derived from user's $VP_{Send}$, $VP_{Rec}$, and `nk`.
+Each user has an address that allows others to send assets to her. Address is derived from user's $VP_{Send}$, $VP_{Rec}$, and `nk`.
 
 In consequence, the user address is split into:
 * A commitment to $VP_{Send}$ and the nullifier key,
@@ -29,7 +29,7 @@ The final address is an outer commitment to these two inner commitments:
 
 Alice is a user of Taiga and defined her two validity predicates:
 * $Send_{VP}$ is a check on the amount of her spent: she does not want to send more than 3XAN at a time.
-* $VP_{Rec}$ is a check on the amount she received: she does not want to receive notes of less than 1XAN.
+* $VP_{Rec}$ is a check on the amount she receives: she does not want to receive notes of less than 1XAN.
 
 When she sends a note of $2$ XAN, she creates a proof $Send_π$ that can be verified against $VP_{Send}$, computes the nullifier of the spent note using $NK_{Alice}$, and a binding proof that $VP_{Send}$ and $NK_{Alice}$ open the spent note owner (Alice) address.
 
