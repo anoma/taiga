@@ -100,7 +100,7 @@ fn action_circuit_test() {
         .unwrap();
 
     // Check the public inputs
-    let mut expect_public_input = PublicInputs::new(action_circuit.padded_circuit_size());
+    let mut expect_public_input = PublicInputs::new();
     expect_public_input.insert(ACTION_PUBLIC_INPUT_NF_INDEX, action.nf.inner());
     expect_public_input.insert(ACTION_PUBLIC_INPUT_ROOT_INDEX, action.root);
     expect_public_input.insert(ACTION_PUBLIC_INPUT_CM_INDEX, action.cm.inner());

@@ -108,7 +108,7 @@ impl<CP: CircuitParameters> ActionSlice<CP> {
     }
 
     pub fn verify(&self) -> Result<(), TaigaError> {
-        let mut action_pi = PublicInputs::new(ACTION_CIRCUIT_SIZE);
+        let mut action_pi = PublicInputs::new();
         action_pi.insert(ACTION_PUBLIC_INPUT_NF_INDEX, self.action_public.nf.inner());
         action_pi.insert(ACTION_PUBLIC_INPUT_ROOT_INDEX, self.action_public.root);
         action_pi.insert(ACTION_PUBLIC_INPUT_CM_INDEX, self.action_public.cm.inner());

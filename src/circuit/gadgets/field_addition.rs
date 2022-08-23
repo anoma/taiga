@@ -9,7 +9,7 @@ pub fn field_addition_gadget<CP: CircuitParameters>(
 ) -> Variable {
     // simple circuit for the computaiton of a+b (and return the variable corresponding to c=a+b).
     let one = CP::CurveScalarField::one();
-    let c = composer.get_value(&var_a) + composer.get_value(&var_b);
+    let c = composer.value_of_var(var_a) + composer.value_of_var(var_b);
     let var_zero = composer.zero_var();
     // Make first constraint a + b = c (as public input)
     composer.arithmetic_gate(|gate| {

@@ -207,7 +207,7 @@ fn test_blinding_circuit() {
         .unwrap();
 
     // Expecting vk_blind(out of circuit)
-    let mut expect_public_input = PublicInputs::new(blinding_circuit_size);
+    let mut expect_public_input = PublicInputs::new();
     let q_m = ws_to_te(vk_blind.arithmetic.q_m.0);
     expect_public_input.insert(392, q_m.x);
     expect_public_input.insert(393, q_m.y);

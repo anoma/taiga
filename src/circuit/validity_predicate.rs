@@ -63,10 +63,6 @@ pub trait ValidityPredicate<CP: CircuitParameters>:
             .map_err(to_pc_error::<CP::CurveScalarField, CP::CurvePC>)?;
         let mut verifier = Verifier::new(b"CircuitCompilation");
         self.gadget(verifier.mut_cs())?;
-        verifier
-            .cs
-            .public_inputs
-            .update_size(verifier.circuit_bound());
         verifier.preprocess(&ck)?;
         Ok(verifier
             .verifier_key
