@@ -20,3 +20,6 @@ pub mod vp_description;
 
 // #[cfg(test)]
 // pub mod tests;
+
+// halo2 mod
+pub mod halo2;
