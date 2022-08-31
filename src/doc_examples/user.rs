@@ -1,3 +1,4 @@
+use crate::app::App;
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::integrity::{
     app_integrity_circuit, ValidityPredicateInputNoteVariables,
@@ -5,7 +6,6 @@ use crate::circuit::integrity::{
 };
 use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
 use crate::note::Note;
-use crate::app::App;
 use ark_std;
 use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
 

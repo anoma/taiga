@@ -38,7 +38,6 @@ impl<CP: CircuitParameters> App<CP> {
 #[test]
 fn app_address_computation() {
     let mut rng = ark_std::test_rng();
-    let xan =
-        App::<crate::circuit::circuit_parameters::PairingCircuitParameters>::dummy(&mut rng);
+    let xan = App::<crate::circuit::circuit_parameters::PairingCircuitParameters>::dummy(&mut rng);
     xan.address().unwrap();
 }

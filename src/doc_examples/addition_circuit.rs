@@ -82,12 +82,12 @@ fn test_circuit_example() {
 #[ignore]
 #[test]
 fn test_app_creation() {
+    use crate::app::App;
     use crate::circuit::circuit_parameters::CircuitParameters;
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::circuit::validity_predicate::NUM_NOTE;
     use crate::doc_examples::validity_predicate::TrivialValidityPredicate;
     use crate::note::Note;
-    use crate::app::App;
     use crate::vp_description::ValidityPredicateDescription;
     use ark_std::test_rng;
 
@@ -148,13 +148,13 @@ fn test_user_creation() {
 #[ignore]
 #[test]
 fn test_note_creation() {
+    use crate::app::App;
     use crate::circuit::circuit_parameters::CircuitParameters;
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::circuit::validity_predicate::NUM_NOTE;
     use crate::doc_examples::validity_predicate::TrivialValidityPredicate;
     use crate::note::Note;
     use crate::nullifier::Nullifier;
-    use crate::app::App;
     use crate::user::NullifierDerivingKey;
     use crate::user::User;
     use crate::vp_description::ValidityPredicateDescription;

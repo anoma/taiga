@@ -4,12 +4,12 @@ fn test_app_creation() {
     use ark_std::test_rng;
     use plonk_core::prelude::Circuit;
 
+    use crate::app::App;
     use crate::circuit::circuit_parameters::CircuitParameters;
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::circuit::validity_predicate::NUM_NOTE;
     use crate::doc_examples::validity_predicate::TrivialValidityPredicate;
     use crate::note::Note;
-    use crate::app::App;
     use crate::vp_description::ValidityPredicateDescription;
 
     type Fr = <CP as CircuitParameters>::CurveScalarField;

@@ -1,8 +1,8 @@
+use crate::app::App;
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::error::TaigaError;
 use crate::nullifier::Nullifier;
 use crate::poseidon::{FieldHasher, WIDTH_3, WIDTH_9};
-use crate::app::App;
 use crate::user::User;
 use ark_ff::{BigInteger, PrimeField};
 use plonk_hashing::poseidon::{

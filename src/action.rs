@@ -1,3 +1,4 @@
+use crate::app::App;
 use crate::circuit::action_circuit::ActionCircuit;
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::error::TaigaError;
@@ -5,7 +6,6 @@ use crate::merkle_tree::{MerklePath, Node, TAIGA_COMMITMENT_TREE_DEPTH};
 use crate::note::{Note, NoteCommitment};
 use crate::nullifier::Nullifier;
 use crate::poseidon::{FieldHasher, WIDTH_3};
-use crate::app::App;
 use crate::user::{User, UserSendAddress};
 use crate::vp_description::ValidityPredicateDescription;
 use ark_ff::UniformRand;
@@ -91,14 +91,7 @@ impl<CP: CircuitParameters> ActionInfo<CP> {
         };
 
         let note_rcm = CP::CurveScalarField::rand(rng);
-        let output_note = Note::new(
-            user,
-            app,
-            self.output.value,
-            nf,
-            self.output.data,
-            note_rcm,
-        );
+        let output_note = Note::new(user, app, self.output.value, nf, self.output.data, note_rcm);
 
         let output_cm = output_note.commitment()?;
         let action = Action::<CP> {

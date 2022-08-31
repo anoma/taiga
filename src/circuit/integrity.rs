@@ -244,8 +244,7 @@ where
     )?;
 
     // check app address
-    let (app_addr, app_bits) =
-        app_integrity_circuit::<CP>(composer, &note.app.app_vp.to_bits())?;
+    let (app_addr, app_bits) = app_integrity_circuit::<CP>(composer, &note.app.app_vp.to_bits())?;
 
     // check note commitment
     let value_var = composer.add_input(CP::CurveScalarField::from(note.value));
@@ -295,8 +294,7 @@ where
     )?;
 
     // check app address
-    let (app_addr, app_bits) =
-        app_integrity_circuit::<CP>(composer, &note.app.app_vp.to_bits())?;
+    let (app_addr, app_bits) = app_integrity_circuit::<CP>(composer, &note.app.app_vp.to_bits())?;
 
     // check and publish note commitment
     let value_var = composer.add_input(CP::CurveScalarField::from(note.value));
@@ -366,13 +364,13 @@ mod test {
 
     #[test]
     fn test_integrity_circuit() {
+        use crate::app::App;
+        use crate::circuit::integrity::app_integrity_circuit;
         use crate::circuit::integrity::note_commitment_circuit;
         use crate::circuit::integrity::nullifier_circuit;
         use crate::circuit::integrity::spent_user_address_integrity_circuit;
-        use crate::circuit::integrity::app_integrity_circuit;
         use crate::note::Note;
         use crate::nullifier::Nullifier;
-        use crate::app::App;
         use crate::user::User;
         use ark_std::{test_rng, UniformRand};
         use plonk_core::constraint_system::StandardComposer;
@@ -404,11 +402,9 @@ mod test {
         // Create a app
         let app = App::<PairingCircuitParameters>::dummy(&mut rng);
 
-        let (app_var, _) = app_integrity_circuit::<PairingCircuitParameters>(
-            &mut composer,
-            &app.app_vp.to_bits(),
-        )
-        .unwrap();
+        let (app_var, _) =
+            app_integrity_circuit::<PairingCircuitParameters>(&mut composer, &app.app_vp.to_bits())
+                .unwrap();
         let expected_app_addr = app.address().unwrap();
         let app_expected_var = composer.add_input(expected_app_addr);
         composer.assert_equal(app_expected_var, app_var);

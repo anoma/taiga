@@ -1,3 +1,4 @@
+use crate::app::App;
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::gadgets::merkle_tree::merkle_tree_gadget;
 use crate::circuit::integrity::{
@@ -7,7 +8,6 @@ use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
 use crate::merkle_tree::{MerklePath, Node};
 use crate::note::Note;
 use crate::poseidon::WIDTH_3;
-use crate::app::App;
 use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
 use plonk_hashing::poseidon::constants::PoseidonConstants;
 
@@ -151,9 +151,7 @@ fn test_white_list_apps_vp_example() {
     let (pk, vk) = white_list_apps_vp.compile::<PC>(pp).unwrap();
 
     // Prover
-    let (proof, public_input) = white_list_apps_vp
-        .gen_proof::<PC>(pp, pk, b"Test")
-        .unwrap();
+    let (proof, public_input) = white_list_apps_vp.gen_proof::<PC>(pp, pk, b"Test").unwrap();
 
     // Verifier
     let verifier_data = VerifierData::new(vk, public_input);
