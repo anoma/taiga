@@ -1,4 +1,6 @@
+pub mod action;
 pub mod constant;
+pub mod merkle_tree;
 pub mod note;
 pub mod nullifier;
 pub mod token;
