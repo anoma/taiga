@@ -13,9 +13,9 @@ use halo2_gadgets::poseidon::{
 };
 
 // number of hashes to do in the circuit
-const NB_HASH:usize = 1000;
+const NB_HASH:usize = 220;
 // constant for the circuit size (depends on the number of hashes, of course)
-pub const K: u32 = 16;
+pub const K: u32 = 14;
 
 pub(crate) fn assign_free_advice<F: Field, V: Copy>(
     mut layouter: impl Layouter<F>,
