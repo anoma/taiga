@@ -1,0 +1,309 @@
+use ff::Field;
+use halo2_proofs::{
+    circuit::{floor_planner, AssignedCell, Layouter, Value},
+    plonk::{self, Advice, Column, Instance as InstanceColumn, SingleVerifier, Assigned},
+    transcript::{Blake2bRead, Blake2bWrite},
+};
+use pasta_curves::{pallas, vesta};
+use rand::RngCore;
+
+use halo2_gadgets::poseidon::{
+    primitives::{self as poseidon, P128Pow5T3},
+    Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
+};
+
+// number of hashes to do in the circuit
+const NB_HASH:usize = 1000;
+// constant for the circuit size (depends on the number of hashes, of course)
+pub const K: u32 = 16;
+
+pub(crate) fn assign_free_advice<F: Field, V: Copy>(
+    mut layouter: impl Layouter<F>,
+    column: Column<Advice>,
+    value: Value<V>,
+) -> Result<AssignedCell<V, F>, plonk::Error>
+where
+    for<'v> Assigned<F>: From<&'v V>,
+{
+    layouter.assign_region(
+        || "load private",
+        |mut region| region.assign_advice(|| "load private", column, 0, || value),
+    )
+}
+
+#[derive(Clone, Debug)]
+pub struct Config {
+    primary: Column<InstanceColumn>,
+    advices: [Column<Advice>; 4],
+    poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
+}
+
+impl Config {
+    pub(super) fn poseidon_chip(&self) -> PoseidonChip<pallas::Base, 3, 2> {
+        PoseidonChip::construct(self.poseidon_config.clone())
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct Circuit {
+    pub x: pallas::Base,
+    pub y: pallas::Base,
+}
+
+impl plonk::Circuit<pallas::Base> for Circuit {
+    type Config = Config;
+    type FloorPlanner = floor_planner::V1;
+
+    fn without_witnesses(&self) -> Self {
+        Self::default()
+    }
+
+    fn configure(meta: &mut plonk::ConstraintSystem<pallas::Base>) -> Self::Config {
+        let advices = [
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+        ];
+
+        // Instance column used for public inputs
+        let primary = meta.instance_column();
+        meta.enable_equality(primary);
+
+        // Permutation over all advice columns.
+        for advice in advices.iter() {
+            meta.enable_equality(*advice);
+        }
+
+        // Poseidon requires four advice columns, while ECC incomplete addition requires
+        // six, so we could choose to configure them in parallel. However, we only use a
+        // single Poseidon invocation, and we have the rows to accommodate it serially.
+        // Instead, we reduce the proof size by sharing fixed columns between the ECC and
+        // Poseidon chips.
+        let lagrange_coeffs = [
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+        ];
+        let rc_a = lagrange_coeffs[2..5].try_into().unwrap();
+        let rc_b = lagrange_coeffs[5..8].try_into().unwrap();
+
+        // Also use the first Lagrange coefficient column for loading global constants.
+        // It's free real estate :)
+        meta.enable_constant(lagrange_coeffs[0]);
+
+        // Configuration for the Poseidon hash.
+        let poseidon_config = PoseidonChip::configure::<poseidon::P128Pow5T3>(
+            meta,
+            // We place the state columns after the partial_sbox column so that the
+            // pad-and-add region can be laid out more efficiently.
+            advices[0..3].try_into().unwrap(),
+            advices[3],
+            rc_a,
+            rc_b,
+        );
+
+        Config {
+            primary,
+            advices,
+            poseidon_config,
+        }
+    }
+
+    #[allow(non_snake_case)]
+    fn synthesize(
+        &self,
+        config: Self::Config,
+        mut layouter: impl Layouter<pallas::Base>,
+    ) -> Result<(), plonk::Error> {
+
+        for i in 0..NB_HASH {
+
+            let x_cell = assign_free_advice(
+                layouter.namespace(|| "x"),
+                config.advices[0],
+                Value::known(self.x),
+            )?;
+            let y_cell = assign_free_advice(
+                layouter.namespace(|| "y"),
+                config.advices[1],
+                Value::known(self.y),
+            )?;
+    
+            // Poseidon(x, y)
+            let gamma = {
+                let poseidon_message: [AssignedCell<pallas::Base, pallas::Base>; 2] = [x_cell, y_cell];
+
+                // let poseidon_message = [u[0], u[1]];
+                let poseidon_hasher = halo2_gadgets::poseidon::Hash::<_, _, P128Pow5T3, _, 3, 2>::init(
+                    config.poseidon_chip(),
+                    layouter.namespace(|| "Poseidon init"),
+                )?;
+                poseidon_hasher.hash(
+                    layouter.namespace(|| "Poseidon hash (nk, rho)"),
+                    poseidon_message,
+                )?
+            };
+
+            layouter
+                .constrain_instance(gamma.cell(), config.primary, i)
+                .unwrap();
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct VerifyingKey {
+    pub(crate) params: halo2_proofs::poly::commitment::Params<vesta::Affine>,
+    pub(crate) vk: plonk::VerifyingKey<vesta::Affine>,
+}
+
+impl VerifyingKey {
+    /// Builds the verifying key.
+    pub fn build() -> Self {
+        let params = halo2_proofs::poly::commitment::Params::new(K);
+        let circuit: Circuit = Default::default();
+
+        let vk = plonk::keygen_vk(&params, &circuit).unwrap();
+
+        VerifyingKey { params, vk }
+    }
+}
+
+#[derive(Debug)]
+pub struct ProvingKey {
+    params: halo2_proofs::poly::commitment::Params<vesta::Affine>,
+    pk: plonk::ProvingKey<vesta::Affine>,
+}
+
+impl ProvingKey {
+    /// Builds the proving key.
+    pub fn build() -> Self {
+        let params = halo2_proofs::poly::commitment::Params::new(K);
+        let circuit: Circuit = Default::default();
+
+        let vk = plonk::keygen_vk(&params, &circuit).unwrap();
+        let pk = plonk::keygen_pk(&params, vk, &circuit).unwrap();
+
+        ProvingKey { params, pk }
+    }
+}
+
+#[derive(Clone)]
+pub struct Proof(Vec<u8>);
+
+impl Proof {
+    /// Creates a proof for the given circuits and instances.
+    pub fn create(
+        pk: &ProvingKey,
+        circuit: Circuit,
+        instance: &[&[pallas::Base]],
+        mut rng: impl RngCore,
+    ) -> Result<Self, plonk::Error> {
+        let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
+        plonk::create_proof(
+            &pk.params,
+            &pk.pk,
+            &[circuit],
+            &[instance],
+            &mut rng,
+            &mut transcript,
+        )?;
+        Ok(Proof(transcript.finalize()))
+    }
+
+    /// Verifies this proof with the given instances.
+    pub fn verify(
+        &self,
+        vk: &VerifyingKey,
+        instance: &[&[pallas::Base]],
+    ) -> Result<(), plonk::Error> {
+        let strategy = SingleVerifier::new(&vk.params);
+        let mut transcript = Blake2bRead::init(&self.0[..]);
+        plonk::verify_proof(&vk.params, &vk.vk, strategy, &[instance], &mut transcript)
+    }
+
+    /// Constructs a new Proof value.
+    pub fn new(bytes: Vec<u8>) -> Self {
+        Proof(bytes)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Instant;
+
+    use ff::Field;
+    use halo2_gadgets::poseidon::primitives::{P128Pow5T3, Hash, ConstantLength};
+    use halo2_proofs::dev::MockProver;
+    use pasta_curves::pallas;
+    use rand::rngs::OsRng;
+    use halo2_proofs::plonk::ConstraintSystem;
+    use halo2_proofs::plonk::Circuit as PlonkCircuit;
+
+    use super::{Proof, ProvingKey, VerifyingKey};
+
+    use super::Circuit;
+
+    #[test]
+    fn test_poseidon_2() {
+        type Fp = pallas::Base;
+        
+        let mut rng = OsRng;
+        let x = Fp::random(&mut rng);
+        let y = Fp::random(&mut rng);
+
+        let hasher = Hash::<_, P128Pow5T3, ConstantLength<2>, 3, 2>::init();
+        let h_x_y = hasher.hash([x,y]);
+
+        let instance = &[h_x_y.clone();super::NB_HASH];
+        // let instance_vec = instance.to_vec();
+        
+        let circuit = Circuit {x,y};
+
+        // // this lets you know the minimum number for K from the config:
+        // let mut cs = ConstraintSystem::<Fp>::default();
+        // let config = <Circuit as PlonkCircuit<Fp>>::configure(&mut cs);
+        // println!("{}", cs.minimum_rows());
+ 
+        // // I don't know how to get the actual K... so I kind of do it by hand...
+        // let mut k:usize = 18;
+        // while MockProver::run(k.try_into().unwrap(), &circuit, vec![instance.to_vec()]).unwrap().verify() == Ok(()) {
+        //     println!("k={}", k);
+        //     k = k-1;
+        // }
+
+        assert_eq!(
+            MockProver::run(super::K, &circuit, vec![instance.to_vec()])
+                .unwrap()
+                .verify(),
+            Ok(())
+        );
+
+        let time = Instant::now();
+        let vk = VerifyingKey::build();
+        let pk = ProvingKey::build();
+        println!(
+            "key generation: \t{:?}ms",
+            (Instant::now() - time).as_millis()
+        );
+
+        let mut rng = OsRng;
+        let time = Instant::now();
+        let proof = Proof::create(&pk, circuit, &[instance], &mut rng).unwrap();
+        println!("proof: \t\t\t{:?}ms", (Instant::now() - time).as_millis());
+
+        let time = Instant::now();
+        assert!(proof.verify(&vk, &[instance]).is_ok());
+        println!(
+            "verification: \t\t{:?}ms",
+            (Instant::now() - time).as_millis()
+        );
+    }
+}
