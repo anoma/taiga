@@ -22,6 +22,10 @@ impl NoteCommitment {
     pub fn inner(&self) -> pallas::Point {
         self.0
     }
+
+    pub fn get_x(&self) -> pallas::Base {
+        extract_p(&self.0)
+    }
 }
 
 /// A note
