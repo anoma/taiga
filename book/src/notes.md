@@ -1,11 +1,11 @@
 # Note
 
-`Note` is an immutable object that represents a unit of value of a certain token. Each note has an [owner](users.md), a [token](token.md) type, and a value:
+`Note` is an immutable object that represents a unit of value of a certain application. Each note has an [owner](users.md), a [application](application.md) type, and a value:
 
 ```rust
 pub struct Note<CP: CircuitParameters> {
 	pub owner: User<CP>,
-	pub token: Token<CP>,
+	pub app: App<CP>,
 	pub value: u64,
 ...
 }
@@ -15,7 +15,7 @@ pub struct Note<CP: CircuitParameters> {
 
 As the notes are immutable, sending a note (transfering the ownership) means **destroying** the existing note (spent note) and **creating** a new note (output note) with a different owner.
 
-`Note(owner: A, token: T, value: V) -> Note(owner: B, token: T, value: V)`
+`Note(owner: A, application: T, value: V) -> Note(owner: B, application: T, value: V)`
 
 To send a note, the owner needs to prove the ownership which is done by revealing note's nullifier `nf`.  The nullifier is only known to the owner of the note and revealing it destroys the note. All revealed nullifiers are stored in a public nullifier tree `NFtree` to make sure none of the notes are spent twice.
 
@@ -32,7 +32,7 @@ The full description of the note structure is
 ```rust
 pub struct Note<CP: CircuitParameters> {
 	pub owner: User<CP>,
-	pub token: Token<CP>,
+	pub app: App<CP>,
 	pub value: u64,
 	pub data: CP::CurveScalarField,
 	pub rho: Nullifier<CP>,
@@ -49,18 +49,18 @@ pub struct Note<CP: CircuitParameters> {
 
 #### Creationg a note
 TODO: add a hyperlink to the existing code
-We provide an example of creation of a note from the structure we have already defined for [Token]() and [User]():
+We provide an example of creation of a note from the structure we have already defined for [Application]() and [User]():
 ```rust
 // ...
 // we use the code of the previous sections
 // ...
 
-// token and user
-let desc_vp_token = ValidityPredicateDescription::from_vp(&mut vp, &vp_setup).unwrap();
-let desc_vp_send = desc_vp_token.clone();
+// app and user
+let desc_vp_app = ValidityPredicateDescription::from_vp(&mut vp, &vp_setup).unwrap();
+let desc_vp_send = desc_vp_app.clone();
 let desc_vp_recv = desc_vp_send.clone();
 
-let tok = Token::<CP>::new(desc_vp_token);
+let tok = App::<CP>::new(desc_vp_app);
 let alice = User::<CP>::new(
 	desc_vp_send,
 	desc_vp_recv,

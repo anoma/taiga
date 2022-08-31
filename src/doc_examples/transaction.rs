@@ -56,20 +56,20 @@ fn test_tx_example() {
         let mut spend_addr_vp =
             TrivialValidityPredicate::<CP>::new(input_notes.clone(), output_notes.clone());
         let spend_addr_vp_check = VPCheck::build(&mut spend_addr_vp, &mut rng).unwrap();
-        let mut spend_token_vp =
+        let mut spend_app_vp =
             TrivialValidityPredicate::<CP>::new(input_notes.clone(), output_notes.clone());
-        let spend_token_vp_check = VPCheck::build(&mut spend_token_vp, &mut rng).unwrap();
-        let spend_slice = SpendSlice::new(spend_addr_vp_check, spend_token_vp_check);
+        let spend_app_vp_check = VPCheck::build(&mut spend_app_vp, &mut rng).unwrap();
+        let spend_slice = SpendSlice::new(spend_addr_vp_check, spend_app_vp_check);
         spend_slices.push(spend_slice);
 
         // Construct dummy output vps
         let mut output_addr_vp =
             TrivialValidityPredicate::<CP>::new(input_notes.clone(), output_notes.clone());
         let output_addr_vp_check = VPCheck::build(&mut output_addr_vp, &mut rng).unwrap();
-        let mut output_token_vp =
+        let mut output_app_vp =
             TrivialValidityPredicate::<CP>::new(input_notes.clone(), output_notes.clone());
-        let output_token_vp_check = VPCheck::build(&mut output_token_vp, &mut rng).unwrap();
-        let output_slice = OutputSlice::new(output_addr_vp_check, output_token_vp_check);
+        let output_app_vp_check = VPCheck::build(&mut output_app_vp, &mut rng).unwrap();
+        let output_slice = OutputSlice::new(output_addr_vp_check, output_app_vp_check);
         output_slices.push(output_slice);
     }
 

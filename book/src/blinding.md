@@ -2,7 +2,7 @@
 
 In the [previous section](./action.md), we explained how we bind the different proofs to the spent and created notes. In this section, we focus on the privacy of the verifier keys of these proofs.
 
-Validity predicates are customizable by users and tokens. Moreover, the verifier keys are computed from the circuits and are visible by all the verifiers of the proof. These verifier keys are private information that leak privacy and need to be protected.
+Validity predicates are customizable by users and applications. Moreover, the verifier keys are computed from the circuits and are visible by all the verifiers of the proof. These verifier keys are private information that leak privacy and need to be protected.
 ![img_1.png](img/blinding_img_1.png)
 
 In order to get full privacy, we blind (or randomize) the verifier keys so that a proof can be checked against a verifier key or its blinded (randomized) version.
@@ -13,8 +13,8 @@ In this way, a verifier does not require the private verifier key to check the p
 
 ![img_3.png](img/blinding_img_3.png)
 
-The blinding technique is used to protect `send_VK`, `recv_VK`, and `token_VK`.
-This blinding is done for user's `send_VK` and `recv_VK` as well as for `token_VK`.
+The blinding technique is used to protect `send_VK`, `recv_VK`, and `app_VK`.
+This blinding is done for user's `send_VK` and `recv_VK` as well as for `app_VK`.
 
 ## Example of blinding proof
 First, we create a blinding circuit structure including the random values used for blinding:

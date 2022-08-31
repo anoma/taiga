@@ -81,13 +81,13 @@ fn test_circuit_example() {
 
 #[ignore]
 #[test]
-fn test_token_creation() {
+fn test_app_creation() {
     use crate::circuit::circuit_parameters::CircuitParameters;
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
     use crate::circuit::validity_predicate::NUM_NOTE;
     use crate::doc_examples::validity_predicate::TrivialValidityPredicate;
     use crate::note::Note;
-    use crate::token::Token;
+    use crate::app::App;
     use crate::vp_description::ValidityPredicateDescription;
     use ark_std::test_rng;
 
@@ -103,7 +103,7 @@ fn test_token_creation() {
     let vp_setup = CP::get_pc_setup_params(vp.padded_circuit_size());
     let desc_vp = ValidityPredicateDescription::from_vp(&mut vp, vp_setup).unwrap();
 
-    let tok = Token::<CP>::new(desc_vp);
+    let tok = App::<CP>::new(desc_vp);
 
     let _tok_addr = tok.address().unwrap();
 }
@@ -154,7 +154,7 @@ fn test_note_creation() {
     use crate::doc_examples::validity_predicate::TrivialValidityPredicate;
     use crate::note::Note;
     use crate::nullifier::Nullifier;
-    use crate::token::Token;
+    use crate::app::App;
     use crate::user::NullifierDerivingKey;
     use crate::user::User;
     use crate::vp_description::ValidityPredicateDescription;
@@ -172,12 +172,12 @@ fn test_note_creation() {
 
     let vp_setup = CP::get_pc_setup_params(vp.padded_circuit_size());
 
-    // token and user
-    let desc_vp_token = ValidityPredicateDescription::from_vp(&mut vp, vp_setup).unwrap();
-    let desc_vp_send = desc_vp_token.clone();
+    // app and user
+    let desc_vp_app = ValidityPredicateDescription::from_vp(&mut vp, vp_setup).unwrap();
+    let desc_vp_send = desc_vp_app.clone();
     let desc_vp_recv = desc_vp_send.clone();
 
-    let tok = Token::<CP>::new(desc_vp_token);
+    let tok = App::<CP>::new(desc_vp_app);
     let alice = User::<CP>::new(
         desc_vp_send,
         desc_vp_recv,

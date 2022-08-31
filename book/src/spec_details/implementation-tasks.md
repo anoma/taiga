@@ -42,12 +42,12 @@
     - Add multi-asset support
         - ~~Derive new asset_generator using Poseidon~~
         - ~~Change value commitment to use new asset_generator~~
-        - Add token_vp input
-        - Add asset/token type to note format
+        - Add app_vp input
+        - Add asset/app type to note format
         - Add data field/tag to note format for NFTs
         - Make new multi-asset tests for all of these
         - Explore using alternative Zcash multi-asset approach
-        - Use token vps for balancing tx instead of homomorphic value commitments
+        - Use app vps for balancing tx instead of homomorphic value commitments
     - Change address format
         - Implement VP commitments in address
         - Add com_vp public input and add a check against the address
@@ -85,10 +85,10 @@
         - Reject all 
         - Whitelist sender ✓
         - Whitelist asset type
-    - Token VPs
+    - App VPs
         - Check tx balance
-        - Shield/unshield tokens
-        - Swap: mint/burn new/old tokens
+        - Shield/unshield apps
+        - Swap: mint/burn new/old apps
     - Experiment: storing mutable VP data/state in a special NFT 
     - All other user workflows (the more examples we implement, the better)
     - Implement verifiable output note encryption
@@ -97,7 +97,7 @@
     - Implement "default" receiving VP logic for short addresses
     - Make tests for all VPs
 1. Implement transaction preparation and verification
-    - Verify Actions > Verify account VPs > Verify token VPs > Ensure all necessary VPs are called with correct public inputs
+    - Verify Actions > Verify account VPs > Verify app VPs > Ensure all necessary VPs are called with correct public inputs
     - Design and make tests
 1. Implement example/proof-of-concept delegated VP proving 
     - E.g. giving delegated prover viewing keys

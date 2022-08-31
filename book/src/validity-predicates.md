@@ -24,12 +24,12 @@ The validity predicate configuration includes the following "gates" in the PLONK
 
 #### Addresses
 
-Even though Taiga does not have *accounts*, it does have *addresses*. Each note is associated with one *user address* and one *token address*. Intuitively, a note belongs to the user address and is of a type given by the token address.
+Even though Taiga does not have *accounts*, it does have *addresses*. Each note is associated with one *user address* and one *app address*. Intuitively, a note belongs to the user address and is of a type given by the app address.
 
-Currently, every [user](./users.md) in Taiga has two VPs: one that authorizes spending notes (`SendVP`), and one that authorizes receiving notes (`RecvVP`). [Tokens](./token.md) in Taiga also have validity predicates, and spending or receiving a note of a particular token requires satisfying the `TokVP`.
+Currently, every [user](./users.md) in Taiga has two VPs: one that authorizes spending notes (`SendVP`), and one that authorizes receiving notes (`RecvVP`). [Apps](./app.md) in Taiga also have validity predicates, and spending or receiving a note of a particular app requires satisfying the `TokVP`.
 
 ### Shielded VPs
-For each transaction, it must be proven that all of the VPs of parties and tokens involved are satisfied. To preserve privacy, ZK proofs are used. The transaction is authorized only if all of the produced proofs are verified successfully.
+For each transaction, it must be proven that all of the VPs of parties and apps involved are satisfied. To preserve privacy, ZK proofs are used. The transaction is authorized only if all of the produced proofs are verified successfully.
 
 ![img.png](img/vp_img.png)
 
@@ -38,10 +38,10 @@ For each transaction, it must be proven that all of the VPs of parties and token
 Informally, transactions take a private subset of unspent notes from the Taiga note set, publicly reveal their nullifiers, and reveal a new set of note commitments to add to the Taiga note set. The Action/Execute circuit verifies consistency of this state transition, but does not check directly its validity. Instead, the validity predicate circuits must check the validity of the state transition. The following VPs are called:
 
 * The spending VP for every spent note
-* The token VP for every spent and created note
+* The app VP for every spent and created note
 * The receiving VP for every created note
 
-Each VP is called *once* per transaction, even if it is checking multiple *notes*. In addition, VPs are given all notes in the transaction as input, whether or not that note is associated with that *token type* or *user address*.
+Each VP is called *once* per transaction, even if it is checking multiple *notes*. In addition, VPs are given all notes in the transaction as input, whether or not that note is associated with that *app type* or *user address*.
 
 ### VP interface
 
@@ -59,8 +59,8 @@ TODO: This might include a public key as well
 
 While not required, most validity predicates will take a few typical private inputs:
 
-* $\{(address, token, v, data, rho, psi, rcm)_i\}$ for each spent note in the transaction
-* $\{(address, token, v, data, rho, psi, rcm)_j\}$ for each created note in the transaction
+* $\{(address, app, v, data, rho, psi, rcm)_i\}$ for each spent note in the transaction
+* $\{(address, app, v, data, rho, psi, rcm)_j\}$ for each created note in the transaction
 
 The validity predicate must verify (via standardized logic) that the contents of each note match the public $\{nf_i\}$ and $\{cm_i\}$.
 
@@ -119,4 +119,4 @@ This example can be run with [this file](https://github.com/anoma/taiga/blob/mai
 ```
 cargo test doc_examples::validity_predicate::test_vp_creation
 ```
-Next: [Token](./token.md)
+Next: [App](./app.md)

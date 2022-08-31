@@ -1,11 +1,11 @@
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::integrity::{
-    token_integrity_circuit, ValidityPredicateInputNoteVariables,
+    app_integrity_circuit, ValidityPredicateInputNoteVariables,
     ValidityPredicateOutputNoteVariables,
 };
 use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
 use crate::note::Note;
-use crate::token::Token;
+use crate::app::App;
 use ark_std;
 use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
 
@@ -44,15 +44,15 @@ where
     ) -> Result<(), Error> {
         // * Alice does not want to send more than 3 XAN at a time.
         let mut rng = ark_std::test_rng();
-        let xan_token =
-            Token::<crate::circuit::circuit_parameters::PairingCircuitParameters>::dummy(&mut rng);
+        let xan_app =
+            App::<crate::circuit::circuit_parameters::PairingCircuitParameters>::dummy(&mut rng);
 
         let (xan_address_var, _) =
-            token_integrity_circuit::<CP>(composer, &xan_token.token_vp.to_bits())?;
+            app_integrity_circuit::<CP>(composer, &xan_app.app_vp.to_bits())?;
 
-        // Check that the token of all the notes of token XAN are less than 3 XAN
+        // Check that the app of all the notes of app XAN are less than 3 XAN
         for note_var in input_note_variables {
-            composer.assert_equal(note_var.token_addr, xan_address_var);
+            composer.assert_equal(note_var.app_addr, xan_address_var);
             // TODO: Check that the note value is less than 3
         }
 
@@ -114,15 +114,15 @@ where
     ) -> Result<(), Error> {
         // * Alice does not want to send more than 3 XAN at a time.
         let mut rng = ark_std::test_rng();
-        let xan_token =
-            Token::<crate::circuit::circuit_parameters::PairingCircuitParameters>::dummy(&mut rng);
+        let xan_app =
+            App::<crate::circuit::circuit_parameters::PairingCircuitParameters>::dummy(&mut rng);
 
         let (xan_address_var, _) =
-            token_integrity_circuit::<CP>(composer, &xan_token.token_vp.to_bits())?;
+            app_integrity_circuit::<CP>(composer, &xan_app.app_vp.to_bits())?;
 
-        // Check that the token of all the notes of token XAN are less than 3 XAN
+        // Check that the app of all the notes of app XAN are less than 3 XAN
         for note_var in input_note_variables {
-            composer.assert_equal(note_var.token_addr, xan_address_var);
+            composer.assert_equal(note_var.app_addr, xan_address_var);
             // TODO: Check that the note value is less than 3
         }
 
