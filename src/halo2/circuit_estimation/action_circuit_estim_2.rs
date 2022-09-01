@@ -1,7 +1,7 @@
 use ff::Field;
 use halo2_proofs::{
     circuit::{floor_planner, AssignedCell, Layouter, Value},
-    plonk::{self, Advice, Column, Instance as InstanceColumn, SingleVerifier, Assigned},
+    plonk::{self, Advice, Assigned, Column, Instance as InstanceColumn, SingleVerifier},
     transcript::{Blake2bRead, Blake2bWrite},
 };
 use pasta_curves::{pallas, vesta};
@@ -13,7 +13,7 @@ use halo2_gadgets::poseidon::{
 };
 
 // number of hashes to do in the circuit
-const NB_HASH:usize = 220;
+const NB_POSEIDON2: usize = 156;
 // constant for the circuit size (depends on the number of hashes, of course)
 pub const K: u32 = 14;
 
@@ -34,13 +34,17 @@ where
 #[derive(Clone, Debug)]
 pub struct Config {
     primary: Column<InstanceColumn>,
-    advices: [Column<Advice>; 4],
-    poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
+    advices: [Column<Advice>; 10],
+    poseidon2_config: PoseidonConfig<pallas::Base, 3, 2>,
+    poseidon4_config: PoseidonConfig<pallas::Base, 5, 4>,
 }
 
 impl Config {
-    pub(super) fn poseidon_chip(&self) -> PoseidonChip<pallas::Base, 3, 2> {
-        PoseidonChip::construct(self.poseidon_config.clone())
+    pub(super) fn poseidon2_chip(&self) -> PoseidonChip<pallas::Base, 3, 2> {
+        PoseidonChip::construct(self.poseidon2_config.clone())
+    }
+    pub(super) fn poseidon4_chip(&self) -> PoseidonChip<pallas::Base, 5, 4> {
+        PoseidonChip::construct(self.poseidon4_config.clone())
     }
 }
 
@@ -48,6 +52,8 @@ impl Config {
 pub struct Circuit {
     pub x: pallas::Base,
     pub y: pallas::Base,
+    pub z: pallas::Base,
+    pub t: pallas::Base,
 }
 
 impl plonk::Circuit<pallas::Base> for Circuit {
@@ -60,6 +66,12 @@ impl plonk::Circuit<pallas::Base> for Circuit {
 
     fn configure(meta: &mut plonk::ConstraintSystem<pallas::Base>) -> Self::Config {
         let advices = [
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
             meta.advice_column(),
             meta.advice_column(),
             meta.advice_column(),
@@ -89,16 +101,27 @@ impl plonk::Circuit<pallas::Base> for Circuit {
             meta.fixed_column(),
             meta.fixed_column(),
             meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
         ];
-        let rc_a = lagrange_coeffs[2..5].try_into().unwrap();
-        let rc_b = lagrange_coeffs[5..8].try_into().unwrap();
 
         // Also use the first Lagrange coefficient column for loading global constants.
         // It's free real estate :)
         meta.enable_constant(lagrange_coeffs[0]);
 
-        // Configuration for the Poseidon hash.
-        let poseidon_config = PoseidonChip::configure::<poseidon::P128Pow5T3>(
+        let rc_a = lagrange_coeffs[1..4].try_into().unwrap();
+        let rc_b = lagrange_coeffs[4..7].try_into().unwrap();
+
+        // Configuration for the Poseidon2 hash.
+        let poseidon2_config = PoseidonChip::configure::<poseidon::P128Pow5T3>(
             meta,
             // We place the state columns after the partial_sbox column so that the
             // pad-and-add region can be laid out more efficiently.
@@ -108,10 +131,27 @@ impl plonk::Circuit<pallas::Base> for Circuit {
             rc_b,
         );
 
+        meta.enable_constant(lagrange_coeffs[7]);
+
+        let rc_c = lagrange_coeffs[8..13].try_into().unwrap();
+        let rc_d = lagrange_coeffs[13..18].try_into().unwrap();
+
+        // Configuration for the Poseidon4 hash.
+        let poseidon4_config = PoseidonChip::configure::<poseidon::P128Pow5T5>(
+            meta,
+            // We place the state columns after the partial_sbox column so that the
+            // pad-and-add region can be laid out more efficiently.
+            advices[4..9].try_into().unwrap(),
+            advices[9],
+            rc_c,
+            rc_d,
+        );
+
         Config {
             primary,
             advices,
-            poseidon_config,
+            poseidon2_config,
+            poseidon4_config,
         }
     }
 
@@ -121,9 +161,7 @@ impl plonk::Circuit<pallas::Base> for Circuit {
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<(), plonk::Error> {
-
-        for i in 0..NB_HASH {
-
+        for i in 0..NB_POSEIDON2 {
             let x_cell = assign_free_advice(
                 layouter.namespace(|| "x"),
                 config.advices[0],
@@ -134,16 +172,18 @@ impl plonk::Circuit<pallas::Base> for Circuit {
                 config.advices[1],
                 Value::known(self.y),
             )?;
-    
+
             // Poseidon(x, y)
             let gamma = {
-                let poseidon_message: [AssignedCell<pallas::Base, pallas::Base>; 2] = [x_cell, y_cell];
+                let poseidon_message: [AssignedCell<pallas::Base, pallas::Base>; 2] =
+                    [x_cell, y_cell];
 
                 // let poseidon_message = [u[0], u[1]];
-                let poseidon_hasher = halo2_gadgets::poseidon::Hash::<_, _, P128Pow5T3, _, 3, 2>::init(
-                    config.poseidon_chip(),
-                    layouter.namespace(|| "Poseidon init"),
-                )?;
+                let poseidon_hasher =
+                    halo2_gadgets::poseidon::Hash::<_, _, P128Pow5T3, _, 3, 2>::init(
+                        config.poseidon2_chip(),
+                        layouter.namespace(|| "Poseidon init"),
+                    )?;
                 poseidon_hasher.hash(
                     layouter.namespace(|| "Poseidon hash (nk, rho)"),
                     poseidon_message,
@@ -240,38 +280,40 @@ mod tests {
     use std::time::Instant;
 
     use ff::Field;
-    use halo2_gadgets::poseidon::primitives::{P128Pow5T3, Hash, ConstantLength};
+    use halo2_gadgets::poseidon::primitives::{ConstantLength, Hash, P128Pow5T3};
     use halo2_proofs::dev::MockProver;
+    use halo2_proofs::plonk::Circuit as PlonkCircuit;
+    use halo2_proofs::plonk::ConstraintSystem;
     use pasta_curves::pallas;
     use rand::rngs::OsRng;
-    use halo2_proofs::plonk::ConstraintSystem;
-    use halo2_proofs::plonk::Circuit as PlonkCircuit;
 
     use super::{Proof, ProvingKey, VerifyingKey};
 
     use super::Circuit;
 
     #[test]
-    fn test_poseidon_2() {
+    fn test_estim_2() {
         type Fp = pallas::Base;
-        
+
         let mut rng = OsRng;
         let x = Fp::random(&mut rng);
         let y = Fp::random(&mut rng);
+        let z = Fp::random(&mut rng);
+        let t = Fp::random(&mut rng);
 
         let hasher = Hash::<_, P128Pow5T3, ConstantLength<2>, 3, 2>::init();
-        let h_x_y = hasher.hash([x,y]);
+        let h_x_y = hasher.hash([x, y]);
 
-        let instance = &[h_x_y.clone();super::NB_HASH];
+        let instance = &[h_x_y.clone(); super::NB_POSEIDON2];
         // let instance_vec = instance.to_vec();
-        
-        let circuit = Circuit {x,y};
+
+        let circuit = Circuit { x, y, z, t };
 
         // // this lets you know the minimum number for K from the config:
         // let mut cs = ConstraintSystem::<Fp>::default();
         // let config = <Circuit as PlonkCircuit<Fp>>::configure(&mut cs);
         // println!("{}", cs.minimum_rows());
- 
+
         // // I don't know how to get the actual K... so I kind of do it by hand...
         // let mut k:usize = 18;
         // while MockProver::run(k.try_into().unwrap(), &circuit, vec![instance.to_vec()]).unwrap().verify() == Ok(()) {
