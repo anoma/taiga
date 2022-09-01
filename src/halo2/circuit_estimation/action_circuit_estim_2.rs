@@ -8,14 +8,17 @@ use pasta_curves::{pallas, vesta};
 use rand::RngCore;
 
 use halo2_gadgets::poseidon::{
-    primitives::{self as poseidon, P128Pow5T3},
+    primitives::{self as poseidon, P128Pow5T3, P128Pow5T5},
     Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
 };
 
 // number of hashes to do in the circuit
-const NB_POSEIDON2: usize = 156;
+const NUM_NOTES: usize = 4;
+const NB_POSEIDON2: usize = NUM_NOTES * 39;
+const NB_POSEIDON4: usize = NUM_NOTES * 1;
+
 // constant for the circuit size (depends on the number of hashes, of course)
-pub const K: u32 = 14;
+pub const K: u32 = 13;
 
 pub(crate) fn assign_free_advice<F: Field, V: Copy>(
     mut layouter: impl Layouter<F>,
@@ -161,6 +164,46 @@ impl plonk::Circuit<pallas::Base> for Circuit {
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<(), plonk::Error> {
+        for i in 0..NB_POSEIDON4 {
+            let x_cell = assign_free_advice(
+                layouter.namespace(|| "x"),
+                config.advices[0],
+                Value::known(self.x),
+            )?;
+            let y_cell = assign_free_advice(
+                layouter.namespace(|| "y"),
+                config.advices[1],
+                Value::known(self.y),
+            )?;
+            let z_cell = assign_free_advice(
+                layouter.namespace(|| "z"),
+                config.advices[0],
+                Value::known(self.z),
+            )?;
+            let t_cell = assign_free_advice(
+                layouter.namespace(|| "t"),
+                config.advices[1],
+                Value::known(self.t),
+            )?;
+
+            // Poseidon(x, y, z, t)
+            let gamma = {
+                let poseidon_message: [AssignedCell<pallas::Base, pallas::Base>; 4] =
+                    [x_cell, y_cell, z_cell, t_cell];
+
+                let poseidon_hasher =
+                    halo2_gadgets::poseidon::Hash::<_, _, P128Pow5T5, _, 5, 4>::init(
+                        config.poseidon4_chip(),
+                        layouter.namespace(|| "Poseidon4 init"),
+                    )?;
+                poseidon_hasher.hash(layouter.namespace(|| "Poseidon4 hash"), poseidon_message)?
+            };
+
+            layouter
+                .constrain_instance(gamma.cell(), config.primary, i)
+                .unwrap();
+        }
+
         for i in 0..NB_POSEIDON2 {
             let x_cell = assign_free_advice(
                 layouter.namespace(|| "x"),
@@ -178,20 +221,16 @@ impl plonk::Circuit<pallas::Base> for Circuit {
                 let poseidon_message: [AssignedCell<pallas::Base, pallas::Base>; 2] =
                     [x_cell, y_cell];
 
-                // let poseidon_message = [u[0], u[1]];
                 let poseidon_hasher =
                     halo2_gadgets::poseidon::Hash::<_, _, P128Pow5T3, _, 3, 2>::init(
                         config.poseidon2_chip(),
-                        layouter.namespace(|| "Poseidon init"),
+                        layouter.namespace(|| "Poseidon2 init"),
                     )?;
-                poseidon_hasher.hash(
-                    layouter.namespace(|| "Poseidon hash (nk, rho)"),
-                    poseidon_message,
-                )?
+                poseidon_hasher.hash(layouter.namespace(|| "Poseidon2 hash"), poseidon_message)?
             };
 
             layouter
-                .constrain_instance(gamma.cell(), config.primary, i)
+                .constrain_instance(gamma.cell(), config.primary, i + NB_POSEIDON4)
                 .unwrap();
         }
         Ok(())
@@ -280,6 +319,7 @@ mod tests {
     use std::time::Instant;
 
     use ff::Field;
+    use halo2_gadgets::poseidon::primitives::P128Pow5T5;
     use halo2_gadgets::poseidon::primitives::{ConstantLength, Hash, P128Pow5T3};
     use halo2_proofs::dev::MockProver;
     use halo2_proofs::plonk::Circuit as PlonkCircuit;
@@ -301,11 +341,18 @@ mod tests {
         let z = Fp::random(&mut rng);
         let t = Fp::random(&mut rng);
 
-        let hasher = Hash::<_, P128Pow5T3, ConstantLength<2>, 3, 2>::init();
-        let h_x_y = hasher.hash([x, y]);
+        let hasher2 = Hash::<_, P128Pow5T3, ConstantLength<2>, 3, 2>::init();
+        let h_x_y = hasher2.hash([x, y]);
 
-        let instance = &[h_x_y.clone(); super::NB_POSEIDON2];
-        // let instance_vec = instance.to_vec();
+        let hasher4 = Hash::<_, P128Pow5T5, ConstantLength<4>, 5, 4>::init();
+        let h_x_y_z_t = hasher4.hash([x, y, z, t]);
+
+        let _instance = [
+            [h_x_y_z_t.clone(); super::NB_POSEIDON4].as_slice(),
+            [h_x_y.clone(); super::NB_POSEIDON2].as_slice(),
+        ]
+        .concat();
+        let instance = _instance.as_slice();
 
         let circuit = Circuit { x, y, z, t };
 

@@ -21,3 +21,10 @@ Using this modification, we can estimate the cost of the action circuit with a b
 
 In order to get something a bit more precise, we implement Poseidon4 in the same way as we did in ZK-Garage, and we implement `BitsToVariable` and `RangeGate64`.
 
+### First estimation
+I implemented Poseidon4 and I benchmark 39*4 Poseidon2 + 1*4 Poseidon4:
+```
+key generation: 	8143ms
+proof: 			1725ms
+verification: 		36ms
+```
