@@ -3,12 +3,12 @@
 `App` define the type of note (e.g. XAN, ETH, BTC). Each application is identified by an address `appAddress` (the same way as user address identifies a user) and has its own VP `AppVP`.
 
 ### Application VP
-Each application has its own [validity predicate](./validity-predicates.md) `TokVP` that defines the conditions on which the application can be sent/received/etc (e.g. whitelist VP that only allows using the application a specified set of users). As with other VPs, `TokVP` checks that input and output notes of the tx satisfy certain constraints.
-It is required that the `TokVP` of the applications involved in a tx evaluated to `true`.
+Each application has its own [validity predicate](./validity-predicates.md) `AppVP` that defines the conditions on which the application can be sent/received/etc (e.g. whitelist VP that only allows using the application a specified set of users). As with other VPs, `AppVP` checks that input and output notes of the tx satisfy certain constraints.
+It is required that the `AppVP` of the applications involved in a tx evaluated to `true`.
 
 In Taiga, VPs are shielded, so instead of showing that `AppVP` evaluates to `true` publicly, a ZK proof is created. To make sure that `AppVP`  evaluates to `true`, an observer can verify the proof (using the verifier key):
 
-```verify(TokVP_proof, app_VK) = True```
+```verify(AppVP_proof, app_VK) = True```
 
 ### Application Address
 Each app is identified by an address that is derived from its verifier key `app_VK`:
@@ -17,7 +17,7 @@ Each app is identified by an address that is derived from its verifier key `app_
 
 ### Example
 ##### Create a application
-In order to create a application, we need `TokVP`. Let's use the `TrivialValidityPredicate` (see [more](./validity-predicates.md)):
+In order to create a application, we need `AppVP`. Let's use the `TrivialValidityPredicate` (see [more](./validity-predicates.md)):
 ```rust
 let mut app_vp = TrivialValidityPredicate::<CP> {
 	input_notes,

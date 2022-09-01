@@ -19,12 +19,12 @@ The details of the action transfer can be found [here](src/transaction.rs).
 
 ## Proofs of a transaction
 A transaction includes several proofs for the different VPs and for the actions and the blinding proofs.
-In this current implementation, we set `NUM_NOTE=4` for the number of input and output notes. Moreover, for we are interested in the `SendVP` and the `TokVP` of input notes and `RecvVP` and `TokVP` of output notes. Finally, every validity predicate is blinded as described [here](blinding.md), leading to a blinding proof.
+In this current implementation, we set `NUM_NOTE=4` for the number of input and output notes. Moreover, for we are interested in the `SendVP` and the `AppVP` of input notes and `RecvVP` and `AppVP` of output notes. Finally, every validity predicate is blinded as described [here](blinding.md), leading to a blinding proof.
 Therefore, a transaction includes:
 * Four `SendVP` proofs corresponding to the four input notes owner constraints,
-* Four `TokVP` proofs corresponding to the four input note app constraints,
+* Four `AppVP` proofs corresponding to the four input note app constraints,
 * Four `RecvVP` proofs corresponding to the four output note owner constraints,
-* Four `TokVP` proofs correspdonding to the four output note app constraints.
+* Four `AppVP` proofs correspdonding to the four output note app constraints.
 * Sixteen blinding proofs for the 16 previous proofs,
 * Four action proofs for binding the 16 first proofs of this list to the actual input and output note owner and app addresses, as described [here](action.md).
 

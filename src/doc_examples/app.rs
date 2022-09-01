@@ -24,7 +24,7 @@ fn test_app_creation() {
     let vp_setup = CP::get_pc_setup_params(vp.padded_circuit_size());
     let desc_vp = ValidityPredicateDescription::from_vp(&mut vp, vp_setup).unwrap();
 
-    let tok = App::<CP>::new(desc_vp);
+    let app = App::<CP>::new(desc_vp);
 
-    let _tok_addr = tok.address().unwrap();
+    let _tok_addr = app.address().unwrap();
 }

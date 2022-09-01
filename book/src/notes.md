@@ -60,7 +60,7 @@ let desc_vp_app = ValidityPredicateDescription::from_vp(&mut vp, &vp_setup).unwr
 let desc_vp_send = desc_vp_app.clone();
 let desc_vp_recv = desc_vp_send.clone();
 
-let tok = App::<CP>::new(desc_vp_app);
+let app = App::<CP>::new(desc_vp_app);
 let alice = User::<CP>::new(
 	desc_vp_send,
 	desc_vp_recv,
@@ -68,7 +68,7 @@ let alice = User::<CP>::new(
 );
 // note
 let nf = Nullifier::<CP>::new(Fr::rand(&mut rng));
-let note = Note::<CP>::new(alice, tok, 12, nf, Fr::rand(&mut rng), Fr::rand(&mut rng));
+let note = Note::<CP>::new(alice, app, 12, nf, Fr::rand(&mut rng), Fr::rand(&mut rng));
 
 let _note_commitment = note.commitment();
 ```

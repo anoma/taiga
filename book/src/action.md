@@ -14,9 +14,9 @@ To spend a note, the users need to prove that they are allowed to do so, namely:
 
 ## Creating a note
 
-To create a note, the user also needs to prove the right to do so. `TokVP` must allow the creation of the note, as well as recipient user's `RecvVP`:
+To create a note, the user also needs to prove the right to do so. `AppVP` must allow the creation of the note, as well as recipient user's `RecvVP`:
 
-- To make sure that the correct `TokVP` is checked, prove the relationship between `app_VK` and the application field in the note to be created.
+- To make sure that the correct `AppVP` is checked, prove the relationship between `app_VK` and the application field in the note to be created.
   ![img_4.png](img/action_img_4.png)
 
 - To make sure the correct `RecvVP` is checked (read more about `RecvVP` [here](./users.md)), prove the relationship between `recv_VK` and the owner field of the note to be created.
