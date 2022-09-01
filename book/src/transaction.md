@@ -9,9 +9,9 @@ In our current implementation version, there are four input notes and four outpu
 
 ## Action Transfer
 An action transfer spends an input note and creates an output note. To do so, it verifies:
-* one `SendVP` proof and one `TokVP` proof corresponding to an input note,
-* one `RecvVP` proof and one `TokVP` proof corresponding to an output note,
-* one action proof corresponding to the integrity of the owner and token addresses of the two notes,
+* one `SendVP` proof and one `AppVP` proof corresponding to an input note,
+* one `RecvVP` proof and one `AppVP` proof corresponding to an output note,
+* one action proof corresponding to the integrity of the owner and app addresses of the two notes,
 * that the input note already exists and is not spent,
 * the output note encryption.
 
@@ -19,14 +19,14 @@ The details of the action transfer can be found [here](src/transaction.rs).
 
 ## Proofs of a transaction
 A transaction includes several proofs for the different VPs and for the actions and the blinding proofs.
-In this current implementation, we set `NUM_NOTE=4` for the number of input and output notes. Moreover, for we are interested in the `SendVP` and the `TokVP` of input notes and `RecvVP` and `TokVP` of output notes. Finally, every validity predicate is blinded as described [here](blinding.md), leading to a blinding proof.
+In this current implementation, we set `NUM_NOTE=4` for the number of input and output notes. Moreover, for we are interested in the `SendVP` and the `AppVP` of input notes and `RecvVP` and `AppVP` of output notes. Finally, every validity predicate is blinded as described [here](blinding.md), leading to a blinding proof.
 Therefore, a transaction includes:
 * Four `SendVP` proofs corresponding to the four input notes owner constraints,
-* Four `TokVP` proofs corresponding to the four input note token constraints,
+* Four `AppVP` proofs corresponding to the four input note app constraints,
 * Four `RecvVP` proofs corresponding to the four output note owner constraints,
-* Four `TokVP` proofs correspdonding to the four output note token constraints.
+* Four `AppVP` proofs correspdonding to the four output note app constraints.
 * Sixteen blinding proofs for the 16 previous proofs,
-* Four action proofs for binding the 16 first proofs of this list to the actual input and output note owner and token addresses, as described [here](action.md).
+* Four action proofs for binding the 16 first proofs of this list to the actual input and output note owner and app addresses, as described [here](action.md).
 
 ![](img/taiga_tx.png)
 
@@ -35,7 +35,7 @@ Therefore, a transaction includes:
 Building a Taiga transaction is flexible: a transaction can be created from different [users](link) and splitted into several phases. In general, we can build a transaction as the following procedures:
 1. Create `Actions`,
 2. Collect all the (input and output) notes from the actions as local data for VPs,
-3. Create user and token validity predicates,
+3. Create user and app validity predicates,
 4. Generate the blinding proofs,
 5. Build the full transaction.
 
@@ -76,13 +76,13 @@ for _action_index in 0..NUM_TX_SLICE {
         &mut rng,
     );
     let spend_addr_vp_check = VPCheck::build(&mut spend_addr_vp, &mut rng).unwrap();
-    let mut spend_token_vp = FieldAdditionValidityPredicate::<CP>::new(
+    let mut spend_app_vp = FieldAdditionValidityPredicate::<CP>::new(
         input_notes.clone(),
         output_notes.clone(),
         &mut rng,
     );
-    let spend_token_vp_check = VPCheck::build(&mut spend_token_vp, &mut rng).unwrap();
-    let spend_slice = SpendSlice::new(spend_addr_vp_check, spend_token_vp_check);
+    let spend_app_vp_check = VPCheck::build(&mut spend_app_vp, &mut rng).unwrap();
+    let spend_slice = SpendSlice::new(spend_addr_vp_check, spend_app_vp_check);
     spend_slices.push(spend_slice);
     // Construct dummy output vps
     let mut output_addr_vp = FieldAdditionValidityPredicate::<CP>::new(
@@ -91,13 +91,13 @@ for _action_index in 0..NUM_TX_SLICE {
         &mut rng,
     );
     let output_addr_vp_check = VPCheck::build(&mut output_addr_vp, &mut rng).unwrap();
-    let mut output_token_vp = FieldAdditionValidityPredicate::<CP>::new(
+    let mut output_app_vp = FieldAdditionValidityPredicate::<CP>::new(
         input_notes.clone(),
         output_notes.clone(),
         &mut rng,
     );
-    let output_token_vp_check = VPCheck::build(&mut output_token_vp, &mut rng).unwrap();
-    let output_slice = OutputSlice::new(output_addr_vp_check, output_token_vp_check);
+    let output_app_vp_check = VPCheck::build(&mut output_app_vp, &mut rng).unwrap();
+    let output_slice = OutputSlice::new(output_addr_vp_check, output_app_vp_check);
     output_slices.push(output_slice);
 }
 // Construct a tx

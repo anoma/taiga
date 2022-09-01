@@ -42,13 +42,13 @@ where
         input_note_variables: &[ValidityPredicateInputNoteVariables],
         output_note_variables: &[ValidityPredicateOutputNoteVariables],
     ) -> Result<(), Error> {
-        // check that all notes use the same token
-        let var_token = input_note_variables[0].token_addr;
+        // check that all notes use the same app
+        let var_app = input_note_variables[0].app_addr;
         for note_var in input_note_variables {
-            composer.assert_equal(note_var.token_addr, var_token);
+            composer.assert_equal(note_var.app_addr, var_app);
         }
         for note_var in output_note_variables {
-            composer.assert_equal(note_var.token_addr, var_token);
+            composer.assert_equal(note_var.app_addr, var_app);
         }
 
         // sum of the input note values
@@ -90,8 +90,8 @@ where
 #[ignore]
 #[test]
 fn test_balance_vp_example() {
+    use crate::app::App;
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
-    use crate::token::Token;
     use plonk_core::circuit::{verify_proof, VerifierData};
     type Fr = <CP as CircuitParameters>::CurveScalarField;
     type P = <CP as CircuitParameters>::InnerCurve;
@@ -99,9 +99,9 @@ fn test_balance_vp_example() {
     use ark_std::test_rng;
 
     let mut rng = test_rng();
-    let xan = Token::<CP>::dummy(&mut rng);
+    let xan = App::<CP>::dummy(&mut rng);
     // input notes
-    let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_from_token(xan.clone(), &mut rng));
+    let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy_from_app(xan.clone(), &mut rng));
     // output notes
     let mut output_notes = input_notes.clone();
     let tmp = output_notes[0].value;

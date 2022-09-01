@@ -1,3 +1,4 @@
+use crate::app::App;
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::gadgets::merkle_tree::merkle_tree_gadget;
 use crate::circuit::integrity::{
@@ -7,22 +8,21 @@ use crate::circuit::validity_predicate::{ValidityPredicate, NUM_NOTE};
 use crate::merkle_tree::{MerklePath, Node};
 use crate::note::Note;
 use crate::poseidon::WIDTH_3;
-use crate::token::Token;
 use plonk_core::{circuit::Circuit, constraint_system::StandardComposer, prelude::Error};
 use plonk_hashing::poseidon::constants::PoseidonConstants;
 
-// WhiteListTokensValidityPredicate have a custom constraint checking that the received notes come from known senders.
-pub struct WhiteListTokensValidityPredicate<CP: CircuitParameters> {
+// WhiteListAppsValidityPredicate have a custom constraint checking that the received notes come from known senders.
+pub struct WhiteListAppsValidityPredicate<CP: CircuitParameters> {
     // basic "private" inputs to the VP
     input_notes: [Note<CP>; NUM_NOTE],
     output_notes: [Note<CP>; NUM_NOTE],
     // custom "private" inputs to the VP
-    white_list_tokens: Vec<Token<CP>>,
+    white_list_apps: Vec<App<CP>>,
     mk_root: Node<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>,
     paths: Vec<MerklePath<CP::CurveScalarField, PoseidonConstants<CP::CurveScalarField>>>,
 }
 
-impl<CP> ValidityPredicate<CP> for WhiteListTokensValidityPredicate<CP>
+impl<CP> ValidityPredicate<CP> for WhiteListAppsValidityPredicate<CP>
 where
     CP: CircuitParameters,
 {
@@ -44,14 +44,14 @@ where
         let poseidon_hash_param_bls12_381_new_scalar_arity2 =
             PoseidonConstants::generate::<WIDTH_3>();
         for (output_note_variable, path) in output_note_variables.iter().zip(self.paths.clone()) {
-            let token_var = output_note_variable.token_addr;
+            let app_var = output_note_variable.app_addr;
             let root_var = merkle_tree_gadget::<
                 CP::CurveScalarField,
                 CP::InnerCurve,
                 PoseidonConstants<CP::CurveScalarField>,
             >(
                 composer,
-                &token_var,
+                &app_var,
                 &path.get_path(),
                 &poseidon_hash_param_bls12_381_new_scalar_arity2,
             )
@@ -62,7 +62,7 @@ where
     }
 }
 
-impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for WhiteListTokensValidityPredicate<CP>
+impl<CP> Circuit<CP::CurveScalarField, CP::InnerCurve> for WhiteListAppsValidityPredicate<CP>
 where
     CP: CircuitParameters,
 {
@@ -83,7 +83,7 @@ where
 
 #[ignore]
 #[test]
-fn test_white_list_tokens_vp_example() {
+fn test_white_list_apps_vp_example() {
     use plonk_core::circuit::{verify_proof, VerifierData};
 
     use crate::circuit::circuit_parameters::PairingCircuitParameters as CP;
@@ -99,61 +99,59 @@ fn test_white_list_tokens_vp_example() {
     let input_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
     let output_notes = [(); NUM_NOTE].map(|_| Note::<CP>::dummy(&mut rng));
 
-    // white list is a list of token addresses, containing the output note token addresses.
-    let white_list_tokens: Vec<Token<CP>> = vec![
-        Token::<CP>::dummy(&mut rng),
-        output_notes[1].token.clone(),
-        Token::<CP>::dummy(&mut rng),
-        Token::<CP>::dummy(&mut rng),
-        output_notes[3].token.clone(),
-        output_notes[2].token.clone(),
-        Token::<CP>::dummy(&mut rng),
-        output_notes[0].token.clone(),
-        Token::<CP>::dummy(&mut rng),
+    // white list is a list of app addresses, containing the output note app addresses.
+    let white_list_apps: Vec<App<CP>> = vec![
+        App::<CP>::dummy(&mut rng),
+        output_notes[1].app.clone(),
+        App::<CP>::dummy(&mut rng),
+        App::<CP>::dummy(&mut rng),
+        output_notes[3].app.clone(),
+        output_notes[2].app.clone(),
+        App::<CP>::dummy(&mut rng),
+        output_notes[0].app.clone(),
+        App::<CP>::dummy(&mut rng),
     ];
 
-    let white_list_tokens_to_fields: Vec<Fr> = white_list_tokens
+    let white_list_apps_to_fields: Vec<Fr> = white_list_apps
         .iter()
         .map(|v| v.address().unwrap())
         .collect();
 
     let poseidon_hash_param_bls12_381_new_scalar_arity2 = PoseidonConstants::generate::<WIDTH_3>();
     let mk_root =
-        MerkleTreeLeafs::<Fr, PoseidonConstants<Fr>>::new(white_list_tokens_to_fields.to_vec())
+        MerkleTreeLeafs::<Fr, PoseidonConstants<Fr>>::new(white_list_apps_to_fields.to_vec())
             .root(&poseidon_hash_param_bls12_381_new_scalar_arity2);
 
     let paths: Vec<MerklePath<Fr, PoseidonConstants<Fr>>> = vec![
-        MerklePath::build_merkle_path(&white_list_tokens_to_fields, 7),
-        MerklePath::build_merkle_path(&white_list_tokens_to_fields, 1),
-        MerklePath::build_merkle_path(&white_list_tokens_to_fields, 5),
-        MerklePath::build_merkle_path(&white_list_tokens_to_fields, 4),
+        MerklePath::build_merkle_path(&white_list_apps_to_fields, 7),
+        MerklePath::build_merkle_path(&white_list_apps_to_fields, 1),
+        MerklePath::build_merkle_path(&white_list_apps_to_fields, 5),
+        MerklePath::build_merkle_path(&white_list_apps_to_fields, 4),
     ];
 
-    let mut white_list_tokens_vp = WhiteListTokensValidityPredicate {
+    let mut white_list_apps_vp = WhiteListAppsValidityPredicate {
         input_notes,
         output_notes,
-        white_list_tokens,
+        white_list_apps,
         mk_root,
         paths,
     };
     let mut composer = StandardComposer::<Fr, P>::new();
-    white_list_tokens_vp.gadget(&mut composer).unwrap();
+    white_list_apps_vp.gadget(&mut composer).unwrap();
     composer.check_circuit_satisfied();
     println!(
-        "circuit size of white_list_tokens_vp: {}",
+        "circuit size of white_list_apps_vp: {}",
         composer.circuit_bound()
     );
 
     // Generate CRS
-    let pp = CP::get_pc_setup_params(white_list_tokens_vp.padded_circuit_size());
+    let pp = CP::get_pc_setup_params(white_list_apps_vp.padded_circuit_size());
 
     // Compile the circuit
-    let (pk, vk) = white_list_tokens_vp.compile::<PC>(pp).unwrap();
+    let (pk, vk) = white_list_apps_vp.compile::<PC>(pp).unwrap();
 
     // Prover
-    let (proof, public_input) = white_list_tokens_vp
-        .gen_proof::<PC>(pp, pk, b"Test")
-        .unwrap();
+    let (proof, public_input) = white_list_apps_vp.gen_proof::<PC>(pp, pk, b"Test").unwrap();
 
     // Verifier
     let verifier_data = VerifierData::new(vk, public_input);

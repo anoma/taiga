@@ -5,7 +5,7 @@ The action is a mechanism that allows a user to spend or create [notes](notes.md
 ## Spending a note
 
 To spend a note, the users need to prove that they are allowed to do so, namely:
-- To make sure that the correct `TokVP` is checked, prove the relationship between `token_VK` and the token field in the spent note.
+- To make sure that the correct `AppVP` is checked, prove the relationship between `app_VK` and the application field in the spent note.
   ![img_3.png](img/action_img_3.png)
 - To make sure the correct `SendVP`(read more about `SendVP` [here](./users.md)) is checked, prove the relationship between `send_VK` and the owner field in the spent note.
 - Compute the nullifier of the spent note (using the nullifier key `nk`) so that it cannot be double-spent. To make sure that the nullifier is computed correctly, prove the relationship between `nk` and the owner field in the spent note.
@@ -14,9 +14,9 @@ To spend a note, the users need to prove that they are allowed to do so, namely:
 
 ## Creating a note
 
-To create a note, the user also needs to prove the right to do so. `TokVP` must allow the creation of the note, as well as recipient user's `RecvVP`:
+To create a note, the user also needs to prove the right to do so. `AppVP` must allow the creation of the note, as well as recipient user's `RecvVP`:
 
-- To make sure that the correct `TokVP` is checked, prove the relationship between `token_VK` and the token field in the note to be created.
+- To make sure that the correct `AppVP` is checked, prove the relationship between `app_VK` and the application field in the note to be created.
   ![img_4.png](img/action_img_4.png)
 
 - To make sure the correct `RecvVP` is checked (read more about `RecvVP` [here](./users.md)), prove the relationship between `recv_VK` and the owner field of the note to be created.

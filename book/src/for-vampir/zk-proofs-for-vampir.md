@@ -80,5 +80,5 @@ cargo test test_circuit_example
 
 ## ZK proofs in Taiga
 ZK proofs are the main ingredient of Taiga:
-* Users and tokens can provide their own rules for the transaction. A user defines rules for sending and receiving notes. As an example, a receiving VP could be a check that the sent notes contains at least 3 tokens.
-* Binding notes, users and tokens is done using hash commitments. We use ZK proofs in order to get full privacy. We will investigate further these definitions in the next sections.
+* Users and applications can provide their own rules for the transaction. A user defines rules for sending and receiving notes. As an example, a receiving VP could be a check that the sent notes contains at least 3 applications.
+* Binding notes, users and applications is done using hash commitments. We use ZK proofs in order to get full privacy. We will investigate further these definitions in the next sections.

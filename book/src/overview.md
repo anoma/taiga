@@ -11,7 +11,7 @@ Taiga is a shielded protocol for bartering on Anoma, leveraging the value of val
 
 * Native support for a broad range of asset types, including NFTs
 * Transactions are authorized by arbitrary user-defined validity predicate circuits
-* Validity predicates authorize both sending and receiving of assets, by the sender's, recipient's, and token's VPs
+* Validity predicates authorize both sending and receiving of assets, by the sender's, recipient's, and applications's VPs
 * Support for building complex matchmaking and private bartering transactions among multiple parties
 * Full zero-knowledge privacy, including of asset type and VP circuits
 * Performance benefits from using PLONK arithmetization, including lookups

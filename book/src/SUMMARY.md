@@ -2,7 +2,7 @@
 
 - [Taiga overview](./overview.md)
 - [Validity predicates](./validity-predicates.md)
-- [Tokens](token.md)
+- [Applications](app.md)
 - [Users](./users.md)
 - [Notes](./notes.md)
 - [Action](./action.md)

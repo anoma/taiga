@@ -4,7 +4,7 @@ use crate::nullifier::Nullifier;
 use crate::circuit::validity_predicate::ValidityPredicate;
 use crate::el_gamal::DecryptionKey;
 use crate::transaction::Transaction;
-use crate::{add_to_tree, note::Note, serializable_to_vec, token::Token, user::User};
+use crate::{add_to_tree, note::Note, serializable_to_vec, app::App, user::User};
 use ark_ff::{One, Zero};
 use ark_poly_commit::PolynomialCommitment;
 use rand::rngs::ThreadRng;
@@ -32,11 +32,11 @@ fn spawn_user<CP: CircuitParameters>(name: &str) -> User<CP> {
     )
 }
 
-fn spawn_token<CP: CircuitParameters>(name: &str) -> Token<CP> {
+fn spawn_app<CP: CircuitParameters>(name: &str) -> App<CP> {
     let mut rng = ThreadRng::default();
     let pp = <CP as CircuitParameters>::CurvePC::setup(1 << 4, None, &mut rng).unwrap();
 
-    Token::<CP>::new(name, &pp, trivial_gadget::<CP>, &mut rng)
+    App::<CP>::new(name, &pp, trivial_gadget::<CP>, &mut rng)
 }
 
 fn spawn_trivial_vps<CP: CircuitParameters>(
@@ -58,12 +58,12 @@ fn test_send<CP: CircuitParameters>() {
     let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&[]);
     let mut cm_ce_list = Vec::new();
 
-    //Create users and tokens to exchange
-    let xan = spawn_token::<CP>("XAN");
+    //Create users and apps to exchange
+    let xan = spawn_app::<CP>("XAN");
     let alice = spawn_user::<CP>("alice");
     let bob = spawn_user::<CP>("bob");
 
-    //Create VPs for the users and tokens
+    //Create VPs for the users and apps
     let vps = spawn_trivial_vps(3, &mut rng);
 
     // Create a 1XAN note for Alice
@@ -157,12 +157,12 @@ fn split_and_merge_notes_test<CP: CircuitParameters>() {
     let mut mt_tree = MerkleTree::<Blake2s>::from_leaves(&[]);
     let mut cm_ce_list = Vec::new();
 
-    //Create users and tokens
+    //Create users and apps
     let yulia = spawn_user::<CP>("yulia");
     let simon = spawn_user::<CP>("simon");
-    let xan = spawn_token::<CP>("xan");
+    let xan = spawn_app::<CP>("xan");
 
-    //Create VPs for the users and tokens
+    //Create VPs for the users and apps
     let vps = spawn_trivial_vps(3, &mut rng);
 
     //Create the initial note

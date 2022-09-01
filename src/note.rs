@@ -1,8 +1,8 @@
+use crate::app::App;
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::error::TaigaError;
 use crate::nullifier::Nullifier;
 use crate::poseidon::{FieldHasher, WIDTH_3, WIDTH_9};
-use crate::token::Token;
 use crate::user::User;
 use ark_ff::{BigInteger, PrimeField};
 use plonk_hashing::poseidon::{
@@ -16,7 +16,7 @@ use rand::RngCore;
 pub struct Note<CP: CircuitParameters> {
     /// Owner of the note
     pub user: User<CP>,
-    pub token: Token<CP>,
+    pub app: App<CP>,
     pub value: u64,
     /// for NFT or whatever. TODO: to be decided the value format.
     pub data: CP::CurveScalarField,
@@ -34,7 +34,7 @@ pub struct NoteCommitment<CP: CircuitParameters>(CP::CurveScalarField);
 impl<CP: CircuitParameters> Note<CP> {
     pub fn new(
         user: User<CP>,
-        token: Token<CP>,
+        app: App<CP>,
         value: u64,
         rho: Nullifier<CP>,
         data: CP::CurveScalarField,
@@ -46,7 +46,7 @@ impl<CP: CircuitParameters> Note<CP> {
         let psi = poseidon_param.native_hash_two(&rho.inner(), &rcm).unwrap();
         Self {
             user,
-            token,
+            app,
             value,
             data,
             rho,
@@ -60,7 +60,7 @@ impl<CP: CircuitParameters> Note<CP> {
         use rand::Rng;
 
         let user = User::<CP>::dummy(rng);
-        let token = Token::<CP>::dummy(rng);
+        let app = App::<CP>::dummy(rng);
         let value: u64 = rng.gen();
         let data = CP::CurveScalarField::rand(rng);
         let rho = Nullifier::new(CP::CurveScalarField::rand(rng));
@@ -72,7 +72,7 @@ impl<CP: CircuitParameters> Note<CP> {
         let psi = poseidon_param.native_hash_two(&rho.inner(), &rcm).unwrap();
         Self {
             user,
-            token,
+            app,
             value,
             data,
             rho,
@@ -81,7 +81,7 @@ impl<CP: CircuitParameters> Note<CP> {
         }
     }
 
-    pub fn dummy_from_token(token: Token<CP>, rng: &mut impl RngCore) -> Note<CP> {
+    pub fn dummy_from_app(app: App<CP>, rng: &mut impl RngCore) -> Note<CP> {
         use ark_ff::UniformRand;
         use rand::Rng;
 
@@ -97,7 +97,7 @@ impl<CP: CircuitParameters> Note<CP> {
         let psi = poseidon_param.native_hash_two(&rho.inner(), &rcm).unwrap();
         Self {
             user,
-            token,
+            app,
             value,
             data,
             rho,
@@ -110,7 +110,7 @@ impl<CP: CircuitParameters> Note<CP> {
         use ark_ff::UniformRand;
         use rand::Rng;
 
-        let token = Token::<CP>::dummy(rng);
+        let app = App::<CP>::dummy(rng);
         let value: u64 = rng.gen();
         let data = CP::CurveScalarField::rand(rng);
         let rho = Nullifier::new(CP::CurveScalarField::rand(rng));
@@ -122,7 +122,7 @@ impl<CP: CircuitParameters> Note<CP> {
         let psi = poseidon_param.native_hash_two(&rho.inner(), &rcm).unwrap();
         Self {
             user,
-            token,
+            app,
             value,
             data,
             rho,
@@ -138,7 +138,7 @@ impl<CP: CircuitParameters> Note<CP> {
     // or Sinsemilla_hash_to_curve used in Orchard) and adding rcm*fixed_generator, which based on DL assumption.
     pub fn commitment(&self) -> Result<NoteCommitment<CP>, TaigaError> {
         let user_address = self.user.address()?;
-        let token_address = self.token.address()?;
+        let app_address = self.app.address()?;
         let value_filed = CP::CurveScalarField::from(self.value);
 
         let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
@@ -148,7 +148,7 @@ impl<CP: CircuitParameters> Note<CP> {
             &poseidon_param,
         );
         poseidon.input(user_address).unwrap();
-        poseidon.input(token_address).unwrap();
+        poseidon.input(app_address).unwrap();
         poseidon.input(value_filed).unwrap();
         poseidon.input(self.data).unwrap();
         poseidon.input(self.rho.inner()).unwrap();

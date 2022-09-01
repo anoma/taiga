@@ -29,12 +29,12 @@ pub struct ActionSlice<CP: CircuitParameters> {
 
 pub struct SpendSlice<CP: CircuitParameters> {
     spend_addr_vp: VPCheck<CP>,
-    spend_token_vp: VPCheck<CP>,
+    spend_app_vp: VPCheck<CP>,
 }
 
 pub struct OutputSlice<CP: CircuitParameters> {
     output_addr_vp: VPCheck<CP>,
-    output_token_vp: VPCheck<CP>,
+    output_app_vp: VPCheck<CP>,
 }
 
 pub struct VPCheck<CP: CircuitParameters> {
@@ -60,19 +60,19 @@ pub struct VPCheck<CP: CircuitParameters> {
 }
 
 impl<CP: CircuitParameters> SpendSlice<CP> {
-    pub fn new(spend_addr_vp: VPCheck<CP>, spend_token_vp: VPCheck<CP>) -> Self {
+    pub fn new(spend_addr_vp: VPCheck<CP>, spend_app_vp: VPCheck<CP>) -> Self {
         Self {
             spend_addr_vp,
-            spend_token_vp,
+            spend_app_vp,
         }
     }
 }
 
 impl<CP: CircuitParameters> OutputSlice<CP> {
-    pub fn new(output_addr_vp: VPCheck<CP>, output_token_vp: VPCheck<CP>) -> Self {
+    pub fn new(output_addr_vp: VPCheck<CP>, output_app_vp: VPCheck<CP>) -> Self {
         Self {
             output_addr_vp,
-            output_token_vp,
+            output_app_vp,
         }
     }
 }
@@ -251,13 +251,13 @@ impl<CP: CircuitParameters> Transaction<CP> {
         // verify spend vp proof and blind proof
         for spend in self.spend_slices.iter() {
             spend.spend_addr_vp.verify()?;
-            spend.spend_token_vp.verify()?;
+            spend.spend_app_vp.verify()?;
         }
 
         // verify output vp proof and blind proof
         for output in self.output_slices.iter() {
             output.output_addr_vp.verify()?;
-            output.output_token_vp.verify()?;
+            output.output_app_vp.verify()?;
         }
 
         // check public input consistency(nf, output_cm, com_vp) among action, vp, vp blind.
@@ -325,13 +325,13 @@ fn test_tx() {
             &mut rng,
         );
         let spend_addr_vp_check = VPCheck::build(&mut spend_addr_vp, &mut rng).unwrap();
-        let mut spend_token_vp = FieldAdditionValidityPredicate::<CP>::new(
+        let mut spend_app_vp = FieldAdditionValidityPredicate::<CP>::new(
             input_notes.clone(),
             output_notes.clone(),
             &mut rng,
         );
-        let spend_token_vp_check = VPCheck::build(&mut spend_token_vp, &mut rng).unwrap();
-        let spend_slice = SpendSlice::new(spend_addr_vp_check, spend_token_vp_check);
+        let spend_app_vp_check = VPCheck::build(&mut spend_app_vp, &mut rng).unwrap();
+        let spend_slice = SpendSlice::new(spend_addr_vp_check, spend_app_vp_check);
         spend_slices.push(spend_slice);
 
         // Construct dummy output vps
@@ -341,13 +341,13 @@ fn test_tx() {
             &mut rng,
         );
         let output_addr_vp_check = VPCheck::build(&mut output_addr_vp, &mut rng).unwrap();
-        let mut output_token_vp = FieldAdditionValidityPredicate::<CP>::new(
+        let mut output_app_vp = FieldAdditionValidityPredicate::<CP>::new(
             input_notes.clone(),
             output_notes.clone(),
             &mut rng,
         );
-        let output_token_vp_check = VPCheck::build(&mut output_token_vp, &mut rng).unwrap();
-        let output_slice = OutputSlice::new(output_addr_vp_check, output_token_vp_check);
+        let output_app_vp_check = VPCheck::build(&mut output_app_vp, &mut rng).unwrap();
+        let output_slice = OutputSlice::new(output_addr_vp_check, output_app_vp_check);
         output_slices.push(output_slice);
     }
 

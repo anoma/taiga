@@ -1,9 +1,9 @@
 # Conclusion
 
 We presented the different structures needed to build a transaction in Taiga. This includes:
-* Tokens, and their corresponding validity predicate proofs,
+* Applications, and their corresponding validity predicate proofs,
 * Users, and their corresponding sending and receiving validity predicate proofs,
-* Notes, with their fields including the user owner address and the token address,
+* Notes, with their fields including the user owner address and the application address,
 * The action proof that binds the different VPs to the note fields,
 * The blinding proof that enables full privacy of VP,
 * The transaction description that enables spending and creating notes by verifying the different proofs.
@@ -15,7 +15,7 @@ In practice, the performance of our current implementation heavily depends on th
 ## Performance
 The performance is significantly affected by the proof generation, i.e. the number of proofs and the size of the different circuits.
 
-In a transaction, the action and the blinding circuit are fixed. The VP circuit size depends on the number of notes and the custom constraints set by the users and tokens.
+In a transaction, the action and the blinding circuit are fixed. The VP circuit size depends on the number of notes and the custom constraints set by the users and applications.
 As we have seen in the [transaction](/book/src/transaction.md), the number of notes in a transaction affects the number of proofs: for `NUM_NOTES` notes in a transaction, there is `9 * NUM_NOTES` proofs to be computed (of different circuit size).
 We provide here the benchmarks of a transaction for different numbers of notes.
 
@@ -64,7 +64,7 @@ From the previous benchmarks, we can perform a full transaction with different n
 
 ### Potential performance improvement
 The overall cost of a transaction is too expensive but there are several way of improvements:
-* The proof generation can be parallelized between the different actors of Taiga (sender, receiver, token, etc.)
+* The proof generation can be parallelized between the different actors of Taiga (sender, receiver, application, etc.)
 * Circuits are not optimized and the size can be reduced by improving the basic gadgets, refining the local data, etc.
 * The proof system can be modified so that we can use accumulation/aggregation, and/or use another polynomial commitment scheme leading to different efficiency tradeoffs.
 
