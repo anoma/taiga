@@ -36,6 +36,9 @@ halo2_gadgets = "0.2"
 halo2_proofs = "0.2"
 bitvec = "1"
 
+# orchard (to be removed)
+orchard = { git = "https://github.com/simonmasson/orchard.git", branch="test-sinsemilla" }
+
 [dev-dependencies]
 ark-std = "0.3"
 
