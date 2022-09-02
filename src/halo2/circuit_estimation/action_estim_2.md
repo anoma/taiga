@@ -9,22 +9,23 @@ Action circuit is composed of:
 
 ## ZK-Garage and Halo 2 primitives
 
-As a first step, we want to change only the note commitment computation. Instead of using Poseidon8, we will use Sinsemilla.
+We apply several changes in our current design for efficiency reasons:
+* We modify the note commitment definition: instead of using Poseidon8, we use Sinsemilla.
+* User and token addresses are committed into the base field, and then committed into the scalar field.
+    * In the case of the pairing setting, a base field element is larger than a scalar field element.
+    * In the case of Halo 2, base field and scalar field of Vesta are of the same size and so we can use Poseidon2 instead of Poseidon4 in the address computation.
 
-User and token address use a base field commitment, and split them into two scalar field elements because with BLS12-381, log(p) = 381 and log(r) = 256. In the case of Vesta, we can actually use only one field element, and use Poseidon2 instead of Poseidon4.
-
-Finally, we are going to keep the Merkle tree as it is, even though we could switch to Sinsemilla as they do in Zcash. As a first version, we want to see if Poseidon can be okay.
+For a first version, we keep the merkle tree with Poseidon hashes.
 
 ## Approximated cost
 
-Using this modification, we can estimate the cost of the action circuit with a bit of refinement. Each action requires 5 `BitsToVariables` + 39 `Poseidon2` + 1 `Poseidon4` + 2 `Sinsemilla` + 2 `RangeGate64`.
+Using these modifications, we can estimate the cost of the action circuit with a bit of refinement. Each action requires 5 `BitsToVariables` + 39 `Poseidon2` + 1 `Poseidon4` + 2 `Sinsemilla` + 2 `RangeGate64`.
 
-In order to get something a bit more precise, we implement Poseidon4 in the same way as we did in ZK-Garage, and we implement `BitsToVariable` and `RangeGate64`.
+In this second estimation, we integrate Sinsemilla hashes and implement Poseidon4. Poseidon4 required the generation of parameters as for ZK-Garage; it was quite easy. For Sinsemilla, I use the Orchard Parameters but we could generate them or reproduce them later.
 
-### First estimation
-I implemented Poseidon4 and I benchmark 39*4 Poseidon2 + 1*4 Poseidon4:
+For `NUM_NOTES = 4`, we have 39*4 Poseidon2 + 1*4 Poseidon4 + 2*4 Sinsemilla. This circuit fits in 2¹³ constraints (without any optimizations) and we obtained the following timings:
 ```
-key generation: 	8143ms
-proof: 			1725ms
+key generation: 	10826ms
+proof: 			2760ms
 verification: 		36ms
 ```

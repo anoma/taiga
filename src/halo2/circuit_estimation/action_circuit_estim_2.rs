@@ -1,4 +1,5 @@
 use ff::Field;
+use group::Curve;
 use halo2_proofs::{
     circuit::{floor_planner, AssignedCell, Layouter, Value},
     plonk::{self, Advice, Assigned, Column, Instance as InstanceColumn, SingleVerifier},
@@ -7,13 +8,28 @@ use halo2_proofs::{
 use pasta_curves::{pallas, vesta};
 use rand::RngCore;
 
-use halo2_gadgets::poseidon::{
-    primitives::{self as poseidon, P128Pow5T3, P128Pow5T5},
-    Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
+use halo2_gadgets::{
+    ecc::{
+        chip::{EccChip, EccConfig},
+        NonIdentityPoint, ScalarFixed,
+    },
+    poseidon::{
+        primitives::{self as poseidon, P128Pow5T3, P128Pow5T5},
+        Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
+    },
+    sinsemilla::{
+        chip::{SinsemillaChip, SinsemillaConfig},
+        CommitDomain, Message, MessagePiece,
+    },
+    utilities::{lookup_range_check::LookupRangeCheckConfig, range_check, RangeConstrained},
 };
+
+// use super::sinsemilla::{TestCommitDomain, TestFixedBases, TestHashDomain};
+use orchard::constants::{OrchardCommitDomains, OrchardFixedBases, OrchardHashDomains};
 
 // number of hashes to do in the circuit
 const NUM_NOTES: usize = 4;
+const NB_SINSEMILLA: usize = NUM_NOTES * 2;
 const NB_POSEIDON2: usize = NUM_NOTES * 39;
 const NB_POSEIDON4: usize = NUM_NOTES * 1;
 
@@ -40,6 +56,9 @@ pub struct Config {
     advices: [Column<Advice>; 10],
     poseidon2_config: PoseidonConfig<pallas::Base, 3, 2>,
     poseidon4_config: PoseidonConfig<pallas::Base, 5, 4>,
+    ecc_config: EccConfig<OrchardFixedBases>,
+    sinsemilla_config:
+        SinsemillaConfig<OrchardHashDomains, OrchardCommitDomains, OrchardFixedBases>,
 }
 
 impl Config {
@@ -48,6 +67,14 @@ impl Config {
     }
     pub(super) fn poseidon4_chip(&self) -> PoseidonChip<pallas::Base, 5, 4> {
         PoseidonChip::construct(self.poseidon4_config.clone())
+    }
+    pub(super) fn ecc_chip(&self) -> EccChip<OrchardFixedBases> {
+        EccChip::construct(self.ecc_config.clone())
+    }
+    pub(super) fn sinsemilla_chip(
+        &self,
+    ) -> SinsemillaChip<OrchardHashDomains, OrchardCommitDomains, OrchardFixedBases> {
+        SinsemillaChip::construct(self.sinsemilla_config.clone())
     }
 }
 
@@ -150,11 +177,36 @@ impl plonk::Circuit<pallas::Base> for Circuit {
             rc_d,
         );
 
+        // ECC
+        let table_idx = meta.lookup_table_column();
+        let small_lagrange: [Column<_>; 8] = lagrange_coeffs[0..8].try_into().unwrap();
+        let range_check = LookupRangeCheckConfig::configure(meta, advices[9], table_idx);
+        let ecc_config =
+            EccChip::<OrchardFixedBases>::configure(meta, advices, small_lagrange, range_check);
+
+        // Sinsemilla
+        let lookup = (
+            table_idx,
+            meta.lookup_table_column(),
+            meta.lookup_table_column(),
+        );
+        let range_check = LookupRangeCheckConfig::configure(meta, advices[9], table_idx);
+        let sinsemilla_config = SinsemillaChip::configure(
+            meta,
+            advices[..5].try_into().unwrap(),
+            advices[6],
+            lagrange_coeffs[0],
+            lookup,
+            range_check,
+        );
+
         Config {
             primary,
             advices,
             poseidon2_config,
             poseidon4_config,
+            ecc_config,
+            sinsemilla_config,
         }
     }
 
@@ -164,6 +216,63 @@ impl plonk::Circuit<pallas::Base> for Circuit {
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<(), plonk::Error> {
+        use halo2_gadgets::sinsemilla::primitives::CommitDomain as CD;
+
+        SinsemillaChip::load(config.sinsemilla_config.clone(), &mut layouter)?;
+
+        for i in 0..NB_SINSEMILLA {
+            // Construct the ECC chip.
+            let ecc_chip = config.ecc_chip();
+
+            // Construct the Sinsemilla chip.
+            let sinsemilla_chip = config.sinsemilla_chip();
+
+            let test_commit = CommitDomain::new(
+                sinsemilla_chip.clone(),
+                ecc_chip.clone(),
+                &OrchardCommitDomains::NoteCommit,
+            );
+            let r_val = pallas::Scalar::from(123);
+            let message: Vec<Value<bool>> = (0..500)
+                .map(|_| Value::known(rand::random::<bool>()))
+                .collect();
+
+            let (result, _) = {
+                let r = ScalarFixed::new(
+                    ecc_chip.clone(),
+                    layouter.namespace(|| "r"),
+                    Value::known(r_val),
+                )?;
+                let message = Message::from_bitstring(
+                    sinsemilla_chip,
+                    layouter.namespace(|| "witness message"),
+                    message.clone(),
+                )?;
+                test_commit.commit(layouter.namespace(|| "commit"), message, r)?
+            };
+
+            // Witness expected result.
+            let expected_result = {
+                let message: Value<Vec<bool>> = message.into_iter().collect();
+                let expected_result = message.map(|message| {
+                    let domain = CD::new("z.cash:Orchard-NoteCommit"); // need to be changed once we generate our params
+                    let point = domain.commit(message.into_iter(), &r_val).unwrap();
+                    point.to_affine()
+                });
+
+                NonIdentityPoint::new(
+                    ecc_chip,
+                    layouter.namespace(|| "Witness expected result"),
+                    expected_result,
+                )?
+            };
+
+            result.constrain_equal(
+                layouter.namespace(|| "result == expected result"),
+                &expected_result,
+            )?;
+        }
+
         for i in 0..NB_POSEIDON4 {
             let x_cell = assign_free_advice(
                 layouter.namespace(|| "x"),
@@ -233,6 +342,19 @@ impl plonk::Circuit<pallas::Base> for Circuit {
                 .constrain_instance(gamma.cell(), config.primary, i + NB_POSEIDON4)
                 .unwrap();
         }
+
+        // // this is a range check and uses sinsemilla chip...
+        // let x_cell = assign_free_advice(
+        //     layouter.namespace(|| "x"),
+        //     config.advices[0],
+        //     Value::known(self.x),
+        // )?;
+        // let a = MessagePiece::from_subpieces(
+        //     sinsemilla_chip.clone(),
+        //     layouter.namespace(|| "a"),
+        //     [RangeConstrained::bitrange_of(x.value(), 0..255)],
+        // )?;
+
         Ok(())
     }
 }
