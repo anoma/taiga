@@ -52,3 +52,9 @@ impl Nullifier {
         self.0
     }
 }
+
+impl Default for Nullifier {
+    fn default() -> Nullifier {
+        Nullifier(pallas::Base::one())
+    }
+}

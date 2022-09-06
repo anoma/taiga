@@ -102,3 +102,11 @@ impl UserSendAddress {
         }
     }
 }
+
+impl Default for User {
+    fn default() -> User {
+        let send_com = UserSendAddress::Closed(pallas::Base::one());
+        let recv_vp = ValidityPredicateDescription::Compressed(pallas::Base::one());
+        User { send_com, recv_vp }
+    }
+}
