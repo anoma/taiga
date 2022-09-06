@@ -1,4 +1,5 @@
 use crate::halo2::constant::{NOTE_COMMITMENT_GENERATOR, NOTE_COMMITMENT_R_GENERATOR, R_U, R_Z};
+use ff::Field;
 use halo2_gadgets::{
     ecc::{
         chip::{constants::H, BaseFieldElem, EccChip, FixedPoint, FullScalar, ShortScalar},
@@ -12,10 +13,10 @@ use halo2_gadgets::{
 };
 use halo2_proofs::{
     circuit::{AssignedCell, Chip, Layouter, Value},
-    plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Selector},
+    plonk::{Advice, Assigned, Column, ConstraintSystem, Constraints, Error, Selector},
     poly::Rotation,
 };
-use pasta_curves::pallas;
+use pasta_curves::{arithmetic::FieldExt, pallas};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NoteCommitmentHashDomain;
@@ -111,8 +112,10 @@ impl FixedPoint<pallas::Affine> for Short {
 
 #[derive(Clone, Debug)]
 pub struct NoteCommitmentConfig {
-    decompose5_5: Decompose5_5,
     advices: [Column<Advice>; 10],
+    decompose5_5: Decompose5_5,
+    base_canonicity_250_5: BaseCanonicity250_5,
+    base_canonicity_5: BaseCanonicity5,
     sinsemilla_config:
         SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
 }
@@ -133,19 +136,24 @@ impl NoteCommitmentChip {
         >,
     ) -> NoteCommitmentConfig {
         let two_pow_5 = pallas::Base::from(1 << 5);
+        let two_pow_250 = pallas::Base::from_u128(1 << 125).square();
 
         let col_l = advices[6];
         let col_m = advices[7];
         let col_r = advices[8];
-        // let col_z = advices[9];
 
         // Decompose configure
         let decompose5_5 = Decompose5_5::configure(meta, col_l, col_m, col_r, two_pow_5);
 
-        // Input canonicity configure
+        // Base canonicity configure
+        let base_canonicity_250_5 =
+            BaseCanonicity250_5::configure(meta, col_l, col_m, col_r, two_pow_250);
+        let base_canonicity_5 = BaseCanonicity5::configure(meta, col_l, col_m, col_r, two_pow_5);
 
         NoteCommitmentConfig {
             decompose5_5,
+            base_canonicity_250_5,
+            base_canonicity_5,
             advices,
             sinsemilla_config,
         }
@@ -179,7 +187,7 @@ pub fn note_commitment_gadget(
         [RangeConstrained::bitrange_of(user_address.value(), 0..250)],
     )?;
 
-    // a || (bits 250..=255 of user) || (bits 0..=4 of token)
+    // `a` = (bits 250..=255 of user) || (bits 0..=4 of token)
     let (a, user_tail_bit5, token_pre_bit5) = Decompose5_5::decompose(
         &lookup_config,
         chip.clone(),
@@ -220,10 +228,11 @@ pub fn note_commitment_gadget(
         [RangeConstrained::bitrange_of(psi.value(), 0..250)],
     )?;
 
-    // c = (bits 250..=255 of psi) || (bits 0..=4 of value)
+    // `c` = (bits 250..=255 of psi) || (bits 0..=4 of value)
     let (c, psi_tail_bit5, value_pre_bit5) =
         Decompose5_5::decompose(&lookup_config, chip.clone(), &mut layouter, &psi, &value)?;
 
+    // `d` = (bits 5..=63 of value) || 0
     let d = MessagePiece::from_subpieces(
         chip.clone(),
         layouter.namespace(|| "d"),
@@ -238,15 +247,15 @@ pub fn note_commitment_gadget(
         let message = Message::from_pieces(
             chip.clone(),
             vec![
-                user_0_249,
+                user_0_249.clone(),
                 a.clone(),
-                token_5_254,
-                data_0_249,
+                token_5_254.clone(),
+                data_0_249.clone(),
                 b.clone(),
-                rho_5_254,
-                psi_0_249,
+                rho_5_254.clone(),
+                psi_0_249.clone(),
                 c.clone(),
-                d,
+                d.clone(),
             ],
         );
         let domain = CommitDomain::new(chip, ecc_chip, &NoteCommitmentDomain);
@@ -257,19 +266,42 @@ pub fn note_commitment_gadget(
         )?
     };
 
-    // TODO: add input canonicity checks
-
     // assign values
     let cfg = note_commit_chip.config;
 
-    cfg.decompose5_5
-        .assign(&mut layouter, a, user_tail_bit5, token_pre_bit5)?;
+    cfg.decompose5_5.assign(
+        &mut layouter,
+        a,
+        user_tail_bit5.clone(),
+        token_pre_bit5.clone(),
+    )?;
 
-    cfg.decompose5_5
-        .assign(&mut layouter, b, data_tail_bit5, rho_pre_bit5)?;
+    cfg.decompose5_5.assign(
+        &mut layouter,
+        b,
+        data_tail_bit5.clone(),
+        rho_pre_bit5.clone(),
+    )?;
 
-    cfg.decompose5_5
-        .assign(&mut layouter, c, psi_tail_bit5, value_pre_bit5)?;
+    cfg.decompose5_5.assign(
+        &mut layouter,
+        c,
+        psi_tail_bit5.clone(),
+        value_pre_bit5.clone(),
+    )?;
+
+    cfg.base_canonicity_250_5
+        .assign(&mut layouter, user_address, user_0_249, user_tail_bit5)?;
+    cfg.base_canonicity_5
+        .assign(&mut layouter, token_address, token_5_254, token_pre_bit5)?;
+    cfg.base_canonicity_250_5
+        .assign(&mut layouter, data, data_0_249, data_tail_bit5)?;
+    cfg.base_canonicity_5
+        .assign(&mut layouter, rho, rho_5_254, rho_pre_bit5)?;
+    cfg.base_canonicity_250_5
+        .assign(&mut layouter, psi, psi_0_249, psi_tail_bit5)?;
+    cfg.base_canonicity_5
+        .assign(&mut layouter, value, d, value_pre_bit5)?;
 
     Ok(cm)
 }
@@ -404,6 +436,156 @@ impl Decompose5_5 {
     }
 }
 
+/// |  A_6  | A_7 | A_8 | q_base_250_5 |
+/// ------------------------------------------------
+/// |  v  | v_250 | v_5 |          1         |
+///
+#[derive(Clone, Debug)]
+struct BaseCanonicity250_5 {
+    q_base_250_5: Selector,
+    col_l: Column<Advice>,
+    col_m: Column<Advice>,
+    col_r: Column<Advice>,
+}
+
+impl BaseCanonicity250_5 {
+    fn configure(
+        meta: &mut ConstraintSystem<pallas::Base>,
+        col_l: Column<Advice>,
+        col_m: Column<Advice>,
+        col_r: Column<Advice>,
+        two_pow_250: pallas::Base,
+    ) -> Self {
+        let q_base_250_5 = meta.selector();
+
+        meta.create_gate("NoteCommit input value", |meta| {
+            let q_base_250_5 = meta.query_selector(q_base_250_5);
+
+            let value = meta.query_advice(col_l, Rotation::cur());
+            // v_250 has been constrained to 250 bits.
+            let v_250 = meta.query_advice(col_m, Rotation::cur());
+            // v_5 has been constrained to 5 bits.
+            let v_5 = meta.query_advice(col_r, Rotation::cur());
+
+            // value = v_250 + (2^250)v_5
+            let value_check = v_250 + v_5 * two_pow_250 - value;
+
+            Constraints::with_selector(q_base_250_5, Some(("value_check", value_check)))
+        });
+
+        Self {
+            q_base_250_5,
+            col_l,
+            col_m,
+            col_r,
+        }
+    }
+
+    fn assign(
+        &self,
+        layouter: &mut impl Layouter<pallas::Base>,
+        value: AssignedCell<pallas::Base, pallas::Base>,
+        v_250: NoteCommitPiece,
+        v_5: RangeConstrained<pallas::Base, AssignedCell<pallas::Base, pallas::Base>>,
+    ) -> Result<(), Error> {
+        layouter.assign_region(
+            || "NoteCommit input value",
+            |mut region| {
+                value.copy_advice(|| "value", &mut region, self.col_l, 0)?;
+                v_250
+                    .inner()
+                    .cell_value()
+                    .copy_advice(|| "v_250", &mut region, self.col_m, 0)?;
+                v_5.inner()
+                    .copy_advice(|| "v_5", &mut region, self.col_r, 0)?;
+                self.q_base_250_5.enable(&mut region, 0)
+            },
+        )
+    }
+}
+
+/// |  A_6  | A_7 | A_8 | q_base_250_5 |
+/// ------------------------------------------------
+/// |  v  | v_tail | v_5 |          1         |
+///
+#[derive(Clone, Debug)]
+struct BaseCanonicity5 {
+    q_base_5: Selector,
+    col_l: Column<Advice>,
+    col_m: Column<Advice>,
+    col_r: Column<Advice>,
+}
+
+impl BaseCanonicity5 {
+    fn configure(
+        meta: &mut ConstraintSystem<pallas::Base>,
+        col_l: Column<Advice>,
+        col_m: Column<Advice>,
+        col_r: Column<Advice>,
+        two_pow_5: pallas::Base,
+    ) -> Self {
+        let q_base_5 = meta.selector();
+
+        meta.create_gate("NoteCommit input value", |meta| {
+            let q_base_5 = meta.query_selector(q_base_5);
+
+            let value = meta.query_advice(col_l, Rotation::cur());
+            // v_tail has been constrained to the tail bits.
+            let v_tail = meta.query_advice(col_m, Rotation::cur());
+            // v_5 has been constrained to the previous 5 bits.
+            let v_5 = meta.query_advice(col_r, Rotation::cur());
+
+            // value = v_tail * (2^5) + v_5
+            let value_check = v_tail * two_pow_5 + v_5 - value;
+
+            Constraints::with_selector(q_base_5, Some(("value_check", value_check)))
+        });
+
+        Self {
+            q_base_5,
+            col_l,
+            col_m,
+            col_r,
+        }
+    }
+
+    fn assign(
+        &self,
+        layouter: &mut impl Layouter<pallas::Base>,
+        value: AssignedCell<pallas::Base, pallas::Base>,
+        v_tail: NoteCommitPiece,
+        v_5: RangeConstrained<pallas::Base, AssignedCell<pallas::Base, pallas::Base>>,
+    ) -> Result<(), Error> {
+        layouter.assign_region(
+            || "NoteCommit input value",
+            |mut region| {
+                value.copy_advice(|| "value", &mut region, self.col_l, 0)?;
+                v_tail
+                    .inner()
+                    .cell_value()
+                    .copy_advice(|| "v_tail", &mut region, self.col_m, 0)?;
+                v_5.inner()
+                    .copy_advice(|| "v_5", &mut region, self.col_r, 0)?;
+                self.q_base_5.enable(&mut region, 0)
+            },
+        )
+    }
+}
+
+pub fn assign_free_advice<F: Field, V: Copy>(
+    mut layouter: impl Layouter<F>,
+    column: Column<Advice>,
+    value: Value<V>,
+) -> Result<AssignedCell<V, F>, Error>
+where
+    for<'v> Assigned<F>: From<&'v V>,
+{
+    layouter.assign_region(
+        || "load private",
+        |mut region| region.assign_advice(|| "load private", column, 0, || value),
+    )
+}
+
 #[test]
 fn note_commit_test() {
     use halo2_proofs::{
@@ -423,6 +605,7 @@ fn note_commit_test() {
         sinsemilla::chip::SinsemillaChip,
         utilities::lookup_range_check::LookupRangeCheckConfig,
     };
+    use rand::{rngs::OsRng, RngCore};
 
     #[derive(Default)]
     struct MyCircuit {
@@ -614,32 +797,16 @@ fn note_commit_test() {
         }
     }
 
-    // Test different values of `ak`, `nk`
+    let mut rng = OsRng;
     let circuit = MyCircuit {
-        user: User::default(),
-        token: Token::default(),
-        value: 1u64,
+        user: User::dummy(&mut rng),
+        token: Token::dummy(&mut rng),
+        value: rng.next_u64(),
         rho: Nullifier::default(),
-        data: pallas::Base::one(),
-        rcm: pallas::Scalar::one(),
+        data: pallas::Base::random(&mut rng),
+        rcm: pallas::Scalar::random(&mut rng),
     };
 
     let prover = MockProver::<pallas::Base>::run(11, &circuit, vec![]).unwrap();
     assert_eq!(prover.verify(), Ok(()));
-}
-
-use ff::Field;
-use halo2_proofs::plonk::Assigned;
-pub fn assign_free_advice<F: Field, V: Copy>(
-    mut layouter: impl Layouter<F>,
-    column: Column<Advice>,
-    value: Value<V>,
-) -> Result<AssignedCell<V, F>, Error>
-where
-    for<'v> Assigned<F>: From<&'v V>,
-{
-    layouter.assign_region(
-        || "load private",
-        |mut region| region.assign_advice(|| "load private", column, 0, || value),
-    )
 }
