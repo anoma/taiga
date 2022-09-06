@@ -24,3 +24,10 @@ impl Token {
         self.token_vp.get_compressed()
     }
 }
+
+impl Default for Token {
+    fn default() -> Token {
+        let token_vp = ValidityPredicateDescription::Compressed(pallas::Base::one());
+        Token { token_vp }
+    }
+}

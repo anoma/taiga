@@ -1,4 +1,5 @@
 pub mod action;
+pub mod circuit;
 pub mod constant;
 pub mod merkle_tree;
 pub mod note;

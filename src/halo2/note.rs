@@ -1,5 +1,5 @@
 use crate::halo2::{
-    constant::NOTE_COMMITMENT_PERSONALIZATION,
+    constant::{BASE_BITS_NUM, NOTE_COMMIT_DOMAIN},
     nullifier::Nullifier,
     token::Token,
     user::User,
@@ -7,10 +7,8 @@ use crate::halo2::{
 };
 use bitvec::{array::BitArray, order::Lsb0};
 use core::iter;
-use ff::Field;
-use group::ff::PrimeFieldBits;
+use ff::{Field, PrimeFieldBits};
 use group::Group;
-use halo2_gadgets::sinsemilla::primitives;
 use pasta_curves::pallas;
 use rand::{Rng, RngCore};
 
@@ -91,28 +89,42 @@ impl Note {
         }
     }
 
-    // To simplify implementation, can we use NoteCommit from VERI-ZEXE(P26 Commitment).
-    // Commit(m, r) = CRH(m||r||0), m is a n filed elements vector, CRH is an algebraic hash function(poseidon here).
-    // If the Commit can't provide enough hiding security(to be verified, we have the same problem in
-    // address commit and vp commit), consider using hash_to_curve(pedersen_hash_to_curve used in sapling
-    // or Sinsemilla_hash_to_curve used in Orchard) and adding rcm*fixed_generator, which based on DL assumption.
+    // cm = SinsemillaCommit^rcm(user_address || token_address || data || rho || psi || value)
     pub fn commitment(&self) -> NoteCommitment {
         let user_address = self.user.address();
         let token_address = self.token.address();
-        let domain = primitives::CommitDomain::new(NOTE_COMMITMENT_PERSONALIZATION);
-        let ret = domain
+        let ret = NOTE_COMMIT_DOMAIN
             .commit(
                 iter::empty()
-                    .chain(user_address.to_le_bits().iter().by_vals())
-                    .chain(token_address.to_le_bits().iter().by_vals())
                     .chain(
-                        BitArray::<_, Lsb0>::new(self.value.to_be_bytes())
+                        user_address
+                            .to_le_bits()
+                            .iter()
+                            .by_vals()
+                            .take(BASE_BITS_NUM),
+                    )
+                    .chain(
+                        token_address
+                            .to_le_bits()
+                            .iter()
+                            .by_vals()
+                            .take(BASE_BITS_NUM),
+                    )
+                    .chain(self.data.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
+                    .chain(
+                        self.rho
+                            .inner()
+                            .to_le_bits()
+                            .iter()
+                            .by_vals()
+                            .take(BASE_BITS_NUM),
+                    )
+                    .chain(self.psi.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
+                    .chain(
+                        BitArray::<_, Lsb0>::new(self.value.to_le())
                             .iter()
                             .by_vals(),
-                    )
-                    .chain(self.data.to_le_bits().iter().by_vals())
-                    .chain(self.rho.inner().to_le_bits().iter().by_vals())
-                    .chain(self.psi.to_le_bits().iter().by_vals()),
+                    ),
                 &self.rcm,
             )
             .unwrap();
