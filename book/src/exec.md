@@ -41,4 +41,15 @@ Note: partial transactions cannot be published on the blockchain as there will b
 After the intents are matched with satsfaction of all of the involved parties, the transaction is published on the blockchain. The intermediate notes themself are not published, but the local CMTree is, as well as all of the proofs created (including the proofs for the intermediate notes).
 
 ### Example with 3-party bartering cycle
+
+On the example below Alice, Bob, and Carol want to exchange some assets. 
+
+1. All three of them create intermediate notes with VPs that make sure the requirements are satisfied, and publish intents. 
+
+2. The first solver matches two intents and produces partial tx and a new intent. 
+
+3. The second solver finds a match for the intents left to match and produces the final transaction. 
+
+Intermediate notes aren't published, but intermediate notes and commitments are.
+
 ![img.png](img/exec_img.png)
