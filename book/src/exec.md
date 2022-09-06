@@ -25,9 +25,19 @@ Note: intermediate notes will not be published
 Not much to say here in the context of Taiga execution but might be helpful to preserve the structure of the page
 
 #### Solve
-We are considering the model when a solver makes one step at a time and sends the result to the next solver. In practice, the solver can send it to themselves and continue solving if they have the intent to make the next step
+We are considering the model when a solver makes one step at a time and sends the result to the next solver. In practice, the solver can send the result to themselves and continue solving if they have the intent to make the next step. It would be nice to merge the steps into one when possible, but for simplicity we ignore this detail here
 
-Note: it would be nice to merge the steps into one when possible
+Note: each solver must check the proofs they receive from other nodes
 
+When a solver has two intents that can be matched together, they match the intents by spending the old notes and creating new notes. Solvers have the authority to spend and create the intermediate notes they receive and produce the proofs required to perform the action. Solvers also know the content of intent-specific VPs and receving VPs of the users (necessary to be able to satisfy them). Solvers don't know the identities of the users. Created notes are added in a local MT tree that will be published later along with the settled transaction.
+
+If a solver has two intents that can be matched together, two situations are possible:
+1. The match is partial and results in a creation of a partial transaction and a new intent. In this case the solver appends the data they produced to the intent and gossip the new intent to the next node
+2. The match is final and the final transaction can be created. In this case the solver publishes the final transaction described below.
+
+Note: partial transactions cannot be published on the blockchain because there will be a VP/other restriction mechanism blocking that
 
 #### Finalize
+Note: All of the intermediate notes created by the solver are added to a local commitment tree that is published in the end
+
+Note: intermediate notes aren't published, but the proofs are
