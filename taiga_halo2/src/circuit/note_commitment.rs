@@ -1,5 +1,4 @@
 use crate::constant::{NOTE_COMMITMENT_GENERATOR, NOTE_COMMITMENT_R_GENERATOR, R_U, R_Z};
-use ff::Field;
 use halo2_gadgets::{
     ecc::{
         chip::{constants::H, BaseFieldElem, EccChip, FixedPoint, FullScalar, ShortScalar},
@@ -13,11 +12,10 @@ use halo2_gadgets::{
 };
 use halo2_proofs::{
     circuit::{AssignedCell, Chip, Layouter, Value},
-    plonk::{Advice, Assigned, Column, ConstraintSystem, Constraints, Error, Selector},
+    plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Selector},
     poly::Rotation,
 };
 use pasta_curves::{arithmetic::FieldExt, pallas};
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NoteCommitmentHashDomain;
 impl HashDomains<pallas::Affine> for NoteCommitmentHashDomain {
@@ -572,30 +570,12 @@ impl BaseCanonicity5 {
     }
 }
 
-pub fn assign_free_advice<F: Field, V: Copy>(
-    mut layouter: impl Layouter<F>,
-    column: Column<Advice>,
-    value: Value<V>,
-) -> Result<AssignedCell<V, F>, Error>
-where
-    for<'v> Assigned<F>: From<&'v V>,
-{
-    layouter.assign_region(
-        || "load private",
-        |mut region| region.assign_advice(|| "load private", column, 0, || value),
-    )
-}
-
 #[test]
 fn note_commit_test() {
-    use halo2_proofs::{
-        circuit::{Layouter, SimpleFloorPlanner, Value},
-        dev::MockProver,
-        plonk::{Circuit, ConstraintSystem, Error},
-    };
-
+    use crate::circuit::gadgets::assign_free_advice;
     use crate::note::Note;
     use crate::{nullifier::Nullifier, token::Token, user::User};
+    use ff::Field;
     use group::Curve;
     use halo2_gadgets::{
         ecc::{
@@ -604,6 +584,11 @@ fn note_commit_test() {
         },
         sinsemilla::chip::SinsemillaChip,
         utilities::lookup_range_check::LookupRangeCheckConfig,
+    };
+    use halo2_proofs::{
+        circuit::{Layouter, SimpleFloorPlanner, Value},
+        dev::MockProver,
+        plonk::{Circuit, ConstraintSystem, Error},
     };
     use rand::{rngs::OsRng, RngCore};
 
