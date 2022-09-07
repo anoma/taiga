@@ -1,4 +1,4 @@
-use crate::halo2::constant::{NOTE_COMMITMENT_GENERATOR, NOTE_COMMITMENT_R_GENERATOR, R_U, R_Z};
+use crate::constant::{NOTE_COMMITMENT_GENERATOR, NOTE_COMMITMENT_R_GENERATOR, R_U, R_Z};
 use ff::Field;
 use halo2_gadgets::{
     ecc::{
@@ -594,8 +594,8 @@ fn note_commit_test() {
         plonk::{Circuit, ConstraintSystem, Error},
     };
 
-    use crate::halo2::note::Note;
-    use crate::halo2::{nullifier::Nullifier, token::Token, user::User};
+    use crate::note::Note;
+    use crate::{nullifier::Nullifier, token::Token, user::User};
     use group::Curve;
     use halo2_gadgets::{
         ecc::{

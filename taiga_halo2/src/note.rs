@@ -1,4 +1,4 @@
-use crate::halo2::{
+use crate::{
     constant::{BASE_BITS_NUM, NOTE_COMMIT_DOMAIN},
     nullifier::Nullifier,
     token::Token,

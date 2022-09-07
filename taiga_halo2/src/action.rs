@@ -1,4 +1,4 @@
-use crate::halo2::{
+use crate::{
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{MerklePath, Node},
     note::{Note, NoteCommitment},
