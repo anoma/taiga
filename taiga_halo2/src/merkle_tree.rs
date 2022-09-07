@@ -143,3 +143,12 @@ impl Node {
         Self(poseidon_hash(left.inner(), right.inner()))
     }
 }
+
+impl Default for MerklePath {
+    fn default() -> MerklePath {
+        let auth_path = (0..32)
+            .map(|_| (Node::new(pallas::Base::one()), true))
+            .collect();
+        Self::from_path(auth_path)
+    }
+}
