@@ -34,7 +34,7 @@ If a solver has two intents that can be matched together, two cases are possible
 1. The match is partial, partial transaction and a new intent are created. In this case the solver appends the data they produced to the new intent and gossips the new intent to the next node
 2. The match is final, the solver publishes the final transaction as described below
 
-Note: partial transactions cannot be published on the blockchain as there will be a VP/other restriction mechanism blocking that
+Currently we assume a simpler model where only one solver can match n-party bartering intents (no partial solving) and an intermediate tx cannot be published on the blockchain as VPs will not allow that (balance issue). In the partial solving case partial transactions cannot be published on the blockchain as there will be a VP/other restriction mechanism blocking that.
 
 ### Finalize
 
