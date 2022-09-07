@@ -1,6 +1,6 @@
 //! Implementation of a Merkle tree of commitments used to prove the existence of notes.
 //!
-use crate::halo2::utils::poseidon_hash;
+use crate::utils::poseidon_hash;
 use ff::Field;
 use pasta_curves::pallas;
 use rand::{Rng, RngCore};

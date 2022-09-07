@@ -1,4 +1,4 @@
-use crate::halo2::vp_description::ValidityPredicateDescription;
+use crate::vp_description::ValidityPredicateDescription;
 use pasta_curves::pallas;
 use rand::RngCore;
 

@@ -18,9 +18,3 @@ pub mod transaction;
 pub mod user;
 pub mod utils;
 pub mod vp_description;
-
-// #[cfg(test)]
-// pub mod tests;
-
-// halo2 mod
-pub mod halo2;

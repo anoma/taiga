@@ -1,4 +1,4 @@
-use crate::halo2::{
+use crate::{
     note::NoteCommitment,
     user::NullifierDerivingKey,
     utils::{extract_p, mod_r_p},

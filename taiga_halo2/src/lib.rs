@@ -1,4 +1,6 @@
-pub mod action;
+#![allow(dead_code)]
+
+// pub mod action;
 pub mod circuit;
 pub mod constant;
 pub mod merkle_tree;

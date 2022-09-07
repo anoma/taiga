@@ -1,4 +1,4 @@
-use crate::halo2::{
+use crate::{
     utils::{poseidon_hash, prf_nf},
     vp_description::ValidityPredicateDescription,
 };
