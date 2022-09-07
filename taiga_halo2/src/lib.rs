@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![allow(clippy::large_enum_variant)]
 
 // pub mod action;
 pub mod circuit;

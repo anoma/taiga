@@ -1,10 +1,10 @@
 [workspace]
 members = [
     "taiga_halo2",
-    "taiga_zk_garage",
+    # "taiga_zk_garage",
 ]
 
-[patch.crates-io]
-ark-serialize = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }
-ark-ff = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }
-ark-ec = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }
+# [patch.crates-io]
+# ark-serialize = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }
+# ark-ff = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }
+# ark-ec = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }
