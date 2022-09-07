@@ -1,3 +1,4 @@
+use crate::app::App;
 use crate::circuit::action_circuit::ActionCircuit;
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::error::TaigaError;
@@ -5,7 +6,6 @@ use crate::merkle_tree::{MerklePath, Node, TAIGA_COMMITMENT_TREE_DEPTH};
 use crate::note::{Note, NoteCommitment};
 use crate::nullifier::Nullifier;
 use crate::poseidon::{FieldHasher, WIDTH_3};
-use crate::token::Token;
 use crate::user::{User, UserSendAddress};
 use crate::vp_description::ValidityPredicateDescription;
 use ark_ff::UniformRand;
@@ -43,7 +43,7 @@ pub struct SpendInfo<CP: CircuitParameters> {
 pub struct OutputInfo<CP: CircuitParameters> {
     addr_send_closed: UserSendAddress<CP>,
     addr_recv_vp: ValidityPredicateDescription<CP>,
-    addr_token_vp: ValidityPredicateDescription<CP>,
+    addr_app_vp: ValidityPredicateDescription<CP>,
     value: u64,
     data: CP::CurveScalarField,
 }
@@ -86,19 +86,12 @@ impl<CP: CircuitParameters> ActionInfo<CP> {
             send_com: self.output.addr_send_closed,
             recv_vp: self.output.addr_recv_vp,
         };
-        let token = Token::<CP> {
-            token_vp: self.output.addr_token_vp,
+        let app = App::<CP> {
+            app_vp: self.output.addr_app_vp,
         };
 
         let note_rcm = CP::CurveScalarField::rand(rng);
-        let output_note = Note::new(
-            user,
-            token,
-            self.output.value,
-            nf,
-            self.output.data,
-            note_rcm,
-        );
+        let output_note = Note::new(user, app, self.output.value, nf, self.output.data, note_rcm);
 
         let output_cm = output_note.commitment()?;
         let action = Action::<CP> {
@@ -142,14 +135,14 @@ impl<CP: CircuitParameters> OutputInfo<CP> {
     pub fn new(
         addr_send_closed: UserSendAddress<CP>,
         addr_recv_vp: ValidityPredicateDescription<CP>,
-        addr_token_vp: ValidityPredicateDescription<CP>,
+        addr_app_vp: ValidityPredicateDescription<CP>,
         value: u64,
         data: CP::CurveScalarField,
     ) -> Self {
         Self {
             addr_send_closed,
             addr_recv_vp,
-            addr_token_vp,
+            addr_app_vp,
             value,
             data,
         }
@@ -159,13 +152,13 @@ impl<CP: CircuitParameters> OutputInfo<CP> {
         use rand::Rng;
         let addr_send_closed = UserSendAddress::<CP>::from_closed(CP::CurveScalarField::rand(rng));
         let addr_recv_vp = ValidityPredicateDescription::<CP>::dummy(rng);
-        let addr_token_vp = ValidityPredicateDescription::<CP>::dummy(rng);
+        let addr_app_vp = ValidityPredicateDescription::<CP>::dummy(rng);
         let value: u64 = rng.gen();
         let data = CP::CurveScalarField::rand(rng);
         Self {
             addr_send_closed,
             addr_recv_vp,
-            addr_token_vp,
+            addr_app_vp,
             value,
             data,
         }

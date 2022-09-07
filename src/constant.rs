@@ -16,8 +16,8 @@ pub const CIRCUIT_SIZE_2_17: usize = 1 << 17;
 pub const BLINDING_CIRCUIT_SIZE: usize = CIRCUIT_SIZE_2_15;
 pub const ACTION_CIRCUIT_SIZE: usize = CIRCUIT_SIZE_2_15;
 pub const ACTION_PUBLIC_INPUT_NF_INDEX: usize = 10781;
-pub const ACTION_PUBLIC_INPUT_ROOT_INDEX: usize = 12530;
-pub const ACTION_PUBLIC_INPUT_CM_INDEX: usize = 19586;
+pub const ACTION_PUBLIC_INPUT_ROOT_INDEX: usize = 24766;
+pub const ACTION_PUBLIC_INPUT_CM_INDEX: usize = 31822;
 
 lazy_static! {
     pub static ref PC_SETUP_MAP: HashMap<

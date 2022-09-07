@@ -7,21 +7,21 @@ use plonk_hashing::poseidon::constants::PoseidonConstants;
 use rand::RngCore;
 
 #[derive(Debug, Clone)]
-pub struct Token<CP: CircuitParameters> {
-    pub token_vp: ValidityPredicateDescription<CP>,
+pub struct App<CP: CircuitParameters> {
+    pub app_vp: ValidityPredicateDescription<CP>,
 }
 
-impl<CP: CircuitParameters> Token<CP> {
-    pub fn new(token_vp_description: ValidityPredicateDescription<CP>) -> Self {
+impl<CP: CircuitParameters> App<CP> {
+    pub fn new(app_vp_description: ValidityPredicateDescription<CP>) -> Self {
         Self {
-            token_vp: token_vp_description,
+            app_vp: app_vp_description,
         }
     }
 
     pub fn dummy(rng: &mut impl RngCore) -> Self {
         Self {
             // TODO: fix this in future.
-            token_vp: ValidityPredicateDescription::dummy(rng),
+            app_vp: ValidityPredicateDescription::dummy(rng),
         }
     }
 
@@ -30,15 +30,14 @@ impl<CP: CircuitParameters> Token<CP> {
         let poseidon_param: PoseidonConstants<CP::CurveScalarField> =
             PoseidonConstants::generate::<WIDTH_3>();
 
-        let address_fields = bits_to_fields::<CP::CurveScalarField>(&self.token_vp.to_bits());
+        let address_fields = bits_to_fields::<CP::CurveScalarField>(&self.app_vp.to_bits());
         poseidon_param.native_hash_two(&address_fields[0], &address_fields[1])
     }
 }
 
 #[test]
-fn token_address_computation() {
+fn app_address_computation() {
     let mut rng = ark_std::test_rng();
-    let xan =
-        Token::<crate::circuit::circuit_parameters::PairingCircuitParameters>::dummy(&mut rng);
+    let xan = App::<crate::circuit::circuit_parameters::PairingCircuitParameters>::dummy(&mut rng);
     xan.address().unwrap();
 }

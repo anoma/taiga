@@ -10,14 +10,14 @@ We use the PLONK construction for our zero-knowledge proofs. For this version, w
 We use several commitments in Taiga. We specify what choices we made for now:
 * We use hash commitment so that we can build circuit using ZK-friendly hash function.
 * Hash function image is a field that needs to be chosen with the binding we need.
-* For example, the note commitment needs to be done over the main curve scalar field because we want to bind the token address (one of the input of the note commitment) with the token address integrity (the fact that token_VK is binded to the token address). This token address integrity is done over main curve scalar field. WHY?
+* For example, the note commitment needs to be done over the main curve scalar field because we want to bind the app address (one of the input of the note commitment) with the app address integrity (the fact that app_VK is binded to the app address). This app address integrity is done over main curve scalar field. WHY?
 * The blinding 
-  we can bind the input of the hash (e.g. the token address) with the circuit corresponding to the  we open the note token address,  we bind it with the verifier The commitment field  are done over the main curve scalar field, except the commitment for Verifier key are over the main curve base field.
+  we can bind the input of the hash (e.g. the app address) with the circuit corresponding to the  we open the note app address,  we bind it with the verifier The commitment field  are done over the main curve scalar field, except the commitment for Verifier key are over the main curve base field.
 
 |Commitment| Field | Why?|
 |-|-|-|
-|Token address|MainCurve::ScalarField| because it is the most efficient choice|
+|App address|MainCurve::ScalarField| because it is the most efficient choice|
 |User address|MainCurve::ScalarField| because it is the most efficient choice (and uses `nk`)|
-|Note commitment|MainCurve::ScalarField| because it is binded to the token address|
+|Note commitment|MainCurve::ScalarField| because it is binded to the app address|
 |...|...|...|
 

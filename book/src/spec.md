@@ -4,7 +4,7 @@ To be edited as design changes. Please make changes as necessary. Keep it **conc
 
 ## Notation
 
-$E_M$ means the main curve under which Action and VP circuits (i.e. user and token validity predicates) are defined.
+$E_M$ means the main curve under which Action and VP circuits (i.e. user and application validity predicates) are defined.
 
 $E_O$ means the outer curve. $E_I$ means the inner curve.
 
@@ -95,12 +95,12 @@ TODO: Should we use `fulldesc_vp` in place of `desc_vp`?
 ### Note
 
 A note encodes:
-* the asset (token) type,
+* the application type,
 * the user (owner) address,
 * the value (fungible),
 * additional data (non-fungible).
 ```
-note = (user_address, token_address, v, data, ρ, ψ)
+note = (user_address, app_address, v, data, ρ, ψ)
 cm = NoteCom(note, rcm_note)
 ```
 
@@ -108,7 +108,7 @@ where:
 
 |Variable/Function|Type||
 |-|-|-|
-|`token_address`| $\mathbb{F}_r$ | a token type encoding `token_vp`|
+|`app_address`| $\mathbb{F}_r$ | a application type encoding `app_vp`|
 |`v`| `u64` ($\mathbb F_r$ element in circuit) | the quantity of fungible value |
 |`data`| $\mathbb{F}_r$ |non-fungible value(to be decided?)|
 |`ρ`| $\mathbb{F}_r$ | an old nullifier|
@@ -216,56 +216,56 @@ Arithmetized over $\mathbb{F}_r$. Represented as a Plonk circuit, `ActionCircuit
 
 Public inputs (`x`):
 - Merkle root `rt`
-- Spent note nullifier `nf`, which commits to note token type, value, and data
+- Spent note nullifier `nf`, which commits to note application type, value, and data
     - User VP commitment: `com_vp_addr_send` (commiting to `desc_vp_addr_send`)
-    - Token VP commitment: `com_vp_token`
+    - Application VP commitment: `com_vp_app`
     - `EnableSpend`
 - Output note commitment `cm`
     - User VP commitment: `com_vp_addr_recv` (commiting to `desc_vp_addr_recv`)
-    - Token VP commitment: `com_vp_token`
+    - Application VP commitment: `com_vp_app`
     - `EnableOutput`
 
 
 Private inputs (`w`):
 - opening of spent note
-    - `note = (address, token, v, data, rho, psi, rcm)`
+    - `note = (address, app, v, data, rho, psi, rcm)`
     - `com_vp_addr` of spent note:
         - `Com_q(desc_vp_addr_send)`, 
         - `nk`, 
         - `Com_q(desc_vp_addr_recv)`, 
         - `rcm_com_vp_addr`
-    - `com_vp_token` of spent note:
-        - `Com_q(desc_vp_token)`, 
-        - `rcm_com_vp_token` 
+    - `com_vp_app` of spent note:
+        - `Com_q(desc_vp_app)`, 
+        - `rcm_com_vp_app` 
 - opening of created note
-    - `note = (address, token, v, data, rho, psi, rcm)`
+    - `note = (address, app, v, data, rho, psi, rcm)`
     - `com_vp_addr` of output note:
         - `Com_r(Com_q(desc_vp_address_send)||nk)`,
         -  `Com_q(desc_vp_address_recv)`, 
         -  `rcm_com_vp_addr`
-    - `com_vp_token` of output note:
-        - `Com_q(desc_vp_token)`, 
-        - `rcm_com_vp_token`
+    - `com_vp_app` of output note:
+        - `Com_q(desc_vp_app)`, 
+        - `rcm_com_vp_app`
 
 Action circuit checks:
-- For spent note `note = (address, token, v, data, ρ, ψ, rcm_note)`:
+- For spent note `note = (address, app, v, data, ρ, ψ, rcm_note)`:
     - Note is a valid note in `rt`
         - Same as Orchard, there is a path in Merkle tree with root `rt` to a note commitment `cm` that opens to `note`
     - `address` and `com_vp_addr` opens to the same `desc_vp_addr`
         - Note User integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv))`
         - Address VP integrity for input note: `com_vp_addr = Com(Com_q(desc_vp_addr_send), rcm_com_vp_addr)`
         - Nullifier integrity(input note only): `nf = DeriveNullier_nk(note)`.
-    - `token` and `com_vp_token` opens to the same `desc_token_vp`
-        - Token (type) integrity: `token = Com_r(Com_q(desc_vp_token))`
-        - Token VP integrity: `com_vp_token = Com(Com_q(desc_vp_token), rcm_com_vp_token)`
-- For output note `note = (address, token, v, data, ρ, ψ, rcm_note)`:
+    - `app` and `com_vp_app` opens to the same `desc_app_vp`
+        - Application (type) integrity: `app = Com_r(Com_q(desc_vp_app))`
+        - Application VP integrity: `com_vp_app = Com(Com_q(desc_vp_app), rcm_com_vp_app)`
+- For output note `note = (address, app, v, data, ρ, ψ, rcm_note)`:
     - `address` and `com_vp_addr` opens to the same `desc_vp_addr`
         - Note User integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv))`
         - Address VP integrity for output note: `com_vp_addr = Com(Com_q(desc_vp_addr_recv), rcm_com_vp_addr)`
         - Commitment integrity(output note only): `cm = NoteCom(note, rcm_note)`
-    - `token` and `com_vp_token` opens to the same `desc_vp_token`
-        - Token (type) integrity: `token = Com_r(Com_q(desc_vp_token))`
-        - Token VP integrity: `com_vp = Com(Com_q(desc_vp_token), rcm_com_vp_token)`
+    - `app` and `com_vp_app` opens to the same `desc_vp_app`
+        - Application (type) integrity: `app = Com_r(Com_q(desc_vp_app))`
+        - Application VP integrity: `com_vp = Com(Com_q(desc_vp_app), rcm_com_vp_app)`
 
 + checks of `EnableSpend` and `EnableOutput` flags?
 

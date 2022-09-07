@@ -4,6 +4,7 @@
 #![allow(clippy::large_enum_variant)]
 
 pub mod action;
+pub mod app;
 pub mod circuit;
 pub mod constant;
 pub mod doc_examples;
@@ -13,7 +14,6 @@ pub mod merkle_tree;
 pub mod note;
 pub mod nullifier;
 pub mod poseidon;
-pub mod token;
 pub mod transaction;
 pub mod user;
 pub mod utils;
