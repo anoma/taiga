@@ -571,7 +571,7 @@ impl BaseCanonicity5 {
 }
 
 #[test]
-fn note_commit_test() {
+fn test_halo2_note_commitment_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use crate::note::Note;
     use crate::{nullifier::Nullifier, token::Token, user::User};

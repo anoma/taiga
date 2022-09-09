@@ -27,6 +27,12 @@ impl NullifierDerivingKey {
     }
 }
 
+impl Default for NullifierDerivingKey {
+    fn default() -> NullifierDerivingKey {
+        NullifierDerivingKey(pallas::Base::one())
+    }
+}
+
 /// The user address binded with send vp and received vp.
 #[derive(Debug, Clone)]
 pub struct User {
