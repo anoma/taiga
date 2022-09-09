@@ -26,6 +26,12 @@ impl NoteCommitment {
     }
 }
 
+impl Default for NoteCommitment {
+    fn default() -> NoteCommitment {
+        NoteCommitment(pallas::Point::generator())
+    }
+}
+
 /// A note
 #[derive(Debug, Clone)]
 pub struct Note {
