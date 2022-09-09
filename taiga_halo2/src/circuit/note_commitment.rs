@@ -58,11 +58,11 @@ impl FixedPoint<pallas::Affine> for NoteCommitmentFixedBasesFull {
     }
 
     fn u(&self) -> Vec<[[u8; 32]; H]> {
-        R_U.clone()
+        R_U.to_vec()
     }
 
     fn z(&self) -> Vec<u64> {
-        R_Z.clone()
+        R_Z.to_vec()
     }
 }
 
@@ -79,11 +79,11 @@ impl FixedPoint<pallas::Affine> for NullifierK {
     }
 
     fn u(&self) -> Vec<[[u8; 32]; H]> {
-        R_U.clone()
+        R_U.to_vec()
     }
 
     fn z(&self) -> Vec<u64> {
-        R_Z.clone()
+        R_Z.to_vec()
     }
 }
 
@@ -100,11 +100,11 @@ impl FixedPoint<pallas::Affine> for Short {
     }
 
     fn u(&self) -> Vec<[[u8; 32]; H]> {
-        R_U.clone()
+        R_U.to_vec()
     }
 
     fn z(&self) -> Vec<u64> {
-        R_Z.clone()
+        R_Z.to_vec()
     }
 }
 
