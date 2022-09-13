@@ -5,9 +5,7 @@ Users use intents when they want to enact a multiparty state transition. High le
 3. **Solve**: Solvers find matching intents and update the intent until it is fully satisfied
 4. **Finalize**: When the intent is satisfied, a transaction is created and published on the blockchain
 
-![img_1.png](img/img_exec_high.png)
-
-Note: 1-3 may cycle until a final transaction is found
+![img.png](img/exec_high.png)
 
 ### Create an intent
 User intents can be seen as partial transactions. Users send them to the intent gossip network and solvers match them in order to create full transactions and publish them on the blockchain. That implies that users need to give some information to the solvers that is sufficient to create the final transaction (proofs). To make sure that users reveal the minimal amount of private infortmation that is still enough to create the transaction, users create **intermediate notes** from the notes they are willing to spend.
@@ -37,6 +35,8 @@ If a solver has two intents that can be matched together, two cases are possible
 2. The match is final, the solver publishes the final transaction as described below
 
 In the current implementation we assume a simpler model where only one solver can match n-party bartering intents (no partial solving), and an intermediate tx cannot be published on the blockchain as VPs will not allow that (balance issue). In the partial solving case partial transactions cannot be published on the blockchain as there will be a VP/other restriction mechanism blocking that.
+
+Note: solvers don't need to be identified as all actions are authorized by user/app VPs. However, if they want to receive fees, they need to have an address on the chain.
 
 ### Finalize
 
