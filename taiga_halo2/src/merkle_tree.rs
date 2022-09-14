@@ -1,5 +1,6 @@
 //! Implementation of a Merkle tree of commitments used to prove the existence of notes.
 //!
+use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
 use crate::utils::poseidon_hash;
 use ff::Field;
 use pasta_curves::pallas;
@@ -146,7 +147,7 @@ impl Node {
 
 impl Default for MerklePath {
     fn default() -> MerklePath {
-        let auth_path = (0..32)
+        let auth_path = (0..TAIGA_COMMITMENT_TREE_DEPTH)
             .map(|_| (Node::new(pallas::Base::one()), true))
             .collect();
         Self::from_path(auth_path)

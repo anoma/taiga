@@ -1,4 +1,5 @@
 use crate::{
+    circuit::action_circuit::ActionCircuit,
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{MerklePath, Node},
     note::{Note, NoteCommitment},
@@ -14,7 +15,7 @@ use rand::RngCore;
 
 /// The action result used in transaction.
 #[derive(Copy, Debug, Clone)]
-pub struct Action {
+pub struct ActionInstance {
     /// The root of the note commitment Merkle tree.
     pub root: pallas::Base,
     /// The nullifier of the spend note.
@@ -25,7 +26,7 @@ pub struct Action {
     // encrypted_note,
 }
 
-/// The information to build Action and ActionCircuit.
+/// The information to build ActionInstance and ActionCircuit.
 #[derive(Debug, Clone)]
 pub struct ActionInfo {
     spend: SpendInfo,
@@ -48,6 +49,12 @@ pub struct OutputInfo {
     data: pallas::Base,
 }
 
+impl ActionInstance {
+    pub fn to_instance(&self) -> Vec<pallas::Base> {
+        vec![self.nf.inner(), self.root, self.cm.get_x()]
+    }
+}
+
 impl ActionInfo {
     pub fn new(spend: SpendInfo, output: OutputInfo) -> Self {
         Self { spend, output }
@@ -63,11 +70,7 @@ impl ActionInfo {
         ActionInfo::new(spend_info, output_info)
     }
 
-    pub fn build(
-        self,
-        rng: &mut impl RngCore,
-        // ) -> (Action, ActionCircuit) {
-    ) -> Action {
+    pub fn build(self, rng: &mut impl RngCore) -> (ActionInstance, ActionCircuit) {
         let spend_cm = self.spend.note.commitment();
         let nk = self.spend.note.user.send_com.get_nk().unwrap();
         let nf = Nullifier::derive_native(
@@ -96,19 +99,19 @@ impl ActionInfo {
         );
 
         let output_cm = output_note.commitment();
-        Action {
+        let action = ActionInstance {
             nf,
             cm: output_cm,
             root: self.spend.root,
-        }
+        };
 
-        // let action_circuit = ActionCircuit{
-        //     spend_note: self.spend.note,
-        //     auth_path: self.spend.auth_path,
-        //     output_note,
-        // };
+        let action_circuit = ActionCircuit {
+            spend_note: self.spend.note,
+            auth_path: self.spend.auth_path,
+            output_note,
+        };
 
-        // (action, action_circuit)
+        (action, action_circuit)
     }
 }
 
