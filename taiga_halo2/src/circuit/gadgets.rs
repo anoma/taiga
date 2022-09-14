@@ -22,6 +22,7 @@ where
 }
 
 // AddChip copy from halo2 example two-chip
+#[derive(Clone, Debug)]
 pub struct AddChip<F: FieldExt> {
     config: AddConfig,
     _marker: PhantomData<F>,

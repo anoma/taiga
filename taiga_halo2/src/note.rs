@@ -1,5 +1,5 @@
 use crate::{
-    constant::{BASE_BITS_NUM, NOTE_COMMIT_DOMAIN},
+    constant::{BASE_BITS_NUM, NOTE_COMMITMENT_R_GENERATOR, NOTE_COMMIT_DOMAIN},
     nullifier::Nullifier,
     token::Token,
     user::User,
@@ -8,7 +8,7 @@ use crate::{
 use bitvec::{array::BitArray, order::Lsb0};
 use core::iter;
 use ff::{Field, PrimeFieldBits};
-use group::Group;
+use group::{cofactor::CofactorCurveAffine, Group};
 use pasta_curves::pallas;
 use rand::{Rng, RngCore};
 
@@ -33,7 +33,7 @@ impl Default for NoteCommitment {
 }
 
 /// A note
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Note {
     /// Owner of the note
     pub user: User,
@@ -43,7 +43,7 @@ pub struct Note {
     pub data: pallas::Base,
     /// old nullifier. Nonce which is a deterministically computed, unique nonce
     pub rho: Nullifier,
-    /// computed from spent_note_nf using a PRF
+    /// computed from spent_note_nf and rcm by using a PRF
     pub psi: pallas::Base,
     pub rcm: pallas::Scalar,
 }
@@ -71,8 +71,9 @@ impl Note {
 
     // psi = poseidon_hash(rho, (rcm * generator).x)
     // The psi derivation is different from Orchard, in which psi = blake2b(rho||rcm)
+    // Use NOTE_COMMITMENT_R_GENERATOR as generator temporarily
     fn derive_psi(rho: &pallas::Base, rcm: &pallas::Scalar) -> pallas::Base {
-        let g_rcm_x = extract_p(&(pallas::Point::generator() * rcm));
+        let g_rcm_x = extract_p(&(NOTE_COMMITMENT_R_GENERATOR.to_curve() * rcm));
         poseidon_hash(*rho, g_rcm_x)
     }
 

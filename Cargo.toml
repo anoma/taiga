@@ -4,7 +4,9 @@ members = [
     # "taiga_zk_garage",
 ]
 
-# [patch.crates-io]
+[patch.crates-io]
 # ark-serialize = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }
 # ark-ff = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }
 # ark-ec = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }
+halo2_gadgets = { git="https://github.com/XuyangSong/halo2", branch="taiga", features = ["test-dependencies"]}
+halo2_proofs = { git="https://github.com/XuyangSong/halo2", branch="taiga"}

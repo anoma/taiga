@@ -114,7 +114,7 @@ pub struct NoteCommitmentConfig {
     decompose5_5: Decompose5_5,
     base_canonicity_250_5: BaseCanonicity250_5,
     base_canonicity_5: BaseCanonicity5,
-    sinsemilla_config:
+    pub sinsemilla_config:
         SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
 }
 

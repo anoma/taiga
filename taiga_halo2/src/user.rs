@@ -62,7 +62,6 @@ impl User {
         let send_com = UserSendAddress::from_open(nk, send_vp);
         Self {
             send_com,
-            // TODO: fix this in future.
             recv_vp: ValidityPredicateDescription::dummy(rng),
         }
     }
@@ -111,7 +110,9 @@ impl UserSendAddress {
 
 impl Default for User {
     fn default() -> User {
-        let send_com = UserSendAddress::Closed(pallas::Base::one());
+        let nk = NullifierDerivingKey::default();
+        let send_vp = ValidityPredicateDescription::Compressed(pallas::Base::one());
+        let send_com = UserSendAddress::from_open(nk, send_vp);
         let recv_vp = ValidityPredicateDescription::Compressed(pallas::Base::one());
         User { send_com, recv_vp }
     }
