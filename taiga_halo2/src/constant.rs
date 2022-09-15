@@ -12,8 +12,10 @@ pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
 
 pub const BASE_BITS_NUM: usize = 255;
 
+/// The number of notes in a tx.
+pub const NUM_NOTE: usize = 4;
+
 // SinsemillaCommit parameters
-// TODO: use constants to replace the lazy_static
 lazy_static! {
     pub static ref NOTE_COMMIT_DOMAIN: CommitDomain =
         CommitDomain::new(NOTE_COMMITMENT_PERSONALIZATION);
