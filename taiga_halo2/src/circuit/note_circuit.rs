@@ -1,15 +1,12 @@
 use crate::circuit::gadgets::{AddChip, AddConfig};
-use crate::constant::{NOTE_COMMITMENT_GENERATOR, NOTE_COMMITMENT_R_GENERATOR, R_U, R_Z};
+use crate::constant::{NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain};
 use halo2_gadgets::{
     ecc::chip::EccConfig,
-    ecc::{
-        chip::{constants::H, BaseFieldElem, EccChip, FixedPoint, FullScalar, ShortScalar},
-        FixedPoints, Point, ScalarFixed,
-    },
+    ecc::{chip::EccChip, Point, ScalarFixed},
     poseidon::{primitives as poseidon, Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig},
     sinsemilla::{
         chip::{SinsemillaChip, SinsemillaConfig},
-        CommitDomain, CommitDomains, HashDomains, Message, MessagePiece,
+        CommitDomain, Message, MessagePiece,
     },
     utilities::{lookup_range_check::LookupRangeCheckConfig, RangeConstrained},
 };
@@ -19,98 +16,6 @@ use halo2_proofs::{
     poly::Rotation,
 };
 use pasta_curves::{arithmetic::FieldExt, pallas};
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct NoteCommitmentHashDomain;
-impl HashDomains<pallas::Affine> for NoteCommitmentHashDomain {
-    fn Q(&self) -> pallas::Affine {
-        *NOTE_COMMITMENT_GENERATOR
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct NoteCommitmentDomain;
-impl CommitDomains<pallas::Affine, NoteCommitmentFixedBases, NoteCommitmentHashDomain>
-    for NoteCommitmentDomain
-{
-    fn r(&self) -> NoteCommitmentFixedBasesFull {
-        NoteCommitmentFixedBasesFull
-    }
-
-    fn hash_domain(&self) -> NoteCommitmentHashDomain {
-        NoteCommitmentHashDomain
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub struct NoteCommitmentFixedBases;
-
-impl FixedPoints<pallas::Affine> for NoteCommitmentFixedBases {
-    type FullScalar = NoteCommitmentFixedBasesFull;
-    type ShortScalar = Short;
-    type Base = NullifierK;
-}
-
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub struct NoteCommitmentFixedBasesFull;
-
-impl FixedPoint<pallas::Affine> for NoteCommitmentFixedBasesFull {
-    type FixedScalarKind = FullScalar;
-
-    fn generator(&self) -> pallas::Affine {
-        *NOTE_COMMITMENT_R_GENERATOR
-    }
-
-    fn u(&self) -> Vec<[[u8; 32]; H]> {
-        R_U.to_vec()
-    }
-
-    fn z(&self) -> Vec<u64> {
-        R_Z.to_vec()
-    }
-}
-
-// NullifierK is used in scalar mul with a base field element.
-// NOTE_COMMITMENT_R_GENERATOR abuse here, replace with a new parameter when needed.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct NullifierK;
-
-impl FixedPoint<pallas::Affine> for NullifierK {
-    type FixedScalarKind = BaseFieldElem;
-
-    fn generator(&self) -> pallas::Affine {
-        *NOTE_COMMITMENT_R_GENERATOR
-    }
-
-    fn u(&self) -> Vec<[[u8; 32]; H]> {
-        R_U.to_vec()
-    }
-
-    fn z(&self) -> Vec<u64> {
-        R_Z.to_vec()
-    }
-}
-
-// We don't need the short?
-// NOTE_COMMITMENT_R_GENERATOR abuse here, replace with a new parameter when needed.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct Short;
-
-impl FixedPoint<pallas::Affine> for Short {
-    type FixedScalarKind = ShortScalar;
-
-    fn generator(&self) -> pallas::Affine {
-        *NOTE_COMMITMENT_R_GENERATOR
-    }
-
-    fn u(&self) -> Vec<[[u8; 32]; H]> {
-        R_U.to_vec()
-    }
-
-    fn z(&self) -> Vec<u64> {
-        R_Z.to_vec()
-    }
-}
 
 type NoteCommitPiece = MessagePiece<
     pallas::Affine,

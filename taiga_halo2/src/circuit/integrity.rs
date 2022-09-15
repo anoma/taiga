@@ -1,7 +1,8 @@
 use crate::circuit::gadgets::{assign_free_advice, AddChip, AddInstructions};
-use crate::circuit::note_circuit::{
-    note_commitment_gadget, NoteCommitmentChip, NoteCommitmentDomain, NoteCommitmentFixedBases,
-    NoteCommitmentFixedBasesFull, NoteCommitmentHashDomain, NullifierK,
+use crate::circuit::note_circuit::{note_commitment_gadget, NoteCommitmentChip};
+use crate::constant::{
+    NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentFixedBasesFull,
+    NoteCommitmentHashDomain, NullifierK,
 };
 use crate::note::Note;
 use halo2_gadgets::{
@@ -332,7 +333,7 @@ pub fn check_output_note(
 fn test_halo2_nullifier_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use crate::circuit::gadgets::AddConfig;
-    use crate::circuit::note_circuit::{
+    use crate::constant::{
         NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain,
     };
     use crate::note::NoteCommitment;

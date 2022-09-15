@@ -2,12 +2,11 @@ use crate::{
     circuit::{
         gadgets::AddChip,
         integrity::{check_output_note, check_spend_note, OutputNoteVar, SpendNoteVar},
-        note_circuit::{
-            NoteCommitmentChip, NoteCommitmentDomain, NoteCommitmentFixedBases,
-            NoteCommitmentHashDomain, NoteConfig,
-        },
+        note_circuit::{NoteCommitmentChip, NoteConfig},
     },
-    constant::NUM_NOTE,
+    constant::{
+        NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain, NUM_NOTE,
+    },
     note::Note,
 };
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};

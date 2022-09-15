@@ -3,11 +3,11 @@ use crate::circuit::integrity::{check_output_note, check_spend_note};
 use crate::circuit::merkle_circuit::{
     merkle_poseidon_gadget, MerklePoseidonChip, MerklePoseidonConfig,
 };
-use crate::circuit::note_circuit::{
-    NoteChip, NoteCommitmentChip, NoteCommitmentDomain, NoteCommitmentFixedBases,
-    NoteCommitmentHashDomain, NoteConfig,
+use crate::circuit::note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig};
+use crate::constant::{
+    NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain,
+    TAIGA_COMMITMENT_TREE_DEPTH,
 };
-use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
 use crate::note::Note;
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
