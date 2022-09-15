@@ -1,20 +1,15 @@
-use crate::circuit::gadgets::{AddChip, AddConfig};
+use crate::circuit::gadgets::AddChip;
 use crate::circuit::integrity::{check_output_note, check_spend_note};
 use crate::circuit::merkle_circuit::{
     merkle_poseidon_gadget, MerklePoseidonChip, MerklePoseidonConfig,
 };
-use crate::circuit::note_commitment::{
-    NoteCommitmentChip, NoteCommitmentConfig, NoteCommitmentDomain, NoteCommitmentFixedBases,
-    NoteCommitmentHashDomain,
+use crate::circuit::note_circuit::{
+    NoteChip, NoteCommitmentChip, NoteCommitmentDomain, NoteCommitmentFixedBases,
+    NoteCommitmentHashDomain, NoteConfig,
 };
 use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
 use crate::note::Note;
-use halo2_gadgets::{
-    ecc::chip::{EccChip, EccConfig},
-    poseidon::{primitives as poseidon, Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig},
-    sinsemilla::chip::{SinsemillaChip, SinsemillaConfig},
-    utilities::lookup_range_check::LookupRangeCheckConfig,
-};
+use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
     circuit::{floor_planner, Layouter},
     plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Instance},
@@ -25,12 +20,7 @@ use pasta_curves::pallas;
 pub struct ActionConfig {
     instances: Column<Instance>,
     advices: [Column<Advice>; 10],
-    add_config: AddConfig,
-    ecc_config: EccConfig<NoteCommitmentFixedBases>,
-    poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
-    sinsemilla_config:
-        SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
-    note_commit_config: NoteCommitmentConfig,
+    note_config: NoteConfig,
     merkle_config: MerklePoseidonConfig,
 }
 
@@ -74,74 +64,18 @@ impl Circuit<pallas::Base> for ActionCircuit {
             meta.enable_equality(*advice);
         }
 
-        let add_config = AddChip::configure(meta, advices[0..2].try_into().unwrap());
-
-        let table_idx = meta.lookup_table_column();
-        let lookup = (
-            table_idx,
-            meta.lookup_table_column(),
-            meta.lookup_table_column(),
-        );
-
-        let range_check = LookupRangeCheckConfig::configure(meta, advices[9], table_idx);
-
-        let lagrange_coeffs = [
-            meta.fixed_column(),
-            meta.fixed_column(),
-            meta.fixed_column(),
-            meta.fixed_column(),
-            meta.fixed_column(),
-            meta.fixed_column(),
-            meta.fixed_column(),
-            meta.fixed_column(),
-        ];
-        meta.enable_constant(lagrange_coeffs[0]);
-
-        let ecc_config = EccChip::<NoteCommitmentFixedBases>::configure(
-            meta,
-            advices,
-            lagrange_coeffs,
-            range_check,
-        );
-
-        let poseidon_config = PoseidonChip::configure::<poseidon::P128Pow5T3>(
-            meta,
-            advices[6..9].try_into().unwrap(),
-            advices[5],
-            lagrange_coeffs[2..5].try_into().unwrap(),
-            lagrange_coeffs[5..8].try_into().unwrap(),
-        );
-
-        let sinsemilla_config = SinsemillaChip::<
-            NoteCommitmentHashDomain,
-            NoteCommitmentDomain,
-            NoteCommitmentFixedBases,
-        >::configure(
-            meta,
-            advices[..5].try_into().unwrap(),
-            advices[2],
-            lagrange_coeffs[0],
-            lookup,
-            range_check,
-        );
-
-        let note_commit_config =
-            NoteCommitmentChip::configure(meta, advices, sinsemilla_config.clone());
+        let note_config = NoteChip::configure(meta, instances, advices);
 
         let merkle_config = MerklePoseidonChip::configure(
             meta,
             advices[..5].try_into().unwrap(),
-            poseidon_config.clone(),
+            note_config.poseidon_config.clone(),
         );
 
         Self::Config {
             instances,
             advices,
-            add_config,
-            ecc_config,
-            poseidon_config,
-            sinsemilla_config,
-            note_commit_config,
+            note_config,
             merkle_config,
         }
     }
@@ -156,19 +90,21 @@ impl Circuit<pallas::Base> for ActionCircuit {
             NoteCommitmentHashDomain,
             NoteCommitmentDomain,
             NoteCommitmentFixedBases,
-        >::load(config.note_commit_config.sinsemilla_config.clone(), &mut layouter)?;
+        >::load(config.note_config.sinsemilla_config.clone(), &mut layouter)?;
 
         // Construct a Sinsemilla chip
-        let sinsemilla_chip = SinsemillaChip::construct(config.sinsemilla_config.clone());
+        let sinsemilla_chip =
+            SinsemillaChip::construct(config.note_config.sinsemilla_config.clone());
 
         // Construct an ECC chip
-        let ecc_chip = EccChip::construct(config.ecc_config);
+        let ecc_chip = EccChip::construct(config.note_config.ecc_config);
 
         // Construct a NoteCommit chip
-        let note_commit_chip = NoteCommitmentChip::construct(config.note_commit_config.clone());
+        let note_commit_chip =
+            NoteCommitmentChip::construct(config.note_config.note_commit_config.clone());
 
         // Construct an add chip
-        let add_chip = AddChip::<pallas::Base>::construct(config.add_config, ());
+        let add_chip = AddChip::<pallas::Base>::construct(config.note_config.add_config, ());
 
         // Construct a merkle chip
         let merkle_chip = MerklePoseidonChip::construct(config.merkle_config);
@@ -179,16 +115,14 @@ impl Circuit<pallas::Base> for ActionCircuit {
             let spend_note_vars = check_spend_note(
                 layouter.namespace(|| "check spend note"),
                 config.advices,
+                config.instances,
                 ecc_chip.clone(),
                 sinsemilla_chip.clone(),
                 note_commit_chip.clone(),
-                config.poseidon_config.clone(),
+                config.note_config.poseidon_config.clone(),
                 add_chip,
                 self.spend_note.clone(),
             )?;
-
-            // Public nullifier
-            layouter.constrain_instance(spend_note_vars.nf.cell(), config.instances, 0)?;
 
             // Check the merkle tree path validity and public the root
             let leaf = spend_note_vars.cm.extract_p().inner().clone();
@@ -215,7 +149,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
                 ecc_chip,
                 sinsemilla_chip,
                 note_commit_chip,
-                config.poseidon_config,
+                config.note_config.poseidon_config,
                 self.output_note.clone(),
                 nf,
             )?;
@@ -250,8 +184,7 @@ fn test_halo2_action_circuit() {
     let (action, action_circuit) = action_info.build(&mut rng);
     let instances = vec![action.to_instance()];
     {
-        let prover =
-            MockProver::<pallas::Base>::run(11, &action_circuit, instances).unwrap();
+        let prover = MockProver::<pallas::Base>::run(11, &action_circuit, instances).unwrap();
         assert_eq!(prover.verify(), Ok(()));
     }
 

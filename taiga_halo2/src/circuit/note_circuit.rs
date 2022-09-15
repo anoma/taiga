@@ -1,9 +1,12 @@
+use crate::circuit::gadgets::{AddChip, AddConfig};
 use crate::constant::{NOTE_COMMITMENT_GENERATOR, NOTE_COMMITMENT_R_GENERATOR, R_U, R_Z};
 use halo2_gadgets::{
+    ecc::chip::EccConfig,
     ecc::{
         chip::{constants::H, BaseFieldElem, EccChip, FixedPoint, FullScalar, ShortScalar},
         FixedPoints, Point, ScalarFixed,
     },
+    poseidon::{primitives as poseidon, Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig},
     sinsemilla::{
         chip::{SinsemillaChip, SinsemillaConfig},
         CommitDomain, CommitDomains, HashDomains, Message, MessagePiece,
@@ -12,10 +15,11 @@ use halo2_gadgets::{
 };
 use halo2_proofs::{
     circuit::{AssignedCell, Chip, Layouter, Value},
-    plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Selector},
+    plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Instance, Selector},
     poly::Rotation,
 };
 use pasta_curves::{arithmetic::FieldExt, pallas};
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NoteCommitmentHashDomain;
 impl HashDomains<pallas::Affine> for NoteCommitmentHashDomain {
@@ -106,202 +110,6 @@ impl FixedPoint<pallas::Affine> for Short {
     fn z(&self) -> Vec<u64> {
         R_Z.to_vec()
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct NoteCommitmentConfig {
-    advices: [Column<Advice>; 10],
-    decompose5_5: Decompose5_5,
-    base_canonicity_250_5: BaseCanonicity250_5,
-    base_canonicity_5: BaseCanonicity5,
-    pub sinsemilla_config:
-        SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
-}
-
-#[derive(Clone, Debug)]
-pub struct NoteCommitmentChip {
-    config: NoteCommitmentConfig,
-}
-
-impl NoteCommitmentChip {
-    pub fn configure(
-        meta: &mut ConstraintSystem<pallas::Base>,
-        advices: [Column<Advice>; 10],
-        sinsemilla_config: SinsemillaConfig<
-            NoteCommitmentHashDomain,
-            NoteCommitmentDomain,
-            NoteCommitmentFixedBases,
-        >,
-    ) -> NoteCommitmentConfig {
-        let two_pow_5 = pallas::Base::from(1 << 5);
-        let two_pow_250 = pallas::Base::from_u128(1 << 125).square();
-
-        let col_l = advices[6];
-        let col_m = advices[7];
-        let col_r = advices[8];
-
-        // Decompose configure
-        let decompose5_5 = Decompose5_5::configure(meta, col_l, col_m, col_r, two_pow_5);
-
-        // Base canonicity configure
-        let base_canonicity_250_5 =
-            BaseCanonicity250_5::configure(meta, col_l, col_m, col_r, two_pow_250);
-        let base_canonicity_5 = BaseCanonicity5::configure(meta, col_l, col_m, col_r, two_pow_5);
-
-        NoteCommitmentConfig {
-            decompose5_5,
-            base_canonicity_250_5,
-            base_canonicity_5,
-            advices,
-            sinsemilla_config,
-        }
-    }
-
-    pub fn construct(config: NoteCommitmentConfig) -> Self {
-        Self { config }
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn note_commitment_gadget(
-    mut layouter: impl Layouter<pallas::Base>,
-    chip: SinsemillaChip<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
-    ecc_chip: EccChip<NoteCommitmentFixedBases>,
-    note_commit_chip: NoteCommitmentChip,
-    user_address: AssignedCell<pallas::Base, pallas::Base>,
-    token_address: AssignedCell<pallas::Base, pallas::Base>,
-    data: AssignedCell<pallas::Base, pallas::Base>,
-    rho: AssignedCell<pallas::Base, pallas::Base>,
-    psi: AssignedCell<pallas::Base, pallas::Base>,
-    value: AssignedCell<pallas::Base, pallas::Base>,
-    rcm: ScalarFixed<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
-) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
-    let lookup_config = chip.config().lookup_config();
-
-    // `user_0_249` = bits 0..=249 of `user_address`
-    let user_0_249 = MessagePiece::from_subpieces(
-        chip.clone(),
-        layouter.namespace(|| "user_0_249"),
-        [RangeConstrained::bitrange_of(user_address.value(), 0..250)],
-    )?;
-
-    // `a` = (bits 250..=255 of user) || (bits 0..=4 of token)
-    let (a, user_tail_bit5, token_pre_bit5) = Decompose5_5::decompose(
-        &lookup_config,
-        chip.clone(),
-        &mut layouter,
-        &user_address,
-        &token_address,
-    )?;
-
-    // `token_5_254` = bits 5..=254 of `token`
-    let token_5_254 = MessagePiece::from_subpieces(
-        chip.clone(),
-        layouter.namespace(|| "token_5_254"),
-        [RangeConstrained::bitrange_of(token_address.value(), 5..255)],
-    )?;
-
-    // `data_0_249` = bits 0..=249 of `data`
-    let data_0_249 = MessagePiece::from_subpieces(
-        chip.clone(),
-        layouter.namespace(|| "data_0_249"),
-        [RangeConstrained::bitrange_of(data.value(), 0..250)],
-    )?;
-
-    // b = (bits 250..=255 of data) || (bits 0..=4 of rho)
-    let (b, data_tail_bit5, rho_pre_bit5) =
-        Decompose5_5::decompose(&lookup_config, chip.clone(), &mut layouter, &data, &rho)?;
-
-    // `rho_5_254` = bits 5..=254 of `rho`
-    let rho_5_254 = MessagePiece::from_subpieces(
-        chip.clone(),
-        layouter.namespace(|| "rho_5_254"),
-        [RangeConstrained::bitrange_of(rho.value(), 5..255)],
-    )?;
-
-    // `psi_0_249` = bits 0..=249 of `psi`
-    let psi_0_249 = MessagePiece::from_subpieces(
-        chip.clone(),
-        layouter.namespace(|| "psi_0_249"),
-        [RangeConstrained::bitrange_of(psi.value(), 0..250)],
-    )?;
-
-    // `c` = (bits 250..=255 of psi) || (bits 0..=4 of value)
-    let (c, psi_tail_bit5, value_pre_bit5) =
-        Decompose5_5::decompose(&lookup_config, chip.clone(), &mut layouter, &psi, &value)?;
-
-    // `d` = (bits 5..=63 of value) || 0
-    let d = MessagePiece::from_subpieces(
-        chip.clone(),
-        layouter.namespace(|| "d"),
-        [
-            RangeConstrained::bitrange_of(value.value(), 5..64),
-            RangeConstrained::bitrange_of(Value::known(&pallas::Base::zero()), 0..1),
-        ],
-    )?;
-
-    // cm = NoteCommit^rcm(user_address || token_address || data || rho || psi || value)
-    let (cm, _zs) = {
-        let message = Message::from_pieces(
-            chip.clone(),
-            vec![
-                user_0_249.clone(),
-                a.clone(),
-                token_5_254.clone(),
-                data_0_249.clone(),
-                b.clone(),
-                rho_5_254.clone(),
-                psi_0_249.clone(),
-                c.clone(),
-                d.clone(),
-            ],
-        );
-        let domain = CommitDomain::new(chip, ecc_chip, &NoteCommitmentDomain);
-        domain.commit(
-            layouter.namespace(|| "Process NoteCommit inputs"),
-            message,
-            rcm,
-        )?
-    };
-
-    // assign values
-    let cfg = note_commit_chip.config;
-
-    cfg.decompose5_5.assign(
-        &mut layouter,
-        a,
-        user_tail_bit5.clone(),
-        token_pre_bit5.clone(),
-    )?;
-
-    cfg.decompose5_5.assign(
-        &mut layouter,
-        b,
-        data_tail_bit5.clone(),
-        rho_pre_bit5.clone(),
-    )?;
-
-    cfg.decompose5_5.assign(
-        &mut layouter,
-        c,
-        psi_tail_bit5.clone(),
-        value_pre_bit5.clone(),
-    )?;
-
-    cfg.base_canonicity_250_5
-        .assign(&mut layouter, user_address, user_0_249, user_tail_bit5)?;
-    cfg.base_canonicity_5
-        .assign(&mut layouter, token_address, token_5_254, token_pre_bit5)?;
-    cfg.base_canonicity_250_5
-        .assign(&mut layouter, data, data_0_249, data_tail_bit5)?;
-    cfg.base_canonicity_5
-        .assign(&mut layouter, rho, rho_5_254, rho_pre_bit5)?;
-    cfg.base_canonicity_250_5
-        .assign(&mut layouter, psi, psi_0_249, psi_tail_bit5)?;
-    cfg.base_canonicity_5
-        .assign(&mut layouter, value, d, value_pre_bit5)?;
-
-    Ok(cm)
 }
 
 type NoteCommitPiece = MessagePiece<
@@ -567,6 +375,295 @@ impl BaseCanonicity5 {
                 self.q_base_5.enable(&mut region, 0)
             },
         )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NoteCommitmentConfig {
+    advices: [Column<Advice>; 10],
+    decompose5_5: Decompose5_5,
+    base_canonicity_250_5: BaseCanonicity250_5,
+    base_canonicity_5: BaseCanonicity5,
+    pub sinsemilla_config:
+        SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
+}
+
+#[derive(Clone, Debug)]
+pub struct NoteCommitmentChip {
+    config: NoteCommitmentConfig,
+}
+
+impl NoteCommitmentChip {
+    pub fn configure(
+        meta: &mut ConstraintSystem<pallas::Base>,
+        advices: [Column<Advice>; 10],
+        sinsemilla_config: SinsemillaConfig<
+            NoteCommitmentHashDomain,
+            NoteCommitmentDomain,
+            NoteCommitmentFixedBases,
+        >,
+    ) -> NoteCommitmentConfig {
+        let two_pow_5 = pallas::Base::from(1 << 5);
+        let two_pow_250 = pallas::Base::from_u128(1 << 125).square();
+
+        let col_l = advices[6];
+        let col_m = advices[7];
+        let col_r = advices[8];
+
+        // Decompose configure
+        let decompose5_5 = Decompose5_5::configure(meta, col_l, col_m, col_r, two_pow_5);
+
+        // Base canonicity configure
+        let base_canonicity_250_5 =
+            BaseCanonicity250_5::configure(meta, col_l, col_m, col_r, two_pow_250);
+        let base_canonicity_5 = BaseCanonicity5::configure(meta, col_l, col_m, col_r, two_pow_5);
+
+        NoteCommitmentConfig {
+            decompose5_5,
+            base_canonicity_250_5,
+            base_canonicity_5,
+            advices,
+            sinsemilla_config,
+        }
+    }
+
+    pub fn construct(config: NoteCommitmentConfig) -> Self {
+        Self { config }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn note_commitment_gadget(
+    mut layouter: impl Layouter<pallas::Base>,
+    chip: SinsemillaChip<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
+    ecc_chip: EccChip<NoteCommitmentFixedBases>,
+    note_commit_chip: NoteCommitmentChip,
+    user_address: AssignedCell<pallas::Base, pallas::Base>,
+    token_address: AssignedCell<pallas::Base, pallas::Base>,
+    data: AssignedCell<pallas::Base, pallas::Base>,
+    rho: AssignedCell<pallas::Base, pallas::Base>,
+    psi: AssignedCell<pallas::Base, pallas::Base>,
+    value: AssignedCell<pallas::Base, pallas::Base>,
+    rcm: ScalarFixed<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
+) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
+    let lookup_config = chip.config().lookup_config();
+
+    // `user_0_249` = bits 0..=249 of `user_address`
+    let user_0_249 = MessagePiece::from_subpieces(
+        chip.clone(),
+        layouter.namespace(|| "user_0_249"),
+        [RangeConstrained::bitrange_of(user_address.value(), 0..250)],
+    )?;
+
+    // `a` = (bits 250..=255 of user) || (bits 0..=4 of token)
+    let (a, user_tail_bit5, token_pre_bit5) = Decompose5_5::decompose(
+        &lookup_config,
+        chip.clone(),
+        &mut layouter,
+        &user_address,
+        &token_address,
+    )?;
+
+    // `token_5_254` = bits 5..=254 of `token`
+    let token_5_254 = MessagePiece::from_subpieces(
+        chip.clone(),
+        layouter.namespace(|| "token_5_254"),
+        [RangeConstrained::bitrange_of(token_address.value(), 5..255)],
+    )?;
+
+    // `data_0_249` = bits 0..=249 of `data`
+    let data_0_249 = MessagePiece::from_subpieces(
+        chip.clone(),
+        layouter.namespace(|| "data_0_249"),
+        [RangeConstrained::bitrange_of(data.value(), 0..250)],
+    )?;
+
+    // b = (bits 250..=255 of data) || (bits 0..=4 of rho)
+    let (b, data_tail_bit5, rho_pre_bit5) =
+        Decompose5_5::decompose(&lookup_config, chip.clone(), &mut layouter, &data, &rho)?;
+
+    // `rho_5_254` = bits 5..=254 of `rho`
+    let rho_5_254 = MessagePiece::from_subpieces(
+        chip.clone(),
+        layouter.namespace(|| "rho_5_254"),
+        [RangeConstrained::bitrange_of(rho.value(), 5..255)],
+    )?;
+
+    // `psi_0_249` = bits 0..=249 of `psi`
+    let psi_0_249 = MessagePiece::from_subpieces(
+        chip.clone(),
+        layouter.namespace(|| "psi_0_249"),
+        [RangeConstrained::bitrange_of(psi.value(), 0..250)],
+    )?;
+
+    // `c` = (bits 250..=255 of psi) || (bits 0..=4 of value)
+    let (c, psi_tail_bit5, value_pre_bit5) =
+        Decompose5_5::decompose(&lookup_config, chip.clone(), &mut layouter, &psi, &value)?;
+
+    // `d` = (bits 5..=63 of value) || 0
+    let d = MessagePiece::from_subpieces(
+        chip.clone(),
+        layouter.namespace(|| "d"),
+        [
+            RangeConstrained::bitrange_of(value.value(), 5..64),
+            RangeConstrained::bitrange_of(Value::known(&pallas::Base::zero()), 0..1),
+        ],
+    )?;
+
+    // cm = NoteCommit^rcm(user_address || token_address || data || rho || psi || value)
+    let (cm, _zs) = {
+        let message = Message::from_pieces(
+            chip.clone(),
+            vec![
+                user_0_249.clone(),
+                a.clone(),
+                token_5_254.clone(),
+                data_0_249.clone(),
+                b.clone(),
+                rho_5_254.clone(),
+                psi_0_249.clone(),
+                c.clone(),
+                d.clone(),
+            ],
+        );
+        let domain = CommitDomain::new(chip, ecc_chip, &NoteCommitmentDomain);
+        domain.commit(
+            layouter.namespace(|| "Process NoteCommit inputs"),
+            message,
+            rcm,
+        )?
+    };
+
+    // assign values
+    let cfg = note_commit_chip.config;
+
+    cfg.decompose5_5.assign(
+        &mut layouter,
+        a,
+        user_tail_bit5.clone(),
+        token_pre_bit5.clone(),
+    )?;
+
+    cfg.decompose5_5.assign(
+        &mut layouter,
+        b,
+        data_tail_bit5.clone(),
+        rho_pre_bit5.clone(),
+    )?;
+
+    cfg.decompose5_5.assign(
+        &mut layouter,
+        c,
+        psi_tail_bit5.clone(),
+        value_pre_bit5.clone(),
+    )?;
+
+    cfg.base_canonicity_250_5
+        .assign(&mut layouter, user_address, user_0_249, user_tail_bit5)?;
+    cfg.base_canonicity_5
+        .assign(&mut layouter, token_address, token_5_254, token_pre_bit5)?;
+    cfg.base_canonicity_250_5
+        .assign(&mut layouter, data, data_0_249, data_tail_bit5)?;
+    cfg.base_canonicity_5
+        .assign(&mut layouter, rho, rho_5_254, rho_pre_bit5)?;
+    cfg.base_canonicity_250_5
+        .assign(&mut layouter, psi, psi_0_249, psi_tail_bit5)?;
+    cfg.base_canonicity_5
+        .assign(&mut layouter, value, d, value_pre_bit5)?;
+
+    Ok(cm)
+}
+
+#[derive(Clone, Debug)]
+pub struct NoteConfig {
+    pub instances: Column<Instance>,
+    pub advices: [Column<Advice>; 10],
+    pub add_config: AddConfig,
+    pub ecc_config: EccConfig<NoteCommitmentFixedBases>,
+    pub poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
+    pub sinsemilla_config:
+        SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
+    pub note_commit_config: NoteCommitmentConfig,
+}
+
+#[derive(Clone, Debug)]
+pub struct NoteChip {
+    config: NoteConfig,
+}
+
+impl NoteChip {
+    pub fn configure(
+        meta: &mut ConstraintSystem<pallas::Base>,
+        instances: Column<Instance>,
+        advices: [Column<Advice>; 10],
+    ) -> NoteConfig {
+        let add_config = AddChip::configure(meta, advices[0..2].try_into().unwrap());
+
+        let table_idx = meta.lookup_table_column();
+        let lookup = (
+            table_idx,
+            meta.lookup_table_column(),
+            meta.lookup_table_column(),
+        );
+
+        let range_check = LookupRangeCheckConfig::configure(meta, advices[9], table_idx);
+
+        let lagrange_coeffs = [
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+        ];
+        meta.enable_constant(lagrange_coeffs[0]);
+
+        let ecc_config = EccChip::<NoteCommitmentFixedBases>::configure(
+            meta,
+            advices,
+            lagrange_coeffs,
+            range_check,
+        );
+
+        let poseidon_config = PoseidonChip::configure::<poseidon::P128Pow5T3>(
+            meta,
+            advices[6..9].try_into().unwrap(),
+            advices[5],
+            lagrange_coeffs[2..5].try_into().unwrap(),
+            lagrange_coeffs[5..8].try_into().unwrap(),
+        );
+
+        let sinsemilla_config = SinsemillaChip::<
+            NoteCommitmentHashDomain,
+            NoteCommitmentDomain,
+            NoteCommitmentFixedBases,
+        >::configure(
+            meta,
+            advices[..5].try_into().unwrap(),
+            advices[2],
+            lagrange_coeffs[0],
+            lookup,
+            range_check,
+        );
+
+        let note_commit_config =
+            NoteCommitmentChip::configure(meta, advices, sinsemilla_config.clone());
+
+        NoteConfig {
+            instances,
+            advices,
+            add_config,
+            ecc_config,
+            poseidon_config,
+            sinsemilla_config,
+            note_commit_config,
+        }
+    }
+
+    pub fn construct(config: NoteConfig) -> Self {
+        Self { config }
     }
 }
 

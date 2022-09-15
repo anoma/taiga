@@ -1,5 +1,5 @@
 use crate::circuit::gadgets::{assign_free_advice, AddChip, AddInstructions};
-use crate::circuit::note_commitment::{
+use crate::circuit::note_circuit::{
     note_commitment_gadget, NoteCommitmentChip, NoteCommitmentDomain, NoteCommitmentFixedBases,
     NoteCommitmentFixedBasesFull, NoteCommitmentHashDomain, NullifierK,
 };
@@ -14,7 +14,7 @@ use halo2_gadgets::{
 };
 use halo2_proofs::{
     circuit::{AssignedCell, Layouter, Value},
-    plonk::{Advice, Column, Error},
+    plonk::{Advice, Column, Error, Instance},
 };
 use pasta_curves::pallas;
 
@@ -69,6 +69,7 @@ pub struct SpendNoteVar {
 pub fn check_spend_note(
     mut layouter: impl Layouter<pallas::Base>,
     advices: [Column<Advice>; 10],
+    instances: Column<Instance>,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
     sinsemilla_chip: SinsemillaChip<
         NoteCommitmentHashDomain,
@@ -211,6 +212,9 @@ pub fn check_spend_note(
         &cm,
     )?;
 
+    // Public nullifier
+    layouter.constrain_instance(nf.cell(), instances, 0)?;
+
     Ok(SpendNoteVar { nf, cm })
 }
 
@@ -328,7 +332,7 @@ pub fn check_output_note(
 fn test_halo2_nullifier_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use crate::circuit::gadgets::AddConfig;
-    use crate::circuit::note_commitment::{
+    use crate::circuit::note_circuit::{
         NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain,
     };
     use crate::note::NoteCommitment;
