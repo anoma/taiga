@@ -1,6 +1,14 @@
 use group::Curve;
-use halo2_gadgets::ecc::chip::constants::{H, NUM_WINDOWS};
-use halo2_gadgets::sinsemilla::primitives::CommitDomain;
+use halo2_gadgets::{
+    ecc::{
+        chip::{
+            constants::{H, NUM_WINDOWS},
+            BaseFieldElem, FixedPoint, FullScalar, ShortScalar,
+        },
+        FixedPoints,
+    },
+    sinsemilla::{primitives::CommitDomain, CommitDomains, HashDomains},
+};
 use lazy_static::lazy_static;
 use pasta_curves::pallas;
 
@@ -2943,6 +2951,98 @@ pub const R_Z: [u64; NUM_WINDOWS] = [
     2552, 135756, 21979, 49331, 41598, 30372, 109576, 173209, 72243, 85893, 7951, 35552, 8118,
     109128, 3101, 306, 108932, 62065, 29042,
 ];
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct NoteCommitmentHashDomain;
+impl HashDomains<pallas::Affine> for NoteCommitmentHashDomain {
+    fn Q(&self) -> pallas::Affine {
+        *NOTE_COMMITMENT_GENERATOR
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct NoteCommitmentDomain;
+impl CommitDomains<pallas::Affine, NoteCommitmentFixedBases, NoteCommitmentHashDomain>
+    for NoteCommitmentDomain
+{
+    fn r(&self) -> NoteCommitmentFixedBasesFull {
+        NoteCommitmentFixedBasesFull
+    }
+
+    fn hash_domain(&self) -> NoteCommitmentHashDomain {
+        NoteCommitmentHashDomain
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct NoteCommitmentFixedBases;
+
+impl FixedPoints<pallas::Affine> for NoteCommitmentFixedBases {
+    type FullScalar = NoteCommitmentFixedBasesFull;
+    type ShortScalar = Short;
+    type Base = NullifierK;
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct NoteCommitmentFixedBasesFull;
+
+impl FixedPoint<pallas::Affine> for NoteCommitmentFixedBasesFull {
+    type FixedScalarKind = FullScalar;
+
+    fn generator(&self) -> pallas::Affine {
+        *NOTE_COMMITMENT_R_GENERATOR
+    }
+
+    fn u(&self) -> Vec<[[u8; 32]; H]> {
+        R_U.to_vec()
+    }
+
+    fn z(&self) -> Vec<u64> {
+        R_Z.to_vec()
+    }
+}
+
+// NullifierK is used in scalar mul with a base field element.
+// NOTE_COMMITMENT_R_GENERATOR abuse here, replace with a new parameter when needed.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct NullifierK;
+
+impl FixedPoint<pallas::Affine> for NullifierK {
+    type FixedScalarKind = BaseFieldElem;
+
+    fn generator(&self) -> pallas::Affine {
+        *NOTE_COMMITMENT_R_GENERATOR
+    }
+
+    fn u(&self) -> Vec<[[u8; 32]; H]> {
+        R_U.to_vec()
+    }
+
+    fn z(&self) -> Vec<u64> {
+        R_Z.to_vec()
+    }
+}
+
+// We don't need the short?
+// NOTE_COMMITMENT_R_GENERATOR abuse here, replace with a new parameter when needed.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct Short;
+
+impl FixedPoint<pallas::Affine> for Short {
+    type FixedScalarKind = ShortScalar;
+
+    fn generator(&self) -> pallas::Affine {
+        *NOTE_COMMITMENT_R_GENERATOR
+    }
+
+    fn u(&self) -> Vec<[[u8; 32]; H]> {
+        R_U.to_vec()
+    }
+
+    fn z(&self) -> Vec<u64> {
+        R_Z.to_vec()
+    }
+}
 
 #[ignore]
 #[test]
