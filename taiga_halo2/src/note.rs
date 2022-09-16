@@ -78,11 +78,15 @@ impl Note {
     }
 
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
+        let rho = Nullifier::new(pallas::Base::random(&mut rng));
+        Self::dummy_from_rho(rng, rho)
+    }
+
+    pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
         let user = User::dummy(&mut rng);
         let token = Token::dummy(&mut rng);
         let value: u64 = rng.gen();
         let data = pallas::Base::random(&mut rng);
-        let rho = Nullifier::new(pallas::Base::random(&mut rng));
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = Self::derive_psi(&rho.inner(), &rcm);
         Self {
@@ -136,5 +140,11 @@ impl Note {
             )
             .unwrap();
         NoteCommitment(ret)
+    }
+
+    pub fn get_nf(&self) -> Nullifier {
+        let nk = self.user.get_nk().unwrap();
+        let cm = self.commitment();
+        Nullifier::derive_native(&nk, &self.rho.inner(), &self.psi, &cm)
     }
 }

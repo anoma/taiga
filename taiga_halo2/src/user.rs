@@ -70,6 +70,10 @@ impl User {
         // address = Com_r(send_com || recv_vp_hash), use poseidon hash as Com_r
         poseidon_hash(self.send_com.get_closed(), self.recv_vp.get_compressed())
     }
+
+    pub fn get_nk(&self) -> Option<NullifierDerivingKey> {
+        self.send_com.get_nk()
+    }
 }
 
 impl UserSendAddress {

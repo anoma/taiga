@@ -23,6 +23,10 @@ pub const BASE_BITS_NUM: usize = 255;
 /// The number of notes in a tx.
 pub const NUM_NOTE: usize = 4;
 
+pub const ACTION_NF_INSTANCE_ROW_IDX: usize = 0;
+pub const ACTION_ROOT_INSTANCE_ROW_IDX: usize = 1;
+pub const ACTION_OUTPUT_CM_INSTANCE_ROW_IDX: usize = 2;
+
 // SinsemillaCommit parameters
 lazy_static! {
     pub static ref NOTE_COMMIT_DOMAIN: CommitDomain =

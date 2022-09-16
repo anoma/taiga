@@ -1,8 +1,8 @@
 use crate::{
     circuit::{
-        gadgets::AddChip,
+        gadgets::{assign_free_advice, AddChip},
         integrity::{check_output_note, check_spend_note, OutputNoteVar, SpendNoteVar},
-        note_circuit::{NoteCommitmentChip, NoteConfig},
+        note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig},
     },
     constant::{
         NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain, NUM_NOTE,
@@ -10,11 +10,38 @@ use crate::{
     note::Note,
 };
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
-use halo2_proofs::{circuit::Layouter, plonk::Error};
+use halo2_proofs::{
+    circuit::{Layouter, Value},
+    plonk::{ConstraintSystem, Error},
+};
 use pasta_curves::pallas;
 
 pub trait ValidityPredicateConfig {
+    fn configure_note(meta: &mut ConstraintSystem<pallas::Base>) -> NoteConfig {
+        let instances = meta.instance_column();
+        meta.enable_equality(instances);
+
+        let advices = [
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+        ];
+
+        for advice in advices.iter() {
+            meta.enable_equality(*advice);
+        }
+
+        NoteChip::configure(meta, instances, advices)
+    }
     fn get_note_config(&self) -> NoteConfig;
+    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self;
 }
 pub trait ValidityPredicateCircuit {
     type Config: ValidityPredicateConfig + Clone;
@@ -61,16 +88,26 @@ pub trait ValidityPredicateCircuit {
                 note_config.poseidon_config.clone(),
                 add_chip.clone(),
                 input_notes[i].clone(),
+                i * 2,
+            )?;
+
+            // The old_nf may not be from above input note
+            let old_nf = assign_free_advice(
+                layouter.namespace(|| "old nf"),
+                note_config.advices[0],
+                Value::known(output_notes[i].rho.inner()),
             )?;
             let output_note_var = check_output_note(
                 layouter.namespace(|| "check output note"),
                 note_config.advices,
+                note_config.instances,
                 ecc_chip.clone(),
                 sinsemilla_chip.clone(),
                 note_commit_chip.clone(),
                 note_config.poseidon_config.clone(),
                 output_notes[i].clone(),
-                input_note_var.nf.clone(),
+                old_nf,
+                i * 2 + 1,
             )?;
             input_note_variables.push(input_note_var);
             output_note_variables.push(output_note_var);
