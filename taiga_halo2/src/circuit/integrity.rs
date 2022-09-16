@@ -83,6 +83,7 @@ pub fn check_spend_note(
     // poseidon_chip: PoseidonChip<pallas::Base, 3, 2>,
     add_chip: AddChip<pallas::Base>,
     spend_note: Note,
+    nf_row_idx: usize,
 ) -> Result<SpendNoteVar, Error> {
     // Check spend note user integrity: user_address = Com_r(Com_r(send_vp, nk), recv_vp_hash)
     let (user_address, nk) = {
@@ -100,7 +101,7 @@ pub fn check_spend_note(
         )?;
 
         // Witness nk
-        let nk = spend_note.user.send_com.get_nk().unwrap();
+        let nk = spend_note.user.get_nk().unwrap();
         let nk_var = assign_free_advice(
             layouter.namespace(|| "witness nk"),
             advices[0],
@@ -214,7 +215,7 @@ pub fn check_spend_note(
     )?;
 
     // Public nullifier
-    layouter.constrain_instance(nf.cell(), instances, 0)?;
+    layouter.constrain_instance(nf.cell(), instances, nf_row_idx)?;
 
     Ok(SpendNoteVar { nf, cm })
 }
@@ -229,6 +230,7 @@ pub struct OutputNoteVar {
 pub fn check_output_note(
     mut layouter: impl Layouter<pallas::Base>,
     advices: [Column<Advice>; 10],
+    instances: Column<Instance>,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
     sinsemilla_chip: SinsemillaChip<
         NoteCommitmentHashDomain,
@@ -241,6 +243,7 @@ pub fn check_output_note(
     // poseidon_chip: PoseidonChip<pallas::Base, 3, 2>,
     output_note: Note,
     old_nf: AssignedCell<pallas::Base, pallas::Base>,
+    cm_row_idx: usize,
 ) -> Result<OutputNoteVar, Error> {
     // Check output note user integrity: user_address = Com_r(, recv_vp_hash)
     let user_address = {
@@ -325,6 +328,10 @@ pub fn check_output_note(
         value_var,
         rcm,
     )?;
+
+    // Public cm
+    let cm_x = cm.extract_p().inner().clone();
+    layouter.constrain_instance(cm_x.cell(), instances, cm_row_idx)?;
 
     Ok(OutputNoteVar { cm })
 }

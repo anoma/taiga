@@ -6,6 +6,7 @@ use crate::circuit::merkle_circuit::{
 use crate::circuit::note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig};
 use crate::constant::{
     NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain,
+    ACTION_NF_INSTANCE_ROW_IDX, ACTION_OUTPUT_CM_INSTANCE_ROW_IDX, ACTION_ROOT_INSTANCE_ROW_IDX,
     TAIGA_COMMITMENT_TREE_DEPTH,
 };
 use crate::note::Note;
@@ -122,6 +123,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
                 config.note_config.poseidon_config.clone(),
                 add_chip,
                 self.spend_note.clone(),
+                ACTION_NF_INSTANCE_ROW_IDX,
             )?;
 
             // Check the merkle tree path validity and public the root
@@ -134,7 +136,11 @@ impl Circuit<pallas::Base> for ActionCircuit {
             )?;
 
             // Public root
-            layouter.constrain_instance(root.cell(), config.instances, 1)?;
+            layouter.constrain_instance(
+                root.cell(),
+                config.instances,
+                ACTION_ROOT_INSTANCE_ROW_IDX,
+            )?;
 
             // TODO: user send address VP commitment and token VP commitment
 
@@ -143,24 +149,22 @@ impl Circuit<pallas::Base> for ActionCircuit {
 
         // Output note
         {
-            let output_note_vars = check_output_note(
+            let _output_note_vars = check_output_note(
                 layouter.namespace(|| "check output note"),
                 config.advices,
+                config.instances,
                 ecc_chip,
                 sinsemilla_chip,
                 note_commit_chip,
                 config.note_config.poseidon_config,
                 self.output_note.clone(),
                 nf,
+                ACTION_OUTPUT_CM_INSTANCE_ROW_IDX,
             )?;
 
             // TODO: add user receive address VP commitment and token VP commitment
 
             // TODO: add note verifiable encryption
-
-            // Public cm
-            let cm = output_note_vars.cm.extract_p().inner().clone();
-            layouter.constrain_instance(cm.cell(), config.instances, 2)?;
         }
 
         Ok(())

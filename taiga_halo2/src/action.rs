@@ -71,14 +71,7 @@ impl ActionInfo {
     }
 
     pub fn build(self, rng: &mut impl RngCore) -> (ActionInstance, ActionCircuit) {
-        let spend_cm = self.spend.note.commitment();
-        let nk = self.spend.note.user.send_com.get_nk().unwrap();
-        let nf = Nullifier::derive_native(
-            &nk,
-            &self.spend.note.rho.inner(),
-            &self.spend.note.psi,
-            &spend_cm,
-        );
+        let nf = self.spend.note.get_nf();
 
         let user = User {
             send_com: self.output.addr_send_closed,

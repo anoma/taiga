@@ -4,3 +4,4 @@ pub mod integrity;
 pub mod merkle_circuit;
 pub mod note_circuit;
 pub mod vp_circuit;
+pub mod vp_examples;
