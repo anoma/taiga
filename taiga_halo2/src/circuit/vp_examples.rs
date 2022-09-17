@@ -17,13 +17,13 @@ mod field_addition;
 
 // DummyValidityPredicateCircuit with empty custom constraints.
 #[derive(Clone, Debug, Default)]
-struct DummyValidityPredicateCircuit {
+pub struct DummyValidityPredicateCircuit {
     input_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
 }
 
 #[derive(Clone, Debug)]
-struct DummyValidityPredicateConfig {
+pub struct DummyValidityPredicateConfig {
     note_conifg: NoteConfig,
 }
 
