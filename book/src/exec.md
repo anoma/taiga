@@ -42,16 +42,20 @@ Note: solvers don't need to be identified as all actions are authorized by user/
 
 After the intents are matched with satisfaction of all involved parties, the transaction is published on the blockchain. The intermediate notes themself are not published, but the local CMTree is, as well as all of the proofs created (including the proofs for the intermediate notes).
 
-### Example with 3-party bartering cycle
+### Example with a 3-party bartering cycle
 
-On the example below Alice, Bob, and Carol want to exchange some assets. 
+On the example below Alice, Bob, and Carol want to exchange some assets (not necessarily with each other). 
 
-1. All three of them create intermediate notes with VPs that make sure the requirements are satisfied, and publish intents. 
+1. All three of the users create intermediate notes with intent-specific VPs.
 
-2. The first solver matches two intents and produces partial tx and a new intent. 
+2. Alice and Bob create their intents and send them to the intent gossip network. 
+   
+2.1 Carol creates her intent and sends it to the intent gossip network.
 
-3. The second solver finds a match for the intents left to match and produces the final transaction. 
+3. The first solver receives the intents of Alice and Bob (but not necessarily Carol's), matches them, and produces a partial tx. This partial transaction satisfies the needs of Alice but not Bob's and cannot be finalized. Solver produces a new intent (seeking for the resources to satisfy Bob's VP).
 
-Intermediate notes aren't published, but intermediate notes and commitments are.
+4. The second solver receives the intent produced by the first solver and Carol's intent and matches them. The resulting transaction satisfies the needs of Alice, Bob, and Carol and can be finalized.
+
+5. The final transaction doesn't contain intermediate notes, but contains commitments to them. In the end, Alice sends her note to Carol, Carol sends her note to Bob, and Bob sends her note Alice.
 
 ![img.png](img/exec_img.png)
