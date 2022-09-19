@@ -24,15 +24,29 @@ The creation of the intermediate note can be seen as sending a note to a new add
 ### Solve
 We are considering the model when a solver makes one step at a time and sends the result to the next solver. In practice, the solver can send the result to themselves and continue solving if they have the intent to make the next step. It would be nice to merge the steps into one when possible, but for simplicity we ignore this detail here
 
-**Note**: each solver must check the proofs they receive from other nodes
+#### Create partial transactions
 
-When a solver has two intents that can be matched together, they match the intents by spending the old notes and creating new notes. Solvers have the authority to spend and create the intermediate notes they receive and produce the proofs required to perform the action. Solvers also know the content of intent-specific VPs and receving VPs of the users (necessary to be able to satisfy them). Solvers don't know the identities of the users. Created notes are added in a local MT tree that will be published later along with the settled transaction.
+When a solver has two intents that can be matched together, they match the intents by spending the old notes and creating new notes. 
+
+##### Prove
+Solvers are responsible for creation of all proofs (`Action`, `tokenVP`, `userVP`, etc) required for a state transition for their partial solutions.
+- solvers **have the authority** to spend and create the intermediate notes they receive and produce the proofs required to perform the action
+- solvers **know** the content of intent-specific VPs and receving VPs of the users (necessary to be able to satisfy them)
+- solvers **don't know** the identities of the users
+
+When solvers receive partial transactions, they must check all of the proofs attached to it.
+
+##### Local `cm` trees
+
+To store intermediate note commitments `cm`, a local commitment tree `CMtree` is created. After the transaction is finalized, the tree will be published on the blockchain along with the transaction.
+
+#### Partial vs final match
 
 If a solver has two intents that can be matched together, two cases are possible:
 1. The match is partial, partial transaction and a new intent are created. In this case the solver appends the data they produced to the new intent and gossips the new intent to the next node
 2. The match is final, the solver publishes the final transaction as described below
 
-In the current implementation we assume a simpler model where only one solver can match n-party bartering intents (no partial solving).
+**Note**: in the current implementation we assume a simpler model where only one solver can match n-party bartering intents (**no partial solving**).
 
 **Note**: solvers don't need to be identified as all actions are authorized by user/app VPs. However, if they want to receive fees, they need to have an address on the chain.
 
