@@ -131,3 +131,39 @@ pub trait ValidityPredicateCircuit {
         Ok(())
     }
 }
+
+#[macro_export]
+macro_rules! vp_circuit_impl {
+    ($name:ident) => {
+        impl Circuit<pallas::Base> for $name {
+            type Config = <Self as ValidityPredicateCircuit>::Config;
+            type FloorPlanner = floor_planner::V1;
+
+            fn without_witnesses(&self) -> Self {
+                Self::default()
+            }
+
+            fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self::Config {
+                Self::Config::configure(meta)
+            }
+
+            fn synthesize(
+                &self,
+                config: Self::Config,
+                mut layouter: impl Layouter<pallas::Base>,
+            ) -> Result<(), Error> {
+                let (input_note_variables, output_note_variables) = self.basic_constraints(
+                    config.clone(),
+                    layouter.namespace(|| "basic constraints"),
+                )?;
+                self.custom_constraints(
+                    config,
+                    layouter.namespace(|| "custom constraints"),
+                    &input_note_variables,
+                    &output_note_variables,
+                )?;
+                Ok(())
+            }
+        }
+    };
+}

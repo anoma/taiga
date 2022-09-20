@@ -76,35 +76,7 @@ impl ValidityPredicateCircuit for DummyValidityPredicateCircuit {
     }
 }
 
-// TODO: The `Circuit` impl for all vp circuits is the same, try to make it a Macros
-impl Circuit<pallas::Base> for DummyValidityPredicateCircuit {
-    type Config = DummyValidityPredicateConfig;
-    type FloorPlanner = floor_planner::V1;
-
-    fn without_witnesses(&self) -> Self {
-        Self::default()
-    }
-
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self::Config {
-        Self::Config::configure(meta)
-    }
-
-    fn synthesize(
-        &self,
-        config: Self::Config,
-        mut layouter: impl Layouter<pallas::Base>,
-    ) -> Result<(), Error> {
-        let (input_note_variables, output_note_variables) =
-            self.basic_constraints(config.clone(), layouter.namespace(|| "basic constraints"))?;
-        self.custom_constraints(
-            config,
-            layouter.namespace(|| "custom constraints"),
-            &input_note_variables,
-            &output_note_variables,
-        )?;
-        Ok(())
-    }
-}
+vp_circuit_impl!(DummyValidityPredicateCircuit);
 
 #[test]
 fn test_halo2_dummy_vp_circuit() {
