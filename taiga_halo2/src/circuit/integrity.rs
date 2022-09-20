@@ -62,6 +62,10 @@ pub fn nullifier_circuit(
 // Return variables in the spend note
 #[derive(Debug)]
 pub struct SpendNoteVar {
+    pub user_address: AssignedCell<pallas::Base, pallas::Base>,
+    pub token_address: AssignedCell<pallas::Base, pallas::Base>,
+    pub value: AssignedCell<pallas::Base, pallas::Base>,
+    pub data: AssignedCell<pallas::Base, pallas::Base>,
     pub nf: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
 }
@@ -157,7 +161,7 @@ pub fn check_spend_note(
     )?;
 
     // Witness value(u64)
-    let value_var = {
+    let value = {
         assign_free_advice(
             layouter.namespace(|| "witness value"),
             advices[0],
@@ -192,12 +196,12 @@ pub fn check_spend_note(
         sinsemilla_chip,
         ecc_chip.clone(),
         note_commit_chip,
-        user_address,
-        token_address,
-        data,
+        user_address.clone(),
+        token_address.clone(),
+        data.clone(),
         rho.clone(),
         psi.clone(),
-        value_var,
+        value.clone(),
         rcm,
     )?;
 
@@ -217,12 +221,23 @@ pub fn check_spend_note(
     // Public nullifier
     layouter.constrain_instance(nf.cell(), instances, nf_row_idx)?;
 
-    Ok(SpendNoteVar { nf, cm })
+    Ok(SpendNoteVar {
+        user_address,
+        token_address,
+        value,
+        data,
+        nf,
+        cm,
+    })
 }
 
 // Return variables in the spend note
 #[derive(Debug)]
 pub struct OutputNoteVar {
+    pub user_address: AssignedCell<pallas::Base, pallas::Base>,
+    pub token_address: AssignedCell<pallas::Base, pallas::Base>,
+    pub value: AssignedCell<pallas::Base, pallas::Base>,
+    pub data: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
 }
 
@@ -284,7 +299,7 @@ pub fn check_output_note(
     )?;
 
     // Witness value(u64)
-    let value_var = {
+    let value = {
         assign_free_advice(
             layouter.namespace(|| "witness value"),
             advices[0],
@@ -320,12 +335,12 @@ pub fn check_output_note(
         sinsemilla_chip,
         ecc_chip,
         note_commit_chip,
-        user_address,
-        token_address,
-        data,
+        user_address.clone(),
+        token_address.clone(),
+        data.clone(),
         old_nf,
         psi,
-        value_var,
+        value.clone(),
         rcm,
     )?;
 
@@ -333,7 +348,13 @@ pub fn check_output_note(
     let cm_x = cm.extract_p().inner().clone();
     layouter.constrain_instance(cm_x.cell(), instances, cm_row_idx)?;
 
-    Ok(OutputNoteVar { cm })
+    Ok(OutputNoteVar {
+        user_address,
+        token_address,
+        value,
+        data,
+        cm,
+    })
 }
 
 #[test]
