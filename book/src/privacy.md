@@ -5,4 +5,4 @@
 * In consequence we need to bind randomizedVK to VK. We use another commitment.
 * Blinding proof is split in two parts:
     * vk and rand leads to randomizedVK,
-    * vk opens vkCommitment.
+    * vk opens vkCommitment. 
