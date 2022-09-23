@@ -63,7 +63,7 @@ pub fn nullifier_circuit(
 #[derive(Debug)]
 pub struct SpendNoteVar {
     pub user_address: AssignedCell<pallas::Base, pallas::Base>,
-    pub token_address: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_address: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub data: AssignedCell<pallas::Base, pallas::Base>,
     pub nf: AssignedCell<pallas::Base, pallas::Base>,
@@ -146,11 +146,11 @@ pub fn check_spend_note(
         (user_address, nk_var)
     };
 
-    // Witness token_address
-    let token_address = assign_free_advice(
-        layouter.namespace(|| "witness token_address"),
+    // Witness app_address
+    let app_address = assign_free_advice(
+        layouter.namespace(|| "witness app_address"),
         advices[0],
-        Value::known(spend_note.token.address()),
+        Value::known(spend_note.app.address()),
     )?;
 
     // Witness data
@@ -197,7 +197,7 @@ pub fn check_spend_note(
         ecc_chip.clone(),
         note_commit_chip,
         user_address.clone(),
-        token_address.clone(),
+        app_address.clone(),
         data.clone(),
         rho.clone(),
         psi.clone(),
@@ -223,7 +223,7 @@ pub fn check_spend_note(
 
     Ok(SpendNoteVar {
         user_address,
-        token_address,
+        app_address,
         value,
         data,
         nf,
@@ -235,7 +235,7 @@ pub fn check_spend_note(
 #[derive(Debug)]
 pub struct OutputNoteVar {
     pub user_address: AssignedCell<pallas::Base, pallas::Base>,
-    pub token_address: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_address: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub data: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
@@ -284,11 +284,11 @@ pub fn check_output_note(
         poseidon_hasher.hash(layouter.namespace(|| "user_address"), poseidon_message)?
     };
 
-    // Witness token_address
-    let token_address = assign_free_advice(
-        layouter.namespace(|| "witness token_address"),
+    // Witness app_address
+    let app_address = assign_free_advice(
+        layouter.namespace(|| "witness app_address"),
         advices[0],
-        Value::known(output_note.token.address()),
+        Value::known(output_note.app.address()),
     )?;
 
     // Witness data
@@ -336,7 +336,7 @@ pub fn check_output_note(
         ecc_chip,
         note_commit_chip,
         user_address.clone(),
-        token_address.clone(),
+        app_address.clone(),
         data.clone(),
         old_nf,
         psi,
@@ -350,7 +350,7 @@ pub fn check_output_note(
 
     Ok(OutputNoteVar {
         user_address,
-        token_address,
+        app_address,
         value,
         data,
         cm,
