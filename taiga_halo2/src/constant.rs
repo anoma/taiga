@@ -12,6 +12,8 @@ use halo2_gadgets::{
 use lazy_static::lazy_static;
 use pasta_curves::pallas;
 
+use crate::circuit::circuit_parameters::CircuitParameters;
+
 /// SWU hash-to-curve personalization for the note commitment generator
 pub const NOTE_COMMITMENT_PERSONALIZATION: &str = "Taiga-NoteCommit";
 
@@ -31,9 +33,9 @@ pub const ACTION_OUTPUT_CM_INSTANCE_ROW_IDX: usize = 2;
 lazy_static! {
     pub static ref NOTE_COMMIT_DOMAIN: CommitDomain =
         CommitDomain::new(NOTE_COMMITMENT_PERSONALIZATION);
-    pub static ref NOTE_COMMITMENT_GENERATOR: CP::InnerCurve = NOTE_COMMIT_DOMAIN.Q().to_affine();
-    pub static ref NOTE_COMMITMENT_R_GENERATOR: CP::InnerCurve = NOTE_COMMIT_DOMAIN.R().to_affine();
-    // pub static ref R_ZS_AND_US: Vec<(u64, [CP::CurveScalarField; H])> =
+    pub static ref NOTE_COMMITMENT_GENERATOR: pallas::Affine = NOTE_COMMIT_DOMAIN.Q().to_affine();
+    pub static ref NOTE_COMMITMENT_R_GENERATOR: pallas::Affine = NOTE_COMMIT_DOMAIN.R().to_affine();
+    // pub static ref R_ZS_AND_US: Vec<(u64, [pallas::Base; H])> =
     //     find_zs_and_us(*NOTE_COMMITMENT_R_GENERATOR, NUM_WINDOWS).unwrap();
     // pub static ref R_U: Vec<[[u8; 32]; H]> = R_ZS_AND_US
     //     .iter()
@@ -2957,40 +2959,43 @@ pub const R_Z: [u64; NUM_WINDOWS] = [
 ];
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct NoteCommitmentHashDomain;
-impl HashDomains<CP::InnerCurve> for NoteCommitmentHashDomain {
+pub struct NoteCommitmentHashDomain<CP: CircuitParameters>;
+
+impl<CP: CircuitParameters> HashDomains<CP::InnerCurve> for NoteCommitmentHashDomain<CP> {
     fn Q(&self) -> CP::InnerCurve {
         *NOTE_COMMITMENT_GENERATOR
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct NoteCommitmentDomain;
-impl CommitDomains<CP::InnerCurve, NoteCommitmentFixedBases, NoteCommitmentHashDomain>
-    for NoteCommitmentDomain
+pub struct NoteCommitmentDomain<CP: CircuitParameters>;
+
+impl<CP: CircuitParameters>
+    CommitDomains<CP::InnerCurve, NoteCommitmentFixedBases<CP>, NoteCommitmentHashDomain<CP>>
+    for NoteCommitmentDomain<CP>
 {
-    fn r(&self) -> NoteCommitmentFixedBasesFull {
+    fn r(&self) -> NoteCommitmentFixedBasesFull<CP> {
         NoteCommitmentFixedBasesFull
     }
 
-    fn hash_domain(&self) -> NoteCommitmentHashDomain {
+    fn hash_domain(&self) -> NoteCommitmentHashDomain<CP> {
         NoteCommitmentHashDomain
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct NoteCommitmentFixedBases;
+pub struct NoteCommitmentFixedBases<CP: CircuitParameters>;
 
-impl FixedPoints<CP::InnerCurve> for NoteCommitmentFixedBases {
-    type FullScalar = NoteCommitmentFixedBasesFull;
-    type ShortScalar = Short;
-    type Base = NullifierK;
+impl<CP: CircuitParameters> FixedPoints<CP::InnerCurve> for NoteCommitmentFixedBases<CP> {
+    type FullScalar = NoteCommitmentFixedBasesFull<CP>;
+    type ShortScalar = Short<CP>;
+    type Base = NullifierK<CP>;
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct NoteCommitmentFixedBasesFull;
+pub struct NoteCommitmentFixedBasesFull<CP: CircuitParameters>;
 
-impl FixedPoint<CP::InnerCurve> for NoteCommitmentFixedBasesFull {
+impl<CP: CircuitParameters> FixedPoint<CP::InnerCurve> for NoteCommitmentFixedBasesFull<CP> {
     type FixedScalarKind = FullScalar;
 
     fn generator(&self) -> CP::InnerCurve {
@@ -3009,9 +3014,9 @@ impl FixedPoint<CP::InnerCurve> for NoteCommitmentFixedBasesFull {
 // NullifierK is used in scalar mul with a base field element.
 // NOTE_COMMITMENT_R_GENERATOR abuse here, replace with a new parameter when needed.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct NullifierK;
+pub struct NullifierK<CP: CircuitParameters>;
 
-impl FixedPoint<CP::InnerCurve> for NullifierK {
+impl<CP: CircuitParameters> FixedPoint<CP::InnerCurve> for NullifierK<CP> {
     type FixedScalarKind = BaseFieldElem;
 
     fn generator(&self) -> CP::InnerCurve {
@@ -3030,9 +3035,9 @@ impl FixedPoint<CP::InnerCurve> for NullifierK {
 // We don't need the short?
 // NOTE_COMMITMENT_R_GENERATOR abuse here, replace with a new parameter when needed.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct Short;
+pub struct Short<CP: CircuitParameters>;
 
-impl FixedPoint<CP::InnerCurve> for Short {
+impl<CP: CircuitParameters> FixedPoint<CP::InnerCurve> for Short<CP> {
     type FixedScalarKind = ShortScalar;
 
     fn generator(&self) -> CP::InnerCurve {
@@ -3051,6 +3056,7 @@ impl FixedPoint<CP::InnerCurve> for Short {
 #[ignore]
 #[test]
 fn r_u_z_generate() {
+    use crate::circuit::circuit_parameters::DLCircuitParameters as CP;
     use ff::PrimeField;
     use halo2_gadgets::ecc::chip::constants::find_zs_and_us;
     let r_zs_and_us: Vec<(u64, [CP::CurveScalarField; H])> =

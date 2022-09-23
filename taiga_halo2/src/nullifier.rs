@@ -6,7 +6,6 @@ use crate::{
     utils::{extract_p, mod_r_p},
 };
 use group::cofactor::CofactorCurveAffine;
-use pasta_curves::pallas;
 
 /// The unique nullifier.
 #[derive(Copy, Debug, Clone)]
@@ -21,7 +20,7 @@ impl<CP: CircuitParameters> Nullifier<CP> {
     // cm is a point
     // $nf =Extract_P([PRF_{nk}(\rho) + \psi \ mod \ q] * K + cm)$
     pub fn derive_native(
-        nk: &NullifierDerivingKey,
+        nk: &NullifierDerivingKey<CP>,
         rho: &CP::CurveScalarField,
         psi: &CP::CurveScalarField,
         cm: &NoteCommitment<CP>,

@@ -1,3 +1,4 @@
+use ff::Field;
 use halo2_gadgets::{
     poseidon::{
         primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
@@ -9,23 +10,22 @@ use halo2_proofs::{
     circuit::{AssignedCell, Chip, Layouter, Value},
     plonk::{Advice, Column, ConstraintSystem, Error},
 };
-use pasta_curves::pallas;
 
 /// MerkleTreeChip based on poseidon hash.
 #[derive(Clone, Debug)]
-pub struct MerklePoseidonConfig {
+pub struct MerklePoseidonConfig<F: Field> {
     advices: [Column<Advice>; 5],
     cond_swap_config: CondSwapConfig,
-    poseidon_config: PoseidonConfig<CP::CurveScalarField, 3, 2>,
+    poseidon_config: PoseidonConfig<F, 3, 2>,
 }
 
 #[derive(Clone, Debug)]
-pub struct MerklePoseidonChip {
-    config: MerklePoseidonConfig,
+pub struct MerklePoseidonChip<F: Field> {
+    config: MerklePoseidonConfig<F>,
 }
 
-impl Chip<CP::CurveScalarField> for MerklePoseidonChip {
-    type Config = MerklePoseidonConfig;
+impl<F: Field> Chip<F> for MerklePoseidonChip<F> {
+    type Config = MerklePoseidonConfig<F>;
     type Loaded = ();
 
     fn config(&self) -> &Self::Config {
@@ -37,12 +37,12 @@ impl Chip<CP::CurveScalarField> for MerklePoseidonChip {
     }
 }
 
-impl MerklePoseidonChip {
+impl<F: Field> MerklePoseidonChip<F> {
     pub fn configure(
-        meta: &mut ConstraintSystem<CP::CurveScalarField>,
+        meta: &mut ConstraintSystem<F>,
         advices: [Column<Advice>; 5],
-        poseidon_config: PoseidonConfig<CP::CurveScalarField, 3, 2>,
-    ) -> MerklePoseidonConfig {
+        poseidon_config: PoseidonConfig<F, 3, 2>,
+    ) -> MerklePoseidonConfig<F> {
         let cond_swap_config = CondSwapChip::configure(meta, advices);
 
         MerklePoseidonConfig {
@@ -52,35 +52,26 @@ impl MerklePoseidonChip {
         }
     }
 
-    pub fn construct(config: MerklePoseidonConfig) -> Self {
+    pub fn construct(config: MerklePoseidonConfig<F>) -> Self {
         MerklePoseidonChip { config }
     }
 }
 
 #[allow(clippy::type_complexity)]
-pub fn merkle_poseidon_gadget(
-    mut layouter: impl Layouter<CP::CurveScalarField>,
-    chip: MerklePoseidonChip,
-    note_x: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
-    merkle_path: &[(CP::CurveScalarField, bool)],
-) -> Result<AssignedCell<CP::CurveScalarField, CP::CurveScalarField>, Error> {
-    fn swap(
-        merkle_chip: &MerklePoseidonChip,
-        layouter: impl Layouter<CP::CurveScalarField>,
-        pair: (
-            AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
-            Value<CP::CurveScalarField>,
-        ),
+pub fn merkle_poseidon_gadget<F: Field>(
+    mut layouter: impl Layouter<F>,
+    chip: MerklePoseidonChip<F>,
+    note_x: AssignedCell<F, F>,
+    merkle_path: &[(F, bool)],
+) -> Result<AssignedCell<F, F>, Error> {
+    fn swap<F: Field>(
+        merkle_chip: &MerklePoseidonChip<F>,
+        layouter: impl Layouter<F>,
+        pair: (AssignedCell<F, F>, Value<F>),
         swap: Value<bool>,
-    ) -> Result<
-        (
-            AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
-            AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
-        ),
-        Error,
-    > {
+    ) -> Result<(AssignedCell<F, F>, AssignedCell<F, F>), Error> {
         let config = merkle_chip.config().cond_swap_config.clone();
-        let chip = CondSwapChip::<CP::CurveScalarField>::construct(config);
+        let chip = CondSwapChip::<F>::construct(config);
         chip.swap(layouter, pair, swap)
     }
 
@@ -126,20 +117,20 @@ fn test_halo2_merkle_circuit() {
     use rand::rngs::OsRng;
 
     #[derive(Default)]
-    struct MyCircuit {
-        leaf: CP::CurveScalarField,
-        merkle_path: MerklePath,
+    struct MyCircuit<F: Field> {
+        leaf: F,
+        merkle_path: MerklePath<F>,
     }
 
-    impl Circuit<CP::CurveScalarField> for MyCircuit {
-        type Config = MerklePoseidonConfig;
+    impl<F: Field> Circuit<F> for MyCircuit<F> {
+        type Config = MerklePoseidonConfig<F>;
         type FloorPlanner = SimpleFloorPlanner;
 
         fn without_witnesses(&self) -> Self {
             Self::default()
         }
 
-        fn configure(meta: &mut ConstraintSystem<CP::CurveScalarField>) -> Self::Config {
+        fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
             let advices = [
                 meta.advice_column(),
                 meta.advice_column(),
@@ -175,7 +166,7 @@ fn test_halo2_merkle_circuit() {
         fn synthesize(
             &self,
             config: Self::Config,
-            mut layouter: impl Layouter<CP::CurveScalarField>,
+            mut layouter: impl Layouter<F>,
         ) -> Result<(), Error> {
             // Witness leaf
             let leaf = assign_free_advice(
@@ -210,7 +201,7 @@ fn test_halo2_merkle_circuit() {
 
     let mut rng = OsRng;
 
-    let leaf = CP::CurveScalarField::random(rng);
+    let leaf = pasta_curves::pallas::Base::random(rng);
     let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
     let circuit = MyCircuit { leaf, merkle_path };

@@ -17,21 +17,20 @@ use halo2_proofs::{
     circuit::{AssignedCell, Layouter, Value},
     plonk::{Advice, Column, Error, Instance},
 };
-use pasta_curves::pallas;
 
 use super::circuit_parameters::CircuitParameters;
 
 // cm is a point
 #[allow(clippy::too_many_arguments)]
-pub fn nullifier_circuit(
+pub fn nullifier_circuit<CP: CircuitParameters>(
     mut layouter: impl Layouter<CP::CurveScalarField>,
     poseidon_chip: PoseidonChip<CP::CurveScalarField, 3, 2>,
     add_chip: AddChip<CP::CurveScalarField>,
-    ecc_chip: EccChip<NoteCommitmentFixedBases>,
+    ecc_chip: EccChip<NoteCommitmentFixedBases<CP>>,
     nk: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     rho: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     psi: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
-    cm: &Point<CP::InnerCurve, EccChip<NoteCommitmentFixedBases>>,
+    cm: &Point<CP::InnerCurve, EccChip<NoteCommitmentFixedBases<CP>>>,
 ) -> Result<AssignedCell<CP::CurveScalarField, CP::CurveScalarField>, Error> {
     let poseidon_message = [nk, rho];
     let poseidon_hasher =
@@ -63,13 +62,13 @@ pub fn nullifier_circuit(
 
 // Return variables in the spend note
 #[derive(Debug)]
-pub struct SpendNoteVar {
+pub struct SpendNoteVar<CP: CircuitParameters> {
     pub user_address: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     pub app_address: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     pub value: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     pub data: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     pub nf: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
-    pub cm: Point<CP::InnerCurve, EccChip<NoteCommitmentFixedBases>>,
+    pub cm: Point<CP::InnerCurve, EccChip<NoteCommitmentFixedBases<CP>>>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -77,20 +76,20 @@ pub fn check_spend_note<CP: CircuitParameters>(
     mut layouter: impl Layouter<CP::CurveScalarField>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
-    ecc_chip: EccChip<NoteCommitmentFixedBases>,
+    ecc_chip: EccChip<NoteCommitmentFixedBases<CP>>,
     sinsemilla_chip: SinsemillaChip<
-        NoteCommitmentHashDomain,
-        NoteCommitmentDomain,
-        NoteCommitmentFixedBases,
+        NoteCommitmentHashDomain<CP>,
+        NoteCommitmentDomain<CP>,
+        NoteCommitmentFixedBases<CP>,
     >,
-    note_commit_chip: NoteCommitmentChip,
+    note_commit_chip: NoteCommitmentChip<CP>,
     // PoseidonChip can not be cloned, use PoseidonConfig temporarily
     poseidon_config: PoseidonConfig<CP::CurveScalarField, 3, 2>,
     // poseidon_chip: PoseidonChip<CP::CurveScalarField, 3, 2>,
     add_chip: AddChip<CP::CurveScalarField>,
     spend_note: Note<CP>,
     nf_row_idx: usize,
-) -> Result<SpendNoteVar, Error> {
+) -> Result<SpendNoteVar<CP>, Error> {
     // Check spend note user integrity: user_address = Com_r(Com_r(send_vp, nk), recv_vp_hash)
     let (user_address, nk) = {
         // Witness send_vp
@@ -235,12 +234,12 @@ pub fn check_spend_note<CP: CircuitParameters>(
 
 // Return variables in the spend note
 #[derive(Debug)]
-pub struct OutputNoteVar {
+pub struct OutputNoteVar<CP: CircuitParameters> {
     pub user_address: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     pub app_address: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     pub value: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     pub data: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
-    pub cm: Point<CP::InnerCurve, EccChip<NoteCommitmentFixedBases>>,
+    pub cm: Point<CP::InnerCurve, EccChip<NoteCommitmentFixedBases<CP>>>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -248,20 +247,20 @@ pub fn check_output_note<CP: CircuitParameters>(
     mut layouter: impl Layouter<CP::CurveScalarField>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
-    ecc_chip: EccChip<NoteCommitmentFixedBases>,
+    ecc_chip: EccChip<NoteCommitmentFixedBases<CP>>,
     sinsemilla_chip: SinsemillaChip<
-        NoteCommitmentHashDomain,
-        NoteCommitmentDomain,
-        NoteCommitmentFixedBases,
+        NoteCommitmentHashDomain<CP>,
+        NoteCommitmentDomain<CP>,
+        NoteCommitmentFixedBases<CP>,
     >,
-    note_commit_chip: NoteCommitmentChip,
+    note_commit_chip: NoteCommitmentChip<CP>,
     // PoseidonChip can not be cloned, use PoseidonConfig temporarily
     poseidon_config: PoseidonConfig<CP::CurveScalarField, 3, 2>,
     // poseidon_chip: PoseidonChip<CP::CurveScalarField, 3, 2>,
     output_note: Note<CP>,
     old_nf: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     cm_row_idx: usize,
-) -> Result<OutputNoteVar, Error> {
+) -> Result<OutputNoteVar<CP>, Error> {
     // Check output note user integrity: user_address = Com_r(, recv_vp_hash)
     let user_address = {
         let send_com = assign_free_advice(
@@ -388,23 +387,23 @@ fn test_halo2_nullifier_circuit() {
 
     #[derive(Default)]
     struct MyCircuit<CP: CircuitParameters> {
-        nk: NullifierDerivingKey,
+        nk: NullifierDerivingKey<CP>,
         rho: CP::CurveScalarField,
         psi: CP::CurveScalarField,
         cm: NoteCommitment<CP>,
     }
 
-    impl<CP:CircuitParameters> Circuit<CP::CurveScalarField> for MyCircuit<CP> {
+    impl<CP: CircuitParameters> Circuit<CP::CurveScalarField> for MyCircuit<CP> {
         type Config = (
             [Column<Advice>; 10],
             PoseidonConfig<CP::CurveScalarField, 3, 2>,
             AddConfig,
-            EccConfig<NoteCommitmentFixedBases>,
+            EccConfig<NoteCommitmentFixedBases<CP>>,
             // add SinsemillaConfig to load look table, just for test
             SinsemillaConfig<
-                NoteCommitmentHashDomain,
-                NoteCommitmentDomain,
-                NoteCommitmentFixedBases,
+                NoteCommitmentHashDomain<CP>,
+                NoteCommitmentDomain<CP>,
+                NoteCommitmentFixedBases<CP>,
             >,
         );
         type FloorPlanner = SimpleFloorPlanner;
@@ -470,9 +469,9 @@ fn test_halo2_nullifier_circuit() {
                 range_check,
             );
             let sinsemilla_config = SinsemillaChip::<
-                NoteCommitmentHashDomain,
-                NoteCommitmentDomain,
-                NoteCommitmentFixedBases,
+                NoteCommitmentHashDomain<CP>,
+                NoteCommitmentDomain<CP>,
+                NoteCommitmentFixedBases<CP>,
             >::configure(
                 meta,
                 advices[..5].try_into().unwrap(),
@@ -500,9 +499,9 @@ fn test_halo2_nullifier_circuit() {
             let ecc_chip = EccChip::construct(ecc_config);
             let add_chip = AddChip::<CP::CurveScalarField>::construct(add_config, ());
             SinsemillaChip::<
-                NoteCommitmentHashDomain,
-                NoteCommitmentDomain,
-                NoteCommitmentFixedBases,
+                NoteCommitmentHashDomain<CP>,
+                NoteCommitmentDomain<CP>,
+                NoteCommitmentFixedBases<CP>,
             >::load(sinsemilla_config, &mut layouter)?;
 
             // Witness nk
@@ -561,6 +560,7 @@ fn test_halo2_nullifier_circuit() {
     }
 
     let mut rng = OsRng;
+    use crate::circuit::circuit_parameters::DLCircuitParameters as CP;
     let circuit = MyCircuit {
         nk: NullifierDerivingKey::rand(&mut rng),
         rho: CP::CurveScalarField::random(&mut rng),

@@ -8,27 +8,26 @@ pub trait CircuitParameters: Copy {
     //   Base Field      Fr            Fq
 
     // Curve
-    type CurveScalarField: PrimeField+FieldExt;
+    type CurveScalarField: PrimeField + FieldExt;
     type CurveBaseField: PrimeField;
-    type Curve: CurveAffine<Base=Self::CurveBaseField>;
+    type Curve: CurveAffine<Base = Self::CurveBaseField>;
     // Inner curve
     type InnerCurveScalarField: PrimeField;
-    type InnerCurve: CurveAffine<Base=Self::CurveScalarField>;
+    type InnerCurve: CurveAffine<Base = Self::CurveScalarField>;
     // Outer curve
     type OuterCurveBaseField: PrimeField;
-    type OuterCurve: CurveAffine<Base=Self::CurveScalarField>;
-
+    type OuterCurve: CurveAffine<Base = Self::CurveScalarField>;
 }
 
 #[derive(Copy, Debug, Clone)]
 pub struct DLCircuitParameters {}
 
 impl CircuitParameters for DLCircuitParameters {
-    type CurveScalarField = CP::CurveScalarField;
-    type CurveBaseField = CP::InnerCurveScalarField;
+    type CurveScalarField = pallas::Base;
+    type CurveBaseField = pallas::Scalar;
     type Curve = EqAffine;
-    type InnerCurveScalarField = CP::InnerCurveScalarField;
+    type InnerCurveScalarField = pallas::Scalar;
     type InnerCurve = EpAffine;
-    type OuterCurveBaseField = CP::CurveScalarField;
+    type OuterCurveBaseField = pallas::Base;
     type OuterCurve = EpAffine;
 }

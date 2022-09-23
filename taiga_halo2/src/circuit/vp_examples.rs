@@ -6,11 +6,7 @@ use crate::{
     constant::NUM_NOTE,
     note::Note,
 };
-use halo2_proofs::{
-    circuit::{floor_planner, Layouter},
-    plonk::{Circuit, ConstraintSystem, Error},
-};
-use pasta_curves::pallas;
+use halo2_proofs::plonk::ConstraintSystem;
 use rand::RngCore;
 
 use super::circuit_parameters::CircuitParameters;
@@ -25,12 +21,12 @@ pub struct DummyValidityPredicateCircuit<CP: CircuitParameters> {
 }
 
 #[derive(Clone, Debug)]
-pub struct DummyValidityPredicateConfig {
-    note_conifg: NoteConfig,
+pub struct DummyValidityPredicateConfig<CP: CircuitParameters> {
+    note_conifg: NoteConfig<CP>,
 }
 
-impl<CP: CircuitParameters> ValidityPredicateConfig<CP> for DummyValidityPredicateConfig {
-    fn get_note_config(&self) -> NoteConfig {
+impl<CP: CircuitParameters> ValidityPredicateConfig<CP> for DummyValidityPredicateConfig<CP> {
+    fn get_note_config(&self) -> NoteConfig<CP> {
         self.note_conifg.clone()
     }
 
@@ -67,7 +63,7 @@ impl<CP: CircuitParameters> DummyValidityPredicateCircuit<CP> {
 }
 
 impl<CP> ValidityPredicateCircuit<CP> for DummyValidityPredicateCircuit<CP> {
-    type Config = DummyValidityPredicateConfig;
+    type Config = DummyValidityPredicateConfig<CP>;
 
     fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE] {
         &self.input_notes
@@ -78,10 +74,11 @@ impl<CP> ValidityPredicateCircuit<CP> for DummyValidityPredicateCircuit<CP> {
     }
 }
 
-vp_circuit_impl!(DummyValidityPredicateCircuit<_>,CP);
+vp_circuit_impl!(DummyValidityPredicateCircuit, CP);
 
 #[test]
 fn test_halo2_dummy_vp_circuit() {
+    use crate::circuit::circuit_parameters::DLCircuitParameters as CP;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 

@@ -1,9 +1,10 @@
 use crate::{
     circuit::{
+        circuit_parameters::CircuitParameters,
         gadgets::{assign_free_advice, AddChip, AddConfig, AddInstructions},
         integrity::{OutputNoteVar, SpendNoteVar},
         note_circuit::NoteConfig,
-        vp_circuit::{ValidityPredicateCircuit, ValidityPredicateConfig}, circuit_parameters::CircuitParameters,
+        vp_circuit::{ValidityPredicateCircuit, ValidityPredicateConfig},
     },
     constant::NUM_NOTE,
     note::Note,
@@ -13,7 +14,6 @@ use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
     plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Instance},
 };
-use pasta_curves::pallas;
 use rand::RngCore;
 
 // FieldAdditionValidityPredicateCircuit with a trivial constraint a + b = c.
@@ -26,15 +26,17 @@ struct FieldAdditionValidityPredicateCircuit<CP: CircuitParameters> {
 }
 
 #[derive(Clone, Debug)]
-struct FieldAdditionValidityPredicateConfig {
-    note_conifg: NoteConfig,
+struct FieldAdditionValidityPredicateConfig<CP: CircuitParameters> {
+    note_conifg: NoteConfig<CP>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
     add_config: AddConfig,
 }
 
-impl<CP: CircuitParameters> ValidityPredicateConfig<CP> for FieldAdditionValidityPredicateConfig {
-    fn get_note_config(&self) -> NoteConfig {
+impl<CP: CircuitParameters> ValidityPredicateConfig<CP>
+    for FieldAdditionValidityPredicateConfig<CP>
+{
+    fn get_note_config(&self) -> NoteConfig<CP> {
         self.note_conifg.clone()
     }
 
@@ -88,8 +90,10 @@ impl<CP: CircuitParameters> FieldAdditionValidityPredicateCircuit<CP> {
     }
 }
 
-impl<CP: CircuitParameters> ValidityPredicateCircuit<CP> for FieldAdditionValidityPredicateCircuit<CP> {
-    type Config = FieldAdditionValidityPredicateConfig;
+impl<CP: CircuitParameters> ValidityPredicateCircuit<CP>
+    for FieldAdditionValidityPredicateCircuit<CP>
+{
+    type Config = FieldAdditionValidityPredicateConfig<CP>;
 
     fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE] {
         &self.input_notes
@@ -105,8 +109,8 @@ impl<CP: CircuitParameters> ValidityPredicateCircuit<CP> for FieldAdditionValidi
         &self,
         config: Self::Config,
         mut layouter: impl Layouter<CP::CurveScalarField>,
-        _input_note_variables: &[SpendNoteVar],
-        _output_note_variables: &[OutputNoteVar],
+        _input_note_variables: &[SpendNoteVar<CP>],
+        _output_note_variables: &[OutputNoteVar<CP>],
     ) -> Result<(), Error> {
         let a = assign_free_advice(
             layouter.namespace(|| "witness a"),
@@ -135,6 +139,7 @@ vp_circuit_impl!(FieldAdditionValidityPredicateCircuit, CP);
 
 #[test]
 fn test_halo2_addition_vp_circuit() {
+    use crate::circuit::circuit_parameters::DLCircuitParameters as CP;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 

@@ -1,19 +1,21 @@
 use blake2b_simd::Params as Blake2bParams;
 use ff::Field;
 use halo2_proofs::plonk::VerifyingKey;
-use pasta_curves::{arithmetic::FieldExt, pallas, vesta};
+use pasta_curves::arithmetic::FieldExt;
 use rand::RngCore;
+
+use crate::circuit::circuit_parameters::CircuitParameters;
 
 // TODO: add vp_param in future.
 #[derive(Debug, Clone)]
-pub enum ValidityPredicateDescription {
+pub enum ValidityPredicateDescription<CP: CircuitParameters> {
     // VK.
     Uncompressed(VerifyingKey<CP::Curve>),
     // Compress vk into one element.
     Compressed(CP::CurveScalarField),
 }
 
-impl ValidityPredicateDescription {
+impl<CP: CircuitParameters> ValidityPredicateDescription<CP> {
     // pub fn from_vp<VP>(
     //     vp: &mut VP,
     //     vp_setup: &<CP::CurvePC as PolynomialCommitment<

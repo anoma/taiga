@@ -1,5 +1,7 @@
+use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::gadgets::{AddChip, AddConfig};
 use crate::constant::{NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain};
+use ff::Field;
 use halo2_gadgets::{
     ecc::chip::EccConfig,
     ecc::{chip::EccChip, Point, ScalarFixed},
@@ -10,16 +12,21 @@ use halo2_gadgets::{
     },
     utilities::{lookup_range_check::LookupRangeCheckConfig, RangeConstrained},
 };
+use halo2_proofs::plonk::Circuit;
 use halo2_proofs::{
     circuit::{AssignedCell, Chip, Layouter, Value},
     plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Instance, Selector},
     poly::Rotation,
 };
-use pasta_curves::{arithmetic::FieldExt, pallas};
+use pasta_curves::arithmetic::FieldExt;
 
-type NoteCommitPiece = MessagePiece<
+type NoteCommitPiece<CP: CircuitParameters> = MessagePiece<
     CP::InnerCurve,
-    SinsemillaChip<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
+    SinsemillaChip<
+        NoteCommitmentHashDomain<CP>,
+        NoteCommitmentDomain<CP>,
+        NoteCommitmentFixedBases<CP>,
+    >,
     10,
     253,
 >;
@@ -31,16 +38,16 @@ type NoteCommitPiece = MessagePiece<
 /// | bit10 | bit5 | bit5_2 |       1        |
 ///
 #[derive(Clone, Debug)]
-struct Decompose5_5 {
+struct Decompose5_5<CP: CircuitParameters> {
     q_notecommit_5_5: Selector,
     col_l: Column<Advice>,
     col_m: Column<Advice>,
     col_r: Column<Advice>,
 }
 
-impl Decompose5_5 {
+impl<CP: CircuitParameters> Decompose5_5<CP> {
     fn configure(
-        meta: &mut ConstraintSystem<CP::CurveScalarField>,
+        meta: &mut ConstraintSystem<CP>,
         col_l: Column<Advice>,
         col_m: Column<Advice>,
         col_r: Column<Advice>,
@@ -79,18 +86,24 @@ impl Decompose5_5 {
     fn decompose(
         lookup_config: &LookupRangeCheckConfig<CP::CurveScalarField, 10>,
         chip: SinsemillaChip<
-            NoteCommitmentHashDomain,
-            NoteCommitmentDomain,
-            NoteCommitmentFixedBases,
+            NoteCommitmentHashDomain<CP>,
+            NoteCommitmentDomain<CP>,
+            NoteCommitmentFixedBases<CP>,
         >,
-        layouter: &mut impl Layouter<CP::CurveScalarField>,
+        layouter: &mut impl Layouter<CP>,
         first: &AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
         second: &AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     ) -> Result<
         (
-            NoteCommitPiece,
-            RangeConstrained<CP::CurveScalarField, AssignedCell<CP::CurveScalarField, CP::CurveScalarField>>,
-            RangeConstrained<CP::CurveScalarField, AssignedCell<CP::CurveScalarField, CP::CurveScalarField>>,
+            NoteCommitPiece<CP>,
+            RangeConstrained<
+                CP::CurveScalarField,
+                AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+            >,
+            RangeConstrained<
+                CP::CurveScalarField,
+                AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+            >,
         ),
         Error,
     > {
@@ -121,10 +134,16 @@ impl Decompose5_5 {
 
     fn assign(
         &self,
-        layouter: &mut impl Layouter<CP::CurveScalarField>,
-        bit10: NoteCommitPiece,
-        bit5: RangeConstrained<CP::CurveScalarField, AssignedCell<CP::CurveScalarField, CP::CurveScalarField>>,
-        bit5_2: RangeConstrained<CP::CurveScalarField, AssignedCell<CP::CurveScalarField, CP::CurveScalarField>>,
+        layouter: &mut impl Layouter<CP>,
+        bit10: NoteCommitPiece<CP>,
+        bit5: RangeConstrained<
+            CP::CurveScalarField,
+            AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+        >,
+        bit5_2: RangeConstrained<
+            CP::CurveScalarField,
+            AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+        >,
     ) -> Result<(), Error> {
         layouter.assign_region(
             || "NoteCommit MessagePiece bit10",
@@ -152,16 +171,16 @@ impl Decompose5_5 {
 /// |  v  | v_250 | v_5 |          1         |
 ///
 #[derive(Clone, Debug)]
-struct BaseCanonicity250_5 {
+struct BaseCanonicity250_5<CP: CircuitParameters> {
     q_base_250_5: Selector,
     col_l: Column<Advice>,
     col_m: Column<Advice>,
     col_r: Column<Advice>,
 }
 
-impl BaseCanonicity250_5 {
+impl<CP: CircuitParameters> BaseCanonicity250_5<CP> {
     fn configure(
-        meta: &mut ConstraintSystem<CP::CurveScalarField>,
+        meta: &mut ConstraintSystem<CP>,
         col_l: Column<Advice>,
         col_m: Column<Advice>,
         col_r: Column<Advice>,
@@ -194,10 +213,13 @@ impl BaseCanonicity250_5 {
 
     fn assign(
         &self,
-        layouter: &mut impl Layouter<CP::CurveScalarField>,
+        layouter: &mut impl Layouter<CP>,
         value: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
-        v_250: NoteCommitPiece,
-        v_5: RangeConstrained<CP::CurveScalarField, AssignedCell<CP::CurveScalarField, CP::CurveScalarField>>,
+        v_250: NoteCommitPiece<CP>,
+        v_5: RangeConstrained<
+            CP::CurveScalarField,
+            AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+        >,
     ) -> Result<(), Error> {
         layouter.assign_region(
             || "NoteCommit input value",
@@ -220,16 +242,16 @@ impl BaseCanonicity250_5 {
 /// |  v  | v_tail | v_5 |          1         |
 ///
 #[derive(Clone, Debug)]
-struct BaseCanonicity5 {
+struct BaseCanonicity5<CP: CircuitParameters> {
     q_base_5: Selector,
     col_l: Column<Advice>,
     col_m: Column<Advice>,
     col_r: Column<Advice>,
 }
 
-impl BaseCanonicity5 {
+impl<CP: CircuitParameters> BaseCanonicity5<CP> {
     fn configure(
-        meta: &mut ConstraintSystem<CP::CurveScalarField>,
+        meta: &mut ConstraintSystem<CP>,
         col_l: Column<Advice>,
         col_m: Column<Advice>,
         col_r: Column<Advice>,
@@ -262,10 +284,13 @@ impl BaseCanonicity5 {
 
     fn assign(
         &self,
-        layouter: &mut impl Layouter<CP::CurveScalarField>,
+        layouter: &mut impl Layouter<CP>,
         value: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
-        v_tail: NoteCommitPiece,
-        v_5: RangeConstrained<CP::CurveScalarField, AssignedCell<CP::CurveScalarField, CP::CurveScalarField>>,
+        v_tail: NoteCommitPiece<CP>,
+        v_5: RangeConstrained<
+            CP::CurveScalarField,
+            AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+        >,
     ) -> Result<(), Error> {
         layouter.assign_region(
             || "NoteCommit input value",
@@ -284,31 +309,34 @@ impl BaseCanonicity5 {
 }
 
 #[derive(Clone, Debug)]
-pub struct NoteCommitmentConfig {
+pub struct NoteCommitmentConfig<CP: CircuitParameters> {
     advices: [Column<Advice>; 10],
-    decompose5_5: Decompose5_5,
-    base_canonicity_250_5: BaseCanonicity250_5,
-    base_canonicity_5: BaseCanonicity5,
-    pub sinsemilla_config:
-        SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
+    decompose5_5: Decompose5_5<CP>,
+    base_canonicity_250_5: BaseCanonicity250_5<CP>,
+    base_canonicity_5: BaseCanonicity5<CP>,
+    pub sinsemilla_config: SinsemillaConfig<
+        NoteCommitmentHashDomain<CP>,
+        NoteCommitmentDomain<CP>,
+        NoteCommitmentFixedBases<CP>,
+    >,
 }
 
 #[derive(Clone, Debug)]
-pub struct NoteCommitmentChip {
-    config: NoteCommitmentConfig,
+pub struct NoteCommitmentChip<CP: CircuitParameters> {
+    config: NoteCommitmentConfig<CP>,
 }
 
-impl NoteCommitmentChip {
+impl<CP: CircuitParameters> NoteCommitmentChip<CP> {
     pub fn configure(
-        meta: &mut ConstraintSystem<CP::CurveScalarField>,
+        meta: &mut ConstraintSystem<CP>,
         advices: [Column<Advice>; 10],
         sinsemilla_config: SinsemillaConfig<
-            NoteCommitmentHashDomain,
-            NoteCommitmentDomain,
-            NoteCommitmentFixedBases,
+            NoteCommitmentHashDomain<CP>,
+            NoteCommitmentDomain<CP>,
+            NoteCommitmentFixedBases<CP>,
         >,
-    ) -> NoteCommitmentConfig {
-        let two_pow_5 = CP::CurveScalarField::from(1 << 5);
+    ) -> NoteCommitmentConfig<CP> {
+        let two_pow_5 = CP::CurveScalarFieldF::from(1 << 5);
         let two_pow_250 = CP::CurveScalarField::from_u128(1 << 125).square();
 
         let col_l = advices[6];
@@ -332,25 +360,29 @@ impl NoteCommitmentChip {
         }
     }
 
-    pub fn construct(config: NoteCommitmentConfig) -> Self {
+    pub fn construct(config: NoteCommitmentConfig<CP>) -> Self {
         Self { config }
     }
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn note_commitment_gadget(
-    mut layouter: impl Layouter<CP::CurveScalarField>,
-    chip: SinsemillaChip<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
-    ecc_chip: EccChip<NoteCommitmentFixedBases>,
-    note_commit_chip: NoteCommitmentChip,
+pub fn note_commitment_gadget<CP: CircuitParameters>(
+    mut layouter: impl Layouter<CP>,
+    chip: SinsemillaChip<
+        NoteCommitmentHashDomain<CP>,
+        NoteCommitmentDomain<CP>,
+        NoteCommitmentFixedBases<CP>,
+    >,
+    ecc_chip: EccChip<NoteCommitmentFixedBases<CP>>,
+    note_commit_chip: NoteCommitmentChip<CP>,
     user_address: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     app_address: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     data: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     rho: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     psi: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     value: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
-    rcm: ScalarFixed<CP::InnerCurve, EccChip<NoteCommitmentFixedBases>>,
-) -> Result<Point<CP::InnerCurve, EccChip<NoteCommitmentFixedBases>>, Error> {
+    rcm: ScalarFixed<CP::InnerCurve, EccChip<NoteCommitmentFixedBases<CP>>>,
+) -> Result<Point<CP::InnerCurve, EccChip<NoteCommitmentFixedBases<CP>>>, Error> {
     let lookup_config = chip.config().lookup_config();
 
     // `user_0_249` = bits 0..=249 of `user_address`
@@ -480,28 +512,31 @@ pub fn note_commitment_gadget(
 }
 
 #[derive(Clone, Debug)]
-pub struct NoteConfig {
+pub struct NoteConfig<CP: CircuitParameters> {
     pub instances: Column<Instance>,
     pub advices: [Column<Advice>; 10],
     pub add_config: AddConfig,
-    pub ecc_config: EccConfig<NoteCommitmentFixedBases>,
+    pub ecc_config: EccConfig<NoteCommitmentFixedBases<CP>>,
     pub poseidon_config: PoseidonConfig<CP::CurveScalarField, 3, 2>,
-    pub sinsemilla_config:
-        SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
-    pub note_commit_config: NoteCommitmentConfig,
+    pub sinsemilla_config: SinsemillaConfig<
+        NoteCommitmentHashDomain<CP>,
+        NoteCommitmentDomain<CP>,
+        NoteCommitmentFixedBases<CP>,
+    >,
+    pub note_commit_config: NoteCommitmentConfig<CP>,
 }
 
 #[derive(Clone, Debug)]
-pub struct NoteChip {
-    config: NoteConfig,
+pub struct NoteChip<CP: CircuitParameters> {
+    config: NoteConfig<CP>,
 }
 
-impl NoteChip {
+impl<CP: CircuitParameters> NoteChip<CP> {
     pub fn configure(
-        meta: &mut ConstraintSystem<CP::CurveScalarField>,
+        meta: &mut ConstraintSystem<CP>,
         instances: Column<Instance>,
         advices: [Column<Advice>; 10],
-    ) -> NoteConfig {
+    ) -> NoteConfig<CP> {
         let add_config = AddChip::configure(meta, advices[0..2].try_into().unwrap());
 
         let table_idx = meta.lookup_table_column();
@@ -525,7 +560,7 @@ impl NoteChip {
         ];
         meta.enable_constant(lagrange_coeffs[0]);
 
-        let ecc_config = EccChip::<NoteCommitmentFixedBases>::configure(
+        let ecc_config = EccChip::<NoteCommitmentFixedBases<CP>>::configure(
             meta,
             advices,
             lagrange_coeffs,
@@ -541,9 +576,9 @@ impl NoteChip {
         );
 
         let sinsemilla_config = SinsemillaChip::<
-            NoteCommitmentHashDomain,
-            NoteCommitmentDomain,
-            NoteCommitmentFixedBases,
+            NoteCommitmentHashDomain<CP>,
+            NoteCommitmentDomain<CP>,
+            NoteCommitmentFixedBases<CP>,
         >::configure(
             meta,
             advices[..5].try_into().unwrap(),
@@ -567,7 +602,7 @@ impl NoteChip {
         }
     }
 
-    pub fn construct(config: NoteConfig) -> Self {
+    pub fn construct(config: NoteConfig<CP>) -> Self {
         Self { config }
     }
 }
@@ -596,24 +631,27 @@ fn test_halo2_note_commitment_circuit() {
 
     use crate::circuit::circuit_parameters::DLCircuitParameters as CP;
     #[derive(Default)]
-    struct MyCircuit {
+    struct MyCircuit<CP: CircuitParameters> {
         user: User<CP>,
-        app: App,
+        app: App<CP>,
         value: u64,
         rho: Nullifier<CP>,
         data: CP::CurveScalarField,
         rcm: CP::InnerCurveScalarField,
     }
 
-    impl Circuit<CP::CurveScalarField> for MyCircuit {
-        type Config = (NoteCommitmentConfig, EccConfig<NoteCommitmentFixedBases>);
+    impl<CP: CircuitParameters> Circuit<CP> for MyCircuit<CP> {
+        type Config = (
+            NoteCommitmentConfig<CP>,
+            EccConfig<NoteCommitmentFixedBases<CP>>,
+        );
         type FloorPlanner = SimpleFloorPlanner;
 
         fn without_witnesses(&self) -> Self {
             Self::default()
         }
 
-        fn configure(meta: &mut ConstraintSystem<CP::CurveScalarField>) -> Self::Config {
+        fn configure(meta: &mut ConstraintSystem<CP>) -> Self::Config {
             let advices = [
                 meta.advice_column(),
                 meta.advice_column(),
@@ -654,9 +692,9 @@ fn test_halo2_note_commitment_circuit() {
 
             let range_check = LookupRangeCheckConfig::configure(meta, advices[9], table_idx);
             let sinsemilla_config = SinsemillaChip::<
-                NoteCommitmentHashDomain,
-                NoteCommitmentDomain,
-                NoteCommitmentFixedBases,
+                NoteCommitmentHashDomain<CP>,
+                NoteCommitmentDomain<CP>,
+                NoteCommitmentFixedBases<CP>,
             >::configure(
                 meta,
                 advices[..5].try_into().unwrap(),
@@ -668,7 +706,7 @@ fn test_halo2_note_commitment_circuit() {
             let note_commit_config =
                 NoteCommitmentChip::configure(meta, advices, sinsemilla_config);
 
-            let ecc_config = EccChip::<NoteCommitmentFixedBases>::configure(
+            let ecc_config = EccChip::<NoteCommitmentFixedBases<CP>>::configure(
                 meta,
                 advices,
                 lagrange_coeffs,
@@ -681,15 +719,15 @@ fn test_halo2_note_commitment_circuit() {
         fn synthesize(
             &self,
             config: Self::Config,
-            mut layouter: impl Layouter<CP::CurveScalarField>,
+            mut layouter: impl Layouter<CP>,
         ) -> Result<(), Error> {
             let (note_commit_config, ecc_config) = config;
 
             // Load the Sinsemilla generator lookup table used by the whole circuit.
             SinsemillaChip::<
-                NoteCommitmentHashDomain,
-                NoteCommitmentDomain,
-                NoteCommitmentFixedBases,
+                NoteCommitmentHashDomain<CP>,
+                NoteCommitmentDomain<CP>,
+                NoteCommitmentFixedBases<CP>,
             >::load(note_commit_config.sinsemilla_config.clone(), &mut layouter)?;
             let note = Note::new(
                 self.user.clone(),
@@ -795,6 +833,6 @@ fn test_halo2_note_commitment_circuit() {
         rcm: CP::InnerCurveScalarField::random(&mut rng),
     };
 
-    let prover = MockProver::<CP::CurveScalarField>::run(11, &circuit, vec![]).unwrap();
+    let prover = MockProver::<CP>::run(11, &circuit, vec![]).unwrap();
     assert_eq!(prover.verify(), Ok(()));
 }

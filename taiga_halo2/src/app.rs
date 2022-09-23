@@ -1,14 +1,15 @@
-use crate::vp_description::ValidityPredicateDescription;
-use pasta_curves::pallas;
+use crate::{
+    circuit::circuit_parameters::CircuitParameters, vp_description::ValidityPredicateDescription,
+};
 use rand::RngCore;
 
 #[derive(Debug, Clone)]
-pub struct App {
-    pub app_vp: ValidityPredicateDescription,
+pub struct App<CP: CircuitParameters> {
+    pub app_vp: ValidityPredicateDescription<CP>,
 }
 
-impl App {
-    pub fn new(app_vp_description: ValidityPredicateDescription) -> Self {
+impl<CP: CircuitParameters> App<CP> {
+    pub fn new(app_vp_description: ValidityPredicateDescription<CP>) -> Self {
         Self {
             app_vp: app_vp_description,
         }
@@ -25,8 +26,8 @@ impl App {
     }
 }
 
-impl Default for App {
-    fn default() -> App {
+impl<CP: CircuitParameters> Default for App<CP> {
+    fn default() -> App<CP> {
         let app_vp = ValidityPredicateDescription::Compressed(CP::CurveScalarField::one());
         App { app_vp }
     }

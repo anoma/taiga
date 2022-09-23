@@ -15,16 +15,15 @@ use halo2_proofs::{
     circuit::{floor_planner, Layouter},
     plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Instance},
 };
-use pasta_curves::pallas;
 
 use super::circuit_parameters::CircuitParameters;
 
 #[derive(Clone, Debug)]
-pub struct ActionConfig {
+pub struct ActionConfig<CP: CircuitParameters> {
     instances: Column<Instance>,
     advices: [Column<Advice>; 10],
-    note_config: NoteConfig,
-    merkle_config: MerklePoseidonConfig,
+    note_config: NoteConfig<CP>,
+    merkle_config: MerklePoseidonConfig<CP>,
 }
 
 /// The Action circuit.
@@ -39,7 +38,7 @@ pub struct ActionCircuit<CP: CircuitParameters> {
 }
 
 impl<CP: CircuitParameters> Circuit<CP::CurveScalarField> for ActionCircuit<CP> {
-    type Config = ActionConfig;
+    type Config = ActionConfig<CP>;
     type FloorPlanner = floor_planner::V1;
 
     fn without_witnesses(&self) -> Self {
@@ -107,7 +106,8 @@ impl<CP: CircuitParameters> Circuit<CP::CurveScalarField> for ActionCircuit<CP> 
             NoteCommitmentChip::construct(config.note_config.note_commit_config.clone());
 
         // Construct an add chip
-        let add_chip = AddChip::<CP::CurveScalarField>::construct(config.note_config.add_config, ());
+        let add_chip =
+            AddChip::<CP::CurveScalarField>::construct(config.note_config.add_config, ());
 
         // Construct a merkle chip
         let merkle_chip = MerklePoseidonChip::construct(config.merkle_config);
@@ -176,13 +176,13 @@ impl<CP: CircuitParameters> Circuit<CP::CurveScalarField> for ActionCircuit<CP> 
 #[test]
 fn test_halo2_action_circuit() {
     use crate::action::ActionInfo;
+    use crate::circuit::circuit_parameters::DLCircuitParameters as CP;
     use halo2_proofs::{
         dev::MockProver,
         plonk::{create_proof, keygen_pk, keygen_vk, verify_proof, SingleVerifier},
         poly::commitment::Params,
         transcript::{Blake2bRead, Blake2bWrite},
     };
-    use pasta_curves::vesta;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
@@ -190,7 +190,8 @@ fn test_halo2_action_circuit() {
     let (action, action_circuit) = action_info.build(&mut rng);
     let instances = vec![action.to_instance()];
     {
-        let prover = MockProver::<CP::CurveScalarField>::run(11, &action_circuit, instances).unwrap();
+        let prover =
+            MockProver::<CP::CurveScalarField>::run(11, &action_circuit, instances).unwrap();
         assert_eq!(prover.verify(), Ok(()));
     }
 

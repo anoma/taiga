@@ -10,7 +10,6 @@ use crate::{
     vp_description::ValidityPredicateDescription,
 };
 use ff::Field;
-use pasta_curves::pallas;
 use rand::RngCore;
 
 /// The action result used in transaction.
@@ -43,8 +42,8 @@ pub struct SpendInfo<CP: CircuitParameters> {
 #[derive(Debug, Clone)]
 pub struct OutputInfo<CP: CircuitParameters> {
     addr_send_closed: UserSendAddress<CP>,
-    addr_recv_vp: ValidityPredicateDescription,
-    addr_app_vp: ValidityPredicateDescription,
+    addr_recv_vp: ValidityPredicateDescription<CP>,
+    addr_app_vp: ValidityPredicateDescription<CP>,
     value: u64,
     data: CP::CurveScalarField,
 }
@@ -102,7 +101,7 @@ impl<CP: CircuitParameters> ActionInfo<CP> {
 }
 
 impl<CP: CircuitParameters> SpendInfo<CP> {
-    pub fn new(note: Note<CP>, merkle_path: MerklePath) -> Self {
+    pub fn new(note: Note<CP>, merkle_path: MerklePath<CP>) -> Self {
         let cm_node = Node::new(note.commitment().get_x());
         let root = merkle_path.root(cm_node).inner();
         let auth_path: [(CP::CurveScalarField, bool); TAIGA_COMMITMENT_TREE_DEPTH] =
@@ -118,8 +117,8 @@ impl<CP: CircuitParameters> SpendInfo<CP> {
 impl<CP: CircuitParameters> OutputInfo<CP> {
     pub fn new(
         addr_send_closed: UserSendAddress<CP>,
-        addr_recv_vp: ValidityPredicateDescription,
-        addr_app_vp: ValidityPredicateDescription,
+        addr_recv_vp: ValidityPredicateDescription<CP>,
+        addr_app_vp: ValidityPredicateDescription<CP>,
         value: u64,
         data: CP::CurveScalarField,
     ) -> Self {

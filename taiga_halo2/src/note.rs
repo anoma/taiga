@@ -1,15 +1,15 @@
 use crate::{
     app::App,
+    circuit::circuit_parameters::CircuitParameters,
     constant::{BASE_BITS_NUM, NOTE_COMMITMENT_R_GENERATOR, NOTE_COMMIT_DOMAIN},
     nullifier::Nullifier,
     user::User,
-    utils::{extract_p, poseidon_hash}, circuit::circuit_parameters::CircuitParameters,
+    utils::{extract_p, poseidon_hash},
 };
 use bitvec::{array::BitArray, order::Lsb0};
 use core::iter;
 use ff::{Field, PrimeFieldBits};
 use group::{cofactor::CofactorCurveAffine, Group};
-use pasta_curves::pallas;
 use rand::{Rng, RngCore};
 
 /// A commitment to a note.
@@ -37,7 +37,7 @@ impl<CP: CircuitParameters> Default for NoteCommitment<CP> {
 pub struct Note<CP: CircuitParameters> {
     /// Owner of the note
     pub user: User<CP>,
-    pub app: App,
+    pub app: App<CP>,
     pub value: u64,
     /// for NFT or whatever. TODO: to be decided the value format.
     pub data: CP::CurveScalarField,
@@ -51,7 +51,7 @@ pub struct Note<CP: CircuitParameters> {
 impl<CP: CircuitParameters> Note<CP> {
     pub fn new(
         user: User<CP>,
-        app: App,
+        app: App<CP>,
         value: u64,
         rho: Nullifier<CP>,
         data: CP::CurveScalarField,
@@ -72,7 +72,10 @@ impl<CP: CircuitParameters> Note<CP> {
     // psi = poseidon_hash(rho, (rcm * generator).x)
     // The psi derivation is different from Orchard, in which psi = blake2b(rho||rcm)
     // Use NOTE_COMMITMENT_R_GENERATOR as generator temporarily
-    fn derive_psi(rho: &CP::CurveScalarField, rcm: &CP::InnerCurveScalarField) -> CP::CurveScalarField {
+    fn derive_psi(
+        rho: &CP::CurveScalarField,
+        rcm: &CP::InnerCurveScalarField,
+    ) -> CP::CurveScalarField {
         let g_rcm_x = extract_p(&(NOTE_COMMITMENT_R_GENERATOR.to_curve() * rcm));
         poseidon_hash(*rho, g_rcm_x)
     }

@@ -12,14 +12,13 @@ use crate::{
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
     circuit::{Layouter, Value},
-    plonk::{ConstraintSystem, Error},
+    plonk::{Circuit, ConstraintSystem, Error},
 };
-use pasta_curves::pallas;
 
 use super::circuit_parameters::CircuitParameters;
 
 pub trait ValidityPredicateConfig<CP: CircuitParameters> {
-    fn configure_note(meta: &mut ConstraintSystem<CP::CurveScalarField>) -> NoteConfig {
+    fn configure_note(meta: &mut ConstraintSystem<CP::CurveScalarField>) -> NoteConfig<CP> {
         let instances = meta.instance_column();
         meta.enable_equality(instances);
 
@@ -42,7 +41,7 @@ pub trait ValidityPredicateConfig<CP: CircuitParameters> {
 
         NoteChip::configure(meta, instances, advices)
     }
-    fn get_note_config(&self) -> NoteConfig;
+    fn get_note_config(&self) -> NoteConfig<CP>;
     fn configure(meta: &mut ConstraintSystem<CP::CurveScalarField>) -> Self;
 }
 pub trait ValidityPredicateCircuit<CP: CircuitParameters> {
@@ -53,7 +52,7 @@ pub trait ValidityPredicateCircuit<CP: CircuitParameters> {
         &self,
         config: Self::Config,
         mut layouter: impl Layouter<CP::CurveScalarField>,
-    ) -> Result<(Vec<SpendNoteVar>, Vec<OutputNoteVar>), Error> {
+    ) -> Result<(Vec<SpendNoteVar<CP>>, Vec<OutputNoteVar<CP>>), Error> {
         let note_config = config.get_note_config();
         // Load the Sinsemilla generator lookup table used by the whole circuit.
         SinsemillaChip::<
@@ -127,8 +126,8 @@ pub trait ValidityPredicateCircuit<CP: CircuitParameters> {
         &self,
         _config: Self::Config,
         mut _layouter: impl Layouter<CP::CurveScalarField>,
-        _input_note_variables: &[SpendNoteVar],
-        _output_note_variables: &[OutputNoteVar],
+        _input_note_variables: &[SpendNoteVar<CP>],
+        _output_note_variables: &[OutputNoteVar<CP>],
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -137,7 +136,11 @@ pub trait ValidityPredicateCircuit<CP: CircuitParameters> {
 #[macro_export]
 macro_rules! vp_circuit_impl {
     ($name:ident, $cp:ident) => {
-        impl<$cp> Circuit<CP::CurveScalarField> for $name {
+        use halo2_proofs::{
+            circuit::Layouter,
+            plonk::{Circuit, Error},
+        };
+        impl<$cp: CircuitParameters> Circuit<CP::CurveScalarField> for $name {
             type Config = <Self as ValidityPredicateCircuit<CP>>::Config;
             type FloorPlanner = floor_planner::V1;
 

@@ -1,15 +1,15 @@
 use crate::{
+    circuit::circuit_parameters::CircuitParameters,
     utils::{poseidon_hash, prf_nf},
-    vp_description::ValidityPredicateDescription, circuit::circuit_parameters::CircuitParameters,
+    vp_description::ValidityPredicateDescription,
 };
 use ff::Field;
-use pasta_curves::pallas;
 use rand::RngCore;
 
 #[derive(Copy, Debug, Clone)]
-pub struct NullifierDerivingKey(CP::CurveScalarField);
+pub struct NullifierDerivingKey<CP: CircuitParameters>(CP::CurveScalarField);
 
-impl NullifierDerivingKey {
+impl<CP: CircuitParameters> NullifierDerivingKey<CP> {
     pub fn new(nk: CP::CurveScalarField) -> Self {
         Self(nk)
     }
@@ -27,8 +27,8 @@ impl NullifierDerivingKey {
     }
 }
 
-impl Default for NullifierDerivingKey {
-    fn default() -> NullifierDerivingKey {
+impl<CP: CircuitParameters> Default for NullifierDerivingKey<CP> {
+    fn default() -> NullifierDerivingKey<CP> {
         NullifierDerivingKey(CP::CurveScalarField::one())
     }
 }
@@ -37,20 +37,20 @@ impl Default for NullifierDerivingKey {
 #[derive(Debug, Clone)]
 pub struct User<CP: CircuitParameters> {
     pub send_com: UserSendAddress<CP>,
-    pub recv_vp: ValidityPredicateDescription,
+    pub recv_vp: ValidityPredicateDescription<CP>,
 }
 
 #[derive(Debug, Clone)]
-pub enum UserSendAddress<CP: CircuitParameters>{
+pub enum UserSendAddress<CP: CircuitParameters> {
     Closed(CP::CurveScalarField),
-    Open(NullifierDerivingKey, ValidityPredicateDescription),
+    Open(NullifierDerivingKey<CP>, ValidityPredicateDescription<CP>),
 }
 
 impl<CP: CircuitParameters> User<CP> {
     pub fn new(
-        send_vp: ValidityPredicateDescription,
-        recv_vp: ValidityPredicateDescription,
-        nk: NullifierDerivingKey,
+        send_vp: ValidityPredicateDescription<CP>,
+        recv_vp: ValidityPredicateDescription<CP>,
+        nk: NullifierDerivingKey<CP>,
     ) -> Self {
         let send_com = UserSendAddress::from_open(nk, send_vp);
         Self { send_com, recv_vp }
@@ -71,14 +71,17 @@ impl<CP: CircuitParameters> User<CP> {
         poseidon_hash(self.send_com.get_closed(), self.recv_vp.get_compressed())
     }
 
-    pub fn get_nk(&self) -> Option<NullifierDerivingKey> {
+    pub fn get_nk(&self) -> Option<NullifierDerivingKey<CP>> {
         self.send_com.get_nk()
     }
 }
 
 impl<CP: CircuitParameters> UserSendAddress<CP> {
     /// Creates an open user send address.
-    pub fn from_open(nk: NullifierDerivingKey, send_vp: ValidityPredicateDescription) -> Self {
+    pub fn from_open(
+        nk: NullifierDerivingKey<CP>,
+        send_vp: ValidityPredicateDescription<CP>,
+    ) -> Self {
         UserSendAddress::Open(nk, send_vp)
     }
 
@@ -87,14 +90,14 @@ impl<CP: CircuitParameters> UserSendAddress<CP> {
         UserSendAddress::Closed(x)
     }
 
-    pub fn get_nk(&self) -> Option<NullifierDerivingKey> {
+    pub fn get_nk(&self) -> Option<NullifierDerivingKey<CP>> {
         match self {
             UserSendAddress::Closed(_) => None,
             UserSendAddress::Open(nk, _) => Some(*nk),
         }
     }
 
-    pub fn get_send_vp(&self) -> Option<&ValidityPredicateDescription> {
+    pub fn get_send_vp(&self) -> Option<&ValidityPredicateDescription<CP>> {
         match self {
             UserSendAddress::Closed(_) => None,
             UserSendAddress::Open(_, send_vp) => Some(send_vp),
