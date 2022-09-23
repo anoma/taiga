@@ -1,3 +1,4 @@
+use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::constant::NOTE_COMMITMENT_R_GENERATOR;
 use crate::{
     note::NoteCommitment,
@@ -9,9 +10,9 @@ use pasta_curves::pallas;
 
 /// The unique nullifier.
 #[derive(Copy, Debug, Clone)]
-pub struct Nullifier(pallas::Base);
+pub struct Nullifier<CP: CircuitParameters>(CP::CurveScalarField);
 
-impl Nullifier {
+impl<CP: CircuitParameters> Nullifier<CP> {
     // for test
     pub fn new(nf: pallas::Base) -> Self {
         Self(nf)
@@ -21,9 +22,9 @@ impl Nullifier {
     // $nf =Extract_P([PRF_{nk}(\rho) + \psi \ mod \ q] * K + cm)$
     pub fn derive_native(
         nk: &NullifierDerivingKey,
-        rho: &pallas::Base,
-        psi: &pallas::Base,
-        cm: &NoteCommitment,
+        rho: &CP::CurveScalarField,
+        psi: &CP::CurveScalarField,
+        cm: &NoteCommitment<CP>,
     ) -> Self {
         // TODO: generate a new generator for nullifier_k
         let k = NOTE_COMMITMENT_R_GENERATOR.to_curve();
@@ -38,8 +39,8 @@ impl Nullifier {
     }
 }
 
-impl Default for Nullifier {
-    fn default() -> Nullifier {
+impl<CP: CircuitParameters> Default for Nullifier<CP> {
+    fn default() -> Nullifier<CP> {
         Nullifier(pallas::Base::one())
     }
 }

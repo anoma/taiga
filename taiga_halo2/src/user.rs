@@ -1,6 +1,6 @@
 use crate::{
     utils::{poseidon_hash, prf_nf},
-    vp_description::ValidityPredicateDescription,
+    vp_description::ValidityPredicateDescription, circuit::circuit_parameters::CircuitParameters,
 };
 use ff::Field;
 use pasta_curves::pallas;
@@ -35,18 +35,18 @@ impl Default for NullifierDerivingKey {
 
 /// The user address binded with send vp and received vp.
 #[derive(Debug, Clone)]
-pub struct User {
-    pub send_com: UserSendAddress,
+pub struct User<CP: CircuitParameters> {
+    pub send_com: UserSendAddress<CP>,
     pub recv_vp: ValidityPredicateDescription,
 }
 
 #[derive(Debug, Clone)]
-pub enum UserSendAddress {
-    Closed(pallas::Base),
+pub enum UserSendAddress<CP: CircuitParameters>{
+    Closed(CP::CurveScalarField),
     Open(NullifierDerivingKey, ValidityPredicateDescription),
 }
 
-impl User {
+impl<CP: CircuitParameters> User<CP> {
     pub fn new(
         send_vp: ValidityPredicateDescription,
         recv_vp: ValidityPredicateDescription,
@@ -76,7 +76,7 @@ impl User {
     }
 }
 
-impl UserSendAddress {
+impl<CP: CircuitParameters> UserSendAddress<CP> {
     /// Creates an open user send address.
     pub fn from_open(nk: NullifierDerivingKey, send_vp: ValidityPredicateDescription) -> Self {
         UserSendAddress::Open(nk, send_vp)
@@ -112,8 +112,8 @@ impl UserSendAddress {
     }
 }
 
-impl Default for User {
-    fn default() -> User {
+impl<CP: CircuitParameters> Default for User<CP> {
+    fn default() -> User<CP> {
         let nk = NullifierDerivingKey::default();
         let send_vp = ValidityPredicateDescription::Compressed(pallas::Base::one());
         let send_com = UserSendAddress::from_open(nk, send_vp);

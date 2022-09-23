@@ -3,7 +3,7 @@ use crate::{
         gadgets::{assign_free_advice, AddChip, AddConfig, AddInstructions},
         integrity::{OutputNoteVar, SpendNoteVar},
         note_circuit::NoteConfig,
-        vp_circuit::{ValidityPredicateCircuit, ValidityPredicateConfig},
+        vp_circuit::{ValidityPredicateCircuit, ValidityPredicateConfig}, circuit_parameters::CircuitParameters,
     },
     constant::NUM_NOTE,
     note::Note,
@@ -18,11 +18,11 @@ use rand::RngCore;
 
 // FieldAdditionValidityPredicateCircuit with a trivial constraint a + b = c.
 #[derive(Clone, Debug, Default)]
-struct FieldAdditionValidityPredicateCircuit {
-    input_notes: [Note; NUM_NOTE],
-    output_notes: [Note; NUM_NOTE],
-    a: pallas::Base,
-    b: pallas::Base,
+struct FieldAdditionValidityPredicateCircuit<CP: CircuitParameters> {
+    input_notes: [Note<CP>; NUM_NOTE],
+    output_notes: [Note<CP>; NUM_NOTE],
+    a: CP::CurveScalarField,
+    b: CP::CurveScalarField,
 }
 
 #[derive(Clone, Debug)]
@@ -33,7 +33,7 @@ struct FieldAdditionValidityPredicateConfig {
     add_config: AddConfig,
 }
 
-impl ValidityPredicateConfig for FieldAdditionValidityPredicateConfig {
+impl<CP: CircuitParameters> ValidityPredicateConfig<CP> for FieldAdditionValidityPredicateConfig {
     fn get_note_config(&self) -> NoteConfig {
         self.note_conifg.clone()
     }
@@ -56,7 +56,7 @@ impl ValidityPredicateConfig for FieldAdditionValidityPredicateConfig {
     }
 }
 
-impl FieldAdditionValidityPredicateCircuit {
+impl<CP: CircuitParameters> FieldAdditionValidityPredicateCircuit<CP> {
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
         let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
@@ -88,14 +88,14 @@ impl FieldAdditionValidityPredicateCircuit {
     }
 }
 
-impl ValidityPredicateCircuit for FieldAdditionValidityPredicateCircuit {
+impl<CP: CircuitParameters> ValidityPredicateCircuit<CP> for FieldAdditionValidityPredicateCircuit<CP> {
     type Config = FieldAdditionValidityPredicateConfig;
 
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
+    fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE] {
         &self.input_notes
     }
 
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
+    fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE] {
         &self.output_notes
     }
 
@@ -131,7 +131,7 @@ impl ValidityPredicateCircuit for FieldAdditionValidityPredicateCircuit {
     }
 }
 
-vp_circuit_impl!(FieldAdditionValidityPredicateCircuit);
+vp_circuit_impl!(FieldAdditionValidityPredicateCircuit, CP);
 
 #[test]
 fn test_halo2_addition_vp_circuit() {

@@ -594,12 +594,13 @@ fn test_halo2_note_commitment_circuit() {
     };
     use rand::{rngs::OsRng, RngCore};
 
+    use crate::circuit::circuit_parameters::DLCircuitParameters as CP;
     #[derive(Default)]
     struct MyCircuit {
-        user: User,
+        user: User<CP>,
         app: App,
         value: u64,
-        rho: Nullifier,
+        rho: Nullifier<CP>,
         data: pallas::Base,
         rcm: pallas::Scalar,
     }

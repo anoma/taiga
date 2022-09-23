@@ -17,6 +17,8 @@ use halo2_proofs::{
 };
 use pasta_curves::pallas;
 
+use super::circuit_parameters::CircuitParameters;
+
 #[derive(Clone, Debug)]
 pub struct ActionConfig {
     instances: Column<Instance>,
@@ -27,16 +29,16 @@ pub struct ActionConfig {
 
 /// The Action circuit.
 #[derive(Clone, Debug, Default)]
-pub struct ActionCircuit {
+pub struct ActionCircuit<CP: CircuitParameters> {
     /// Spent note
-    pub spend_note: Note,
+    pub spend_note: Note<CP>,
     /// The authorization path of spend note
     pub auth_path: [(pallas::Base, bool); TAIGA_COMMITMENT_TREE_DEPTH],
     /// Output note
-    pub output_note: Note,
+    pub output_note: Note<CP>,
 }
 
-impl Circuit<pallas::Base> for ActionCircuit {
+impl<CP: CircuitParameters> Circuit<pallas::Base> for ActionCircuit<CP> {
     type Config = ActionConfig;
     type FloorPlanner = floor_planner::V1;
 

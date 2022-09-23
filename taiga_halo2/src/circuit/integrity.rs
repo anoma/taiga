@@ -19,6 +19,8 @@ use halo2_proofs::{
 };
 use pasta_curves::pallas;
 
+use super::circuit_parameters::CircuitParameters;
+
 // cm is a point
 #[allow(clippy::too_many_arguments)]
 pub fn nullifier_circuit(
@@ -71,7 +73,7 @@ pub struct SpendNoteVar {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn check_spend_note(
+pub fn check_spend_note<CP: CircuitParameters>(
     mut layouter: impl Layouter<pallas::Base>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
@@ -86,7 +88,7 @@ pub fn check_spend_note(
     poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
     // poseidon_chip: PoseidonChip<pallas::Base, 3, 2>,
     add_chip: AddChip<pallas::Base>,
-    spend_note: Note,
+    spend_note: Note<CP>,
     nf_row_idx: usize,
 ) -> Result<SpendNoteVar, Error> {
     // Check spend note user integrity: user_address = Com_r(Com_r(send_vp, nk), recv_vp_hash)
@@ -242,7 +244,7 @@ pub struct OutputNoteVar {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn check_output_note(
+pub fn check_output_note<CP: CircuitParameters>(
     mut layouter: impl Layouter<pallas::Base>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
@@ -256,7 +258,7 @@ pub fn check_output_note(
     // PoseidonChip can not be cloned, use PoseidonConfig temporarily
     poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
     // poseidon_chip: PoseidonChip<pallas::Base, 3, 2>,
-    output_note: Note,
+    output_note: Note<CP>,
     old_nf: AssignedCell<pallas::Base, pallas::Base>,
     cm_row_idx: usize,
 ) -> Result<OutputNoteVar, Error> {
@@ -385,14 +387,14 @@ fn test_halo2_nullifier_circuit() {
     use rand::rngs::OsRng;
 
     #[derive(Default)]
-    struct MyCircuit {
+    struct MyCircuit<CP: CircuitParameters> {
         nk: NullifierDerivingKey,
         rho: pallas::Base,
         psi: pallas::Base,
-        cm: NoteCommitment,
+        cm: NoteCommitment<CP>,
     }
 
-    impl Circuit<pallas::Base> for MyCircuit {
+    impl<CP:CircuitParameters> Circuit<pallas::Base> for MyCircuit<CP> {
         type Config = (
             [Column<Advice>; 10],
             PoseidonConfig<pallas::Base, 3, 2>,

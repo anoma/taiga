@@ -1,4 +1,5 @@
 pub mod action_circuit;
+pub mod circuit_parameters;
 pub mod gadgets;
 pub mod integrity;
 pub mod merkle_circuit;

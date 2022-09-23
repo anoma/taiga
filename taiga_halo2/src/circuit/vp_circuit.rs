@@ -16,7 +16,9 @@ use halo2_proofs::{
 };
 use pasta_curves::pallas;
 
-pub trait ValidityPredicateConfig {
+use super::circuit_parameters::CircuitParameters;
+
+pub trait ValidityPredicateConfig<CP: CircuitParameters> {
     fn configure_note(meta: &mut ConstraintSystem<pallas::Base>) -> NoteConfig {
         let instances = meta.instance_column();
         meta.enable_equality(instances);
@@ -43,8 +45,8 @@ pub trait ValidityPredicateConfig {
     fn get_note_config(&self) -> NoteConfig;
     fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self;
 }
-pub trait ValidityPredicateCircuit {
-    type Config: ValidityPredicateConfig + Clone;
+pub trait ValidityPredicateCircuit<CP: CircuitParameters> {
+    type Config: ValidityPredicateConfig<CP> + Clone;
     // Default implementation, constrains the notes integrity.
     // TODO: how to enforce the constraints in vp circuit?
     fn basic_constraints(
@@ -118,8 +120,8 @@ pub trait ValidityPredicateCircuit {
 
     // VP designer need to implement the following functions.
     // `get_input_notes` and `get_output_notes` will be used in `basic_constraints` to get the basic note info.
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE];
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE];
+    fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE];
+    fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE];
     // Add custom constraints on basic note variables and user-defined variables.
     fn custom_constraints(
         &self,
@@ -134,9 +136,9 @@ pub trait ValidityPredicateCircuit {
 
 #[macro_export]
 macro_rules! vp_circuit_impl {
-    ($name:ident) => {
-        impl Circuit<pallas::Base> for $name {
-            type Config = <Self as ValidityPredicateCircuit>::Config;
+    ($name:ident, $cp:ident) => {
+        impl<$cp> Circuit<pallas::Base> for $name {
+            type Config = <Self as ValidityPredicateCircuit<CP>>::Config;
             type FloorPlanner = floor_planner::V1;
 
             fn without_witnesses(&self) -> Self {

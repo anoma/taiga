@@ -3,7 +3,7 @@ use crate::{
     constant::{BASE_BITS_NUM, NOTE_COMMITMENT_R_GENERATOR, NOTE_COMMIT_DOMAIN},
     nullifier::Nullifier,
     user::User,
-    utils::{extract_p, poseidon_hash},
+    utils::{extract_p, poseidon_hash}, circuit::circuit_parameters::CircuitParameters,
 };
 use bitvec::{array::BitArray, order::Lsb0};
 use core::iter;
@@ -14,10 +14,10 @@ use rand::{Rng, RngCore};
 
 /// A commitment to a note.
 #[derive(Copy, Debug, Clone)]
-pub struct NoteCommitment(pallas::Point);
+pub struct NoteCommitment<CP: CircuitParameters>(CP::CurveScalarField);
 
-impl NoteCommitment {
-    pub fn inner(&self) -> pallas::Point {
+impl<CP: CircuitParameters> NoteCommitment<CP> {
+    pub fn inner(&self) -> CP::InnerCurve {
         self.0
     }
 
@@ -26,36 +26,36 @@ impl NoteCommitment {
     }
 }
 
-impl Default for NoteCommitment {
-    fn default() -> NoteCommitment {
-        NoteCommitment(pallas::Point::generator())
+impl<CP: CircuitParameters> Default for NoteCommitment<CP> {
+    fn default() -> NoteCommitment<CP> {
+        NoteCommitment(CP::InnerCurve::generator())
     }
 }
 
 /// A note
 #[derive(Debug, Clone, Default)]
-pub struct Note {
+pub struct Note<CP: CircuitParameters> {
     /// Owner of the note
-    pub user: User,
+    pub user: User<CP>,
     pub app: App,
     pub value: u64,
     /// for NFT or whatever. TODO: to be decided the value format.
-    pub data: pallas::Base,
+    pub data: CP::CurveScalarField,
     /// old nullifier. Nonce which is a deterministically computed, unique nonce
-    pub rho: Nullifier,
+    pub rho: Nullifier<CP>,
     /// computed from spent_note_nf and rcm by using a PRF
-    pub psi: pallas::Base,
-    pub rcm: pallas::Scalar,
+    pub psi: CP::CurveScalarField,
+    pub rcm: CP::CurveBaseField,
 }
 
-impl Note {
+impl<CP: CircuitParameters> Note<CP> {
     pub fn new(
-        user: User,
+        user: User<CP>,
         app: App,
         value: u64,
-        rho: Nullifier,
-        data: pallas::Base,
-        rcm: pallas::Scalar,
+        rho: Nullifier<CP>,
+        data: CP::CurveScalarField,
+        rcm: CP::CurveBaseField,
     ) -> Self {
         let psi = Self::derive_psi(&rho.inner(), &rcm);
         Self {
@@ -82,7 +82,7 @@ impl Note {
         Self::dummy_from_rho(rng, rho)
     }
 
-    pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
+    pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier<CP>) -> Self {
         let user = User::dummy(&mut rng);
         let app = App::dummy(&mut rng);
         let value: u64 = rng.gen();
@@ -101,7 +101,7 @@ impl Note {
     }
 
     // cm = SinsemillaCommit^rcm(user_address || app_address || data || rho || psi || value)
-    pub fn commitment(&self) -> NoteCommitment {
+    pub fn commitment(&self) -> NoteCommitment<CP> {
         let user_address = self.user.address();
         let app_address = self.app.address();
         let ret = NOTE_COMMIT_DOMAIN
@@ -142,7 +142,7 @@ impl Note {
         NoteCommitment(ret)
     }
 
-    pub fn get_nf(&self) -> Nullifier {
+    pub fn get_nf(&self) -> Nullifier<CP> {
         let nk = self.user.get_nk().unwrap();
         let cm = self.commitment();
         Nullifier::derive_native(&nk, &self.rho.inner(), &self.psi, &cm)

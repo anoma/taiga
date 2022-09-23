@@ -1,6 +1,6 @@
 use crate::{
     app::App,
-    circuit::action_circuit::ActionCircuit,
+    circuit::{action_circuit::ActionCircuit, circuit_parameters::CircuitParameters},
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{MerklePath, Node},
     note::{Note, NoteCommitment},
@@ -15,48 +15,48 @@ use rand::RngCore;
 
 /// The action result used in transaction.
 #[derive(Copy, Debug, Clone)]
-pub struct ActionInstance {
+pub struct ActionInstance<CP: CircuitParameters> {
     /// The root of the note commitment Merkle tree.
-    pub root: pallas::Base,
+    pub root: CP::CurveScalarField,
     /// The nullifier of the spend note.
-    pub nf: Nullifier,
+    pub nf: Nullifier<CP>,
     /// The commitment of the output note.
-    pub cm: NoteCommitment,
+    pub cm: NoteCommitment<CP>,
     // TODO: The EncryptedNote.
     // encrypted_note,
 }
 
 /// The information to build ActionInstance and ActionCircuit.
 #[derive(Debug, Clone)]
-pub struct ActionInfo {
-    spend: SpendInfo,
-    output: OutputInfo,
+pub struct ActionInfo<CP: CircuitParameters> {
+    spend: SpendInfo<CP>,
+    output: OutputInfo<CP>,
 }
 
 #[derive(Debug, Clone)]
-pub struct SpendInfo {
-    note: Note,
+pub struct SpendInfo<CP: CircuitParameters> {
+    note: Note<CP>,
     auth_path: [(pallas::Base, bool); TAIGA_COMMITMENT_TREE_DEPTH],
     root: pallas::Base,
 }
 
 #[derive(Debug, Clone)]
-pub struct OutputInfo {
-    addr_send_closed: UserSendAddress,
+pub struct OutputInfo<CP: CircuitParameters> {
+    addr_send_closed: UserSendAddress<CP>,
     addr_recv_vp: ValidityPredicateDescription,
     addr_app_vp: ValidityPredicateDescription,
     value: u64,
     data: pallas::Base,
 }
 
-impl ActionInstance {
+impl<CP: CircuitParameters> ActionInstance<CP> {
     pub fn to_instance(&self) -> Vec<pallas::Base> {
         vec![self.nf.inner(), self.root, self.cm.get_x()]
     }
 }
 
-impl ActionInfo {
-    pub fn new(spend: SpendInfo, output: OutputInfo) -> Self {
+impl<CP: CircuitParameters> ActionInfo<CP> {
+    pub fn new(spend: SpendInfo<CP>, output: OutputInfo<CP>) -> Self {
         Self { spend, output }
     }
 
@@ -70,7 +70,7 @@ impl ActionInfo {
         ActionInfo::new(spend_info, output_info)
     }
 
-    pub fn build(self, rng: &mut impl RngCore) -> (ActionInstance, ActionCircuit) {
+    pub fn build(self, rng: &mut impl RngCore) -> (ActionInstance<CP>, ActionCircuit<CP>) {
         let nf = self.spend.note.get_nf();
 
         let user = User {
@@ -101,8 +101,8 @@ impl ActionInfo {
     }
 }
 
-impl SpendInfo {
-    pub fn new(note: Note, merkle_path: MerklePath) -> Self {
+impl<CP: CircuitParameters> SpendInfo<CP> {
+    pub fn new(note: Note<CP>, merkle_path: MerklePath) -> Self {
         let cm_node = Node::new(note.commitment().get_x());
         let root = merkle_path.root(cm_node).inner();
         let auth_path: [(pallas::Base, bool); TAIGA_COMMITMENT_TREE_DEPTH] =
@@ -115,9 +115,9 @@ impl SpendInfo {
     }
 }
 
-impl OutputInfo {
+impl<CP: CircuitParameters> OutputInfo<CP> {
     pub fn new(
-        addr_send_closed: UserSendAddress,
+        addr_send_closed: UserSendAddress<CP>,
         addr_recv_vp: ValidityPredicateDescription,
         addr_app_vp: ValidityPredicateDescription,
         value: u64,
