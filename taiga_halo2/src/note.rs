@@ -1,7 +1,7 @@
 use crate::{
+    app::App,
     constant::{BASE_BITS_NUM, NOTE_COMMITMENT_R_GENERATOR, NOTE_COMMIT_DOMAIN},
     nullifier::Nullifier,
-    token::Token,
     user::User,
     utils::{extract_p, poseidon_hash},
 };
@@ -37,7 +37,7 @@ impl Default for NoteCommitment {
 pub struct Note {
     /// Owner of the note
     pub user: User,
-    pub token: Token,
+    pub app: App,
     pub value: u64,
     /// for NFT or whatever. TODO: to be decided the value format.
     pub data: pallas::Base,
@@ -51,7 +51,7 @@ pub struct Note {
 impl Note {
     pub fn new(
         user: User,
-        token: Token,
+        app: App,
         value: u64,
         rho: Nullifier,
         data: pallas::Base,
@@ -60,7 +60,7 @@ impl Note {
         let psi = Self::derive_psi(&rho.inner(), &rcm);
         Self {
             user,
-            token,
+            app,
             value,
             data,
             rho,
@@ -84,14 +84,14 @@ impl Note {
 
     pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
         let user = User::dummy(&mut rng);
-        let token = Token::dummy(&mut rng);
+        let app = App::dummy(&mut rng);
         let value: u64 = rng.gen();
         let data = pallas::Base::random(&mut rng);
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = Self::derive_psi(&rho.inner(), &rcm);
         Self {
             user,
-            token,
+            app,
             value,
             data,
             rho,
@@ -100,10 +100,10 @@ impl Note {
         }
     }
 
-    // cm = SinsemillaCommit^rcm(user_address || token_address || data || rho || psi || value)
+    // cm = SinsemillaCommit^rcm(user_address || app_address || data || rho || psi || value)
     pub fn commitment(&self) -> NoteCommitment {
         let user_address = self.user.address();
-        let token_address = self.token.address();
+        let app_address = self.app.address();
         let ret = NOTE_COMMIT_DOMAIN
             .commit(
                 iter::empty()
@@ -115,7 +115,7 @@ impl Note {
                             .take(BASE_BITS_NUM),
                     )
                     .chain(
-                        token_address
+                        app_address
                             .to_le_bits()
                             .iter()
                             .by_vals()

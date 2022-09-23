@@ -1,10 +1,10 @@
 use crate::{
+    app::App,
     circuit::action_circuit::ActionCircuit,
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{MerklePath, Node},
     note::{Note, NoteCommitment},
     nullifier::Nullifier,
-    token::Token,
     user::User,
     user::UserSendAddress,
     vp_description::ValidityPredicateDescription,
@@ -44,7 +44,7 @@ pub struct SpendInfo {
 pub struct OutputInfo {
     addr_send_closed: UserSendAddress,
     addr_recv_vp: ValidityPredicateDescription,
-    addr_token_vp: ValidityPredicateDescription,
+    addr_app_vp: ValidityPredicateDescription,
     value: u64,
     data: pallas::Base,
 }
@@ -77,19 +77,12 @@ impl ActionInfo {
             send_com: self.output.addr_send_closed,
             recv_vp: self.output.addr_recv_vp,
         };
-        let token = Token {
-            token_vp: self.output.addr_token_vp,
+        let app = App {
+            app_vp: self.output.addr_app_vp,
         };
 
         let note_rcm = pallas::Scalar::random(rng);
-        let output_note = Note::new(
-            user,
-            token,
-            self.output.value,
-            nf,
-            self.output.data,
-            note_rcm,
-        );
+        let output_note = Note::new(user, app, self.output.value, nf, self.output.data, note_rcm);
 
         let output_cm = output_note.commitment();
         let action = ActionInstance {
@@ -126,14 +119,14 @@ impl OutputInfo {
     pub fn new(
         addr_send_closed: UserSendAddress,
         addr_recv_vp: ValidityPredicateDescription,
-        addr_token_vp: ValidityPredicateDescription,
+        addr_app_vp: ValidityPredicateDescription,
         value: u64,
         data: pallas::Base,
     ) -> Self {
         Self {
             addr_send_closed,
             addr_recv_vp,
-            addr_token_vp,
+            addr_app_vp,
             value,
             data,
         }
@@ -143,13 +136,13 @@ impl OutputInfo {
         use rand::Rng;
         let addr_send_closed = UserSendAddress::from_closed(pallas::Base::random(&mut rng));
         let addr_recv_vp = ValidityPredicateDescription::dummy(&mut rng);
-        let addr_token_vp = ValidityPredicateDescription::dummy(&mut rng);
+        let addr_app_vp = ValidityPredicateDescription::dummy(&mut rng);
         let value: u64 = rng.gen();
         let data = pallas::Base::random(rng);
         Self {
             addr_send_closed,
             addr_recv_vp,
-            addr_token_vp,
+            addr_app_vp,
             value,
             data,
         }
