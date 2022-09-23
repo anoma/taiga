@@ -18,7 +18,7 @@ impl NullifierDerivingKey {
         Self(pallas::Base::random(rng))
     }
 
-    pub fn prf_nf(&self, rho: pallas::Base) -> pallas::Base {
+    pub fn compute_nf(&self, rho: pallas::Base) -> pallas::Base {
         prf_nf(self.0, rho)
     }
 

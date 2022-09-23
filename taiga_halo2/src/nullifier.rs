@@ -29,7 +29,7 @@ impl Nullifier {
         let k = NOTE_COMMITMENT_R_GENERATOR.to_curve();
 
         Nullifier(extract_p(
-            &(k * mod_r_p(nk.prf_nf(*rho) + psi) + cm.inner()),
+            &(k * mod_r_p(nk.compute_nf(*rho) + psi) + cm.inner()),
         ))
     }
 
