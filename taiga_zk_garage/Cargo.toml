@@ -29,3 +29,13 @@ rand_core = {version = "0.6", default-features=false, features = ["getrandom"] }
 
 [dev-dependencies]
 ark-std = "0.3"
+criterion = "0.3"
+proptest = "1.0.0"
+
+# [[bench]]
+# name = "action_proof"
+# harness = false
+
+[[bench]]
+name = "vp_proof"
+harness = false
