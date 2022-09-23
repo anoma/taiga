@@ -20,14 +20,14 @@ impl App {
         }
     }
 
-    pub fn address(&self) -> pallas::Base {
+    pub fn address(&self) -> CP::CurveScalarField {
         self.app_vp.get_compressed()
     }
 }
 
 impl Default for App {
     fn default() -> App {
-        let app_vp = ValidityPredicateDescription::Compressed(pallas::Base::one());
+        let app_vp = ValidityPredicateDescription::Compressed(CP::CurveScalarField::one());
         App { app_vp }
     }
 }

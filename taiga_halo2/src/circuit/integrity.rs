@@ -24,15 +24,15 @@ use super::circuit_parameters::CircuitParameters;
 // cm is a point
 #[allow(clippy::too_many_arguments)]
 pub fn nullifier_circuit(
-    mut layouter: impl Layouter<pallas::Base>,
-    poseidon_chip: PoseidonChip<pallas::Base, 3, 2>,
-    add_chip: AddChip<pallas::Base>,
+    mut layouter: impl Layouter<CP::CurveScalarField>,
+    poseidon_chip: PoseidonChip<CP::CurveScalarField, 3, 2>,
+    add_chip: AddChip<CP::CurveScalarField>,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
-    nk: AssignedCell<pallas::Base, pallas::Base>,
-    rho: AssignedCell<pallas::Base, pallas::Base>,
-    psi: AssignedCell<pallas::Base, pallas::Base>,
-    cm: &Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
-) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
+    nk: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    rho: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    psi: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    cm: &Point<CP::InnerCurve, EccChip<NoteCommitmentFixedBases>>,
+) -> Result<AssignedCell<CP::CurveScalarField, CP::CurveScalarField>, Error> {
     let poseidon_message = [nk, rho];
     let poseidon_hasher =
         PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
@@ -64,17 +64,17 @@ pub fn nullifier_circuit(
 // Return variables in the spend note
 #[derive(Debug)]
 pub struct SpendNoteVar {
-    pub user_address: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_address: AssignedCell<pallas::Base, pallas::Base>,
-    pub value: AssignedCell<pallas::Base, pallas::Base>,
-    pub data: AssignedCell<pallas::Base, pallas::Base>,
-    pub nf: AssignedCell<pallas::Base, pallas::Base>,
-    pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
+    pub user_address: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    pub app_address: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    pub value: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    pub data: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    pub nf: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    pub cm: Point<CP::InnerCurve, EccChip<NoteCommitmentFixedBases>>,
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn check_spend_note<CP: CircuitParameters>(
-    mut layouter: impl Layouter<pallas::Base>,
+    mut layouter: impl Layouter<CP::CurveScalarField>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
@@ -85,9 +85,9 @@ pub fn check_spend_note<CP: CircuitParameters>(
     >,
     note_commit_chip: NoteCommitmentChip,
     // PoseidonChip can not be cloned, use PoseidonConfig temporarily
-    poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
-    // poseidon_chip: PoseidonChip<pallas::Base, 3, 2>,
-    add_chip: AddChip<pallas::Base>,
+    poseidon_config: PoseidonConfig<CP::CurveScalarField, 3, 2>,
+    // poseidon_chip: PoseidonChip<CP::CurveScalarField, 3, 2>,
+    add_chip: AddChip<CP::CurveScalarField>,
     spend_note: Note<CP>,
     nf_row_idx: usize,
 ) -> Result<SpendNoteVar, Error> {
@@ -167,7 +167,7 @@ pub fn check_spend_note<CP: CircuitParameters>(
         assign_free_advice(
             layouter.namespace(|| "witness value"),
             advices[0],
-            Value::known(pallas::Base::from(spend_note.value)),
+            Value::known(CP::CurveScalarField::from(spend_note.value)),
         )?
     };
 
@@ -236,16 +236,16 @@ pub fn check_spend_note<CP: CircuitParameters>(
 // Return variables in the spend note
 #[derive(Debug)]
 pub struct OutputNoteVar {
-    pub user_address: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_address: AssignedCell<pallas::Base, pallas::Base>,
-    pub value: AssignedCell<pallas::Base, pallas::Base>,
-    pub data: AssignedCell<pallas::Base, pallas::Base>,
-    pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
+    pub user_address: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    pub app_address: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    pub value: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    pub data: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    pub cm: Point<CP::InnerCurve, EccChip<NoteCommitmentFixedBases>>,
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn check_output_note<CP: CircuitParameters>(
-    mut layouter: impl Layouter<pallas::Base>,
+    mut layouter: impl Layouter<CP::CurveScalarField>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
@@ -256,10 +256,10 @@ pub fn check_output_note<CP: CircuitParameters>(
     >,
     note_commit_chip: NoteCommitmentChip,
     // PoseidonChip can not be cloned, use PoseidonConfig temporarily
-    poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
-    // poseidon_chip: PoseidonChip<pallas::Base, 3, 2>,
+    poseidon_config: PoseidonConfig<CP::CurveScalarField, 3, 2>,
+    // poseidon_chip: PoseidonChip<CP::CurveScalarField, 3, 2>,
     output_note: Note<CP>,
-    old_nf: AssignedCell<pallas::Base, pallas::Base>,
+    old_nf: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     cm_row_idx: usize,
 ) -> Result<OutputNoteVar, Error> {
     // Check output note user integrity: user_address = Com_r(, recv_vp_hash)
@@ -305,7 +305,7 @@ pub fn check_output_note<CP: CircuitParameters>(
         assign_free_advice(
             layouter.namespace(|| "witness value"),
             advices[0],
-            Value::known(pallas::Base::from(output_note.value)),
+            Value::known(CP::CurveScalarField::from(output_note.value)),
         )?
     };
 
@@ -389,15 +389,15 @@ fn test_halo2_nullifier_circuit() {
     #[derive(Default)]
     struct MyCircuit<CP: CircuitParameters> {
         nk: NullifierDerivingKey,
-        rho: pallas::Base,
-        psi: pallas::Base,
+        rho: CP::CurveScalarField,
+        psi: CP::CurveScalarField,
         cm: NoteCommitment<CP>,
     }
 
-    impl<CP:CircuitParameters> Circuit<pallas::Base> for MyCircuit<CP> {
+    impl<CP:CircuitParameters> Circuit<CP::CurveScalarField> for MyCircuit<CP> {
         type Config = (
             [Column<Advice>; 10],
-            PoseidonConfig<pallas::Base, 3, 2>,
+            PoseidonConfig<CP::CurveScalarField, 3, 2>,
             AddConfig,
             EccConfig<NoteCommitmentFixedBases>,
             // add SinsemillaConfig to load look table, just for test
@@ -413,7 +413,7 @@ fn test_halo2_nullifier_circuit() {
             Self::default()
         }
 
-        fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self::Config {
+        fn configure(meta: &mut ConstraintSystem<CP::CurveScalarField>) -> Self::Config {
             let advices = [
                 meta.advice_column(),
                 meta.advice_column(),
@@ -493,12 +493,12 @@ fn test_halo2_nullifier_circuit() {
         fn synthesize(
             &self,
             config: Self::Config,
-            mut layouter: impl Layouter<pallas::Base>,
+            mut layouter: impl Layouter<CP::CurveScalarField>,
         ) -> Result<(), Error> {
             let (advices, poseidon_config, add_config, ecc_config, sinsemilla_config) = config;
             let poseidon_chip = PoseidonChip::construct(poseidon_config);
             let ecc_chip = EccChip::construct(ecc_config);
-            let add_chip = AddChip::<pallas::Base>::construct(add_config, ());
+            let add_chip = AddChip::<CP::CurveScalarField>::construct(add_config, ());
             SinsemillaChip::<
                 NoteCommitmentHashDomain,
                 NoteCommitmentDomain,
@@ -563,8 +563,8 @@ fn test_halo2_nullifier_circuit() {
     let mut rng = OsRng;
     let circuit = MyCircuit {
         nk: NullifierDerivingKey::rand(&mut rng),
-        rho: pallas::Base::random(&mut rng),
-        psi: pallas::Base::random(&mut rng),
+        rho: CP::CurveScalarField::random(&mut rng),
+        psi: CP::CurveScalarField::random(&mut rng),
         cm: NoteCommitment::default(),
     };
 

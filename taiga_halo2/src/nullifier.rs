@@ -14,7 +14,7 @@ pub struct Nullifier<CP: CircuitParameters>(CP::CurveScalarField);
 
 impl<CP: CircuitParameters> Nullifier<CP> {
     // for test
-    pub fn new(nf: pallas::Base) -> Self {
+    pub fn new(nf: CP::CurveScalarField) -> Self {
         Self(nf)
     }
 
@@ -34,13 +34,13 @@ impl<CP: CircuitParameters> Nullifier<CP> {
         ))
     }
 
-    pub fn inner(&self) -> pallas::Base {
+    pub fn inner(&self) -> CP::CurveScalarField {
         self.0
     }
 }
 
 impl<CP: CircuitParameters> Default for Nullifier<CP> {
     fn default() -> Nullifier<CP> {
-        Nullifier(pallas::Base::one())
+        Nullifier(CP::CurveScalarField::one())
     }
 }

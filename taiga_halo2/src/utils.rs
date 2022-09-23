@@ -5,7 +5,7 @@ use pasta_curves::pallas;
 
 use crate::circuit::circuit_parameters::CircuitParameters;
 
-/// Converts from pallas::Base to pallas::Scalar (aka $x \pmod{r_\mathbb{P}}$).
+/// Converts from CP::CurveScalarField to CP::InnerCurveScalarField (aka $x \pmod{r_\mathbb{P}}$).
 ///
 /// This requires no modular reduction because Pallas' base field is smaller than its
 /// scalar field.

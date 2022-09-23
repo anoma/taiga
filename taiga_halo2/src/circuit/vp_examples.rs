@@ -34,7 +34,7 @@ impl<CP: CircuitParameters> ValidityPredicateConfig<CP> for DummyValidityPredica
         self.note_conifg.clone()
     }
 
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
+    fn configure(meta: &mut ConstraintSystem<CP::CurveScalarField>) -> Self {
         let note_conifg = Self::configure_note(meta);
         Self { note_conifg }
     }
@@ -50,7 +50,7 @@ impl<CP: CircuitParameters> DummyValidityPredicateCircuit<CP> {
         }
     }
 
-    pub fn get_instances(&self) -> Vec<pallas::Base> {
+    pub fn get_instances(&self) -> Vec<CP::CurveScalarField> {
         let mut instances = vec![];
         self.input_notes
             .iter()
@@ -89,6 +89,6 @@ fn test_halo2_dummy_vp_circuit() {
     let circuit = DummyValidityPredicateCircuit::dummy(&mut rng);
     let instances = circuit.get_instances();
 
-    let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances]).unwrap();
+    let prover = MockProver::<CP::CurveScalarField>::run(12, &circuit, vec![instances]).unwrap();
     assert_eq!(prover.verify(), Ok(()));
 }

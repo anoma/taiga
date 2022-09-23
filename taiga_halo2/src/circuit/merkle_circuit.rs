@@ -16,7 +16,7 @@ use pasta_curves::pallas;
 pub struct MerklePoseidonConfig {
     advices: [Column<Advice>; 5],
     cond_swap_config: CondSwapConfig,
-    poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
+    poseidon_config: PoseidonConfig<CP::CurveScalarField, 3, 2>,
 }
 
 #[derive(Clone, Debug)]
@@ -24,7 +24,7 @@ pub struct MerklePoseidonChip {
     config: MerklePoseidonConfig,
 }
 
-impl Chip<pallas::Base> for MerklePoseidonChip {
+impl Chip<CP::CurveScalarField> for MerklePoseidonChip {
     type Config = MerklePoseidonConfig;
     type Loaded = ();
 
@@ -39,9 +39,9 @@ impl Chip<pallas::Base> for MerklePoseidonChip {
 
 impl MerklePoseidonChip {
     pub fn configure(
-        meta: &mut ConstraintSystem<pallas::Base>,
+        meta: &mut ConstraintSystem<CP::CurveScalarField>,
         advices: [Column<Advice>; 5],
-        poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
+        poseidon_config: PoseidonConfig<CP::CurveScalarField, 3, 2>,
     ) -> MerklePoseidonConfig {
         let cond_swap_config = CondSwapChip::configure(meta, advices);
 
@@ -59,28 +59,28 @@ impl MerklePoseidonChip {
 
 #[allow(clippy::type_complexity)]
 pub fn merkle_poseidon_gadget(
-    mut layouter: impl Layouter<pallas::Base>,
+    mut layouter: impl Layouter<CP::CurveScalarField>,
     chip: MerklePoseidonChip,
-    note_x: AssignedCell<pallas::Base, pallas::Base>,
-    merkle_path: &[(pallas::Base, bool)],
-) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
+    note_x: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    merkle_path: &[(CP::CurveScalarField, bool)],
+) -> Result<AssignedCell<CP::CurveScalarField, CP::CurveScalarField>, Error> {
     fn swap(
         merkle_chip: &MerklePoseidonChip,
-        layouter: impl Layouter<pallas::Base>,
+        layouter: impl Layouter<CP::CurveScalarField>,
         pair: (
-            AssignedCell<pallas::Base, pallas::Base>,
-            Value<pallas::Base>,
+            AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+            Value<CP::CurveScalarField>,
         ),
         swap: Value<bool>,
     ) -> Result<
         (
-            AssignedCell<pallas::Base, pallas::Base>,
-            AssignedCell<pallas::Base, pallas::Base>,
+            AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+            AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
         ),
         Error,
     > {
         let config = merkle_chip.config().cond_swap_config.clone();
-        let chip = CondSwapChip::<pallas::Base>::construct(config);
+        let chip = CondSwapChip::<CP::CurveScalarField>::construct(config);
         chip.swap(layouter, pair, swap)
     }
 
@@ -127,11 +127,11 @@ fn test_halo2_merkle_circuit() {
 
     #[derive(Default)]
     struct MyCircuit {
-        leaf: pallas::Base,
+        leaf: CP::CurveScalarField,
         merkle_path: MerklePath,
     }
 
-    impl Circuit<pallas::Base> for MyCircuit {
+    impl Circuit<CP::CurveScalarField> for MyCircuit {
         type Config = MerklePoseidonConfig;
         type FloorPlanner = SimpleFloorPlanner;
 
@@ -139,7 +139,7 @@ fn test_halo2_merkle_circuit() {
             Self::default()
         }
 
-        fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self::Config {
+        fn configure(meta: &mut ConstraintSystem<CP::CurveScalarField>) -> Self::Config {
             let advices = [
                 meta.advice_column(),
                 meta.advice_column(),
@@ -175,7 +175,7 @@ fn test_halo2_merkle_circuit() {
         fn synthesize(
             &self,
             config: Self::Config,
-            mut layouter: impl Layouter<pallas::Base>,
+            mut layouter: impl Layouter<CP::CurveScalarField>,
         ) -> Result<(), Error> {
             // Witness leaf
             let leaf = assign_free_advice(
@@ -210,7 +210,7 @@ fn test_halo2_merkle_circuit() {
 
     let mut rng = OsRng;
 
-    let leaf = pallas::Base::random(rng);
+    let leaf = CP::CurveScalarField::random(rng);
     let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
     let circuit = MyCircuit { leaf, merkle_path };

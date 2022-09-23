@@ -19,7 +19,7 @@ use pasta_curves::pallas;
 use super::circuit_parameters::CircuitParameters;
 
 pub trait ValidityPredicateConfig<CP: CircuitParameters> {
-    fn configure_note(meta: &mut ConstraintSystem<pallas::Base>) -> NoteConfig {
+    fn configure_note(meta: &mut ConstraintSystem<CP::CurveScalarField>) -> NoteConfig {
         let instances = meta.instance_column();
         meta.enable_equality(instances);
 
@@ -43,7 +43,7 @@ pub trait ValidityPredicateConfig<CP: CircuitParameters> {
         NoteChip::configure(meta, instances, advices)
     }
     fn get_note_config(&self) -> NoteConfig;
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self;
+    fn configure(meta: &mut ConstraintSystem<CP::CurveScalarField>) -> Self;
 }
 pub trait ValidityPredicateCircuit<CP: CircuitParameters> {
     type Config: ValidityPredicateConfig<CP> + Clone;
@@ -52,7 +52,7 @@ pub trait ValidityPredicateCircuit<CP: CircuitParameters> {
     fn basic_constraints(
         &self,
         config: Self::Config,
-        mut layouter: impl Layouter<pallas::Base>,
+        mut layouter: impl Layouter<CP::CurveScalarField>,
     ) -> Result<(Vec<SpendNoteVar>, Vec<OutputNoteVar>), Error> {
         let note_config = config.get_note_config();
         // Load the Sinsemilla generator lookup table used by the whole circuit.
@@ -73,7 +73,7 @@ pub trait ValidityPredicateCircuit<CP: CircuitParameters> {
             NoteCommitmentChip::construct(note_config.note_commit_config.clone());
 
         // Construct an add chip
-        let add_chip = AddChip::<pallas::Base>::construct(note_config.add_config, ());
+        let add_chip = AddChip::<CP::CurveScalarField>::construct(note_config.add_config, ());
 
         let input_notes = self.get_input_notes();
         let output_notes = self.get_output_notes();
@@ -126,7 +126,7 @@ pub trait ValidityPredicateCircuit<CP: CircuitParameters> {
     fn custom_constraints(
         &self,
         _config: Self::Config,
-        mut _layouter: impl Layouter<pallas::Base>,
+        mut _layouter: impl Layouter<CP::CurveScalarField>,
         _input_note_variables: &[SpendNoteVar],
         _output_note_variables: &[OutputNoteVar],
     ) -> Result<(), Error> {
@@ -137,7 +137,7 @@ pub trait ValidityPredicateCircuit<CP: CircuitParameters> {
 #[macro_export]
 macro_rules! vp_circuit_impl {
     ($name:ident, $cp:ident) => {
-        impl<$cp> Circuit<pallas::Base> for $name {
+        impl<$cp> Circuit<CP::CurveScalarField> for $name {
             type Config = <Self as ValidityPredicateCircuit<CP>>::Config;
             type FloorPlanner = floor_planner::V1;
 
@@ -145,14 +145,14 @@ macro_rules! vp_circuit_impl {
                 Self::default()
             }
 
-            fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self::Config {
+            fn configure(meta: &mut ConstraintSystem<CP::CurveScalarField>) -> Self::Config {
                 Self::Config::configure(meta)
             }
 
             fn synthesize(
                 &self,
                 config: Self::Config,
-                mut layouter: impl Layouter<pallas::Base>,
+                mut layouter: impl Layouter<CP::CurveScalarField>,
             ) -> Result<(), Error> {
                 let (input_note_variables, output_note_variables) = self.basic_constraints(
                     config.clone(),

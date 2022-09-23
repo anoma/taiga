@@ -33,12 +33,12 @@ pub struct ActionCircuit<CP: CircuitParameters> {
     /// Spent note
     pub spend_note: Note<CP>,
     /// The authorization path of spend note
-    pub auth_path: [(pallas::Base, bool); TAIGA_COMMITMENT_TREE_DEPTH],
+    pub auth_path: [(CP::CurveScalarField, bool); TAIGA_COMMITMENT_TREE_DEPTH],
     /// Output note
     pub output_note: Note<CP>,
 }
 
-impl<CP: CircuitParameters> Circuit<pallas::Base> for ActionCircuit<CP> {
+impl<CP: CircuitParameters> Circuit<CP::CurveScalarField> for ActionCircuit<CP> {
     type Config = ActionConfig;
     type FloorPlanner = floor_planner::V1;
 
@@ -46,7 +46,7 @@ impl<CP: CircuitParameters> Circuit<pallas::Base> for ActionCircuit<CP> {
         Self::default()
     }
 
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self::Config {
+    fn configure(meta: &mut ConstraintSystem<CP::CurveScalarField>) -> Self::Config {
         let instances = meta.instance_column();
         meta.enable_equality(instances);
 
@@ -86,7 +86,7 @@ impl<CP: CircuitParameters> Circuit<pallas::Base> for ActionCircuit<CP> {
     fn synthesize(
         &self,
         config: Self::Config,
-        mut layouter: impl Layouter<pallas::Base>,
+        mut layouter: impl Layouter<CP::CurveScalarField>,
     ) -> Result<(), Error> {
         // Load the Sinsemilla generator lookup table used by the whole circuit.
         SinsemillaChip::<
@@ -107,7 +107,7 @@ impl<CP: CircuitParameters> Circuit<pallas::Base> for ActionCircuit<CP> {
             NoteCommitmentChip::construct(config.note_config.note_commit_config.clone());
 
         // Construct an add chip
-        let add_chip = AddChip::<pallas::Base>::construct(config.note_config.add_config, ());
+        let add_chip = AddChip::<CP::CurveScalarField>::construct(config.note_config.add_config, ());
 
         // Construct a merkle chip
         let merkle_chip = MerklePoseidonChip::construct(config.merkle_config);
@@ -190,7 +190,7 @@ fn test_halo2_action_circuit() {
     let (action, action_circuit) = action_info.build(&mut rng);
     let instances = vec![action.to_instance()];
     {
-        let prover = MockProver::<pallas::Base>::run(11, &action_circuit, instances).unwrap();
+        let prover = MockProver::<CP::CurveScalarField>::run(11, &action_circuit, instances).unwrap();
         assert_eq!(prover.verify(), Ok(()));
     }
 
@@ -200,7 +200,7 @@ fn test_halo2_action_circuit() {
         let empty_circuit: ActionCircuit = Default::default();
         let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
         let pk = keygen_pk(&params, vk, &empty_circuit).expect("keygen_pk should not fail");
-        let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
+        let mut transcript = Blake2bWrite::<_, CP::Curve, _>::init(vec![]);
         create_proof(
             &params,
             &pk,

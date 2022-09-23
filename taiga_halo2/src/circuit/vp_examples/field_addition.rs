@@ -38,7 +38,7 @@ impl<CP: CircuitParameters> ValidityPredicateConfig<CP> for FieldAdditionValidit
         self.note_conifg.clone()
     }
 
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
+    fn configure(meta: &mut ConstraintSystem<CP::CurveScalarField>) -> Self {
         let note_conifg = Self::configure_note(meta);
 
         let advices = note_conifg.advices;
@@ -60,8 +60,8 @@ impl<CP: CircuitParameters> FieldAdditionValidityPredicateCircuit<CP> {
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
         let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let a = pallas::Base::random(&mut rng);
-        let b = pallas::Base::random(&mut rng);
+        let a = CP::CurveScalarField::random(&mut rng);
+        let b = CP::CurveScalarField::random(&mut rng);
         Self {
             input_notes,
             output_notes,
@@ -70,7 +70,7 @@ impl<CP: CircuitParameters> FieldAdditionValidityPredicateCircuit<CP> {
         }
     }
 
-    pub fn get_instances(&self) -> Vec<pallas::Base> {
+    pub fn get_instances(&self) -> Vec<CP::CurveScalarField> {
         let mut instances = vec![];
         self.input_notes
             .iter()
@@ -104,7 +104,7 @@ impl<CP: CircuitParameters> ValidityPredicateCircuit<CP> for FieldAdditionValidi
     fn custom_constraints(
         &self,
         config: Self::Config,
-        mut layouter: impl Layouter<pallas::Base>,
+        mut layouter: impl Layouter<CP::CurveScalarField>,
         _input_note_variables: &[SpendNoteVar],
         _output_note_variables: &[OutputNoteVar],
     ) -> Result<(), Error> {
@@ -120,7 +120,7 @@ impl<CP: CircuitParameters> ValidityPredicateCircuit<CP> for FieldAdditionValidi
             Value::known(self.b),
         )?;
 
-        let add_chip = AddChip::<pallas::Base>::construct(config.add_config, ());
+        let add_chip = AddChip::<CP::CurveScalarField>::construct(config.add_config, ());
 
         let c = add_chip.add(layouter.namespace(|| "a + b = c"), &a, &b)?;
 
@@ -142,6 +142,6 @@ fn test_halo2_addition_vp_circuit() {
     let circuit = FieldAdditionValidityPredicateCircuit::dummy(&mut rng);
     let instances = circuit.get_instances();
 
-    let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances]).unwrap();
+    let prover = MockProver::<CP::CurveScalarField>::run(12, &circuit, vec![instances]).unwrap();
     assert_eq!(prover.verify(), Ok(()));
 }

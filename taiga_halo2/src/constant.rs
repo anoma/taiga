@@ -31,9 +31,9 @@ pub const ACTION_OUTPUT_CM_INSTANCE_ROW_IDX: usize = 2;
 lazy_static! {
     pub static ref NOTE_COMMIT_DOMAIN: CommitDomain =
         CommitDomain::new(NOTE_COMMITMENT_PERSONALIZATION);
-    pub static ref NOTE_COMMITMENT_GENERATOR: pallas::Affine = NOTE_COMMIT_DOMAIN.Q().to_affine();
-    pub static ref NOTE_COMMITMENT_R_GENERATOR: pallas::Affine = NOTE_COMMIT_DOMAIN.R().to_affine();
-    // pub static ref R_ZS_AND_US: Vec<(u64, [pallas::Base; H])> =
+    pub static ref NOTE_COMMITMENT_GENERATOR: CP::InnerCurve = NOTE_COMMIT_DOMAIN.Q().to_affine();
+    pub static ref NOTE_COMMITMENT_R_GENERATOR: CP::InnerCurve = NOTE_COMMIT_DOMAIN.R().to_affine();
+    // pub static ref R_ZS_AND_US: Vec<(u64, [CP::CurveScalarField; H])> =
     //     find_zs_and_us(*NOTE_COMMITMENT_R_GENERATOR, NUM_WINDOWS).unwrap();
     // pub static ref R_U: Vec<[[u8; 32]; H]> = R_ZS_AND_US
     //     .iter()
@@ -2958,15 +2958,15 @@ pub const R_Z: [u64; NUM_WINDOWS] = [
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NoteCommitmentHashDomain;
-impl HashDomains<pallas::Affine> for NoteCommitmentHashDomain {
-    fn Q(&self) -> pallas::Affine {
+impl HashDomains<CP::InnerCurve> for NoteCommitmentHashDomain {
+    fn Q(&self) -> CP::InnerCurve {
         *NOTE_COMMITMENT_GENERATOR
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NoteCommitmentDomain;
-impl CommitDomains<pallas::Affine, NoteCommitmentFixedBases, NoteCommitmentHashDomain>
+impl CommitDomains<CP::InnerCurve, NoteCommitmentFixedBases, NoteCommitmentHashDomain>
     for NoteCommitmentDomain
 {
     fn r(&self) -> NoteCommitmentFixedBasesFull {
@@ -2981,7 +2981,7 @@ impl CommitDomains<pallas::Affine, NoteCommitmentFixedBases, NoteCommitmentHashD
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct NoteCommitmentFixedBases;
 
-impl FixedPoints<pallas::Affine> for NoteCommitmentFixedBases {
+impl FixedPoints<CP::InnerCurve> for NoteCommitmentFixedBases {
     type FullScalar = NoteCommitmentFixedBasesFull;
     type ShortScalar = Short;
     type Base = NullifierK;
@@ -2990,10 +2990,10 @@ impl FixedPoints<pallas::Affine> for NoteCommitmentFixedBases {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct NoteCommitmentFixedBasesFull;
 
-impl FixedPoint<pallas::Affine> for NoteCommitmentFixedBasesFull {
+impl FixedPoint<CP::InnerCurve> for NoteCommitmentFixedBasesFull {
     type FixedScalarKind = FullScalar;
 
-    fn generator(&self) -> pallas::Affine {
+    fn generator(&self) -> CP::InnerCurve {
         *NOTE_COMMITMENT_R_GENERATOR
     }
 
@@ -3011,10 +3011,10 @@ impl FixedPoint<pallas::Affine> for NoteCommitmentFixedBasesFull {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct NullifierK;
 
-impl FixedPoint<pallas::Affine> for NullifierK {
+impl FixedPoint<CP::InnerCurve> for NullifierK {
     type FixedScalarKind = BaseFieldElem;
 
-    fn generator(&self) -> pallas::Affine {
+    fn generator(&self) -> CP::InnerCurve {
         *NOTE_COMMITMENT_R_GENERATOR
     }
 
@@ -3032,10 +3032,10 @@ impl FixedPoint<pallas::Affine> for NullifierK {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Short;
 
-impl FixedPoint<pallas::Affine> for Short {
+impl FixedPoint<CP::InnerCurve> for Short {
     type FixedScalarKind = ShortScalar;
 
-    fn generator(&self) -> pallas::Affine {
+    fn generator(&self) -> CP::InnerCurve {
         *NOTE_COMMITMENT_R_GENERATOR
     }
 
@@ -3053,7 +3053,7 @@ impl FixedPoint<pallas::Affine> for Short {
 fn r_u_z_generate() {
     use ff::PrimeField;
     use halo2_gadgets::ecc::chip::constants::find_zs_and_us;
-    let r_zs_and_us: Vec<(u64, [pallas::Base; H])> =
+    let r_zs_and_us: Vec<(u64, [CP::CurveScalarField; H])> =
         find_zs_and_us(*NOTE_COMMITMENT_R_GENERATOR, NUM_WINDOWS).unwrap();
     println!("pub const R_U: [[[u8; 32]; H]; NUM_WINDOWS] = [");
     for u in r_zs_and_us.iter() {

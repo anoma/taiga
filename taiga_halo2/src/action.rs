@@ -36,8 +36,8 @@ pub struct ActionInfo<CP: CircuitParameters> {
 #[derive(Debug, Clone)]
 pub struct SpendInfo<CP: CircuitParameters> {
     note: Note<CP>,
-    auth_path: [(pallas::Base, bool); TAIGA_COMMITMENT_TREE_DEPTH],
-    root: pallas::Base,
+    auth_path: [(CP::CurveScalarField, bool); TAIGA_COMMITMENT_TREE_DEPTH],
+    root: CP::CurveScalarField,
 }
 
 #[derive(Debug, Clone)]
@@ -46,11 +46,11 @@ pub struct OutputInfo<CP: CircuitParameters> {
     addr_recv_vp: ValidityPredicateDescription,
     addr_app_vp: ValidityPredicateDescription,
     value: u64,
-    data: pallas::Base,
+    data: CP::CurveScalarField,
 }
 
 impl<CP: CircuitParameters> ActionInstance<CP> {
-    pub fn to_instance(&self) -> Vec<pallas::Base> {
+    pub fn to_instance(&self) -> Vec<CP::CurveScalarField> {
         vec![self.nf.inner(), self.root, self.cm.get_x()]
     }
 }
@@ -81,7 +81,7 @@ impl<CP: CircuitParameters> ActionInfo<CP> {
             app_vp: self.output.addr_app_vp,
         };
 
-        let note_rcm = pallas::Scalar::random(rng);
+        let note_rcm = CP::InnerCurveScalarField::random(rng);
         let output_note = Note::new(user, app, self.output.value, nf, self.output.data, note_rcm);
 
         let output_cm = output_note.commitment();
@@ -105,7 +105,7 @@ impl<CP: CircuitParameters> SpendInfo<CP> {
     pub fn new(note: Note<CP>, merkle_path: MerklePath) -> Self {
         let cm_node = Node::new(note.commitment().get_x());
         let root = merkle_path.root(cm_node).inner();
-        let auth_path: [(pallas::Base, bool); TAIGA_COMMITMENT_TREE_DEPTH] =
+        let auth_path: [(CP::CurveScalarField, bool); TAIGA_COMMITMENT_TREE_DEPTH] =
             merkle_path.get_path().as_slice().try_into().unwrap();
         Self {
             note,
@@ -121,7 +121,7 @@ impl<CP: CircuitParameters> OutputInfo<CP> {
         addr_recv_vp: ValidityPredicateDescription,
         addr_app_vp: ValidityPredicateDescription,
         value: u64,
-        data: pallas::Base,
+        data: CP::CurveScalarField,
     ) -> Self {
         Self {
             addr_send_closed,
@@ -134,11 +134,11 @@ impl<CP: CircuitParameters> OutputInfo<CP> {
 
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
         use rand::Rng;
-        let addr_send_closed = UserSendAddress::from_closed(pallas::Base::random(&mut rng));
+        let addr_send_closed = UserSendAddress::from_closed(CP::CurveScalarField::random(&mut rng));
         let addr_recv_vp = ValidityPredicateDescription::dummy(&mut rng);
         let addr_app_vp = ValidityPredicateDescription::dummy(&mut rng);
         let value: u64 = rng.gen();
-        let data = pallas::Base::random(rng);
+        let data = CP::CurveScalarField::random(rng);
         Self {
             addr_send_closed,
             addr_recv_vp,

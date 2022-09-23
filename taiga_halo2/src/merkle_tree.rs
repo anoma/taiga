@@ -12,7 +12,7 @@ pub struct MerkleTreeLeafs {
 }
 
 impl MerkleTreeLeafs {
-    pub fn new(values: Vec<pallas::Base>) -> Self {
+    pub fn new(values: Vec<CP::CurveScalarField>) -> Self {
         let nodes_vec = values.iter().map(|x| Node::new(*x)).collect::<Vec<_>>();
         Self { leafs: nodes_vec }
     }
@@ -101,7 +101,7 @@ impl MerklePath {
     }
 
     /// Returns the input parameters for merkle tree gadget.
-    pub fn get_path(&self) -> Vec<(pallas::Base, bool)> {
+    pub fn get_path(&self) -> Vec<(CP::CurveScalarField, bool)> {
         self.auth_path
             .iter()
             .map(|(node, b)| (node.inner(), *b))
@@ -122,21 +122,21 @@ fn add_remaining_addresses(addresses: &Vec<Node>) -> Vec<Node> {
 
 /// A node within the Sapling commitment tree.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct Node(pallas::Base);
+pub struct Node(CP::CurveScalarField);
 
 impl Node {
-    pub fn new(v: pallas::Base) -> Self {
+    pub fn new(v: CP::CurveScalarField) -> Self {
         Self(v)
     }
 
     pub fn rand(rng: &mut impl RngCore) -> Self {
-        Self(pallas::Base::random(rng))
+        Self(CP::CurveScalarField::random(rng))
     }
 
     // TODO: add new from commitment
     // pub fn new_from_cm(note: &Note)-> Self {}
 
-    pub fn inner(&self) -> pallas::Base {
+    pub fn inner(&self) -> CP::CurveScalarField {
         self.0
     }
 
@@ -148,7 +148,7 @@ impl Node {
 impl Default for MerklePath {
     fn default() -> MerklePath {
         let auth_path = (0..TAIGA_COMMITMENT_TREE_DEPTH)
-            .map(|_| (Node::new(pallas::Base::one()), true))
+            .map(|_| (Node::new(CP::CurveScalarField::one()), true))
             .collect();
         Self::from_path(auth_path)
     }

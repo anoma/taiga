@@ -21,7 +21,7 @@ impl<CP: CircuitParameters> NoteCommitment<CP> {
         self.0
     }
 
-    pub fn get_x(&self) -> pallas::Base {
+    pub fn get_x(&self) -> CP::CurveScalarField {
         extract_p(&self.0)
     }
 }
@@ -72,13 +72,13 @@ impl<CP: CircuitParameters> Note<CP> {
     // psi = poseidon_hash(rho, (rcm * generator).x)
     // The psi derivation is different from Orchard, in which psi = blake2b(rho||rcm)
     // Use NOTE_COMMITMENT_R_GENERATOR as generator temporarily
-    fn derive_psi(rho: &pallas::Base, rcm: &pallas::Scalar) -> pallas::Base {
+    fn derive_psi(rho: &CP::CurveScalarField, rcm: &CP::InnerCurveScalarField) -> CP::CurveScalarField {
         let g_rcm_x = extract_p(&(NOTE_COMMITMENT_R_GENERATOR.to_curve() * rcm));
         poseidon_hash(*rho, g_rcm_x)
     }
 
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        let rho = Nullifier::new(pallas::Base::random(&mut rng));
+        let rho = Nullifier::new(CP::CurveScalarField::random(&mut rng));
         Self::dummy_from_rho(rng, rho)
     }
 
@@ -86,8 +86,8 @@ impl<CP: CircuitParameters> Note<CP> {
         let user = User::dummy(&mut rng);
         let app = App::dummy(&mut rng);
         let value: u64 = rng.gen();
-        let data = pallas::Base::random(&mut rng);
-        let rcm = pallas::Scalar::random(&mut rng);
+        let data = CP::CurveScalarField::random(&mut rng);
+        let rcm = CP::InnerCurveScalarField::random(&mut rng);
         let psi = Self::derive_psi(&rho.inner(), &rcm);
         Self {
             user,

@@ -8,9 +8,9 @@ use rand::RngCore;
 #[derive(Debug, Clone)]
 pub enum ValidityPredicateDescription {
     // VK.
-    Uncompressed(VerifyingKey<vesta::Affine>),
+    Uncompressed(VerifyingKey<CP::Curve>),
     // Compress vk into one element.
-    Compressed(pallas::Base),
+    Compressed(CP::CurveScalarField),
 }
 
 impl ValidityPredicateDescription {
@@ -28,18 +28,18 @@ impl ValidityPredicateDescription {
     //     Ok(Self::from_vk(&vk))
     // }
 
-    pub fn from_vk(vk: VerifyingKey<vesta::Affine>) -> Self {
+    pub fn from_vk(vk: VerifyingKey<CP::Curve>) -> Self {
         Self::Uncompressed(vk)
     }
 
-    pub fn get_vk(&self) -> Option<VerifyingKey<vesta::Affine>> {
+    pub fn get_vk(&self) -> Option<VerifyingKey<CP::Curve>> {
         match self {
             ValidityPredicateDescription::Uncompressed(vk) => Some(vk.clone()),
             ValidityPredicateDescription::Compressed(_) => None,
         }
     }
 
-    pub fn get_compressed(&self) -> pallas::Base {
+    pub fn get_compressed(&self) -> CP::CurveScalarField {
         match self {
             ValidityPredicateDescription::Uncompressed(vk) => {
                 let mut hasher = Blake2bParams::new()
@@ -53,13 +53,13 @@ impl ValidityPredicateDescription {
                 hasher.update(s.as_bytes());
 
                 // Hash in final Blake2bState
-                pallas::Base::from_bytes_wide(hasher.finalize().as_array())
+                CP::CurveScalarField::from_bytes_wide(hasher.finalize().as_array())
             }
             ValidityPredicateDescription::Compressed(v) => *v,
         }
     }
 
     pub fn dummy(rng: &mut impl RngCore) -> Self {
-        Self::Compressed(pallas::Base::random(rng))
+        Self::Compressed(CP::CurveScalarField::random(rng))
     }
 }

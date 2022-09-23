@@ -18,7 +18,7 @@ use halo2_proofs::{
 use pasta_curves::{arithmetic::FieldExt, pallas};
 
 type NoteCommitPiece = MessagePiece<
-    pallas::Affine,
+    CP::InnerCurve,
     SinsemillaChip<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
     10,
     253,
@@ -40,11 +40,11 @@ struct Decompose5_5 {
 
 impl Decompose5_5 {
     fn configure(
-        meta: &mut ConstraintSystem<pallas::Base>,
+        meta: &mut ConstraintSystem<CP::CurveScalarField>,
         col_l: Column<Advice>,
         col_m: Column<Advice>,
         col_r: Column<Advice>,
-        two_pow_5: pallas::Base,
+        two_pow_5: CP::CurveScalarField,
     ) -> Self {
         let q_notecommit_5_5 = meta.selector();
 
@@ -77,20 +77,20 @@ impl Decompose5_5 {
 
     #[allow(clippy::type_complexity)]
     fn decompose(
-        lookup_config: &LookupRangeCheckConfig<pallas::Base, 10>,
+        lookup_config: &LookupRangeCheckConfig<CP::CurveScalarField, 10>,
         chip: SinsemillaChip<
             NoteCommitmentHashDomain,
             NoteCommitmentDomain,
             NoteCommitmentFixedBases,
         >,
-        layouter: &mut impl Layouter<pallas::Base>,
-        first: &AssignedCell<pallas::Base, pallas::Base>,
-        second: &AssignedCell<pallas::Base, pallas::Base>,
+        layouter: &mut impl Layouter<CP::CurveScalarField>,
+        first: &AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+        second: &AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     ) -> Result<
         (
             NoteCommitPiece,
-            RangeConstrained<pallas::Base, AssignedCell<pallas::Base, pallas::Base>>,
-            RangeConstrained<pallas::Base, AssignedCell<pallas::Base, pallas::Base>>,
+            RangeConstrained<CP::CurveScalarField, AssignedCell<CP::CurveScalarField, CP::CurveScalarField>>,
+            RangeConstrained<CP::CurveScalarField, AssignedCell<CP::CurveScalarField, CP::CurveScalarField>>,
         ),
         Error,
     > {
@@ -121,10 +121,10 @@ impl Decompose5_5 {
 
     fn assign(
         &self,
-        layouter: &mut impl Layouter<pallas::Base>,
+        layouter: &mut impl Layouter<CP::CurveScalarField>,
         bit10: NoteCommitPiece,
-        bit5: RangeConstrained<pallas::Base, AssignedCell<pallas::Base, pallas::Base>>,
-        bit5_2: RangeConstrained<pallas::Base, AssignedCell<pallas::Base, pallas::Base>>,
+        bit5: RangeConstrained<CP::CurveScalarField, AssignedCell<CP::CurveScalarField, CP::CurveScalarField>>,
+        bit5_2: RangeConstrained<CP::CurveScalarField, AssignedCell<CP::CurveScalarField, CP::CurveScalarField>>,
     ) -> Result<(), Error> {
         layouter.assign_region(
             || "NoteCommit MessagePiece bit10",
@@ -161,11 +161,11 @@ struct BaseCanonicity250_5 {
 
 impl BaseCanonicity250_5 {
     fn configure(
-        meta: &mut ConstraintSystem<pallas::Base>,
+        meta: &mut ConstraintSystem<CP::CurveScalarField>,
         col_l: Column<Advice>,
         col_m: Column<Advice>,
         col_r: Column<Advice>,
-        two_pow_250: pallas::Base,
+        two_pow_250: CP::CurveScalarField,
     ) -> Self {
         let q_base_250_5 = meta.selector();
 
@@ -194,10 +194,10 @@ impl BaseCanonicity250_5 {
 
     fn assign(
         &self,
-        layouter: &mut impl Layouter<pallas::Base>,
-        value: AssignedCell<pallas::Base, pallas::Base>,
+        layouter: &mut impl Layouter<CP::CurveScalarField>,
+        value: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
         v_250: NoteCommitPiece,
-        v_5: RangeConstrained<pallas::Base, AssignedCell<pallas::Base, pallas::Base>>,
+        v_5: RangeConstrained<CP::CurveScalarField, AssignedCell<CP::CurveScalarField, CP::CurveScalarField>>,
     ) -> Result<(), Error> {
         layouter.assign_region(
             || "NoteCommit input value",
@@ -229,11 +229,11 @@ struct BaseCanonicity5 {
 
 impl BaseCanonicity5 {
     fn configure(
-        meta: &mut ConstraintSystem<pallas::Base>,
+        meta: &mut ConstraintSystem<CP::CurveScalarField>,
         col_l: Column<Advice>,
         col_m: Column<Advice>,
         col_r: Column<Advice>,
-        two_pow_5: pallas::Base,
+        two_pow_5: CP::CurveScalarField,
     ) -> Self {
         let q_base_5 = meta.selector();
 
@@ -262,10 +262,10 @@ impl BaseCanonicity5 {
 
     fn assign(
         &self,
-        layouter: &mut impl Layouter<pallas::Base>,
-        value: AssignedCell<pallas::Base, pallas::Base>,
+        layouter: &mut impl Layouter<CP::CurveScalarField>,
+        value: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
         v_tail: NoteCommitPiece,
-        v_5: RangeConstrained<pallas::Base, AssignedCell<pallas::Base, pallas::Base>>,
+        v_5: RangeConstrained<CP::CurveScalarField, AssignedCell<CP::CurveScalarField, CP::CurveScalarField>>,
     ) -> Result<(), Error> {
         layouter.assign_region(
             || "NoteCommit input value",
@@ -300,7 +300,7 @@ pub struct NoteCommitmentChip {
 
 impl NoteCommitmentChip {
     pub fn configure(
-        meta: &mut ConstraintSystem<pallas::Base>,
+        meta: &mut ConstraintSystem<CP::CurveScalarField>,
         advices: [Column<Advice>; 10],
         sinsemilla_config: SinsemillaConfig<
             NoteCommitmentHashDomain,
@@ -308,8 +308,8 @@ impl NoteCommitmentChip {
             NoteCommitmentFixedBases,
         >,
     ) -> NoteCommitmentConfig {
-        let two_pow_5 = pallas::Base::from(1 << 5);
-        let two_pow_250 = pallas::Base::from_u128(1 << 125).square();
+        let two_pow_5 = CP::CurveScalarField::from(1 << 5);
+        let two_pow_250 = CP::CurveScalarField::from_u128(1 << 125).square();
 
         let col_l = advices[6];
         let col_m = advices[7];
@@ -339,18 +339,18 @@ impl NoteCommitmentChip {
 
 #[allow(clippy::too_many_arguments)]
 pub fn note_commitment_gadget(
-    mut layouter: impl Layouter<pallas::Base>,
+    mut layouter: impl Layouter<CP::CurveScalarField>,
     chip: SinsemillaChip<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
     note_commit_chip: NoteCommitmentChip,
-    user_address: AssignedCell<pallas::Base, pallas::Base>,
-    app_address: AssignedCell<pallas::Base, pallas::Base>,
-    data: AssignedCell<pallas::Base, pallas::Base>,
-    rho: AssignedCell<pallas::Base, pallas::Base>,
-    psi: AssignedCell<pallas::Base, pallas::Base>,
-    value: AssignedCell<pallas::Base, pallas::Base>,
-    rcm: ScalarFixed<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
-) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
+    user_address: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    app_address: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    data: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    rho: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    psi: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    value: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
+    rcm: ScalarFixed<CP::InnerCurve, EccChip<NoteCommitmentFixedBases>>,
+) -> Result<Point<CP::InnerCurve, EccChip<NoteCommitmentFixedBases>>, Error> {
     let lookup_config = chip.config().lookup_config();
 
     // `user_0_249` = bits 0..=249 of `user_address`
@@ -411,7 +411,7 @@ pub fn note_commitment_gadget(
         layouter.namespace(|| "d"),
         [
             RangeConstrained::bitrange_of(value.value(), 5..64),
-            RangeConstrained::bitrange_of(Value::known(&pallas::Base::zero()), 0..1),
+            RangeConstrained::bitrange_of(Value::known(&CP::CurveScalarField::zero()), 0..1),
         ],
     )?;
 
@@ -485,7 +485,7 @@ pub struct NoteConfig {
     pub advices: [Column<Advice>; 10],
     pub add_config: AddConfig,
     pub ecc_config: EccConfig<NoteCommitmentFixedBases>,
-    pub poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
+    pub poseidon_config: PoseidonConfig<CP::CurveScalarField, 3, 2>,
     pub sinsemilla_config:
         SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
     pub note_commit_config: NoteCommitmentConfig,
@@ -498,7 +498,7 @@ pub struct NoteChip {
 
 impl NoteChip {
     pub fn configure(
-        meta: &mut ConstraintSystem<pallas::Base>,
+        meta: &mut ConstraintSystem<CP::CurveScalarField>,
         instances: Column<Instance>,
         advices: [Column<Advice>; 10],
     ) -> NoteConfig {
@@ -601,11 +601,11 @@ fn test_halo2_note_commitment_circuit() {
         app: App,
         value: u64,
         rho: Nullifier<CP>,
-        data: pallas::Base,
-        rcm: pallas::Scalar,
+        data: CP::CurveScalarField,
+        rcm: CP::InnerCurveScalarField,
     }
 
-    impl Circuit<pallas::Base> for MyCircuit {
+    impl Circuit<CP::CurveScalarField> for MyCircuit {
         type Config = (NoteCommitmentConfig, EccConfig<NoteCommitmentFixedBases>);
         type FloorPlanner = SimpleFloorPlanner;
 
@@ -613,7 +613,7 @@ fn test_halo2_note_commitment_circuit() {
             Self::default()
         }
 
-        fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self::Config {
+        fn configure(meta: &mut ConstraintSystem<CP::CurveScalarField>) -> Self::Config {
             let advices = [
                 meta.advice_column(),
                 meta.advice_column(),
@@ -681,7 +681,7 @@ fn test_halo2_note_commitment_circuit() {
         fn synthesize(
             &self,
             config: Self::Config,
-            mut layouter: impl Layouter<pallas::Base>,
+            mut layouter: impl Layouter<CP::CurveScalarField>,
         ) -> Result<(), Error> {
             let (note_commit_config, ecc_config) = config;
 
@@ -736,7 +736,7 @@ fn test_halo2_note_commitment_circuit() {
                 assign_free_advice(
                     layouter.namespace(|| "witness value"),
                     note_commit_config.advices[0],
-                    Value::known(pallas::Base::from(note.value)),
+                    Value::known(CP::CurveScalarField::from(note.value)),
                 )?
             };
 
@@ -791,10 +791,10 @@ fn test_halo2_note_commitment_circuit() {
         app: App::dummy(&mut rng),
         value: rng.next_u64(),
         rho: Nullifier::default(),
-        data: pallas::Base::random(&mut rng),
-        rcm: pallas::Scalar::random(&mut rng),
+        data: CP::CurveScalarField::random(&mut rng),
+        rcm: CP::InnerCurveScalarField::random(&mut rng),
     };
 
-    let prover = MockProver::<pallas::Base>::run(11, &circuit, vec![]).unwrap();
+    let prover = MockProver::<CP::CurveScalarField>::run(11, &circuit, vec![]).unwrap();
     assert_eq!(prover.verify(), Ok(()));
 }

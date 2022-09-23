@@ -7,29 +7,29 @@ use pasta_curves::pallas;
 use rand::RngCore;
 
 #[derive(Copy, Debug, Clone)]
-pub struct NullifierDerivingKey(pallas::Base);
+pub struct NullifierDerivingKey(CP::CurveScalarField);
 
 impl NullifierDerivingKey {
-    pub fn new(nk: pallas::Base) -> Self {
+    pub fn new(nk: CP::CurveScalarField) -> Self {
         Self(nk)
     }
 
     pub fn rand(rng: &mut impl RngCore) -> Self {
-        Self(pallas::Base::random(rng))
+        Self(CP::CurveScalarField::random(rng))
     }
 
-    pub fn prf_nf(&self, rho: pallas::Base) -> pallas::Base {
+    pub fn prf_nf(&self, rho: CP::CurveScalarField) -> CP::CurveScalarField {
         prf_nf(self.0, rho)
     }
 
-    pub fn inner(&self) -> pallas::Base {
+    pub fn inner(&self) -> CP::CurveScalarField {
         self.0
     }
 }
 
 impl Default for NullifierDerivingKey {
     fn default() -> NullifierDerivingKey {
-        NullifierDerivingKey(pallas::Base::one())
+        NullifierDerivingKey(CP::CurveScalarField::one())
     }
 }
 
@@ -66,7 +66,7 @@ impl<CP: CircuitParameters> User<CP> {
         }
     }
 
-    pub fn address(&self) -> pallas::Base {
+    pub fn address(&self) -> CP::CurveScalarField {
         // address = Com_r(send_com || recv_vp_hash), use poseidon hash as Com_r
         poseidon_hash(self.send_com.get_closed(), self.recv_vp.get_compressed())
     }
@@ -83,7 +83,7 @@ impl<CP: CircuitParameters> UserSendAddress<CP> {
     }
 
     /// Creates a closed user send address.
-    pub fn from_closed(x: pallas::Base) -> Self {
+    pub fn from_closed(x: CP::CurveScalarField) -> Self {
         UserSendAddress::Closed(x)
     }
 
@@ -101,7 +101,7 @@ impl<CP: CircuitParameters> UserSendAddress<CP> {
         }
     }
 
-    pub fn get_closed(&self) -> pallas::Base {
+    pub fn get_closed(&self) -> CP::CurveScalarField {
         match self {
             UserSendAddress::Closed(v) => *v,
             UserSendAddress::Open(nk, send_vp) => {
@@ -115,9 +115,9 @@ impl<CP: CircuitParameters> UserSendAddress<CP> {
 impl<CP: CircuitParameters> Default for User<CP> {
     fn default() -> User<CP> {
         let nk = NullifierDerivingKey::default();
-        let send_vp = ValidityPredicateDescription::Compressed(pallas::Base::one());
+        let send_vp = ValidityPredicateDescription::Compressed(CP::CurveScalarField::one());
         let send_com = UserSendAddress::from_open(nk, send_vp);
-        let recv_vp = ValidityPredicateDescription::Compressed(pallas::Base::one());
+        let recv_vp = ValidityPredicateDescription::Compressed(CP::CurveScalarField::one());
         User { send_com, recv_vp }
     }
 }
