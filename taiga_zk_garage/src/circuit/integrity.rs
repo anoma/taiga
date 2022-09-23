@@ -233,7 +233,7 @@ where
     CP: CircuitParameters,
 {
     // check user address
-    let nk = note.user.get_nk().unwrap();
+    let nk = note.user.send_com.get_nk().unwrap();
     let nk_var = composer.add_input(nk.inner());
     let send_vp = note.user.send_com.get_send_vp().unwrap();
     let (sender_addr, send_vp_bits) = spent_user_address_integrity_circuit::<CP>(
