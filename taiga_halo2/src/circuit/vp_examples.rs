@@ -74,7 +74,7 @@ impl<CP> ValidityPredicateCircuit<CP> for DummyValidityPredicateCircuit<CP> {
     }
 }
 
-vp_circuit_impl!(DummyValidityPredicateCircuit, CP);
+vp_circuit_impl!(DummyValidityPredicateCircuit<CP>, CP);
 
 #[test]
 fn test_halo2_dummy_vp_circuit() {
