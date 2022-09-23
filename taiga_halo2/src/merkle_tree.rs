@@ -38,7 +38,7 @@ impl MerkleTreeLeafs {
 }
 
 /// A path from a position in a particular commitment tree to the root of that tree.
-/// TODO: do we need add position to use halo2 MerkleCRH?
+/// In Orchard merkle tree, they are using MerkleCRH(layer, left, right), where MerkleCRH is a sinsemilla. We are using poseidon_hash(left, right).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MerklePath {
     auth_path: Vec<(Node, bool)>,
@@ -132,9 +132,6 @@ impl Node {
     pub fn rand(rng: &mut impl RngCore) -> Self {
         Self(pallas::Base::random(rng))
     }
-
-    // TODO: add new from commitment
-    // pub fn new_from_cm(note: &Note)-> Self {}
 
     pub fn inner(&self) -> pallas::Base {
         self.0

@@ -20,7 +20,6 @@ impl<CP: CircuitParameters> App<CP> {
 
     pub fn dummy(rng: &mut impl RngCore) -> Self {
         Self {
-            // TODO: fix this in future.
             app_vp: ValidityPredicateDescription::dummy(rng),
         }
     }

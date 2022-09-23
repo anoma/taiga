@@ -183,7 +183,7 @@ fn test_blinding_circuit() {
     // we blind the VP desc
     let pp = CP::get_pc_setup_params(balance_vp.padded_circuit_size());
     let vp_desc = ValidityPredicateDescription::from_vp(&mut balance_vp, pp).unwrap();
-    let vp_desc_compressed = vp_desc.get_compress();
+    let vp_desc_compressed = vp_desc.get_compressed();
 
     // the blinding circuit, containing the random values used to blind
     let mut blinding_circuit =
