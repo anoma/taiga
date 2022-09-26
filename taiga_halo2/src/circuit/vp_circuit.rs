@@ -17,6 +17,7 @@ use halo2_proofs::{
     circuit::{Layouter, Value},
     plonk::{Circuit, ConstraintSystem, Error},
 };
+use pasta_curves::EpAffine;
 
 use super::circuit_parameters::CircuitParameters;
 
@@ -57,7 +58,8 @@ pub trait ValidityPredicateCircuit<CP: CircuitParameters> {
         mut layouter: impl Layouter<CP::CurveScalarField>,
     ) -> Result<(Vec<SpendNoteVar<CP>>, Vec<OutputNoteVar<CP>>), Error>
     where
-        EccChip<NoteCommitmentFixedBases<CP>>: EccInstructions<EpAffine>,
+        // EccChip<NoteCommitmentFixedBases>: EccInstructions<EpAffine>,
+        EccChip<NoteCommitmentFixedBases>: EccInstructions<<CP as CircuitParameters>::InnerCurve>
     {
         let note_config = config.get_note_config();
         // Load the Sinsemilla generator lookup table used by the whole circuit.
@@ -134,7 +136,8 @@ pub trait ValidityPredicateCircuit<CP: CircuitParameters> {
         mut _layouter: impl Layouter<CP::CurveScalarField>,
         _input_note_variables: &[SpendNoteVar<CP>],
         _output_note_variables: &[OutputNoteVar<CP>],
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error> 
+    where EccChip<NoteCommitmentFixedBases>: EccInstructions<<CP as CircuitParameters>::InnerCurve> {
         Ok(())
     }
 }

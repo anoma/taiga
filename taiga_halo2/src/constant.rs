@@ -2962,54 +2962,42 @@ pub const R_Z: [u64; NUM_WINDOWS] = [
 ];
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct NoteCommitmentHashDomain<C: CurveAffine> {
-    phantom: PhantomData<C>,
-}
+pub struct NoteCommitmentHashDomain;
 
-impl<C: CurveAffine> HashDomains<C> for NoteCommitmentHashDomain<C> {
+impl<C: CurveAffine> HashDomains<C> for NoteCommitmentHashDomain {
     fn Q(&self) -> C {
         *NOTE_COMMITMENT_GENERATOR
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct NoteCommitmentDomain<C: CurveAffine> {
-    phantom: PhantomData<C>,
-}
+pub struct NoteCommitmentDomain;
 
-impl<C: CurveAffine> CommitDomains<C, NoteCommitmentFixedBases<C>, NoteCommitmentHashDomain<C>>
-    for NoteCommitmentDomain<C>
+impl<C: CurveAffine> CommitDomains<C, NoteCommitmentFixedBases, NoteCommitmentHashDomain>
+    for NoteCommitmentDomain
 {
-    fn r(&self) -> NoteCommitmentFixedBasesFull<C> {
-        NoteCommitmentFixedBasesFull {
-            phantom: PhantomData,
-        }
+    fn r(&self) -> NoteCommitmentFixedBasesFull {
+        NoteCommitmentFixedBasesFull
     }
 
-    fn hash_domain(&self) -> NoteCommitmentHashDomain<C> {
-        NoteCommitmentHashDomain {
-            phantom: PhantomData,
-        }
+    fn hash_domain(&self) -> NoteCommitmentHashDomain {
+        NoteCommitmentHashDomain
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct NoteCommitmentFixedBases<C: CurveAffine> {
-    phantom: PhantomData<C>,
-}
+pub struct NoteCommitmentFixedBases;
 
-impl<C: CurveAffine> FixedPoints<C> for NoteCommitmentFixedBases<C> {
-    type FullScalar = NoteCommitmentFixedBasesFull<C>;
-    type ShortScalar = Short<C>;
-    type Base = NullifierK<C>;
+impl<C: CurveAffine> FixedPoints<C> for NoteCommitmentFixedBases {
+    type FullScalar = NoteCommitmentFixedBasesFull;
+    type ShortScalar = Short;
+    type Base = NullifierK;
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct NoteCommitmentFixedBasesFull<C: CurveAffine> {
-    phantom: PhantomData<C>,
-}
+pub struct NoteCommitmentFixedBasesFull;
 
-impl<C: CurveAffine> FixedPoint<C> for NoteCommitmentFixedBasesFull<C> {
+impl<C: CurveAffine> FixedPoint<C> for NoteCommitmentFixedBasesFull {
     type FixedScalarKind = FullScalar;
 
     fn generator(&self) -> C {
@@ -3028,11 +3016,9 @@ impl<C: CurveAffine> FixedPoint<C> for NoteCommitmentFixedBasesFull<C> {
 // NullifierK is used in scalar mul with a base field element.
 // NOTE_COMMITMENT_R_GENERATOR abuse here, replace with a new parameter when needed.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct NullifierK<C: CurveAffine> {
-    phantom: PhantomData<C>,
-}
+pub struct NullifierK;
 
-impl<C: CurveAffine> FixedPoint<C> for NullifierK<C> {
+impl<C: CurveAffine> FixedPoint<C> for NullifierK {
     type FixedScalarKind = BaseFieldElem;
 
     fn generator(&self) -> C {
@@ -3051,11 +3037,9 @@ impl<C: CurveAffine> FixedPoint<C> for NullifierK<C> {
 // We don't need the short?
 // NOTE_COMMITMENT_R_GENERATOR abuse here, replace with a new parameter when needed.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct Short<C: CurveAffine> {
-    phantom: PhantomData<C>,
-}
+pub struct Short;
 
-impl<C: CurveAffine> FixedPoint<C> for Short<C> {
+impl<C: CurveAffine> FixedPoint<C> for Short {
     type FixedScalarKind = ShortScalar;
 
     fn generator(&self) -> C {
