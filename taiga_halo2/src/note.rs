@@ -1,5 +1,6 @@
 use crate::{
     app::App,
+    circuit::circuit_parameters::CircuitParameters,
     constant::{BASE_BITS_NUM, NOTE_COMMITMENT_R_GENERATOR, NOTE_COMMIT_DOMAIN},
     nullifier::Nullifier,
     user::User,
@@ -9,6 +10,7 @@ use bitvec::{array::BitArray, order::Lsb0};
 use core::iter;
 use ff::{Field, PrimeFieldBits};
 use group::{cofactor::CofactorCurveAffine, Group};
+use halo2_proofs::plonk::Circuit;
 use pasta_curves::pallas;
 use rand::{Rng, RngCore};
 
@@ -34,9 +36,9 @@ impl Default for NoteCommitment {
 
 /// A note
 #[derive(Debug, Clone, Default)]
-pub struct Note {
+pub struct Note<CP: CircuitParameters> {
     /// Owner of the note
-    pub user: User,
+    pub user: User<CP>,
     pub app: App,
     pub value: u64,
     /// for NFT or whatever. TODO: to be decided the value format.
@@ -48,9 +50,9 @@ pub struct Note {
     pub rcm: pallas::Scalar,
 }
 
-impl Note {
+impl<CP: CircuitParameters> Note<CP> {
     pub fn new(
-        user: User,
+        user: User<CP>,
         app: App,
         value: u64,
         rho: Nullifier,

@@ -574,6 +574,7 @@ impl NoteChip {
 
 #[test]
 fn test_halo2_note_commitment_circuit() {
+    use crate::circuit::circuit_parameters::DLCircuitParameters as CP;
     use crate::circuit::gadgets::assign_free_advice;
     use crate::note::Note;
     use crate::{app::App, nullifier::Nullifier, user::User};
@@ -596,7 +597,7 @@ fn test_halo2_note_commitment_circuit() {
 
     #[derive(Default)]
     struct MyCircuit {
-        user: User,
+        user: User<CP>,
         app: App,
         value: u64,
         rho: Nullifier,

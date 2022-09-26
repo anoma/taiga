@@ -1,5 +1,6 @@
 use crate::{
     circuit::{
+        circuit_parameters::CircuitParameters,
         gadgets::{assign_free_advice, AddChip, AddConfig, AddInstructions},
         integrity::{OutputNoteVar, SpendNoteVar},
         note_circuit::NoteConfig,
@@ -18,9 +19,9 @@ use rand::RngCore;
 
 // FieldAdditionValidityPredicateCircuit with a trivial constraint a + b = c.
 #[derive(Clone, Debug, Default)]
-struct FieldAdditionValidityPredicateCircuit {
-    input_notes: [Note; NUM_NOTE],
-    output_notes: [Note; NUM_NOTE],
+struct FieldAdditionValidityPredicateCircuit<CP: CircuitParameters> {
+    input_notes: [Note<CP>; NUM_NOTE],
+    output_notes: [Note<CP>; NUM_NOTE],
     a: pallas::Base,
     b: pallas::Base,
 }
@@ -56,7 +57,7 @@ impl ValidityPredicateConfig for FieldAdditionValidityPredicateConfig {
     }
 }
 
-impl FieldAdditionValidityPredicateCircuit {
+impl<CP: CircuitParameters> FieldAdditionValidityPredicateCircuit<CP> {
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
         let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
@@ -88,14 +89,16 @@ impl FieldAdditionValidityPredicateCircuit {
     }
 }
 
-impl ValidityPredicateCircuit for FieldAdditionValidityPredicateCircuit {
+impl<CP: CircuitParameters> ValidityPredicateCircuit<CP>
+    for FieldAdditionValidityPredicateCircuit<CP>
+{
     type Config = FieldAdditionValidityPredicateConfig;
 
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
+    fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE] {
         &self.input_notes
     }
 
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
+    fn get_output_notes(&self) -> &[Note<CP>; NUM_NOTE] {
         &self.output_notes
     }
 
