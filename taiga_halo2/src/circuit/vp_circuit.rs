@@ -139,22 +139,22 @@ macro_rules! vp_circuit_impl {
     ($name:ident) => {
         // (name($name:ident$(<$($generic_type_name:ident),+>)?)) => {
         // something else ?
-        impl Circuit<pallas::Base> for $name {
-            type Config = <Self as ValidityPredicateCircuit>::Config;
+        impl<CP: CircuitParameters> Circuit<CP::CurveScalarField> for $name<CP> {
+            type Config = <Self as ValidityPredicateCircuit<CP>>::Config;
             type FloorPlanner = floor_planner::V1;
 
             fn without_witnesses(&self) -> Self {
                 Self::default()
             }
 
-            fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self::Config {
+            fn configure(meta: &mut ConstraintSystem<CP::CurveScalarField>) -> Self::Config {
                 Self::Config::configure(meta)
             }
 
             fn synthesize(
                 &self,
                 config: Self::Config,
-                mut layouter: impl Layouter<pallas::Base>,
+                mut layouter: impl Layouter<CP::CurveScalarField>,
             ) -> Result<(), Error> {
                 let (input_note_variables, output_note_variables) = self.basic_constraints(
                     config.clone(),
