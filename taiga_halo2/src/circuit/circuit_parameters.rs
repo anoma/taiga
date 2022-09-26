@@ -1,4 +1,4 @@
-use ff::PrimeField;
+use ff::{PrimeField, PrimeFieldBits};
 use halo2_proofs::arithmetic::{CurveAffine, FieldExt};
 use pasta_curves::{pallas, EpAffine, EqAffine};
 
@@ -8,7 +8,7 @@ pub trait CircuitParameters: Copy {
     //   Base Field      Fr            Fq
 
     // Curve
-    type CurveScalarField: PrimeField + FieldExt;
+    type CurveScalarField: PrimeField + FieldExt + PrimeFieldBits;
     type CurveBaseField: PrimeField;
     type Curve: CurveAffine<Base = Self::CurveBaseField>;
     // Inner curve
@@ -19,7 +19,7 @@ pub trait CircuitParameters: Copy {
     type OuterCurve: CurveAffine<Base = Self::CurveScalarField>;
 }
 
-#[derive(Copy, Debug, Clone)]
+#[derive(Copy, Debug, Clone, PartialEq)]
 pub struct DLCircuitParameters {}
 
 impl CircuitParameters for DLCircuitParameters {

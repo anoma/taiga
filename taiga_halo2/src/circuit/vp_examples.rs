@@ -62,7 +62,7 @@ impl<CP: CircuitParameters> DummyValidityPredicateCircuit<CP> {
     }
 }
 
-impl<CP> ValidityPredicateCircuit<CP> for DummyValidityPredicateCircuit<CP> {
+impl<CP: CircuitParameters> ValidityPredicateCircuit<CP> for DummyValidityPredicateCircuit<CP> {
     type Config = DummyValidityPredicateConfig<CP>;
 
     fn get_input_notes(&self) -> &[Note<CP>; NUM_NOTE] {
@@ -74,7 +74,7 @@ impl<CP> ValidityPredicateCircuit<CP> for DummyValidityPredicateCircuit<CP> {
     }
 }
 
-vp_circuit_impl!(DummyValidityPredicateCircuit<CP>, CP);
+vp_circuit_impl!(DummyValidityPredicateCircuit<CP>);
 
 #[test]
 fn test_halo2_dummy_vp_circuit() {

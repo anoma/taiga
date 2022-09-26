@@ -9,7 +9,10 @@ use crate::{
     },
     note::Note,
 };
-use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
+use halo2_gadgets::{
+    ecc::{chip::EccChip, EccInstructions},
+    sinsemilla::chip::SinsemillaChip,
+};
 use halo2_proofs::{
     circuit::{Layouter, Value},
     plonk::{Circuit, ConstraintSystem, Error},
@@ -52,7 +55,10 @@ pub trait ValidityPredicateCircuit<CP: CircuitParameters> {
         &self,
         config: Self::Config,
         mut layouter: impl Layouter<CP::CurveScalarField>,
-    ) -> Result<(Vec<SpendNoteVar<CP>>, Vec<OutputNoteVar<CP>>), Error> {
+    ) -> Result<(Vec<SpendNoteVar<CP>>, Vec<OutputNoteVar<CP>>), Error>
+    where
+        EccChip<NoteCommitmentFixedBases<CP>>: EccInstructions<EpAffine>,
+    {
         let note_config = config.get_note_config();
         // Load the Sinsemilla generator lookup table used by the whole circuit.
         SinsemillaChip::<
@@ -135,7 +141,7 @@ pub trait ValidityPredicateCircuit<CP: CircuitParameters> {
 
 #[macro_export]
 macro_rules! vp_circuit_impl {
-    ($name:ident, $cp:ident) => {
+    (name($name:ident$(<$($generic_type_name:ident),+>)?)) => {
         use halo2_proofs::{
             circuit::Layouter,
             plonk::{Circuit, Error},

@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use crate::circuit::gadgets::{assign_free_advice, AddChip, AddInstructions};
 use crate::circuit::note_circuit::{note_commitment_gadget, NoteCommitmentChip};
 use crate::constant::{
@@ -5,6 +7,7 @@ use crate::constant::{
     NoteCommitmentHashDomain, NullifierK,
 };
 use crate::note::Note;
+use halo2_gadgets::ecc::FixedPoints;
 use halo2_gadgets::{
     ecc::{chip::EccChip, FixedPoint, FixedPointBaseField, Point, ScalarFixed},
     poseidon::{
@@ -17,8 +20,10 @@ use halo2_proofs::{
     circuit::{AssignedCell, Layouter, Value},
     plonk::{Advice, Column, Error, Instance},
 };
+use pasta_curves::EpAffine;
 
 use super::circuit_parameters::CircuitParameters;
+use halo2_gadgets::ecc::EccInstructions;
 
 // cm is a point
 #[allow(clippy::too_many_arguments)]
@@ -26,12 +31,17 @@ pub fn nullifier_circuit<CP: CircuitParameters>(
     mut layouter: impl Layouter<CP::CurveScalarField>,
     poseidon_chip: PoseidonChip<CP::CurveScalarField, 3, 2>,
     add_chip: AddChip<CP::CurveScalarField>,
-    ecc_chip: EccChip<NoteCommitmentFixedBases<CP>>,
+    ecc_chip: EccChip<NoteCommitmentFixedBases<CP::InnerCurve>>,
     nk: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     rho: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     psi: AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
-    cm: &Point<CP::InnerCurve, EccChip<NoteCommitmentFixedBases<CP>>>,
-) -> Result<AssignedCell<CP::CurveScalarField, CP::CurveScalarField>, Error> {
+    cm: &Point<CP::InnerCurve, EccChip<NoteCommitmentFixedBases<EpAffine>>>, // pasta
+) -> Result<AssignedCell<CP::CurveScalarField, CP::CurveScalarField>, Error>
+where
+    NoteCommitmentFixedBases<<CP as CircuitParameters>::InnerCurve>: FixedPoints<EpAffine>,
+    EccChip<NoteCommitmentFixedBases<EpAffine>>:
+        EccInstructions<<CP as CircuitParameters>::InnerCurve>,
+{
     let poseidon_message = [nk, rho];
     let poseidon_hasher =
         PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
@@ -50,7 +60,12 @@ pub fn nullifier_circuit<CP: CircuitParameters>(
     )?;
 
     // TODO: generate a new generator for nullifier_k
-    let nullifier_k = FixedPointBaseField::from_inner(ecc_chip, NullifierK);
+    let nullifier_k = FixedPointBaseField::from_inner(
+        ecc_chip,
+        NullifierK {
+            phantom: PhantomData,
+        },
+    );
     let hash_nk_rho_add_psi_mul_k = nullifier_k.mul(
         layouter.namespace(|| "hash_nk_rho_add_psi * nullifier_k"),
         hash_nk_rho_add_psi,
@@ -76,7 +91,7 @@ pub fn check_spend_note<CP: CircuitParameters>(
     mut layouter: impl Layouter<CP::CurveScalarField>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
-    ecc_chip: EccChip<NoteCommitmentFixedBases<CP>>,
+    ecc_chip: EccChip<NoteCommitmentFixedBases<CP::InnerCurve>>,
     sinsemilla_chip: SinsemillaChip<
         NoteCommitmentHashDomain<CP>,
         NoteCommitmentDomain<CP>,

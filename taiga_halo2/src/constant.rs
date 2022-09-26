@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use group::Curve;
 use halo2_gadgets::{
     ecc::{
@@ -9,6 +11,7 @@ use halo2_gadgets::{
     },
     sinsemilla::{primitives::CommitDomain, CommitDomains, HashDomains},
 };
+use halo2_proofs::arithmetic::CurveAffine;
 use lazy_static::lazy_static;
 use pasta_curves::pallas;
 
@@ -2959,46 +2962,57 @@ pub const R_Z: [u64; NUM_WINDOWS] = [
 ];
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct NoteCommitmentHashDomain<CP: CircuitParameters>;
+pub struct NoteCommitmentHashDomain<C: CurveAffine> {
+    phantom: PhantomData<C>,
+}
 
-impl<CP: CircuitParameters> HashDomains<CP::InnerCurve> for NoteCommitmentHashDomain<CP> {
-    fn Q(&self) -> CP::InnerCurve {
+impl<C: CurveAffine> HashDomains<C> for NoteCommitmentHashDomain<C> {
+    fn Q(&self) -> C {
         *NOTE_COMMITMENT_GENERATOR
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct NoteCommitmentDomain<CP: CircuitParameters>;
+pub struct NoteCommitmentDomain<C: CurveAffine> {
+    phantom: PhantomData<C>,
+}
 
-impl<CP: CircuitParameters>
-    CommitDomains<CP::InnerCurve, NoteCommitmentFixedBases<CP>, NoteCommitmentHashDomain<CP>>
-    for NoteCommitmentDomain<CP>
+impl<C: CurveAffine> CommitDomains<C, NoteCommitmentFixedBases<C>, NoteCommitmentHashDomain<C>>
+    for NoteCommitmentDomain<C>
 {
-    fn r(&self) -> NoteCommitmentFixedBasesFull<CP> {
-        NoteCommitmentFixedBasesFull
+    fn r(&self) -> NoteCommitmentFixedBasesFull<C> {
+        NoteCommitmentFixedBasesFull {
+            phantom: PhantomData,
+        }
     }
 
-    fn hash_domain(&self) -> NoteCommitmentHashDomain<CP> {
-        NoteCommitmentHashDomain
+    fn hash_domain(&self) -> NoteCommitmentHashDomain<C> {
+        NoteCommitmentHashDomain {
+            phantom: PhantomData,
+        }
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct NoteCommitmentFixedBases<CP: CircuitParameters>;
+pub struct NoteCommitmentFixedBases<C: CurveAffine> {
+    phantom: PhantomData<C>,
+}
 
-impl<CP: CircuitParameters> FixedPoints<CP::InnerCurve> for NoteCommitmentFixedBases<CP> {
-    type FullScalar = NoteCommitmentFixedBasesFull<CP>;
-    type ShortScalar = Short<CP>;
-    type Base = NullifierK<CP>;
+impl<C: CurveAffine> FixedPoints<C> for NoteCommitmentFixedBases<C> {
+    type FullScalar = NoteCommitmentFixedBasesFull<C>;
+    type ShortScalar = Short<C>;
+    type Base = NullifierK<C>;
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct NoteCommitmentFixedBasesFull<CP: CircuitParameters>;
+pub struct NoteCommitmentFixedBasesFull<C: CurveAffine> {
+    phantom: PhantomData<C>,
+}
 
-impl<CP: CircuitParameters> FixedPoint<CP::InnerCurve> for NoteCommitmentFixedBasesFull<CP> {
+impl<C: CurveAffine> FixedPoint<C> for NoteCommitmentFixedBasesFull<C> {
     type FixedScalarKind = FullScalar;
 
-    fn generator(&self) -> CP::InnerCurve {
+    fn generator(&self) -> C {
         *NOTE_COMMITMENT_R_GENERATOR
     }
 
@@ -3014,12 +3028,14 @@ impl<CP: CircuitParameters> FixedPoint<CP::InnerCurve> for NoteCommitmentFixedBa
 // NullifierK is used in scalar mul with a base field element.
 // NOTE_COMMITMENT_R_GENERATOR abuse here, replace with a new parameter when needed.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct NullifierK<CP: CircuitParameters>;
+pub struct NullifierK<C: CurveAffine> {
+    phantom: PhantomData<C>,
+}
 
-impl<CP: CircuitParameters> FixedPoint<CP::InnerCurve> for NullifierK<CP> {
+impl<C: CurveAffine> FixedPoint<C> for NullifierK<C> {
     type FixedScalarKind = BaseFieldElem;
 
-    fn generator(&self) -> CP::InnerCurve {
+    fn generator(&self) -> C {
         *NOTE_COMMITMENT_R_GENERATOR
     }
 
@@ -3035,12 +3051,14 @@ impl<CP: CircuitParameters> FixedPoint<CP::InnerCurve> for NullifierK<CP> {
 // We don't need the short?
 // NOTE_COMMITMENT_R_GENERATOR abuse here, replace with a new parameter when needed.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct Short<CP: CircuitParameters>;
+pub struct Short<C: CurveAffine> {
+    phantom: PhantomData<C>,
+}
 
-impl<CP: CircuitParameters> FixedPoint<CP::InnerCurve> for Short<CP> {
+impl<C: CurveAffine> FixedPoint<C> for Short<C> {
     type FixedScalarKind = ShortScalar;
 
-    fn generator(&self) -> CP::InnerCurve {
+    fn generator(&self) -> C {
         *NOTE_COMMITMENT_R_GENERATOR
     }
 

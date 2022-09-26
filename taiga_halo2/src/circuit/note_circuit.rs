@@ -1,7 +1,12 @@
+use std::marker::PhantomData;
+
 use crate::circuit::circuit_parameters::CircuitParameters;
 use crate::circuit::gadgets::{AddChip, AddConfig};
 use crate::constant::{NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain};
 use ff::Field;
+use halo2_gadgets::ecc::FixedPoints;
+use halo2_gadgets::sinsemilla::CommitDomains;
+use halo2_gadgets::sinsemilla::HashDomains;
 use halo2_gadgets::{
     ecc::chip::EccConfig,
     ecc::{chip::EccChip, Point, ScalarFixed},
@@ -19,9 +24,11 @@ use halo2_proofs::{
     poly::Rotation,
 };
 use pasta_curves::arithmetic::FieldExt;
+use pasta_curves::EpAffine;
 
 type NoteCommitPiece<CP: CircuitParameters> = MessagePiece<
-    CP::InnerCurve,
+    EpAffine,
+    // CP::InnerCurve,
     SinsemillaChip<
         NoteCommitmentHashDomain<CP>,
         NoteCommitmentDomain<CP>,
@@ -43,11 +50,12 @@ struct Decompose5_5<CP: CircuitParameters> {
     col_l: Column<Advice>,
     col_m: Column<Advice>,
     col_r: Column<Advice>,
+    phantom: PhantomData<CP>,
 }
 
 impl<CP: CircuitParameters> Decompose5_5<CP> {
     fn configure(
-        meta: &mut ConstraintSystem<CP>,
+        meta: &mut ConstraintSystem<CP::CurveScalarField>,
         col_l: Column<Advice>,
         col_m: Column<Advice>,
         col_r: Column<Advice>,
@@ -79,6 +87,7 @@ impl<CP: CircuitParameters> Decompose5_5<CP> {
             col_l,
             col_m,
             col_r,
+            phantom: PhantomData,
         }
     }
 
@@ -86,11 +95,11 @@ impl<CP: CircuitParameters> Decompose5_5<CP> {
     fn decompose(
         lookup_config: &LookupRangeCheckConfig<CP::CurveScalarField, 10>,
         chip: SinsemillaChip<
-            NoteCommitmentHashDomain<CP>,
-            NoteCommitmentDomain<CP>,
-            NoteCommitmentFixedBases<CP>,
+            NoteCommitmentHashDomain<CP::InnerCurve>,
+            NoteCommitmentDomain<CP::InnerCurve>,
+            NoteCommitmentFixedBases<CP::InnerCurve>,
         >,
-        layouter: &mut impl Layouter<CP>,
+        layouter: &mut impl Layouter<CP::CurveScalarField>,
         first: &AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
         second: &AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,
     ) -> Result<
@@ -134,8 +143,8 @@ impl<CP: CircuitParameters> Decompose5_5<CP> {
 
     fn assign(
         &self,
-        layouter: &mut impl Layouter<CP>,
-        bit10: NoteCommitPiece<CP>,
+        layouter: &mut impl Layouter<CP::CurveScalarField>,
+        bit10: NoteCommitPiece<EpAffine>,
         bit5: RangeConstrained<
             CP::CurveScalarField,
             AssignedCell<CP::CurveScalarField, CP::CurveScalarField>,

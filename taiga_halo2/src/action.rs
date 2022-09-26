@@ -101,7 +101,7 @@ impl<CP: CircuitParameters> ActionInfo<CP> {
 }
 
 impl<CP: CircuitParameters> SpendInfo<CP> {
-    pub fn new(note: Note<CP>, merkle_path: MerklePath<CP>) -> Self {
+    pub fn new(note: Note<CP>, merkle_path: MerklePath<CP::CurveScalarField>) -> Self {
         let cm_node = Node::new(note.commitment().get_x());
         let root = merkle_path.root(cm_node).inner();
         let auth_path: [(CP::CurveScalarField, bool); TAIGA_COMMITMENT_TREE_DEPTH] =

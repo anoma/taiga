@@ -23,7 +23,7 @@ pub struct ActionConfig<CP: CircuitParameters> {
     instances: Column<Instance>,
     advices: [Column<Advice>; 10],
     note_config: NoteConfig<CP>,
-    merkle_config: MerklePoseidonConfig<CP>,
+    merkle_config: MerklePoseidonConfig<CP::CurveScalarField>,
 }
 
 /// The Action circuit.

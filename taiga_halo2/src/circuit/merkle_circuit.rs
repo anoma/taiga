@@ -7,24 +7,25 @@ use halo2_gadgets::{
     utilities::cond_swap::{CondSwapChip, CondSwapConfig, CondSwapInstructions},
 };
 use halo2_proofs::{
+    arithmetic::FieldExt,
     circuit::{AssignedCell, Chip, Layouter, Value},
     plonk::{Advice, Column, ConstraintSystem, Error},
 };
 
 /// MerkleTreeChip based on poseidon hash.
 #[derive(Clone, Debug)]
-pub struct MerklePoseidonConfig<F: Field> {
+pub struct MerklePoseidonConfig<F: Field + FieldExt> {
     advices: [Column<Advice>; 5],
     cond_swap_config: CondSwapConfig,
     poseidon_config: PoseidonConfig<F, 3, 2>,
 }
 
 #[derive(Clone, Debug)]
-pub struct MerklePoseidonChip<F: Field> {
+pub struct MerklePoseidonChip<F: Field + FieldExt> {
     config: MerklePoseidonConfig<F>,
 }
 
-impl<F: Field> Chip<F> for MerklePoseidonChip<F> {
+impl<F: Field + FieldExt> Chip<F> for MerklePoseidonChip<F> {
     type Config = MerklePoseidonConfig<F>;
     type Loaded = ();
 
@@ -37,7 +38,7 @@ impl<F: Field> Chip<F> for MerklePoseidonChip<F> {
     }
 }
 
-impl<F: Field> MerklePoseidonChip<F> {
+impl<F: Field + FieldExt> MerklePoseidonChip<F> {
     pub fn configure(
         meta: &mut ConstraintSystem<F>,
         advices: [Column<Advice>; 5],
@@ -58,13 +59,13 @@ impl<F: Field> MerklePoseidonChip<F> {
 }
 
 #[allow(clippy::type_complexity)]
-pub fn merkle_poseidon_gadget<F: Field>(
+pub fn merkle_poseidon_gadget<F: Field + FieldExt>(
     mut layouter: impl Layouter<F>,
     chip: MerklePoseidonChip<F>,
     note_x: AssignedCell<F, F>,
     merkle_path: &[(F, bool)],
 ) -> Result<AssignedCell<F, F>, Error> {
-    fn swap<F: Field>(
+    fn swap<F: Field + FieldExt>(
         merkle_chip: &MerklePoseidonChip<F>,
         layouter: impl Layouter<F>,
         pair: (AssignedCell<F, F>, Value<F>),
@@ -122,7 +123,7 @@ fn test_halo2_merkle_circuit() {
         merkle_path: MerklePath<F>,
     }
 
-    impl<F: Field> Circuit<F> for MyCircuit<F> {
+    impl<F: Field + FieldExt> Circuit<F> for MyCircuit<F> {
         type Config = MerklePoseidonConfig<F>;
         type FloorPlanner = SimpleFloorPlanner;
 
