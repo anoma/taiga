@@ -120,7 +120,7 @@ where:
 Dummy notes: A note is dummy iff `v = 0`.
 
 Other options of `NoteCom`:
-1. `cm = hash_to_curve(note) + [rcm_note] * H` the same as Sapling or Orchard.
+1. `cm = hash_to_curve(note) + [rcm_note] * H` the same as Sapling or Orchard.(We are using this approach in taiga_halo2 version)
 2. `cm = [CRH(note||0)] G + [rcm] H`. Then `cm` is a point of $E_M$.
 
 For us: knowing the opening of `address` to `desc_vp_addr_send` <=> can derive `nf` for the notes owned by `address`
@@ -139,7 +139,7 @@ where:
 | `PERSONALIZATION_NK` | string bytes | set to `"Taiga_PRF_NK"`|
 | `PRF` | outputs 64 bytes | Blake2b function |
 
-### Nullifier
+### Nullifier(taiga_zk_garage)
 
 The nullifier is derived using:
 ```
@@ -156,7 +156,7 @@ where:
 |`cm` | $\mathbb F_r$ | a commitment from `NoteCom` |
 | `PRF` | $[\mathbb F_r] \to \mathbb F_r$ | Poseidon hash with four input elements|
 
-### Nullifier $-$ designed for other options of `NoteCom` (deprecated)
+### Nullifier(taiga_halo2)
 
 Use the nullifier derivation as in Orchard:
 ```
@@ -272,7 +272,7 @@ Action circuit checks:
 Changes and justifications: 
 - No more `asset_generator`, `cv`, `cdata`, as they are already committed to in `nf` and `cm`.
 
-### VPBlind Circuit
+### VPBlind Circuit(taiga_zk_garage)
 Arithmetized over $\mathbb{F}_q$.
 
 Public inputs (`x`):
@@ -290,6 +290,7 @@ VPBlind checks:
 
 VPBlind ensures that `blind_desc_vp` matches the VP committed to inside `com_vp` hence making usage of the same vp unlinkable across different invocations. 
 
+### TODO: VPBlind Circuit(taiga_halo2)
 ## Taiga Application
 
 Taiga is an application, i.e. an account with VP (in the Anoma sense) and state, on the Anoma ledger. Taiga maintains a **state** and needs to process **transactions**.
