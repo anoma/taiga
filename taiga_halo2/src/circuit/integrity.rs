@@ -1,12 +1,11 @@
 use crate::circuit::gadgets::{assign_free_advice, AddChip, AddInstructions};
 use crate::circuit::note_circuit::{note_commitment_gadget, NoteCommitmentChip};
 use crate::constant::{
-    NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentFixedBasesFull,
-    NoteCommitmentHashDomain, NullifierK,
+    NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain, NullifierK,
 };
 use crate::note::Note;
 use halo2_gadgets::{
-    ecc::{chip::EccChip, FixedPoint, FixedPointBaseField, Point, ScalarFixed},
+    ecc::{chip::EccChip, FixedPointBaseField, Point, ScalarFixed},
     poseidon::{
         primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
         Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
@@ -178,7 +177,7 @@ pub fn check_spend_note(
 
     // Witness psi
     let psi = assign_free_advice(
-        layouter.namespace(|| "witness psi"),
+        layouter.namespace(|| "witness psi_input"),
         advices[0],
         Value::known(spend_note.psi),
     )?;
@@ -274,7 +273,7 @@ pub fn check_output_note(
             Value::known(output_note.user.recv_vp.get_compressed()),
         )?;
 
-        let poseidon_chip = PoseidonChip::construct(poseidon_config.clone());
+        let poseidon_chip = PoseidonChip::construct(poseidon_config);
         let poseidon_hasher =
             PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
                 poseidon_chip,
@@ -314,19 +313,13 @@ pub fn check_output_note(
         Value::known(output_note.rcm),
     )?;
 
-    // Derive psi: psi = poseidon_hash(rho, (rcm * generator).x)
+    // Witness psi
     let psi = {
-        let generator = FixedPoint::from_inner(ecc_chip.clone(), NoteCommitmentFixedBasesFull);
-        let (rcm_mul_gen, _) = generator.mul(layouter.namespace(|| "rcm * generator"), &rcm)?;
-        let rcm_mul_gen_x = rcm_mul_gen.extract_p().inner().clone();
-        let poseidon_chip = PoseidonChip::construct(poseidon_config);
-        let poseidon_hasher =
-            PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
-                poseidon_chip,
-                layouter.namespace(|| "Poseidon init"),
-            )?;
-        let poseidon_message = [old_nf.clone(), rcm_mul_gen_x];
-        poseidon_hasher.hash(layouter.namespace(|| "user_address"), poseidon_message)?
+        assign_free_advice(
+            layouter.namespace(|| "witness psi_output"),
+            advices[0],
+            Value::known(output_note.psi),
+        )?
     };
 
     // Check note commitment

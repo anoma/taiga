@@ -601,6 +601,7 @@ fn test_halo2_note_commitment_circuit() {
         value: u64,
         rho: Nullifier,
         data: pallas::Base,
+        psi: pallas::Base,
         rcm: pallas::Scalar,
     }
 
@@ -696,6 +697,7 @@ fn test_halo2_note_commitment_circuit() {
                 self.value,
                 self.rho,
                 self.data,
+                self.psi,
                 self.rcm,
             );
             // Construct a Sinsemilla chip
@@ -791,6 +793,7 @@ fn test_halo2_note_commitment_circuit() {
         value: rng.next_u64(),
         rho: Nullifier::default(),
         data: pallas::Base::random(&mut rng),
+        psi: pallas::Base::random(&mut rng),
         rcm: pallas::Scalar::random(&mut rng),
     };
 
