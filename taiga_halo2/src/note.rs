@@ -1,14 +1,14 @@
 use crate::{
     app::App,
-    constant::{BASE_BITS_NUM, NOTE_COMMITMENT_R_GENERATOR, NOTE_COMMIT_DOMAIN},
+    constant::{BASE_BITS_NUM, NOTE_COMMIT_DOMAIN},
     nullifier::Nullifier,
     user::User,
-    utils::{extract_p, poseidon_hash},
+    utils::extract_p,
 };
 use bitvec::{array::BitArray, order::Lsb0};
 use core::iter;
 use ff::{Field, PrimeFieldBits};
-use group::{cofactor::CofactorCurveAffine, Group};
+use group::Group;
 use pasta_curves::pallas;
 use rand::{Rng, RngCore};
 
@@ -55,9 +55,9 @@ impl Note {
         value: u64,
         rho: Nullifier,
         data: pallas::Base,
+        psi: pallas::Base,
         rcm: pallas::Scalar,
     ) -> Self {
-        let psi = Self::derive_psi(&rho.inner(), &rcm);
         Self {
             user,
             app,
@@ -67,14 +67,6 @@ impl Note {
             psi,
             rcm,
         }
-    }
-
-    // psi = poseidon_hash(rho, (rcm * generator).x)
-    // The psi derivation is different from Orchard, in which psi = blake2b(rho||rcm)
-    // Use NOTE_COMMITMENT_R_GENERATOR as generator temporarily
-    fn derive_psi(rho: &pallas::Base, rcm: &pallas::Scalar) -> pallas::Base {
-        let g_rcm_x = extract_p(&(NOTE_COMMITMENT_R_GENERATOR.to_curve() * rcm));
-        poseidon_hash(*rho, g_rcm_x)
     }
 
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
@@ -88,7 +80,7 @@ impl Note {
         let value: u64 = rng.gen();
         let data = pallas::Base::random(&mut rng);
         let rcm = pallas::Scalar::random(&mut rng);
-        let psi = Self::derive_psi(&rho.inner(), &rcm);
+        let psi = pallas::Base::random(&mut rng);
         Self {
             user,
             app,
