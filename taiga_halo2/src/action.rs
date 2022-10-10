@@ -15,11 +15,11 @@ use rand::RngCore;
 
 /// The action result used in transaction.
 #[derive(Copy, Debug, Clone)]
-pub struct ActionInstance {
+pub struct ActionInstance<CP: CircuitParameters> {
     /// The root of the note commitment Merkle tree.
     pub root: pallas::Base,
     /// The nullifier of the spend note.
-    pub nf: Nullifier,
+    pub nf: Nullifier<CP>,
     /// The commitment of the output note.
     pub cm: NoteCommitment,
     // TODO: The EncryptedNote.
@@ -43,13 +43,13 @@ pub struct SpendInfo<CP: CircuitParameters> {
 #[derive(Debug, Clone)]
 pub struct OutputInfo<CP: CircuitParameters> {
     addr_send_closed: UserSendAddress<CP>,
-    addr_recv_vp: ValidityPredicateDescription,
-    addr_app_vp: ValidityPredicateDescription,
+    addr_recv_vp: ValidityPredicateDescription<CP>,
+    addr_app_vp: ValidityPredicateDescription<CP>,
     value: u64,
     data: pallas::Base,
 }
 
-impl ActionInstance {
+impl<CP: CircuitParameters> ActionInstance<CP> {
     pub fn to_instance(&self) -> Vec<pallas::Base> {
         vec![self.nf.inner(), self.root, self.cm.get_x()]
     }
@@ -70,7 +70,7 @@ impl<CP: CircuitParameters> ActionInfo<CP> {
         ActionInfo::new(spend_info, output_info)
     }
 
-    pub fn build(self, rng: &mut impl RngCore) -> (ActionInstance, ActionCircuit<CP>) {
+    pub fn build(self, rng: &mut impl RngCore) -> (ActionInstance<CP>, ActionCircuit<CP>) {
         let nf = self.spend.note.get_nf();
 
         let user = User {
@@ -118,8 +118,8 @@ impl<CP: CircuitParameters> SpendInfo<CP> {
 impl<CP: CircuitParameters> OutputInfo<CP> {
     pub fn new(
         addr_send_closed: UserSendAddress<CP>,
-        addr_recv_vp: ValidityPredicateDescription,
-        addr_app_vp: ValidityPredicateDescription,
+        addr_recv_vp: ValidityPredicateDescription<CP>,
+        addr_app_vp: ValidityPredicateDescription<CP>,
         value: u64,
         data: pallas::Base,
     ) -> Self {

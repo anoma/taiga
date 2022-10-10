@@ -39,12 +39,12 @@ impl Default for NoteCommitment {
 pub struct Note<CP: CircuitParameters> {
     /// Owner of the note
     pub user: User<CP>,
-    pub app: App,
+    pub app: App<CP>,
     pub value: u64,
     /// for NFT or whatever. TODO: to be decided the value format.
     pub data: pallas::Base,
     /// old nullifier. Nonce which is a deterministically computed, unique nonce
-    pub rho: Nullifier,
+    pub rho: Nullifier<CP>,
     /// computed from spent_note_nf and rcm by using a PRF
     pub psi: pallas::Base,
     pub rcm: pallas::Scalar,
@@ -53,9 +53,9 @@ pub struct Note<CP: CircuitParameters> {
 impl<CP: CircuitParameters> Note<CP> {
     pub fn new(
         user: User<CP>,
-        app: App,
+        app: App<CP>,
         value: u64,
-        rho: Nullifier,
+        rho: Nullifier<CP>,
         data: pallas::Base,
         rcm: pallas::Scalar,
     ) -> Self {
@@ -84,7 +84,7 @@ impl<CP: CircuitParameters> Note<CP> {
         Self::dummy_from_rho(rng, rho)
     }
 
-    pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
+    pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier<CP>) -> Self {
         let user = User::dummy(&mut rng);
         let app = App::dummy(&mut rng);
         let value: u64 = rng.gen();
@@ -144,7 +144,7 @@ impl<CP: CircuitParameters> Note<CP> {
         NoteCommitment(ret)
     }
 
-    pub fn get_nf(&self) -> Nullifier {
+    pub fn get_nf(&self) -> Nullifier<CP> {
         let nk = self.user.get_nk().unwrap();
         let cm = self.commitment();
         Nullifier::derive_native(&nk, &self.rho.inner(), &self.psi, &cm)

@@ -1,31 +1,33 @@
 use blake2b_simd::Params as Blake2bParams;
 use ff::Field;
 use halo2_proofs::plonk::VerifyingKey;
-use pasta_curves::{arithmetic::FieldExt, pallas, vesta};
+use pasta_curves::arithmetic::FieldExt;
 use rand::RngCore;
+
+use crate::circuit::circuit_parameters::CircuitParameters;
 
 // TODO: add vp_param in future.
 #[derive(Debug, Clone)]
-pub enum ValidityPredicateDescription {
+pub enum ValidityPredicateDescription<CP: CircuitParameters> {
     // VK.
-    Uncompressed(VerifyingKey<vesta::Affine>),
+    Uncompressed(VerifyingKey<CP::Curve>),
     // Compress vk into one element.
-    Compressed(pallas::Base),
+    Compressed(CP::CurveScalarField),
 }
 
-impl ValidityPredicateDescription {
-    pub fn from_vk(vk: VerifyingKey<vesta::Affine>) -> Self {
+impl<CP: CircuitParameters> ValidityPredicateDescription<CP> {
+    pub fn from_vk(vk: VerifyingKey<CP::Curve>) -> Self {
         Self::Uncompressed(vk)
     }
 
-    pub fn get_vk(&self) -> Option<VerifyingKey<vesta::Affine>> {
+    pub fn get_vk(&self) -> Option<VerifyingKey<CP::Curve>> {
         match self {
             ValidityPredicateDescription::Uncompressed(vk) => Some(vk.clone()),
             ValidityPredicateDescription::Compressed(_) => None,
         }
     }
 
-    pub fn get_compressed(&self) -> pallas::Base {
+    pub fn get_compressed(&self) -> CP::CurveScalarField {
         match self {
             ValidityPredicateDescription::Uncompressed(vk) => {
                 let mut hasher = Blake2bParams::new()
@@ -39,13 +41,13 @@ impl ValidityPredicateDescription {
                 hasher.update(s.as_bytes());
 
                 // Hash in final Blake2bState
-                pallas::Base::from_bytes_wide(hasher.finalize().as_array())
+                CP::CurveScalarField::from_bytes_wide(hasher.finalize().as_array())
             }
             ValidityPredicateDescription::Compressed(v) => *v,
         }
     }
 
     pub fn dummy(rng: &mut impl RngCore) -> Self {
-        Self::Compressed(pallas::Base::random(rng))
+        Self::Compressed(CP::CurveScalarField::random(rng))
     }
 }

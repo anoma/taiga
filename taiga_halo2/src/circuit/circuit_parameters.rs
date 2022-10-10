@@ -1,4 +1,5 @@
 use ff::{PrimeField, PrimeFieldBits};
+use halo2_gadgets::poseidon::primitives::{Spec, P128Pow5T3};
 use halo2_proofs::arithmetic::{CurveAffine, FieldExt};
 use pasta_curves::{pallas, EpAffine, EqAffine};
 
@@ -9,6 +10,7 @@ pub trait CircuitParameters: Copy {
 
     // Curve
     type CurveScalarField: PrimeField + FieldExt + PrimeFieldBits;
+    type PoseionParamsCurveScalarField: Spec<Self::CurveScalarField, 3, 2>;
     type CurveBaseField: PrimeField;
     type Curve: CurveAffine<Base = Self::CurveBaseField>;
     // Inner curve
@@ -24,6 +26,7 @@ pub struct DLCircuitParameters {}
 
 impl CircuitParameters for DLCircuitParameters {
     type CurveScalarField = pallas::Base;
+    type PoseionParamsCurveScalarField = P128Pow5T3;
     type CurveBaseField = pallas::Scalar;
     type Curve = EqAffine;
     type InnerCurveScalarField = pallas::Scalar;

@@ -7,14 +7,15 @@ use crate::{
 };
 use group::cofactor::CofactorCurveAffine;
 use pasta_curves::pallas;
+use ff::Field;
 
 /// The unique nullifier.
 #[derive(Copy, Debug, Clone)]
-pub struct Nullifier(pallas::Base);
+pub struct Nullifier<CP: CircuitParameters>(CP::CurveScalarField);
 
-impl<CP: CircuitParameters> Nullifier {
+impl<CP: CircuitParameters> Nullifier<CP> {
     // for test
-    pub fn new(nf: pallas::Base) -> Self {
+    pub fn new(nf: CP::CurveScalarField) -> Self {
         Self(nf)
     }
 
@@ -22,14 +23,14 @@ impl<CP: CircuitParameters> Nullifier {
     // $nf =Extract_P([PRF_{nk}(\rho) + \psi \ mod \ q] * K + cm)$
     pub fn derive_native(
         nk: &NullifierDerivingKey<CP>,
-        rho: &pallas::Base,
-        psi: &pallas::Base,
+        rho: &CP::CurveScalarField,
+        psi: &CP::CurveScalarField,
         cm: &NoteCommitment,
     ) -> Self {
         // TODO: generate a new generator for nullifier_k
         let k = NOTE_COMMITMENT_R_GENERATOR.to_curve();
 
-        Nullifier(extract_p(
+        Nullifier::<CP>(extract_p(
             &(k * mod_r_p(nk.compute_nf(*rho) + psi) + cm.inner()),
         ))
     }
@@ -39,8 +40,8 @@ impl<CP: CircuitParameters> Nullifier {
     }
 }
 
-impl Default for Nullifier {
-    fn default() -> Nullifier {
-        Nullifier(pallas::Base::one())
+impl<CP: CircuitParameters> Default for Nullifier<CP> {
+    fn default() -> Nullifier<CP> {
+        Nullifier(CP::CurveScalarField::one())
     }
 }
