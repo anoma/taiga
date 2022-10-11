@@ -70,7 +70,7 @@ impl ActionInfo {
         ActionInfo::new(spend_info, output_info)
     }
 
-    pub fn build(self, rng: &mut impl RngCore) -> (ActionInstance, ActionCircuit) {
+    pub fn build<R: RngCore>(self, mut rng: R) -> (ActionInstance, ActionCircuit) {
         let nf = self.spend.note.get_nf();
 
         let user = User {
@@ -81,8 +81,17 @@ impl ActionInfo {
             app_vp: self.output.addr_app_vp,
         };
 
-        let note_rcm = pallas::Scalar::random(rng);
-        let output_note = Note::new(user, app, self.output.value, nf, self.output.data, note_rcm);
+        let psi = pallas::Base::random(&mut rng);
+        let note_rcm = pallas::Scalar::random(&mut rng);
+        let output_note = Note::new(
+            user,
+            app,
+            self.output.value,
+            nf,
+            self.output.data,
+            psi,
+            note_rcm,
+        );
 
         let output_cm = output_note.commitment();
         let action = ActionInstance {
