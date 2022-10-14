@@ -2,8 +2,8 @@
 
 ## On a high level
 Users use intents when they want to enact a multiparty state transition. High level description of the flow:
-1. **Create**: User creates an intent publishing the information of what they have and what they want to get in exchange
-2. **Gossip**: The intent goes to the intent gossip network and gossiped around the solver nodes.
+1. **Create**: A user creates an intent publishing the information of what they have and what they want to get
+2. **Gossip**: The intent goes to the intent gossip network and is gossiped around the solver nodes.
 3. **Solve**: Solvers find matching intents and update the intent with partial transactions until the intent is fully satisfied
 4. **Finalize**: When the intent is satisfied, a transaction is created and published on the blockchain
 
