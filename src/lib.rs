@@ -1,7 +1,6 @@
 // Temporary for annoying warning(unused implementation).
 #![allow(dead_code)]
 #![allow(clippy::type_complexity)]
-#![allow(clippy::large_enum_variant)]
 
 pub mod action;
 pub mod app;
@@ -18,3 +17,6 @@ pub mod transaction;
 pub mod user;
 pub mod utils;
 pub mod vp_description;
+
+// #[cfg(test)]
+// pub mod tests;

@@ -74,7 +74,7 @@ impl<CP: CircuitParameters> ActionInfo<CP> {
         rng: &mut impl RngCore,
     ) -> Result<(Action<CP>, ActionCircuit<CP>), TaigaError> {
         let spend_cm = self.spend.note.commitment()?;
-        let nk = self.spend.note.user.get_nk().unwrap();
+        let nk = self.spend.note.user.send_com.get_nk().unwrap();
         let nf = Nullifier::<CP>::derive_native(
             &nk,
             &self.spend.note.rho,
