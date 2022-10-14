@@ -34,6 +34,8 @@ pub struct ActionCircuit {
     pub auth_path: [(pallas::Base, bool); TAIGA_COMMITMENT_TREE_DEPTH],
     /// Output note
     pub output_note: Note,
+    /// random scalar for vet value commitment
+    pub rcv: pallas::Scalar,
 }
 
 impl Circuit<pallas::Base> for ActionCircuit {
@@ -166,6 +168,9 @@ impl Circuit<pallas::Base> for ActionCircuit {
 
             // TODO: add note verifiable encryption
         }
+
+        // Vet value commitment
+        {}
 
         Ok(())
     }
