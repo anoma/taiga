@@ -1,25 +1,58 @@
+# Taiga execution model
+
 ## On a high level
 Users use intents when they want to enact a multiparty state transition. High level description of the flow:
 1. **Create**: User creates an intent publishing the information of what they have and what they want to get in exchange
 2. **Gossip**: The intent goes to the intent gossip network and gossiped around the solver nodes.
-3. **Solve**: Solvers find matching intents and update the intent until it is fully satisfied
+3. **Solve**: Solvers find matching intents and update the intent with partial transactions until the intent is fully satisfied
 4. **Finalize**: When the intent is satisfied, a transaction is created and published on the blockchain
 
 ![img.png](img/exec_high.png)
 
 ### Create an intent
-User intents can be seen as partial transactions. Users send them to the intent gossip network and solvers match them in order to create full transactions and publish them on the blockchain. That implies that users need to give some information to the solvers that is sufficient to create the final transaction (proofs). To make sure that users reveal the minimal amount of private infortmation that is still enough to create the transaction, users create **intermediate notes** from the notes they are willing to spend.
 
-#### Intermediate notes
-An intermediate note is a note with a simplified sending VP. This VP is specific to the intent and includes only the rules from the userVP that are governing the specific state transition (e.g. if Alice wants to trade A for B, she sends her asset A to a temporary intent-specific VP that allows to send A to anyone who sends Alice B). All of the note fields stay the same except:
-- sending VP -> intent-specific VP
-- owner address -> intent-specific owner address (sending VP is used to calculate the owner address, so different VPs correspond to different owner addresses)
+Intents specify ephemeral interests of the users. The step of creating an intent can be split into two:
+1. **Specify an intent**. IntentVP encodes the needs of the user and enforces their satisfaction.
+2. **Create a partial transaction**. 
 
-The creation of the intermediate note can be seen as sending a note to a new address with intent-specific VP.
+**Note**: For simplicity we assume that an intent includes a user sending some of their notes and receving some other notes.
 
-**Note**: as the *nullifier key* **nk** is also used to calculate the address, so the VP doesn't solely define the address
+#### Partial transaction
 
-**Note**: The content of intent-specific VPs in known to the solver because the solver will create the final transaction and some of the proofs
+Two of the main requirements for a transaction to be valid are 
+1. VPs of all involved parties must be satisfied
+2. The transaction must be balanced (the value spent = the value output for all involved token types)
+
+We call a **partial transaction** a state transition where the first requirement is satisfied (all VPs evaluate to True), but the second one isn't (the state transition is unbalanced). Such a state transition isn't a valid transaction and cannot be published on the blockchain, 
+but can be combined with other partial transactions in order to build a valid [balanced] transaction. 
+
+Partial transactions can be created by solvers who match intents and create transactions, and by users who spend their notes as a part of creating an intent.
+
+Note: roles, other users that can create ptx)
+
+In the initial partial transaction the user spends the assets they were willing to spend as a part of the intent and outputs an **intent token note**.
+
+#### Intent tokens
+
+To make sure that the user's intent being satisfied, we use **intent tokens**. Intent token notes is a special type of notes that cannot be spent, but only created. In addition, intent notes can have negative value.
+
+How to use intent tokens:
+1. Spending their notes in the initial partial transaction, the user additionally spends an intent token note of value [1].
+2. The other note of value [-1] balancing this token will only be created if the user's intent is satisfied.
+3. Once all of the parties involved in a state transition create their [-1] intent token notes (meaning that the intents of all of them are satisfied), the transaction is balanced and can be finalized.
+
+If we look at the notes as messages passing from one user (application to another), the first [1] intent note can be seen as message being sent, when the [-1] note will signal that the message has been received. See more about message passing [here](./message_passing.md).
+
+**Note**: instead of using notes of negative value the user can instead spend a [1] intent token note (that haven't been created before) in their initial partial transaction. Once the user's intent is satisfied, a [1] intent note will be output balancing the initial spend.
+
+
+Once intentVP is specified and the initial partial transaction is created, the user sends the intent to the intent gossip network and solvers match intents in order to create full transactions and publish them on the blockchain. That implies that users need to give some information to the solvers that is sufficient to create partial transactions and transactions (proofs)
+
+To Do: what is the minimal amount of information needs to be revealed to the solver in order to match a transaction?
+
+**Note**: intent token notes are not committed to in the global CMtree
+
+**Note**: The content of the intentVP in revealed to the solver so that they can create a transaction that satisfies this VP
 
 ### Solve
 We are considering the model when a solver makes one step at a time and sends the result to the next solver. In practice, the solver can send the result to themselves and continue solving if they have the intent to make the next step. It would be nice to merge the steps into one when possible, but for simplicity we ignore this detail here
