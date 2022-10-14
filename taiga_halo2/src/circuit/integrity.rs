@@ -160,13 +160,11 @@ pub fn check_spend_note(
     )?;
 
     // Witness value(u64)
-    let value = {
-        assign_free_advice(
-            layouter.namespace(|| "witness value"),
-            advices[0],
-            Value::known(pallas::Base::from(spend_note.value)),
-        )?
-    };
+    let value = assign_free_advice(
+        layouter.namespace(|| "witness value"),
+        advices[0],
+        Value::known(pallas::Base::from(spend_note.value)),
+    )?;
 
     // Witness rho
     let rho = assign_free_advice(
@@ -189,6 +187,13 @@ pub fn check_spend_note(
         Value::known(spend_note.rcm),
     )?;
 
+    // Witness is_normal
+    let is_normal = assign_free_advice(
+        layouter.namespace(|| "witness is_normal"),
+        advices[0],
+        Value::known(pallas::Base::from(spend_note.is_normal)),
+    )?;
+
     // Check note commitment
     let cm = note_commitment_gadget(
         layouter.namespace(|| "Hash NoteCommit pieces"),
@@ -202,6 +207,7 @@ pub fn check_spend_note(
         psi.clone(),
         value.clone(),
         rcm,
+        is_normal,
     )?;
 
     // Generate nullifier
@@ -298,13 +304,11 @@ pub fn check_output_note(
     )?;
 
     // Witness value(u64)
-    let value = {
-        assign_free_advice(
-            layouter.namespace(|| "witness value"),
-            advices[0],
-            Value::known(pallas::Base::from(output_note.value)),
-        )?
-    };
+    let value = assign_free_advice(
+        layouter.namespace(|| "witness value"),
+        advices[0],
+        Value::known(pallas::Base::from(output_note.value)),
+    )?;
 
     // Witness rcm
     let rcm = ScalarFixed::new(
@@ -314,13 +318,18 @@ pub fn check_output_note(
     )?;
 
     // Witness psi
-    let psi = {
-        assign_free_advice(
-            layouter.namespace(|| "witness psi_output"),
-            advices[0],
-            Value::known(output_note.psi),
-        )?
-    };
+    let psi = assign_free_advice(
+        layouter.namespace(|| "witness psi_output"),
+        advices[0],
+        Value::known(output_note.psi),
+    )?;
+
+    // Witness is_normal
+    let is_normal = assign_free_advice(
+        layouter.namespace(|| "witness is_normal"),
+        advices[0],
+        Value::known(pallas::Base::from(output_note.is_normal)),
+    )?;
 
     // Check note commitment
     let cm = note_commitment_gadget(
@@ -335,6 +344,7 @@ pub fn check_output_note(
         psi,
         value.clone(),
         rcm,
+        is_normal,
     )?;
 
     // Public cm

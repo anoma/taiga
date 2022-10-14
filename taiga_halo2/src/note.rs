@@ -46,9 +46,12 @@ pub struct Note {
     /// computed from spent_note_nf and rcm by using a PRF
     pub psi: pallas::Base,
     pub rcm: pallas::Scalar,
+    /// The non-normal note won't be stored in commitment tree.
+    pub is_normal: bool,
 }
 
 impl Note {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         user: User,
         app: App,
@@ -57,6 +60,7 @@ impl Note {
         data: pallas::Base,
         psi: pallas::Base,
         rcm: pallas::Scalar,
+        is_normal: bool,
     ) -> Self {
         Self {
             user,
@@ -66,6 +70,7 @@ impl Note {
             rho,
             psi,
             rcm,
+            is_normal,
         }
     }
 
@@ -89,10 +94,11 @@ impl Note {
             rho,
             psi,
             rcm,
+            is_normal: true,
         }
     }
 
-    // cm = SinsemillaCommit^rcm(user_address || app_address || data || rho || psi || value)
+    // cm = SinsemillaCommit^rcm(user_address || app_address || data || rho || psi || is_normal || value)
     pub fn commitment(&self) -> NoteCommitment {
         let user_address = self.user.address();
         let app_address = self.app.address();
@@ -123,6 +129,7 @@ impl Note {
                             .take(BASE_BITS_NUM),
                     )
                     .chain(self.psi.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
+                    .chain([self.is_normal])
                     .chain(
                         BitArray::<_, Lsb0>::new(self.value.to_le())
                             .iter()

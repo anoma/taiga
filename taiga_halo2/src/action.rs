@@ -47,6 +47,7 @@ pub struct OutputInfo {
     addr_app_vp: ValidityPredicateDescription,
     value: u64,
     data: pallas::Base,
+    is_normal: bool,
 }
 
 impl ActionInstance {
@@ -91,6 +92,7 @@ impl ActionInfo {
             self.output.data,
             psi,
             note_rcm,
+            self.output.is_normal,
         );
 
         let output_cm = output_note.commitment();
@@ -100,10 +102,13 @@ impl ActionInfo {
             root: self.spend.root,
         };
 
+        let rcv = pallas::Scalar::random(&mut rng);
+
         let action_circuit = ActionCircuit {
             spend_note: self.spend.note,
             auth_path: self.spend.auth_path,
             output_note,
+            rcv,
         };
 
         (action, action_circuit)
@@ -131,6 +136,7 @@ impl OutputInfo {
         addr_app_vp: ValidityPredicateDescription,
         value: u64,
         data: pallas::Base,
+        is_normal: bool,
     ) -> Self {
         Self {
             addr_send_closed,
@@ -138,6 +144,7 @@ impl OutputInfo {
             addr_app_vp,
             value,
             data,
+            is_normal,
         }
     }
 
@@ -154,6 +161,7 @@ impl OutputInfo {
             addr_app_vp,
             value,
             data,
+            is_normal: true,
         }
     }
 }
