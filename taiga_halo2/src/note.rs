@@ -1,14 +1,14 @@
 use crate::{
-    app::App,
-    constant::{BASE_BITS_NUM, NOTE_COMMIT_DOMAIN},
+    constant::{BASE_BITS_NUM, NOTE_COMMITMENT_R_GENERATOR, NOTE_COMMIT_DOMAIN},
     nullifier::Nullifier,
+    token::Token,
     user::User,
-    utils::extract_p,
+    utils::{extract_p, poseidon_hash},
 };
 use bitvec::{array::BitArray, order::Lsb0};
 use core::iter;
 use ff::{Field, PrimeFieldBits};
-use group::Group;
+use group::{cofactor::CofactorCurveAffine, Group};
 use pasta_curves::pallas;
 use rand::{Rng, RngCore};
 
@@ -37,7 +37,7 @@ impl Default for NoteCommitment {
 pub struct Note {
     /// Owner of the note
     pub user: User,
-    pub app: App,
+    pub token: Token,
     pub value: u64,
     /// for NFT or whatever. TODO: to be decided the value format.
     pub data: pallas::Base,
@@ -51,22 +51,30 @@ pub struct Note {
 impl Note {
     pub fn new(
         user: User,
-        app: App,
+        token: Token,
         value: u64,
         rho: Nullifier,
         data: pallas::Base,
-        psi: pallas::Base,
         rcm: pallas::Scalar,
     ) -> Self {
+        let psi = Self::derive_psi(&rho.inner(), &rcm);
         Self {
             user,
-            app,
+            token,
             value,
             data,
             rho,
             psi,
             rcm,
         }
+    }
+
+    // psi = poseidon_hash(rho, (rcm * generator).x)
+    // The psi derivation is different from Orchard, in which psi = blake2b(rho||rcm)
+    // Use NOTE_COMMITMENT_R_GENERATOR as generator temporarily
+    fn derive_psi(rho: &pallas::Base, rcm: &pallas::Scalar) -> pallas::Base {
+        let g_rcm_x = extract_p(&(NOTE_COMMITMENT_R_GENERATOR.to_curve() * rcm));
+        poseidon_hash(*rho, g_rcm_x)
     }
 
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
@@ -76,14 +84,14 @@ impl Note {
 
     pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
         let user = User::dummy(&mut rng);
-        let app = App::dummy(&mut rng);
+        let token = Token::dummy(&mut rng);
         let value: u64 = rng.gen();
         let data = pallas::Base::random(&mut rng);
         let rcm = pallas::Scalar::random(&mut rng);
-        let psi = pallas::Base::random(&mut rng);
+        let psi = Self::derive_psi(&rho.inner(), &rcm);
         Self {
             user,
-            app,
+            token,
             value,
             data,
             rho,
@@ -92,10 +100,10 @@ impl Note {
         }
     }
 
-    // cm = SinsemillaCommit^rcm(user_address || app_address || data || rho || psi || value)
+    // cm = SinsemillaCommit^rcm(user_address || token_address || data || rho || psi || value)
     pub fn commitment(&self) -> NoteCommitment {
         let user_address = self.user.address();
-        let app_address = self.app.address();
+        let token_address = self.token.address();
         let ret = NOTE_COMMIT_DOMAIN
             .commit(
                 iter::empty()
@@ -107,7 +115,7 @@ impl Note {
                             .take(BASE_BITS_NUM),
                     )
                     .chain(
-                        app_address
+                        token_address
                             .to_le_bits()
                             .iter()
                             .by_vals()

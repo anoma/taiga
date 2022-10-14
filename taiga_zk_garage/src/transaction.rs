@@ -137,7 +137,7 @@ impl<CP: CircuitParameters> VPCheck<CP> {
         let vp_setup = CP::get_pc_setup_params(vp_circuit_size);
         // Generate blinding circuit for vp
         let vp_desc = ValidityPredicateDescription::from_vp(vp, vp_setup)?;
-        // let vp_desc_compressed = vp_desc.get_compressed();
+        // let vp_desc_compressed = vp_desc.get_compress();
         let mut blinding_circuit =
             BlindingCircuit::<CP>::new(rng, vp_desc, vp_setup, vp_circuit_size)?;
 

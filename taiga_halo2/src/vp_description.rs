@@ -14,6 +14,20 @@ pub enum ValidityPredicateDescription {
 }
 
 impl ValidityPredicateDescription {
+    // pub fn from_vp<VP>(
+    //     vp: &mut VP,
+    //     vp_setup: &<CP::CurvePC as PolynomialCommitment<
+    //         CP::CurveScalarField,
+    //         DensePolynomial<CP::CurveScalarField>,
+    //     >>::UniversalParams,
+    // ) -> Result<Self, Error>
+    // where
+    //     VP: ValidityPredicate<CP>,
+    // {
+    //     let vk = vp.get_desc_vp(vp_setup)?;
+    //     Ok(Self::from_vk(&vk))
+    // }
+
     pub fn from_vk(vk: VerifyingKey<vesta::Affine>) -> Self {
         Self::Uncompressed(vk)
     }

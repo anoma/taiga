@@ -79,6 +79,7 @@ impl<CP: CircuitParameters> User<CP> {
         let send_com = UserSendAddress::<CP>::from_open(nk, send_vp);
         Self {
             send_com,
+            // TODO: fix this in future.
             recv_vp: ValidityPredicateDescription::dummy(rng),
         }
     }

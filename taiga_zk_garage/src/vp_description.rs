@@ -15,7 +15,7 @@ use rand::RngCore;
 #[derive(Debug, Clone)]
 pub enum ValidityPredicateDescription<CP: CircuitParameters> {
     // Pack vk into CurveBaseField array.
-    Uncompressed(Vec<CP::CurveBaseField>),
+    Packed(Vec<CP::CurveBaseField>),
     // Compress(Com_q) vk into one CurveBaseField element.
     Compressed(CP::CurveBaseField),
 }
@@ -37,19 +37,19 @@ impl<CP: CircuitParameters> ValidityPredicateDescription<CP> {
 
     pub fn from_vk(vk: &VerifierKey<CP::CurveScalarField, CP::CurvePC>) -> Self {
         let vp_desc = CP::pack_vk(vk);
-        Self::Uncompressed(vp_desc)
+        Self::Packed(vp_desc)
     }
 
     pub fn get_pack(&self) -> Option<Vec<CP::CurveBaseField>> {
         match self {
-            ValidityPredicateDescription::Uncompressed(v) => Some(v.clone()),
+            ValidityPredicateDescription::Packed(v) => Some(v.clone()),
             ValidityPredicateDescription::Compressed(_) => None,
         }
     }
 
-    pub fn get_compressed(&self) -> CP::CurveBaseField {
+    pub fn get_compress(&self) -> CP::CurveBaseField {
         match self {
-            ValidityPredicateDescription::Uncompressed(v) => {
+            ValidityPredicateDescription::Packed(v) => {
                 assert_eq!(v.len(), 40);
                 let poseidon_param: PoseidonConstants<CP::CurveBaseField> =
                     PoseidonConstants::generate::<WIDTH_9>();
@@ -84,6 +84,6 @@ impl<CP: CircuitParameters> ValidityPredicateDescription<CP> {
     }
 
     pub fn to_bits(&self) -> Vec<bool> {
-        self.get_compressed().into_repr().to_bits_le()
+        self.get_compress().into_repr().to_bits_le()
     }
 }

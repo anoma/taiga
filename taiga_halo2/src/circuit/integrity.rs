@@ -1,11 +1,12 @@
 use crate::circuit::gadgets::{assign_free_advice, AddChip, AddInstructions};
 use crate::circuit::note_circuit::{note_commitment_gadget, NoteCommitmentChip};
 use crate::constant::{
-    NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain, NullifierK,
+    NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentFixedBasesFull,
+    NoteCommitmentHashDomain, NullifierK,
 };
 use crate::note::Note;
 use halo2_gadgets::{
-    ecc::{chip::EccChip, FixedPointBaseField, Point, ScalarFixed},
+    ecc::{chip::EccChip, FixedPoint, FixedPointBaseField, Point, ScalarFixed},
     poseidon::{
         primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
         Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
@@ -62,7 +63,7 @@ pub fn nullifier_circuit(
 #[derive(Debug)]
 pub struct SpendNoteVar {
     pub user_address: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_address: AssignedCell<pallas::Base, pallas::Base>,
+    pub token_address: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub data: AssignedCell<pallas::Base, pallas::Base>,
     pub nf: AssignedCell<pallas::Base, pallas::Base>,
@@ -145,11 +146,11 @@ pub fn check_spend_note(
         (user_address, nk_var)
     };
 
-    // Witness app_address
-    let app_address = assign_free_advice(
-        layouter.namespace(|| "witness app_address"),
+    // Witness token_address
+    let token_address = assign_free_advice(
+        layouter.namespace(|| "witness token_address"),
         advices[0],
-        Value::known(spend_note.app.address()),
+        Value::known(spend_note.token.address()),
     )?;
 
     // Witness data
@@ -177,7 +178,7 @@ pub fn check_spend_note(
 
     // Witness psi
     let psi = assign_free_advice(
-        layouter.namespace(|| "witness psi_input"),
+        layouter.namespace(|| "witness psi"),
         advices[0],
         Value::known(spend_note.psi),
     )?;
@@ -196,7 +197,7 @@ pub fn check_spend_note(
         ecc_chip.clone(),
         note_commit_chip,
         user_address.clone(),
-        app_address.clone(),
+        token_address.clone(),
         data.clone(),
         rho.clone(),
         psi.clone(),
@@ -222,7 +223,7 @@ pub fn check_spend_note(
 
     Ok(SpendNoteVar {
         user_address,
-        app_address,
+        token_address,
         value,
         data,
         nf,
@@ -234,7 +235,7 @@ pub fn check_spend_note(
 #[derive(Debug)]
 pub struct OutputNoteVar {
     pub user_address: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_address: AssignedCell<pallas::Base, pallas::Base>,
+    pub token_address: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub data: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
@@ -273,7 +274,7 @@ pub fn check_output_note(
             Value::known(output_note.user.recv_vp.get_compressed()),
         )?;
 
-        let poseidon_chip = PoseidonChip::construct(poseidon_config);
+        let poseidon_chip = PoseidonChip::construct(poseidon_config.clone());
         let poseidon_hasher =
             PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
                 poseidon_chip,
@@ -283,11 +284,11 @@ pub fn check_output_note(
         poseidon_hasher.hash(layouter.namespace(|| "user_address"), poseidon_message)?
     };
 
-    // Witness app_address
-    let app_address = assign_free_advice(
-        layouter.namespace(|| "witness app_address"),
+    // Witness token_address
+    let token_address = assign_free_advice(
+        layouter.namespace(|| "witness token_address"),
         advices[0],
-        Value::known(output_note.app.address()),
+        Value::known(output_note.token.address()),
     )?;
 
     // Witness data
@@ -313,13 +314,19 @@ pub fn check_output_note(
         Value::known(output_note.rcm),
     )?;
 
-    // Witness psi
+    // Derive psi: psi = poseidon_hash(rho, (rcm * generator).x)
     let psi = {
-        assign_free_advice(
-            layouter.namespace(|| "witness psi_output"),
-            advices[0],
-            Value::known(output_note.psi),
-        )?
+        let generator = FixedPoint::from_inner(ecc_chip.clone(), NoteCommitmentFixedBasesFull);
+        let (rcm_mul_gen, _) = generator.mul(layouter.namespace(|| "rcm * generator"), &rcm)?;
+        let rcm_mul_gen_x = rcm_mul_gen.extract_p().inner().clone();
+        let poseidon_chip = PoseidonChip::construct(poseidon_config);
+        let poseidon_hasher =
+            PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
+                poseidon_chip,
+                layouter.namespace(|| "Poseidon init"),
+            )?;
+        let poseidon_message = [old_nf.clone(), rcm_mul_gen_x];
+        poseidon_hasher.hash(layouter.namespace(|| "user_address"), poseidon_message)?
     };
 
     // Check note commitment
@@ -329,7 +336,7 @@ pub fn check_output_note(
         ecc_chip,
         note_commit_chip,
         user_address.clone(),
-        app_address.clone(),
+        token_address.clone(),
         data.clone(),
         old_nf,
         psi,
@@ -343,7 +350,7 @@ pub fn check_output_note(
 
     Ok(OutputNoteVar {
         user_address,
-        app_address,
+        token_address,
         value,
         data,
         cm,

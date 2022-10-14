@@ -344,7 +344,7 @@ pub fn note_commitment_gadget(
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
     note_commit_chip: NoteCommitmentChip,
     user_address: AssignedCell<pallas::Base, pallas::Base>,
-    app_address: AssignedCell<pallas::Base, pallas::Base>,
+    token_address: AssignedCell<pallas::Base, pallas::Base>,
     data: AssignedCell<pallas::Base, pallas::Base>,
     rho: AssignedCell<pallas::Base, pallas::Base>,
     psi: AssignedCell<pallas::Base, pallas::Base>,
@@ -360,20 +360,20 @@ pub fn note_commitment_gadget(
         [RangeConstrained::bitrange_of(user_address.value(), 0..250)],
     )?;
 
-    // `a` = (bits 250..=255 of user) || (bits 0..=4 of app)
-    let (a, user_tail_bit5, app_pre_bit5) = Decompose5_5::decompose(
+    // `a` = (bits 250..=255 of user) || (bits 0..=4 of token)
+    let (a, user_tail_bit5, token_pre_bit5) = Decompose5_5::decompose(
         &lookup_config,
         chip.clone(),
         &mut layouter,
         &user_address,
-        &app_address,
+        &token_address,
     )?;
 
-    // `app_5_254` = bits 5..=254 of `app`
-    let app_5_254 = MessagePiece::from_subpieces(
+    // `token_5_254` = bits 5..=254 of `token`
+    let token_5_254 = MessagePiece::from_subpieces(
         chip.clone(),
-        layouter.namespace(|| "app_5_254"),
-        [RangeConstrained::bitrange_of(app_address.value(), 5..255)],
+        layouter.namespace(|| "token_5_254"),
+        [RangeConstrained::bitrange_of(token_address.value(), 5..255)],
     )?;
 
     // `data_0_249` = bits 0..=249 of `data`
@@ -415,14 +415,14 @@ pub fn note_commitment_gadget(
         ],
     )?;
 
-    // cm = NoteCommit^rcm(user_address || app_address || data || rho || psi || value)
+    // cm = NoteCommit^rcm(user_address || token_address || data || rho || psi || value)
     let (cm, _zs) = {
         let message = Message::from_pieces(
             chip.clone(),
             vec![
                 user_0_249.clone(),
                 a.clone(),
-                app_5_254.clone(),
+                token_5_254.clone(),
                 data_0_249.clone(),
                 b.clone(),
                 rho_5_254.clone(),
@@ -446,7 +446,7 @@ pub fn note_commitment_gadget(
         &mut layouter,
         a,
         user_tail_bit5.clone(),
-        app_pre_bit5.clone(),
+        token_pre_bit5.clone(),
     )?;
 
     cfg.decompose5_5.assign(
@@ -466,7 +466,7 @@ pub fn note_commitment_gadget(
     cfg.base_canonicity_250_5
         .assign(&mut layouter, user_address, user_0_249, user_tail_bit5)?;
     cfg.base_canonicity_5
-        .assign(&mut layouter, app_address, app_5_254, app_pre_bit5)?;
+        .assign(&mut layouter, token_address, token_5_254, token_pre_bit5)?;
     cfg.base_canonicity_250_5
         .assign(&mut layouter, data, data_0_249, data_tail_bit5)?;
     cfg.base_canonicity_5
@@ -576,7 +576,7 @@ impl NoteChip {
 fn test_halo2_note_commitment_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use crate::note::Note;
-    use crate::{app::App, nullifier::Nullifier, user::User};
+    use crate::{nullifier::Nullifier, token::Token, user::User};
     use ff::Field;
     use group::Curve;
     use halo2_gadgets::{
@@ -597,11 +597,10 @@ fn test_halo2_note_commitment_circuit() {
     #[derive(Default)]
     struct MyCircuit {
         user: User,
-        app: App,
+        token: Token,
         value: u64,
         rho: Nullifier,
         data: pallas::Base,
-        psi: pallas::Base,
         rcm: pallas::Scalar,
     }
 
@@ -693,11 +692,10 @@ fn test_halo2_note_commitment_circuit() {
             >::load(note_commit_config.sinsemilla_config.clone(), &mut layouter)?;
             let note = Note::new(
                 self.user.clone(),
-                self.app.clone(),
+                self.token.clone(),
                 self.value,
                 self.rho,
                 self.data,
-                self.psi,
                 self.rcm,
             );
             // Construct a Sinsemilla chip
@@ -717,11 +715,11 @@ fn test_halo2_note_commitment_circuit() {
                 Value::known(note.user.address()),
             )?;
 
-            // Witness app
-            let app_address = assign_free_advice(
+            // Witness token
+            let token_address = assign_free_advice(
                 layouter.namespace(|| "witness rho"),
                 note_commit_config.advices[0],
-                Value::known(note.app.address()),
+                Value::known(note.token.address()),
             )?;
 
             // Witness data
@@ -767,7 +765,7 @@ fn test_halo2_note_commitment_circuit() {
                 ecc_chip.clone(),
                 note_commit_chip,
                 user_address,
-                app_address,
+                token_address,
                 data,
                 rho,
                 psi,
@@ -789,11 +787,10 @@ fn test_halo2_note_commitment_circuit() {
     let mut rng = OsRng;
     let circuit = MyCircuit {
         user: User::dummy(&mut rng),
-        app: App::dummy(&mut rng),
+        token: Token::dummy(&mut rng),
         value: rng.next_u64(),
         rho: Nullifier::default(),
         data: pallas::Base::random(&mut rng),
-        psi: pallas::Base::random(&mut rng),
         rcm: pallas::Scalar::random(&mut rng),
     };
 
