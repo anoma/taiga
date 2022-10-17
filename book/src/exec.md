@@ -87,11 +87,50 @@ After the solver matches the intents, two cases are possible:
 
 After the intents are matched with satisfaction of all involved parties, the transaction is published on the blockchain. The local CMTree and all of the proofs created are published on the blockchain.
 
-### Example with a 3-party bartering cycle
+### Examples
 
-#### 3-party exchange
+#### Three-party barter
+
+On the diagram below you can see an example of three-party bartering cycle in the execution model described in this document.
+
+**Step 1**: The users (Alice, Bob, and Charlie) define their intents and create intentVPs. It doesn't have to happen at the same time for all users, but for simplicity we describe it as one step. The intentVPs of all three users have the same structure: users are willing to spend their asset (Alice - a star, Bob - a dolphin, Charlie - a tree) in exchange for some other asset. Once the user receives the desired asset, an intent token note of value [-1] is emitted. In addition to that, all three users also create their initial partial transactions spending the asset they are ready to give away (Alice ptx, Bob ptx, and Charlie ptx).
+
+**Step 2**: A solver sees Alice's ptx and Bob's ptx and matches them together, and sends the rest further. 
+
+Total balance:
+|token|spent|output|spent - output|
+|-|-|-|-|
+|star NFT|1|0|1|
+|blue dolphin NFT|1|0|1|
+|blue intent token|[1]|-|[1]|
+|yellow intent token|[1]|-|[1]|
+
+**Step 3**: A solver sees the partial transactions matched on the previous step and creates another partial transaction, outputting the dolphin that Bob spend to Alice. At this point, Alice's intentVP is satisfied and a [-1] note of Alice intent token is created.
+Total balance:
+|token|spent|output|spent - output|
+|-|-|-|-|
+|star NFT|1|0|1|
+|blue dolphin NFT|1|1|0|
+|blue intent token|[1] + [-1] = [0]|-|0|
+|yellow intent token|[1]|-|[1]|
+
+
+**Step 4**: A solver sees all previous partial transactions and the initial transaction created by Charlie. The solver matches them together, and creates new partial transactions, sending the three to Bob and the star to Charlie. VPs of all parties are satisfied, the corresponding notes of value [-1] are created. The total balance of partial transactions is equal to zero, which means it is possible to create a transaction.
+Total balance:
+|token|spent|output|spent - output|
+|-|-|-|-|
+|star NFT|1|1|0|
+|blue dolphin NFT|1|1|0|
+|blue intent token|[1] + [-1] = [0]|-|0|
+|yellow intent token|[1] + [-1]|-|0|
+|tree NFT|1|1|0|
+|green intent token|[1]+ [-1]|-|0|
+
+**Step 5**:
+The final transaction containing the spent and output notes from partial transactions is created. All proofs are attached.
+
 ![img.png](img/exec_3_party.png)
 
 #### Complex intentVP
-
+![img.png](exec_complex_vp.png)
 To Do: add the userVP update
