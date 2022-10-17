@@ -46,7 +46,7 @@ pub struct Note {
     /// computed from spent_note_nf and rcm by using a PRF
     pub psi: pallas::Base,
     pub rcm: pallas::Scalar,
-    /// The non-normal note won't be stored in commitment tree.
+    /// Only normal-type note will be stored in commitment tree.
     pub is_normal: bool,
 }
 

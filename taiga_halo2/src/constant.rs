@@ -24,8 +24,11 @@ pub const BASE_BITS_NUM: usize = 255;
 pub const NUM_NOTE: usize = 4;
 
 pub const ACTION_NF_INSTANCE_ROW_IDX: usize = 0;
-pub const ACTION_ROOT_INSTANCE_ROW_IDX: usize = 1;
+pub const ACTION_ANCHOR_INSTANCE_ROW_IDX: usize = 1;
 pub const ACTION_OUTPUT_CM_INSTANCE_ROW_IDX: usize = 2;
+pub const ACTION_ENABLE_INPUT_INSTANCE_ROW_IDX: usize = 3;
+pub const ACTION_ENABLE_OUTPUT_INSTANCE_ROW_IDX: usize = 4;
+// pub const ACTION_NET_VALUE_CM_INSTANCE_ROW_IDX: usize = 5;
 
 // SinsemillaCommit parameters
 lazy_static! {
