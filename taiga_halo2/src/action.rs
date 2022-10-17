@@ -22,6 +22,10 @@ pub struct ActionInstance {
     pub nf: Nullifier,
     /// The commitment of the output note.
     pub cm: NoteCommitment,
+    /// Enable input
+    pub enable_input: bool,
+    /// Enable output
+    pub enable_output: bool,
     // TODO: The EncryptedNote.
     // encrypted_note,
 }
@@ -52,7 +56,13 @@ pub struct OutputInfo {
 
 impl ActionInstance {
     pub fn to_instance(&self) -> Vec<pallas::Base> {
-        vec![self.nf.inner(), self.root, self.cm.get_x()]
+        vec![
+            self.nf.inner(),
+            self.root,
+            self.cm.get_x(),
+            pallas::Base::from(self.enable_input),
+            pallas::Base::from(self.enable_output),
+        ]
     }
 }
 
@@ -96,10 +106,15 @@ impl ActionInfo {
         );
 
         let output_cm = output_note.commitment();
+        let enable_input = (self.spend.note.is_normal as u64) * self.spend.note.value > 0;
+        let enable_output = (self.output.is_normal as u64) * self.output.value > 0;
+
         let action = ActionInstance {
             nf,
             cm: output_cm,
             root: self.spend.root,
+            enable_input,
+            enable_output,
         };
 
         let rcv = pallas::Scalar::random(&mut rng);

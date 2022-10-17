@@ -6,14 +6,19 @@ use crate::circuit::merkle_circuit::{
 use crate::circuit::note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig};
 use crate::constant::{
     NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain,
-    ACTION_NF_INSTANCE_ROW_IDX, ACTION_OUTPUT_CM_INSTANCE_ROW_IDX, ACTION_ROOT_INSTANCE_ROW_IDX,
-    TAIGA_COMMITMENT_TREE_DEPTH,
+    ACTION_ANCHOR_INSTANCE_ROW_IDX, ACTION_ENABLE_INPUT_INSTANCE_ROW_IDX,
+    ACTION_ENABLE_OUTPUT_INSTANCE_ROW_IDX, ACTION_NF_INSTANCE_ROW_IDX,
+    ACTION_OUTPUT_CM_INSTANCE_ROW_IDX, TAIGA_COMMITMENT_TREE_DEPTH,
 };
 use crate::note::Note;
-use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
+use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip, utilities::bool_check};
 use halo2_proofs::{
     circuit::{floor_planner, Layouter},
-    plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Instance},
+    plonk::{
+        Advice, Circuit, Column, ConstraintSystem, Constraints, Error, Expression, Instance,
+        Selector,
+    },
+    poly::Rotation,
 };
 use pasta_curves::pallas;
 
@@ -23,6 +28,7 @@ pub struct ActionConfig {
     advices: [Column<Advice>; 10],
     note_config: NoteConfig,
     merkle_config: MerklePoseidonConfig,
+    basic_checks_selector: Selector,
 }
 
 /// The Action circuit.
@@ -67,6 +73,65 @@ impl Circuit<pallas::Base> for ActionCircuit {
             meta.enable_equality(*advice);
         }
 
+        let basic_checks_selector = meta.selector();
+        meta.create_gate("Basic checks", |meta| {
+            let basic_checks_selector = meta.query_selector(basic_checks_selector);
+            let is_normal_input = meta.query_advice(advices[0], Rotation::cur());
+            let is_normal_output = meta.query_advice(advices[1], Rotation::cur());
+            let v_input = meta.query_advice(advices[2], Rotation::cur());
+            let v_output = meta.query_advice(advices[3], Rotation::cur());
+
+            let anchor = meta.query_advice(advices[4], Rotation::cur());
+            let root = meta.query_advice(advices[5], Rotation::cur());
+
+            let one = Expression::Constant(pallas::Base::one());
+
+            // if v_normal = 0, it's a dummy note.
+            let v_normal_input = v_input * is_normal_input;
+            let v_normal_output = v_output * is_normal_output;
+
+            // `v_normal` zero check.
+            // Constrain: v_normal(1 - v_normal * v_normal_inv) = 0, in which is_zero = (1 - v_normal * v_normal_inv)
+            let v_normal_input_inv = meta.query_advice(advices[6], Rotation::cur());
+            let is_dummy_input = one.clone() - v_normal_input.clone() * v_normal_input_inv;
+            let v_normal_output_inv = meta.query_advice(advices[7], Rotation::cur());
+            let is_dummy_output = one.clone() - v_normal_output.clone() * v_normal_output_inv;
+
+            let enable_input = meta.query_advice(advices[8], Rotation::cur());
+            let enable_output = meta.query_advice(advices[9], Rotation::cur());
+
+            Constraints::with_selector(
+                basic_checks_selector,
+                [
+                    (
+                        "dummy input, or root = anchor",
+                        v_normal_input.clone() * (root - anchor),
+                    ),
+                    (
+                        "v_normal_input zero check",
+                        v_normal_input * is_dummy_input.clone(),
+                    ),
+                    ("bool check enable_input", bool_check(enable_input.clone())),
+                    (
+                        "check enable input: not relation",
+                        is_dummy_input + enable_input - one.clone(),
+                    ),
+                    (
+                        "v_normal_output zero check",
+                        v_normal_output * is_dummy_output.clone(),
+                    ),
+                    (
+                        "bool check enable_output",
+                        bool_check(enable_output.clone()),
+                    ),
+                    (
+                        "check enable output: not relation",
+                        is_dummy_output + enable_output - one,
+                    ),
+                ],
+            )
+        });
+
         let note_config = NoteChip::configure(meta, instances, advices);
 
         let merkle_config = MerklePoseidonChip::configure(
@@ -80,6 +145,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             advices,
             note_config,
             merkle_config,
+            basic_checks_selector,
         }
     }
 
@@ -113,64 +179,130 @@ impl Circuit<pallas::Base> for ActionCircuit {
         let merkle_chip = MerklePoseidonChip::construct(config.merkle_config);
 
         // Spend note
-        let nf = {
-            // Check the spend note commitment
-            let spend_note_vars = check_spend_note(
-                layouter.namespace(|| "check spend note"),
-                config.advices,
-                config.instances,
-                ecc_chip.clone(),
-                sinsemilla_chip.clone(),
-                note_commit_chip.clone(),
-                config.note_config.poseidon_config.clone(),
-                add_chip,
-                self.spend_note.clone(),
-                ACTION_NF_INSTANCE_ROW_IDX,
-            )?;
+        // Check the spend note commitment
+        let spend_note_vars = check_spend_note(
+            layouter.namespace(|| "check spend note"),
+            config.advices,
+            config.instances,
+            ecc_chip.clone(),
+            sinsemilla_chip.clone(),
+            note_commit_chip.clone(),
+            config.note_config.poseidon_config.clone(),
+            add_chip,
+            self.spend_note.clone(),
+            ACTION_NF_INSTANCE_ROW_IDX,
+        )?;
 
-            // Check the merkle tree path validity and public the root
-            let leaf = spend_note_vars.cm.extract_p().inner().clone();
-            let root = merkle_poseidon_gadget(
-                layouter.namespace(|| "poseidon merkle"),
-                merkle_chip,
-                leaf,
-                &self.auth_path,
-            )?;
+        // Check the merkle tree path validity and public the root
+        let leaf = spend_note_vars.cm.extract_p().inner().clone();
+        let root = merkle_poseidon_gadget(
+            layouter.namespace(|| "poseidon merkle"),
+            merkle_chip,
+            leaf,
+            &self.auth_path,
+        )?;
 
-            // Public root
-            layouter.constrain_instance(
-                root.cell(),
-                config.instances,
-                ACTION_ROOT_INSTANCE_ROW_IDX,
-            )?;
+        // derivate value base and public value commitment
 
-            // TODO: user send address VP commitment and token VP commitment
-
-            spend_note_vars.nf
-        };
+        // TODO: user send address VP commitment and token VP commitment
 
         // Output note
-        {
-            let _output_note_vars = check_output_note(
-                layouter.namespace(|| "check output note"),
-                config.advices,
-                config.instances,
-                ecc_chip,
-                sinsemilla_chip,
-                note_commit_chip,
-                config.note_config.poseidon_config,
-                self.output_note.clone(),
-                nf,
-                ACTION_OUTPUT_CM_INSTANCE_ROW_IDX,
-            )?;
+        let output_note_vars = check_output_note(
+            layouter.namespace(|| "check output note"),
+            config.advices,
+            config.instances,
+            ecc_chip,
+            sinsemilla_chip,
+            note_commit_chip,
+            config.note_config.poseidon_config,
+            self.output_note.clone(),
+            spend_note_vars.nf,
+            ACTION_OUTPUT_CM_INSTANCE_ROW_IDX,
+        )?;
 
-            // TODO: add user receive address VP commitment and token VP commitment
+        // TODO: add user receive address VP commitment and token VP commitment
 
-            // TODO: add note verifiable encryption
-        }
+        // TODO: add note verifiable encryption
 
-        // Vet value commitment
-        {}
+        // derivate value base and public value commitment
+
+        // Basic checks
+        layouter.assign_region(
+            || "Basic checks",
+            |mut region| {
+                spend_note_vars.is_normal.copy_advice(
+                    || "is_normal_input",
+                    &mut region,
+                    config.advices[0],
+                    0,
+                )?;
+                output_note_vars.is_normal.copy_advice(
+                    || "is_normal_output",
+                    &mut region,
+                    config.advices[1],
+                    0,
+                )?;
+                spend_note_vars.value.copy_advice(
+                    || "v_input",
+                    &mut region,
+                    config.advices[2],
+                    0,
+                )?;
+                output_note_vars.value.copy_advice(
+                    || "v_output",
+                    &mut region,
+                    config.advices[3],
+                    0,
+                )?;
+                region.assign_advice_from_instance(
+                    || "anchor",
+                    config.instances,
+                    ACTION_ANCHOR_INSTANCE_ROW_IDX,
+                    config.advices[4],
+                    0,
+                )?;
+                root.copy_advice(|| "root", &mut region, config.advices[5], 0)?;
+
+                let v_normal_input_inv = (spend_note_vars.is_normal.value()
+                    * spend_note_vars.value.value())
+                .into_field()
+                .invert();
+                region.assign_advice(
+                    || "v_normal_input_inv",
+                    config.advices[6],
+                    0,
+                    || v_normal_input_inv,
+                )?;
+                let v_normal_output_inv = (output_note_vars.is_normal.value()
+                    * output_note_vars.value.value())
+                .into_field()
+                .invert();
+                region.assign_advice(
+                    || "v_normal_output_inv",
+                    config.advices[7],
+                    0,
+                    || v_normal_output_inv,
+                )?;
+
+                region.assign_advice_from_instance(
+                    || "enable input",
+                    config.instances,
+                    ACTION_ENABLE_INPUT_INSTANCE_ROW_IDX,
+                    config.advices[8],
+                    0,
+                )?;
+
+                region.assign_advice_from_instance(
+                    || "enable output",
+                    config.instances,
+                    ACTION_ENABLE_OUTPUT_INSTANCE_ROW_IDX,
+                    config.advices[9],
+                    0,
+                )?;
+
+                config.basic_checks_selector.enable(&mut region, 0)
+            },
+        )?;
 
         Ok(())
     }

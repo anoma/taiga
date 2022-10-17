@@ -67,6 +67,7 @@ pub struct SpendNoteVar {
     pub data: AssignedCell<pallas::Base, pallas::Base>,
     pub nf: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
+    pub is_normal: AssignedCell<pallas::Base, pallas::Base>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -207,7 +208,7 @@ pub fn check_spend_note(
         psi.clone(),
         value.clone(),
         rcm,
-        is_normal,
+        is_normal.clone(),
     )?;
 
     // Generate nullifier
@@ -233,6 +234,7 @@ pub fn check_spend_note(
         data,
         nf,
         cm,
+        is_normal,
     })
 }
 
@@ -244,6 +246,7 @@ pub struct OutputNoteVar {
     pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub data: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
+    pub is_normal: AssignedCell<pallas::Base, pallas::Base>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -344,7 +347,7 @@ pub fn check_output_note(
         psi,
         value.clone(),
         rcm,
-        is_normal,
+        is_normal.clone(),
     )?;
 
     // Public cm
@@ -357,6 +360,7 @@ pub fn check_output_note(
         value,
         data,
         cm,
+        is_normal,
     })
 }
 
