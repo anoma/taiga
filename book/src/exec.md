@@ -9,7 +9,7 @@ Intents are a mechanism that allows users to enact a multiparty state transition
 
 ![img.png](img/exec_high.png)
 
-### Step 1: Create an intent
+## Step 1: Create an intent
 
 Intents specify ephemeral interests of users. This step consists of two parts:
 1. **Specify an intent**. `IntentVP` encodes the needs of the user and enforces their satisfaction
@@ -17,7 +17,7 @@ Intents specify ephemeral interests of users. This step consists of two parts:
 
 **Note**: For simplicity we assume that an intent includes the user sending notes and receving notes.
 
-#### Partial transaction
+### Partial transaction
 
 Two of the main requirements for an Anoma transaction to be valid are: 
 1. VPs of all involved parties must be satisfied
@@ -31,7 +31,7 @@ In principle, any party can create a partial transaction, if they can prove that
 
 ![img.png](img/exec_partial_tx.png)
 
-#### Intent tokens
+### Intent tokens
 
 To make sure that the user's intent is satisfied, we use **intent tokens**. Intent token notes are a special type of notes that cannot be spent, only created. In addition, intent notes can have negative value.
 
@@ -49,19 +49,19 @@ If we look at the notes as messages passing from one user (application) to anoth
 
 ![img.png](img/exec_intent_notes.png)
 
-### Step 2: Gossip
+## Step 2: Gossip
 Once intentVP is specified and the initial partial transaction is created, the user sends the intent to the intent gossip network and solvers match intents in order to create full transactions and publish them on the blockchain. That implies that users need to give some information to the solvers (including the content of `intentVP`) that is sufficient to create partial transactions and transactions (proofs)
 
 To Do: what is the minimal amount of information needs to be revealed to the solver in order to match a transaction?
 
-### Step 3: Solve
+## Step 3: Solve
 We are considering the model when a solver makes one step at a time and sends the step result to the next solver. In practice, the solver can send the result to themselves and continue solving if they have the intent to make the next step. It would be nice to merge the steps into one when possible, but for simplicity we ignore this detail here
 
-#### Create partial transactions
+### Create partial transactions
 
 When a solver has two intents that can be [partially] matched together, they [partially] match the intents by creating new partial transactions. The intentVPs or other partial transactions are not modified.
 
-##### Prove
+#### Prove
 Solvers are responsible for creation of all proofs (`Action`, `tokenVP`, etc) required for a state transition for their partial solutions.
 - solvers **have the authority** to spend and create the notes they receive and produce the proofs required to perform the action
 - solvers **know** the content of intentVPs of the users (necessary to be able to satisfy them)
@@ -69,11 +69,11 @@ Solvers are responsible for creation of all proofs (`Action`, `tokenVP`, etc) re
 
 When solvers receive partial transactions, they must check all of the proofs attached to them.
 
-##### Local `cm` trees
+#### Local `cm` trees
 
 To store note commitments `cm`, a local commitment tree `CMtree` is created. After the transaction is finalized, the tree will be published on the blockchain along with the transaction.
 
-#### Partial vs final match
+### Partial vs final match
 
 After the solver matches the intents, two cases are possible:
 1. The total balance computed by summing up the balances of partial transactions is a non-zero value. The solver sends the data to the next solver
@@ -83,13 +83,13 @@ After the solver matches the intents, two cases are possible:
 
 **Note**: solvers don't need to be identified as all actions are authorized by user/app VPs. However, if they want to receive fees, they need to have an address on the chain.
 
-### Step 4: Finalize
+## Step 4: Finalize
 
 After the intents are matched with satisfaction of all involved parties, the transaction is published on the blockchain. The local CMTree and all of the proofs created are published on the blockchain.
 
-### Examples
+## Examples
 
-#### Three-party barter
+### Three-party barter
 
 On the diagram below you can see an example of three-party bartering cycle in the execution model described in this document.
 
@@ -132,6 +132,6 @@ Total balance:
 The final transaction containing the spent and output notes from partial transactions is created. All proofs are attached.
 
 
-#### Complex intentVP
+### Complex intentVP
 ![img.png](exec_complex_vp.png)
 To Do: add the userVP update
