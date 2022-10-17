@@ -89,6 +89,9 @@ After the intents are matched with satisfaction of all involved parties, the tra
 
 ### Example with a 3-party bartering cycle
 
-To Do: describe the new examples, with diagrams
+#### 3-party exchange
+![img.png](img/exec_3_party.png)
+
+#### Complex intentVP
 
 To Do: add the userVP update
