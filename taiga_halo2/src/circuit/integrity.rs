@@ -1,11 +1,18 @@
+use std::ops::Neg;
+
 use crate::circuit::gadgets::{assign_free_advice, AddChip, AddInstructions};
 use crate::circuit::note_circuit::{note_commitment_gadget, NoteCommitmentChip};
 use crate::constant::{
-    NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain, NullifierK,
+    NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentFixedBasesFull,
+    NoteCommitmentHashDomain, NullifierK,
 };
 use crate::note::Note;
+use group::{Curve, Group};
 use halo2_gadgets::{
-    ecc::{chip::EccChip, FixedPointBaseField, Point, ScalarFixed},
+    ecc::{
+        chip::EccChip, FixedPoint, FixedPointBaseField, NonIdentityPoint, Point, ScalarFixed,
+        ScalarVar,
+    },
     poseidon::{
         primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
         Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
@@ -362,6 +369,98 @@ pub fn check_output_note(
         cm,
         is_normal,
     })
+}
+
+// TODO: hash_to_curve to derivate the value base
+// use the generator as value base temporarily
+pub fn derivate_value_base(
+    mut layouter: impl Layouter<pallas::Base>,
+    ecc_chip: EccChip<NoteCommitmentFixedBases>,
+    _is_normal_input: AssignedCell<pallas::Base, pallas::Base>,
+    _token_vp_input: AssignedCell<pallas::Base, pallas::Base>,
+    _data_input: AssignedCell<pallas::Base, pallas::Base>,
+) -> Result<NonIdentityPoint<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
+    NonIdentityPoint::new(
+        ecc_chip,
+        layouter.namespace(|| "derivate value base"),
+        Value::known(pallas::Point::generator().to_affine()),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn compute_net_value_commitment(
+    mut layouter: impl Layouter<pallas::Base>,
+    ecc_chip: EccChip<NoteCommitmentFixedBases>,
+    is_normal_input: AssignedCell<pallas::Base, pallas::Base>,
+    app_address_input: AssignedCell<pallas::Base, pallas::Base>,
+    data_input: AssignedCell<pallas::Base, pallas::Base>,
+    v_input: AssignedCell<pallas::Base, pallas::Base>,
+    is_normal_output: AssignedCell<pallas::Base, pallas::Base>,
+    app_address_output: AssignedCell<pallas::Base, pallas::Base>,
+    data_output: AssignedCell<pallas::Base, pallas::Base>,
+    v_output: AssignedCell<pallas::Base, pallas::Base>,
+    rcv: pallas::Scalar,
+) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
+    // input value point
+    let value_base_input = derivate_value_base(
+        layouter.namespace(|| "derivate input value base"),
+        ecc_chip.clone(),
+        is_normal_input,
+        app_address_input,
+        data_input,
+    )?;
+    let v_input_scalar = ScalarVar::from_base(
+        ecc_chip.clone(),
+        layouter.namespace(|| "ScalarVar from_base"),
+        &v_input,
+    )?;
+    let (value_point_input, _) =
+        value_base_input.mul(layouter.namespace(|| "input value point"), v_input_scalar)?;
+
+    // output value point
+    let value_base_output = derivate_value_base(
+        layouter.namespace(|| "derivate output value base"),
+        ecc_chip.clone(),
+        is_normal_output,
+        app_address_output,
+        data_output,
+    )?;
+    let v_output_scalar = ScalarVar::from_base(
+        ecc_chip.clone(),
+        layouter.namespace(|| "ScalarVar from_base"),
+        &v_output,
+    )?;
+    let (value_point_output, _) =
+        value_base_output.mul(layouter.namespace(|| "output value point"), v_output_scalar)?;
+
+    // Get and constrain the negative output value point
+    let neg_v_point_output = Point::new(
+        ecc_chip.clone(),
+        layouter.namespace(|| "negative output value point"),
+        value_point_output.inner().point().neg(),
+    )?;
+
+    // TODO: need a constraint between value_point_output and neg_v_point_output here
+
+    let commitment_v = value_point_input.add(
+        layouter.namespace(|| "v_pioint_input - v_point_output"),
+        &neg_v_point_output,
+    )?;
+
+    // blind point
+    let blind_scalar = ScalarFixed::new(
+        ecc_chip.clone(),
+        layouter.namespace(|| "blind scalar"),
+        Value::known(rcv),
+    )?;
+
+    let blind_base = FixedPoint::from_inner(ecc_chip, NoteCommitmentFixedBasesFull);
+    let (blind, _) = blind_base.mul(
+        layouter.namespace(|| "blind_scalar * blind_base"),
+        &blind_scalar,
+    )?;
+
+    commitment_v.add(layouter.namespace(|| "net value commitment"), &blind)
 }
 
 #[test]

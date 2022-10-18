@@ -28,7 +28,8 @@ pub const ACTION_ANCHOR_INSTANCE_ROW_IDX: usize = 1;
 pub const ACTION_OUTPUT_CM_INSTANCE_ROW_IDX: usize = 2;
 pub const ACTION_ENABLE_INPUT_INSTANCE_ROW_IDX: usize = 3;
 pub const ACTION_ENABLE_OUTPUT_INSTANCE_ROW_IDX: usize = 4;
-// pub const ACTION_NET_VALUE_CM_INSTANCE_ROW_IDX: usize = 5;
+pub const ACTION_NET_VALUE_CM_X_INSTANCE_ROW_IDX: usize = 5;
+pub const ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX: usize = 6;
 
 // SinsemillaCommit parameters
 lazy_static! {
