@@ -1,5 +1,7 @@
 use crate::circuit::gadgets::AddChip;
-use crate::circuit::integrity::{check_output_note, check_spend_note};
+use crate::circuit::integrity::{
+    check_output_note, check_spend_note, compute_net_value_commitment,
+};
 use crate::circuit::merkle_circuit::{
     merkle_poseidon_gadget, MerklePoseidonChip, MerklePoseidonConfig,
 };
@@ -7,7 +9,8 @@ use crate::circuit::note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig};
 use crate::constant::{
     NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain,
     ACTION_ANCHOR_INSTANCE_ROW_IDX, ACTION_ENABLE_INPUT_INSTANCE_ROW_IDX,
-    ACTION_ENABLE_OUTPUT_INSTANCE_ROW_IDX, ACTION_NF_INSTANCE_ROW_IDX,
+    ACTION_ENABLE_OUTPUT_INSTANCE_ROW_IDX, ACTION_NET_VALUE_CM_X_INSTANCE_ROW_IDX,
+    ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX, ACTION_NF_INSTANCE_ROW_IDX,
     ACTION_OUTPUT_CM_INSTANCE_ROW_IDX, TAIGA_COMMITMENT_TREE_DEPTH,
 };
 use crate::note::Note;
@@ -40,7 +43,7 @@ pub struct ActionCircuit {
     pub auth_path: [(pallas::Base, bool); TAIGA_COMMITMENT_TREE_DEPTH],
     /// Output note
     pub output_note: Note,
-    /// random scalar for vet value commitment
+    /// random scalar for net value commitment
     pub rcv: pallas::Scalar,
 }
 
@@ -202,8 +205,6 @@ impl Circuit<pallas::Base> for ActionCircuit {
             &self.auth_path,
         )?;
 
-        // derivate value base and public value commitment
-
         // TODO: user send address VP commitment and token VP commitment
 
         // Output note
@@ -211,7 +212,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             layouter.namespace(|| "check output note"),
             config.advices,
             config.instances,
-            ecc_chip,
+            ecc_chip.clone(),
             sinsemilla_chip,
             note_commit_chip,
             config.note_config.poseidon_config,
@@ -224,7 +225,30 @@ impl Circuit<pallas::Base> for ActionCircuit {
 
         // TODO: add note verifiable encryption
 
-        // derivate value base and public value commitment
+        // compute and public net value commitment(input_value_commitment - output_value_commitment)
+        let net_value_commitment = compute_net_value_commitment(
+            layouter.namespace(|| "net value commitment"),
+            ecc_chip,
+            spend_note_vars.is_normal.clone(),
+            spend_note_vars.app_address.clone(),
+            spend_note_vars.data.clone(),
+            spend_note_vars.value.clone(),
+            output_note_vars.is_normal.clone(),
+            output_note_vars.app_address.clone(),
+            output_note_vars.data.clone(),
+            output_note_vars.value.clone(),
+            self.rcv,
+        )?;
+        layouter.constrain_instance(
+            net_value_commitment.inner().x().cell(),
+            config.instances,
+            ACTION_NET_VALUE_CM_X_INSTANCE_ROW_IDX,
+        )?;
+        layouter.constrain_instance(
+            net_value_commitment.inner().y().cell(),
+            config.instances,
+            ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX,
+        )?;
 
         // Basic checks
         layouter.assign_region(
