@@ -1,8 +1,9 @@
 use crate::{
     app::App,
     circuit::action_circuit::ActionCircuit,
-    constant::{NOTE_COMMITMENT_R_GENERATOR, TAIGA_COMMITMENT_TREE_DEPTH},
+    constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{MerklePath, Node},
+    net_value_commitment::NetValueCommitment,
     note::{Note, NoteCommitment},
     nullifier::Nullifier,
     user::User,
@@ -10,8 +11,6 @@ use crate::{
     vp_description::ValidityPredicateDescription,
 };
 use ff::Field;
-use group::{cofactor::CofactorCurveAffine, Curve, Group};
-use halo2_proofs::arithmetic::CurveAffine;
 use pasta_curves::pallas;
 use rand::RngCore;
 
@@ -29,7 +28,7 @@ pub struct ActionInstance {
     /// Enable output
     pub enable_output: bool,
     /// net value commitment
-    pub net_value_commitment: pallas::Point,
+    pub net_value_commitment: NetValueCommitment,
     // TODO: The EncryptedNote.
     // encrypted_note,
 }
@@ -60,22 +59,14 @@ pub struct OutputInfo {
 
 impl ActionInstance {
     pub fn to_instance(&self) -> Vec<pallas::Base> {
-        let (net_value_commitment_x, net_value_commitment_y) =
-            if self.net_value_commitment == pallas::Point::identity() {
-                (pallas::Base::zero(), pallas::Base::zero())
-            } else {
-                let x_y = self.net_value_commitment.to_affine().coordinates().unwrap();
-                (*x_y.x(), *x_y.y())
-            };
-
         vec![
             self.nf.inner(),
             self.root,
             self.cm.get_x(),
             pallas::Base::from(self.enable_input),
             pallas::Base::from(self.enable_output),
-            net_value_commitment_x,
-            net_value_commitment_y,
+            self.net_value_commitment.get_x(),
+            self.net_value_commitment.get_y(),
         ]
     }
 }
@@ -125,8 +116,7 @@ impl ActionInfo {
 
         let rcv = pallas::Scalar::random(&mut rng);
 
-        let net_value_commitment =
-            compute_net_value_commitment(self.spend.note.value, self.output.value, rcv);
+        let net_value_commitment = NetValueCommitment::new(&self.spend.note, &output_note, &rcv);
         let action = ActionInstance {
             nf,
             cm: output_cm,
@@ -196,21 +186,4 @@ impl OutputInfo {
             is_normal: true,
         }
     }
-}
-
-// TODO: hash_to_curve to derivate the value base
-// use the generator as value base temporarily
-pub fn derivate_value_base() -> pallas::Point {
-    pallas::Point::generator()
-}
-
-pub fn compute_net_value_commitment(
-    v_input: u64,
-    v_output: u64,
-    rcv: pallas::Scalar,
-) -> pallas::Point {
-    let base_input = derivate_value_base();
-    let base_output = derivate_value_base();
-    base_input * pallas::Scalar::from(v_input) - base_output * pallas::Scalar::from(v_output)
-        + NOTE_COMMITMENT_R_GENERATOR.to_curve() * rcv
 }
