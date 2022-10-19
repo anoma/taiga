@@ -440,7 +440,19 @@ pub fn compute_net_value_commitment(
         value_point_output.inner().point().neg(),
     )?;
 
-    // TODO: need a constraint between value_point_output and neg_v_point_output here
+    let zero_point = value_point_output.add(
+        layouter.namespace(|| "value_point + neg_value_point"),
+        &neg_v_point_output,
+    )?;
+    layouter.assign_region(
+        || "constrain zero point",
+        |mut region| {
+            // Constrain x-coordinates
+            region.constrain_constant(zero_point.inner().x().cell(), pallas::Base::zero())?;
+            // Constrain y-coordinates
+            region.constrain_constant(zero_point.inner().y().cell(), pallas::Base::zero())
+        },
+    )?;
 
     let commitment_v = value_point_input.add(
         layouter.namespace(|| "v_pioint_input - v_point_output"),
