@@ -46,7 +46,7 @@ where
             )?;
             composer.public_inputize(&root);
 
-            // TODO: user send address VP commitment and token VP commitment
+            // TODO: user send address VP commitment and app VP commitment
             input_note_var.nf
         };
 
@@ -54,7 +54,7 @@ where
         {
             let _output_note_var = output_note_constraint(&self.output_note, &nf, composer)?;
 
-            // TODO: add user receive address VP commitment and token VP commitment
+            // TODO: add user receive address VP commitment and app VP commitment
 
             // TODO: add note encryption
         }

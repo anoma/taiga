@@ -377,7 +377,7 @@ pub fn derivate_value_base(
     mut layouter: impl Layouter<pallas::Base>,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
     _is_normal_input: AssignedCell<pallas::Base, pallas::Base>,
-    _token_vp_input: AssignedCell<pallas::Base, pallas::Base>,
+    _app_input: AssignedCell<pallas::Base, pallas::Base>,
     _data_input: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<NonIdentityPoint<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
     NonIdentityPoint::new(

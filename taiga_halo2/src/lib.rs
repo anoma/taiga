@@ -6,6 +6,7 @@ pub mod app;
 pub mod circuit;
 pub mod constant;
 pub mod merkle_tree;
+pub mod net_value_commitment;
 pub mod note;
 pub mod nullifier;
 pub mod user;
