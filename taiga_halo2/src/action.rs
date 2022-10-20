@@ -18,7 +18,7 @@ use rand::RngCore;
 #[derive(Copy, Debug, Clone)]
 pub struct ActionInstance {
     /// The root of the note commitment Merkle tree.
-    pub root: pallas::Base,
+    pub anchor: pallas::Base,
     /// The nullifier of the spend note.
     pub nf: Nullifier,
     /// The commitment of the output note.
@@ -61,7 +61,7 @@ impl ActionInstance {
     pub fn to_instance(&self) -> Vec<pallas::Base> {
         vec![
             self.nf.inner(),
-            self.root,
+            self.anchor,
             self.cm.get_x(),
             pallas::Base::from(self.enable_input),
             pallas::Base::from(self.enable_output),
@@ -120,7 +120,7 @@ impl ActionInfo {
         let action = ActionInstance {
             nf,
             cm: output_cm,
-            root: self.spend.root,
+            anchor: self.spend.root,
             enable_input,
             enable_output,
             net_value_commitment,
