@@ -132,3 +132,23 @@ Let's consider a situation where one of the parties has a more complex VP. Here 
 **Step 3**: A solver sees Alice's and Bob's partial transactions and matches them together, creating new partial transactions. Alice receives the blue dolphin NFT and one of her notes ([1] of A) back, her intentVP is satisfied and the [-1] note of Alice's intent token is released. Bob get's [2]B note from Alice, his intentVP is satisfied, [-1] intent token note is released. All total per-token balances are equal to 0, and the final transaction can be created.
 
 **Step 4**: The final transaction is created from the spent and output notes from the partial transactions. All proofs are attached.
+
+## Arbitrary state transitions
+
+For arbitrary application, notes store the state of the application. When the application needs to change its state, it (anyone who has the authority) can spend the old state and produce a new state.
+If the state change is possible within one partial transaction, such a note has a value 0 and doesn't affect the total balance.
+![img.png](img/exec_arbitrary_state_update.png)
+
+If the state change happens across partial transactions (meaning that the state gets consumed in one partial transaction and a new state is output in another), the process is a bit different. 
+
+### State transition across partial transactions
+
+
+
+![img_1.png](img/exec_arb_state_update_across_ptx.png)
+
+For simplicity, let's assume that the old state note has a 0 value. A zero-value note doesn't affect the total balance which is necessary for across-ptx communication. And so the first step is to turn a zero-value note into a non-zero value note (step 1 on the diagram).
+
+In the next partial transaction (step 2) we output [-1] value note to balance the old [1] state note, but if the state can be changed to final in the next partial transaction (step 2.1), a new state zero-value note is produced, total balance becomes zero, and the transaction can be finalized. If the state isn't final (step 2.2), another [1] value note with the new (but not final) state is produced, the total balance is non-zero and the transaction cannot be finalized. In that case, the step 2 is repeated until the final state is computed
+
+**Note**: different states imply different token types, and the old state note cannot balance a new state note
