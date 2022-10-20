@@ -133,7 +133,7 @@ Let's consider a situation where one of the parties has a more complex VP. Here 
 
 **Step 4**: The final transaction is created from the spent and output notes from the partial transactions. All proofs are attached.
 
-## Arbitrary state transitions
+### One way to represent arbitrary states
 
 For arbitrary application, notes store the state of the application. When the application needs to change its state, it (anyone who has the authority) can spend the old state and produce a new state.
 If the state change is possible within one partial transaction, such a note has a value 0 and doesn't affect the total balance.
@@ -141,7 +141,7 @@ If the state change is possible within one partial transaction, such a note has 
 
 If the state change happens across partial transactions (meaning that the state gets consumed in one partial transaction and a new state is output in another), the process is a bit different. 
 
-### State transition across partial transactions
+#### State transition across partial transactions
 
 
 
