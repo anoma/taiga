@@ -19,7 +19,7 @@ use rand::RngCore;
 // FieldAdditionValidityPredicateCircuit with a trivial constraint a + b = c.
 #[derive(Clone, Debug, Default)]
 struct FieldAdditionValidityPredicateCircuit {
-    input_notes: [Note; NUM_NOTE],
+    spend_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
     a: pallas::Base,
     b: pallas::Base,
@@ -58,12 +58,12 @@ impl ValidityPredicateConfig for FieldAdditionValidityPredicateConfig {
 
 impl FieldAdditionValidityPredicateCircuit {
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let spend_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let a = pallas::Base::random(&mut rng);
         let b = pallas::Base::random(&mut rng);
         Self {
-            input_notes,
+            spend_notes,
             output_notes,
             a,
             b,
@@ -72,11 +72,11 @@ impl FieldAdditionValidityPredicateCircuit {
 
     pub fn get_instances(&self) -> Vec<pallas::Base> {
         let mut instances = vec![];
-        self.input_notes
+        self.spend_notes
             .iter()
             .zip(self.output_notes.iter())
-            .for_each(|(input_note, output_note)| {
-                let nf = input_note.get_nf().inner();
+            .for_each(|(spend_note, output_note)| {
+                let nf = spend_note.get_nf().inner();
                 instances.push(nf);
                 let cm = output_note.commitment();
                 instances.push(cm.get_x());
@@ -91,8 +91,8 @@ impl FieldAdditionValidityPredicateCircuit {
 impl ValidityPredicateCircuit for FieldAdditionValidityPredicateCircuit {
     type Config = FieldAdditionValidityPredicateConfig;
 
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.input_notes
+    fn get_spend_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.spend_notes
     }
 
     fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
@@ -100,12 +100,12 @@ impl ValidityPredicateCircuit for FieldAdditionValidityPredicateCircuit {
     }
 
     // Add custom constraints
-    // Note: the trivial vp doesn't constrain on input_note_variables and output_note_variables
+    // Note: the trivial vp doesn't constrain on spend_note_variables and output_note_variables
     fn custom_constraints(
         &self,
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
-        _input_note_variables: &[SpendNoteVar],
+        _spend_note_variables: &[SpendNoteVar],
         _output_note_variables: &[OutputNoteVar],
     ) -> Result<(), Error> {
         let a = assign_free_advice(

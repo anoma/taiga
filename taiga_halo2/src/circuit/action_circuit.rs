@@ -8,8 +8,8 @@ use crate::circuit::merkle_circuit::{
 use crate::circuit::note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig};
 use crate::constant::{
     NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain,
-    ACTION_ANCHOR_INSTANCE_ROW_IDX, ACTION_ENABLE_INPUT_INSTANCE_ROW_IDX,
-    ACTION_ENABLE_OUTPUT_INSTANCE_ROW_IDX, ACTION_NET_VALUE_CM_X_INSTANCE_ROW_IDX,
+    ACTION_ANCHOR_INSTANCE_ROW_IDX, ACTION_ENABLE_OUTPUT_INSTANCE_ROW_IDX,
+    ACTION_ENABLE_SPEND_INSTANCE_ROW_IDX, ACTION_NET_VALUE_CM_X_INSTANCE_ROW_IDX,
     ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX, ACTION_NF_INSTANCE_ROW_IDX,
     ACTION_OUTPUT_CM_INSTANCE_ROW_IDX, TAIGA_COMMITMENT_TREE_DEPTH,
 };
@@ -79,9 +79,9 @@ impl Circuit<pallas::Base> for ActionCircuit {
         let basic_checks_selector = meta.selector();
         meta.create_gate("Basic checks", |meta| {
             let basic_checks_selector = meta.query_selector(basic_checks_selector);
-            let is_normal_input = meta.query_advice(advices[0], Rotation::cur());
+            let is_normal_spend = meta.query_advice(advices[0], Rotation::cur());
             let is_normal_output = meta.query_advice(advices[1], Rotation::cur());
-            let v_input = meta.query_advice(advices[2], Rotation::cur());
+            let v_spend = meta.query_advice(advices[2], Rotation::cur());
             let v_output = meta.query_advice(advices[3], Rotation::cur());
 
             let anchor = meta.query_advice(advices[4], Rotation::cur());
@@ -90,34 +90,34 @@ impl Circuit<pallas::Base> for ActionCircuit {
             let one = Expression::Constant(pallas::Base::one());
 
             // if v_normal = 0, it's a dummy note.
-            let v_normal_input = v_input * is_normal_input;
+            let v_normal_spend = v_spend * is_normal_spend;
             let v_normal_output = v_output * is_normal_output;
 
             // `v_normal` zero check.
             // Constrain: v_normal(1 - v_normal * v_normal_inv) = 0, in which is_zero = (1 - v_normal * v_normal_inv)
-            let v_normal_input_inv = meta.query_advice(advices[6], Rotation::cur());
-            let is_dummy_input = one.clone() - v_normal_input.clone() * v_normal_input_inv;
+            let v_normal_spend_inv = meta.query_advice(advices[6], Rotation::cur());
+            let is_dummy_spend = one.clone() - v_normal_spend.clone() * v_normal_spend_inv;
             let v_normal_output_inv = meta.query_advice(advices[7], Rotation::cur());
             let is_dummy_output = one.clone() - v_normal_output.clone() * v_normal_output_inv;
 
-            let enable_input = meta.query_advice(advices[8], Rotation::cur());
+            let enable_spend = meta.query_advice(advices[8], Rotation::cur());
             let enable_output = meta.query_advice(advices[9], Rotation::cur());
 
             Constraints::with_selector(
                 basic_checks_selector,
                 [
                     (
-                        "dummy input, or root = anchor",
-                        v_normal_input.clone() * (root - anchor),
+                        "dummy spend note, or root = anchor",
+                        v_normal_spend.clone() * (root - anchor),
                     ),
                     (
-                        "v_normal_input zero check",
-                        v_normal_input * is_dummy_input.clone(),
+                        "v_normal_spend zero check",
+                        v_normal_spend * is_dummy_spend.clone(),
                     ),
-                    ("bool check enable_input", bool_check(enable_input.clone())),
+                    ("bool check enable_spend", bool_check(enable_spend.clone())),
                     (
-                        "check enable input: not relation",
-                        is_dummy_input + enable_input - one.clone(),
+                        "check enable spend: not relation",
+                        is_dummy_spend + enable_spend - one.clone(),
                     ),
                     (
                         "v_normal_output zero check",
@@ -225,7 +225,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
 
         // TODO: add note verifiable encryption
 
-        // compute and public net value commitment(input_value_commitment - output_value_commitment)
+        // compute and public net value commitment(spend_value_commitment - output_value_commitment)
         let net_value_commitment = compute_net_value_commitment(
             layouter.namespace(|| "net value commitment"),
             ecc_chip,
@@ -255,7 +255,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             || "Basic checks",
             |mut region| {
                 spend_note_vars.is_normal.copy_advice(
-                    || "is_normal_input",
+                    || "is_normal_spend",
                     &mut region,
                     config.advices[0],
                     0,
@@ -267,7 +267,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
                     0,
                 )?;
                 spend_note_vars.value.copy_advice(
-                    || "v_input",
+                    || "v_spend",
                     &mut region,
                     config.advices[2],
                     0,
@@ -287,15 +287,15 @@ impl Circuit<pallas::Base> for ActionCircuit {
                 )?;
                 root.copy_advice(|| "root", &mut region, config.advices[5], 0)?;
 
-                let v_normal_input_inv = (spend_note_vars.is_normal.value()
+                let v_normal_spend_inv = (spend_note_vars.is_normal.value()
                     * spend_note_vars.value.value())
                 .into_field()
                 .invert();
                 region.assign_advice(
-                    || "v_normal_input_inv",
+                    || "v_normal_spend_inv",
                     config.advices[6],
                     0,
-                    || v_normal_input_inv,
+                    || v_normal_spend_inv,
                 )?;
                 let v_normal_output_inv = (output_note_vars.is_normal.value()
                     * output_note_vars.value.value())
@@ -309,9 +309,9 @@ impl Circuit<pallas::Base> for ActionCircuit {
                 )?;
 
                 region.assign_advice_from_instance(
-                    || "enable input",
+                    || "enable spend",
                     config.instances,
-                    ACTION_ENABLE_INPUT_INSTANCE_ROW_IDX,
+                    ACTION_ENABLE_SPEND_INSTANCE_ROW_IDX,
                     config.advices[8],
                     0,
                 )?;

@@ -183,7 +183,7 @@ pub fn check_spend_note(
 
     // Witness psi
     let psi = assign_free_advice(
-        layouter.namespace(|| "witness psi_input"),
+        layouter.namespace(|| "witness psi_spend"),
         advices[0],
         Value::known(spend_note.psi),
     )?;
@@ -376,9 +376,9 @@ pub fn check_output_note(
 pub fn derivate_value_base(
     mut layouter: impl Layouter<pallas::Base>,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
-    _is_normal_input: AssignedCell<pallas::Base, pallas::Base>,
-    _app_input: AssignedCell<pallas::Base, pallas::Base>,
-    _data_input: AssignedCell<pallas::Base, pallas::Base>,
+    _is_normal_spend: AssignedCell<pallas::Base, pallas::Base>,
+    _app_spend: AssignedCell<pallas::Base, pallas::Base>,
+    _data_spend: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<NonIdentityPoint<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
     NonIdentityPoint::new(
         ecc_chip,
@@ -391,31 +391,31 @@ pub fn derivate_value_base(
 pub fn compute_net_value_commitment(
     mut layouter: impl Layouter<pallas::Base>,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
-    is_normal_input: AssignedCell<pallas::Base, pallas::Base>,
-    app_address_input: AssignedCell<pallas::Base, pallas::Base>,
-    data_input: AssignedCell<pallas::Base, pallas::Base>,
-    v_input: AssignedCell<pallas::Base, pallas::Base>,
+    is_normal_spend: AssignedCell<pallas::Base, pallas::Base>,
+    app_address_spend: AssignedCell<pallas::Base, pallas::Base>,
+    data_spend: AssignedCell<pallas::Base, pallas::Base>,
+    v_spend: AssignedCell<pallas::Base, pallas::Base>,
     is_normal_output: AssignedCell<pallas::Base, pallas::Base>,
     app_address_output: AssignedCell<pallas::Base, pallas::Base>,
     data_output: AssignedCell<pallas::Base, pallas::Base>,
     v_output: AssignedCell<pallas::Base, pallas::Base>,
     rcv: pallas::Scalar,
 ) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
-    // input value point
-    let value_base_input = derivate_value_base(
-        layouter.namespace(|| "derivate input value base"),
+    // spend value point
+    let value_base_spend = derivate_value_base(
+        layouter.namespace(|| "derivate spend value base"),
         ecc_chip.clone(),
-        is_normal_input,
-        app_address_input,
-        data_input,
+        is_normal_spend,
+        app_address_spend,
+        data_spend,
     )?;
-    let v_input_scalar = ScalarVar::from_base(
+    let v_spend_scalar = ScalarVar::from_base(
         ecc_chip.clone(),
         layouter.namespace(|| "ScalarVar from_base"),
-        &v_input,
+        &v_spend,
     )?;
-    let (value_point_input, _) =
-        value_base_input.mul(layouter.namespace(|| "input value point"), v_input_scalar)?;
+    let (value_point_spend, _) =
+        value_base_spend.mul(layouter.namespace(|| "spend value point"), v_spend_scalar)?;
 
     // output value point
     let value_base_output = derivate_value_base(
@@ -454,8 +454,8 @@ pub fn compute_net_value_commitment(
         },
     )?;
 
-    let commitment_v = value_point_input.add(
-        layouter.namespace(|| "v_pioint_input - v_point_output"),
+    let commitment_v = value_point_spend.add(
+        layouter.namespace(|| "v_pioint_spend - v_point_output"),
         &neg_v_point_output,
     )?;
 
