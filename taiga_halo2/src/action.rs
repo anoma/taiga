@@ -23,8 +23,8 @@ pub struct ActionInstance {
     pub nf: Nullifier,
     /// The commitment of the output note.
     pub cm: NoteCommitment,
-    /// Enable input
-    pub enable_input: bool,
+    /// Enable spend
+    pub enable_spend: bool,
     /// Enable output
     pub enable_output: bool,
     /// net value commitment
@@ -63,7 +63,7 @@ impl ActionInstance {
             self.nf.inner(),
             self.anchor,
             self.cm.get_x(),
-            pallas::Base::from(self.enable_input),
+            pallas::Base::from(self.enable_spend),
             pallas::Base::from(self.enable_output),
             self.net_value_commitment.get_x(),
             self.net_value_commitment.get_y(),
@@ -111,7 +111,7 @@ impl ActionInfo {
         );
 
         let output_cm = output_note.commitment();
-        let enable_input = (self.spend.note.is_normal as u64) * self.spend.note.value > 0;
+        let enable_spend = (self.spend.note.is_normal as u64) * self.spend.note.value > 0;
         let enable_output = (self.output.is_normal as u64) * self.output.value > 0;
 
         let rcv = pallas::Scalar::random(&mut rng);
@@ -121,7 +121,7 @@ impl ActionInfo {
             nf,
             cm: output_cm,
             anchor: self.spend.root,
-            enable_input,
+            enable_spend,
             enable_output,
             net_value_commitment,
         };
