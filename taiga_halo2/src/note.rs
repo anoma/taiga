@@ -39,8 +39,6 @@ pub struct Note {
     pub user: User,
     pub app: App,
     pub value: u64,
-    /// for NFT or whatever. TODO: to be decided the value format.
-    pub data: pallas::Base,
     /// old nullifier. Nonce which is a deterministically computed, unique nonce
     pub rho: Nullifier,
     /// computed from spent_note_nf and rcm by using a PRF
@@ -57,7 +55,6 @@ impl Note {
         app: App,
         value: u64,
         rho: Nullifier,
-        data: pallas::Base,
         psi: pallas::Base,
         rcm: pallas::Scalar,
         is_normal: bool,
@@ -66,7 +63,6 @@ impl Note {
             user,
             app,
             value,
-            data,
             rho,
             psi,
             rcm,
@@ -83,14 +79,12 @@ impl Note {
         let user = User::dummy(&mut rng);
         let app = App::dummy(&mut rng);
         let value: u64 = rng.gen();
-        let data = pallas::Base::random(&mut rng);
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         Self {
             user,
             app,
             value,
-            data,
             rho,
             psi,
             rcm,
@@ -119,7 +113,14 @@ impl Note {
                             .by_vals()
                             .take(BASE_BITS_NUM),
                     )
-                    .chain(self.data.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
+                    .chain(
+                        self.app
+                            .data
+                            .to_le_bits()
+                            .iter()
+                            .by_vals()
+                            .take(BASE_BITS_NUM),
+                    )
                     .chain(
                         self.rho
                             .inner()

@@ -162,9 +162,9 @@ pub fn check_spend_note(
 
     // Witness data
     let data = assign_free_advice(
-        layouter.namespace(|| "witness rho"),
+        layouter.namespace(|| "witness data"),
         advices[0],
-        Value::known(spend_note.data),
+        Value::known(spend_note.app.data),
     )?;
 
     // Witness value(u64)
@@ -310,7 +310,7 @@ pub fn check_output_note(
     let data = assign_free_advice(
         layouter.namespace(|| "witness data"),
         advices[0],
-        Value::known(output_note.data),
+        Value::known(output_note.app.data),
     )?;
 
     // Witness value(u64)

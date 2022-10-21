@@ -93,9 +93,7 @@ impl ActionInfo {
             send_com: self.output.addr_send_closed,
             recv_vp: self.output.addr_recv_vp,
         };
-        let app = App {
-            app_vp: self.output.addr_app_vp,
-        };
+        let app = App::new(self.output.addr_app_vp, self.output.data);
 
         let psi = pallas::Base::random(&mut rng);
         let note_rcm = pallas::Scalar::random(&mut rng);
@@ -104,7 +102,6 @@ impl ActionInfo {
             app,
             self.output.value,
             nf,
-            self.output.data,
             psi,
             note_rcm,
             self.output.is_normal,

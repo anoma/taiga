@@ -1,33 +1,35 @@
 use crate::vp_description::ValidityPredicateDescription;
+use ff::Field;
 use pasta_curves::pallas;
 use rand::RngCore;
 
 #[derive(Debug, Clone)]
 pub struct App {
-    pub app_vp: ValidityPredicateDescription,
+    pub vp: ValidityPredicateDescription,
+    pub data: pallas::Base,
 }
 
 impl App {
-    pub fn new(app_vp_description: ValidityPredicateDescription) -> Self {
-        Self {
-            app_vp: app_vp_description,
-        }
+    pub fn new(vp: ValidityPredicateDescription, data: pallas::Base) -> Self {
+        Self { vp, data }
     }
 
     pub fn dummy(rng: &mut impl RngCore) -> Self {
         Self {
-            app_vp: ValidityPredicateDescription::dummy(rng),
+            vp: ValidityPredicateDescription::dummy(rng),
+            data: pallas::Base::random(rng),
         }
     }
 
     pub fn address(&self) -> pallas::Base {
-        self.app_vp.get_compressed()
+        self.vp.get_compressed()
     }
 }
 
 impl Default for App {
     fn default() -> App {
-        let app_vp = ValidityPredicateDescription::Compressed(pallas::Base::one());
-        App { app_vp }
+        let vp = ValidityPredicateDescription::Compressed(pallas::Base::one());
+        let data = pallas::Base::one();
+        App { vp, data }
     }
 }
