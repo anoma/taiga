@@ -816,7 +816,6 @@ fn test_halo2_note_commitment_circuit() {
                 self.app.clone(),
                 self.value,
                 self.rho,
-                self.data,
                 self.psi,
                 self.rcm,
                 self.is_normal,
@@ -847,9 +846,9 @@ fn test_halo2_note_commitment_circuit() {
 
             // Witness data
             let data = assign_free_advice(
-                layouter.namespace(|| "witness rho"),
+                layouter.namespace(|| "witness app data"),
                 note_commit_config.advices[0],
-                Value::known(note.data),
+                Value::known(note.app.data),
             )?;
 
             // Witness a random non-negative u64 note value

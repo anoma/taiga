@@ -11,9 +11,12 @@ pub struct NetValueCommitment(pallas::Point);
 impl NetValueCommitment {
     pub fn new(input_note: &Note, output_note: &Note, blind_r: &pallas::Scalar) -> Self {
         let base_input =
-            derivate_value_base(input_note.is_normal, &input_note.app, &input_note.data);
-        let base_output =
-            derivate_value_base(output_note.is_normal, &output_note.app, &output_note.data);
+            derivate_value_base(input_note.is_normal, &input_note.app, &input_note.app.data);
+        let base_output = derivate_value_base(
+            output_note.is_normal,
+            &output_note.app,
+            &output_note.app.data,
+        );
         NetValueCommitment(
             base_input * pallas::Scalar::from(input_note.value)
                 - base_output * pallas::Scalar::from(output_note.value)
