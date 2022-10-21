@@ -1,8 +1,9 @@
 use crate::app::App;
 use crate::constant::NOTE_COMMITMENT_R_GENERATOR;
 use crate::note::Note;
+use ff::PrimeField;
 use group::{cofactor::CofactorCurveAffine, Curve, Group};
-use halo2_proofs::arithmetic::CurveAffine;
+use halo2_proofs::arithmetic::{CurveAffine, CurveExt};
 use pasta_curves::pallas;
 
 #[derive(Copy, Clone, Debug)]
@@ -48,5 +49,13 @@ pub fn derivate_value_base(
     _app_address: &App,
     _data: &pallas::Base,
 ) -> pallas::Point {
-    pallas::Point::generator()
+    let hash = pallas::Point::hash_to_curve("taiga:test");
+    let mut bytes: Vec<u8> = vec![_is_normal.into()];
+    _app_address.get_vp().to_repr().map(|x| {
+        bytes.push(x);
+    });
+    _app_address.data.to_repr().map(|x| {
+        bytes.push(x);
+    });
+    hash(&bytes)
 }
