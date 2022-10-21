@@ -473,8 +473,8 @@ pub fn note_commitment_gadget(
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
     note_commit_chip: NoteCommitmentChip,
     user_address: AssignedCell<pallas::Base, pallas::Base>,
-    app_address: AssignedCell<pallas::Base, pallas::Base>,
-    data: AssignedCell<pallas::Base, pallas::Base>,
+    app_vp: AssignedCell<pallas::Base, pallas::Base>,
+    app_data: AssignedCell<pallas::Base, pallas::Base>,
     rho: AssignedCell<pallas::Base, pallas::Base>,
     psi: AssignedCell<pallas::Base, pallas::Base>,
     value: AssignedCell<pallas::Base, pallas::Base>,
@@ -496,26 +496,26 @@ pub fn note_commitment_gadget(
         chip.clone(),
         &mut layouter,
         &user_address,
-        &app_address,
+        &app_vp,
     )?;
 
     // `app_5_254` = bits 5..=254 of `app`
     let app_5_254 = MessagePiece::from_subpieces(
         chip.clone(),
         layouter.namespace(|| "app_5_254"),
-        [RangeConstrained::bitrange_of(app_address.value(), 5..255)],
+        [RangeConstrained::bitrange_of(app_vp.value(), 5..255)],
     )?;
 
-    // `data_0_249` = bits 0..=249 of `data`
+    // `data_0_249` = bits 0..=249 of `app_data`
     let data_0_249 = MessagePiece::from_subpieces(
         chip.clone(),
         layouter.namespace(|| "data_0_249"),
-        [RangeConstrained::bitrange_of(data.value(), 0..250)],
+        [RangeConstrained::bitrange_of(app_data.value(), 0..250)],
     )?;
 
-    // b = (bits 250..=255 of data) || (bits 0..=4 of rho)
+    // b = (bits 250..=255 of app_data) || (bits 0..=4 of rho)
     let (b, data_tail_bit5, rho_pre_bit5) =
-        Decompose5_5::decompose(&lookup_config, chip.clone(), &mut layouter, &data, &rho)?;
+        Decompose5_5::decompose(&lookup_config, chip.clone(), &mut layouter, &app_data, &rho)?;
 
     // `rho_5_254` = bits 5..=254 of `rho`
     let rho_5_254 = MessagePiece::from_subpieces(
@@ -541,7 +541,7 @@ pub fn note_commitment_gadget(
         &value,
     )?;
 
-    // cm = NoteCommit^rcm(user_address || app_address || data || rho || psi || is_normal || value)
+    // cm = NoteCommit^rcm(user_address || app_vp || app_data || rho || psi || is_normal || value)
     let (cm, _zs) = {
         let message = Message::from_pieces(
             chip.clone(),
@@ -587,9 +587,9 @@ pub fn note_commitment_gadget(
     cfg.base_canonicity_250_5
         .assign(&mut layouter, user_address, user_0_249, user_tail_bit5)?;
     cfg.base_canonicity_5
-        .assign(&mut layouter, app_address, app_5_254, app_pre_bit5)?;
+        .assign(&mut layouter, app_vp, app_5_254, app_pre_bit5)?;
     cfg.base_canonicity_250_5
-        .assign(&mut layouter, data, data_0_249, data_tail_bit5)?;
+        .assign(&mut layouter, app_data, data_0_249, data_tail_bit5)?;
     cfg.base_canonicity_5
         .assign(&mut layouter, rho, rho_5_254, rho_pre_bit5)?;
     cfg.base_canonicity_250_5
@@ -719,7 +719,6 @@ fn test_halo2_note_commitment_circuit() {
         app: App,
         value: u64,
         rho: Nullifier,
-        data: pallas::Base,
         psi: pallas::Base,
         rcm: pallas::Scalar,
         is_normal: bool,
@@ -838,15 +837,15 @@ fn test_halo2_note_commitment_circuit() {
             )?;
 
             // Witness app
-            let app_address = assign_free_advice(
+            let app_vp = assign_free_advice(
                 layouter.namespace(|| "witness rho"),
                 note_commit_config.advices[0],
-                Value::known(note.app.address()),
+                Value::known(note.app.get_vp()),
             )?;
 
-            // Witness data
-            let data = assign_free_advice(
-                layouter.namespace(|| "witness app data"),
+            // Witness app_data
+            let app_data = assign_free_advice(
+                layouter.namespace(|| "witness app app_data"),
                 note_commit_config.advices[0],
                 Value::known(note.app.data),
             )?;
@@ -893,8 +892,8 @@ fn test_halo2_note_commitment_circuit() {
                 ecc_chip.clone(),
                 note_commit_chip,
                 user_address,
-                app_address,
-                data,
+                app_vp,
+                app_data,
                 rho,
                 psi,
                 value_var,
@@ -922,7 +921,6 @@ fn test_halo2_note_commitment_circuit() {
             app: App::dummy(&mut rng),
             value: rng.next_u64(),
             rho: Nullifier::default(),
-            data: pallas::Base::random(&mut rng),
             psi: pallas::Base::random(&mut rng),
             rcm: pallas::Scalar::random(&mut rng),
             is_normal: false,
@@ -939,7 +937,6 @@ fn test_halo2_note_commitment_circuit() {
             app: App::dummy(&mut rng),
             value: rng.next_u64(),
             rho: Nullifier::default(),
-            data: pallas::Base::random(&mut rng),
             psi: pallas::Base::random(&mut rng),
             rcm: pallas::Scalar::random(&mut rng),
             is_normal: true,
