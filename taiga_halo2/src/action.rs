@@ -51,9 +51,9 @@ pub struct SpendInfo {
 pub struct OutputInfo {
     addr_send_closed: UserSendAddress,
     addr_recv_vp: ValidityPredicateDescription,
-    addr_app_vp: ValidityPredicateDescription,
+    app_vp: ValidityPredicateDescription,
+    app_data: pallas::Base,
     value: u64,
-    data: pallas::Base,
     is_normal: bool,
 }
 
@@ -93,7 +93,7 @@ impl ActionInfo {
             send_com: self.output.addr_send_closed,
             recv_vp: self.output.addr_recv_vp,
         };
-        let app = App::new(self.output.addr_app_vp, self.output.data);
+        let app = App::new(self.output.app_vp, self.output.app_data);
 
         let psi = pallas::Base::random(&mut rng);
         let note_rcm = pallas::Scalar::random(&mut rng);
@@ -152,17 +152,17 @@ impl OutputInfo {
     pub fn new(
         addr_send_closed: UserSendAddress,
         addr_recv_vp: ValidityPredicateDescription,
-        addr_app_vp: ValidityPredicateDescription,
+        app_vp: ValidityPredicateDescription,
+        app_data: pallas::Base,
         value: u64,
-        data: pallas::Base,
         is_normal: bool,
     ) -> Self {
         Self {
             addr_send_closed,
             addr_recv_vp,
-            addr_app_vp,
+            app_vp,
+            app_data,
             value,
-            data,
             is_normal,
         }
     }
@@ -171,15 +171,15 @@ impl OutputInfo {
         use rand::Rng;
         let addr_send_closed = UserSendAddress::from_closed(pallas::Base::random(&mut rng));
         let addr_recv_vp = ValidityPredicateDescription::dummy(&mut rng);
-        let addr_app_vp = ValidityPredicateDescription::dummy(&mut rng);
+        let app_vp = ValidityPredicateDescription::dummy(&mut rng);
+        let app_data = pallas::Base::random(&mut rng);
         let value: u64 = rng.gen();
-        let data = pallas::Base::random(rng);
         Self {
             addr_send_closed,
             addr_recv_vp,
-            addr_app_vp,
+            app_vp,
+            app_data,
             value,
-            data,
             is_normal: true,
         }
     }

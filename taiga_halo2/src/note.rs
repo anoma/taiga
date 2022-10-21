@@ -92,10 +92,10 @@ impl Note {
         }
     }
 
-    // cm = SinsemillaCommit^rcm(user_address || app_address || data || rho || psi || is_normal || value)
+    // cm = SinsemillaCommit^rcm(user_address || app_vp || app_data || rho || psi || is_normal || value)
     pub fn commitment(&self) -> NoteCommitment {
         let user_address = self.user.address();
-        let app_address = self.app.address();
+        let app_vp = self.app.get_vp();
         let ret = NOTE_COMMIT_DOMAIN
             .commit(
                 iter::empty()
@@ -106,13 +106,7 @@ impl Note {
                             .by_vals()
                             .take(BASE_BITS_NUM),
                     )
-                    .chain(
-                        app_address
-                            .to_le_bits()
-                            .iter()
-                            .by_vals()
-                            .take(BASE_BITS_NUM),
-                    )
+                    .chain(app_vp.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
                     .chain(
                         self.app
                             .data

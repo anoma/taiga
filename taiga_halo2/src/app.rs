@@ -21,7 +21,7 @@ impl App {
         }
     }
 
-    pub fn address(&self) -> pallas::Base {
+    pub fn get_vp(&self) -> pallas::Base {
         self.vp.get_compressed()
     }
 }

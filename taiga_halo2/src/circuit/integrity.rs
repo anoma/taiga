@@ -69,9 +69,9 @@ pub fn nullifier_circuit(
 #[derive(Debug)]
 pub struct SpendNoteVar {
     pub user_address: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_address: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_vp: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_data: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
-    pub data: AssignedCell<pallas::Base, pallas::Base>,
     pub nf: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
     pub is_normal: AssignedCell<pallas::Base, pallas::Base>,
@@ -153,16 +153,16 @@ pub fn check_spend_note(
         (user_address, nk_var)
     };
 
-    // Witness app_address
-    let app_address = assign_free_advice(
-        layouter.namespace(|| "witness app_address"),
+    // Witness app_vp
+    let app_vp = assign_free_advice(
+        layouter.namespace(|| "witness app_vp"),
         advices[0],
-        Value::known(spend_note.app.address()),
+        Value::known(spend_note.app.get_vp()),
     )?;
 
-    // Witness data
-    let data = assign_free_advice(
-        layouter.namespace(|| "witness data"),
+    // Witness app_data
+    let app_data = assign_free_advice(
+        layouter.namespace(|| "witness app_data"),
         advices[0],
         Value::known(spend_note.app.data),
     )?;
@@ -209,8 +209,8 @@ pub fn check_spend_note(
         ecc_chip.clone(),
         note_commit_chip,
         user_address.clone(),
-        app_address.clone(),
-        data.clone(),
+        app_vp.clone(),
+        app_data.clone(),
         rho.clone(),
         psi.clone(),
         value.clone(),
@@ -236,9 +236,9 @@ pub fn check_spend_note(
 
     Ok(SpendNoteVar {
         user_address,
-        app_address,
+        app_vp,
         value,
-        data,
+        app_data,
         nf,
         cm,
         is_normal,
@@ -249,9 +249,9 @@ pub fn check_spend_note(
 #[derive(Debug)]
 pub struct OutputNoteVar {
     pub user_address: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_address: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_vp: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_data: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
-    pub data: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
     pub is_normal: AssignedCell<pallas::Base, pallas::Base>,
 }
@@ -299,16 +299,16 @@ pub fn check_output_note(
         poseidon_hasher.hash(layouter.namespace(|| "user_address"), poseidon_message)?
     };
 
-    // Witness app_address
-    let app_address = assign_free_advice(
-        layouter.namespace(|| "witness app_address"),
+    // Witness app_vp
+    let app_vp = assign_free_advice(
+        layouter.namespace(|| "witness app_vp"),
         advices[0],
-        Value::known(output_note.app.address()),
+        Value::known(output_note.app.get_vp()),
     )?;
 
-    // Witness data
-    let data = assign_free_advice(
-        layouter.namespace(|| "witness data"),
+    // Witness app_data
+    let app_data = assign_free_advice(
+        layouter.namespace(|| "witness app_data"),
         advices[0],
         Value::known(output_note.app.data),
     )?;
@@ -348,8 +348,8 @@ pub fn check_output_note(
         ecc_chip,
         note_commit_chip,
         user_address.clone(),
-        app_address.clone(),
-        data.clone(),
+        app_vp.clone(),
+        app_data.clone(),
         old_nf,
         psi,
         value.clone(),
@@ -363,9 +363,9 @@ pub fn check_output_note(
 
     Ok(OutputNoteVar {
         user_address,
-        app_address,
+        app_vp,
+        app_data,
         value,
-        data,
         cm,
         is_normal,
     })
