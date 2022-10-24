@@ -6,8 +6,8 @@ use rand::RngCore;
 
 #[derive(Debug, Clone, Default)]
 pub struct Application {
-    pub vp: ValidityPredicateDescription,
-    pub vp_data: pallas::Base,
+    vp: ValidityPredicateDescription,
+    vp_data: pallas::Base,
     user: User,
 }
 
@@ -26,6 +26,10 @@ impl Application {
 
     pub fn get_vp(&self) -> pallas::Base {
         self.vp.get_compressed()
+    }
+
+    pub fn get_vp_data(&self) -> pallas::Base {
+        self.vp_data
     }
 
     pub fn get_user_send_closed(&self) -> pallas::Base {

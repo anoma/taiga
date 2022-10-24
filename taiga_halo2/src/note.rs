@@ -102,7 +102,7 @@ impl Note {
                     .chain(app_vp.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
                     .chain(
                         self.application
-                            .vp_data
+                            .get_vp_data()
                             .to_le_bits()
                             .iter()
                             .by_vals()
