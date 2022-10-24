@@ -1,5 +1,5 @@
 use crate::{
-    app::App,
+    application::Application,
     constant::{BASE_BITS_NUM, NOTE_COMMIT_DOMAIN},
     nullifier::Nullifier,
     utils::extract_p,
@@ -34,7 +34,7 @@ impl Default for NoteCommitment {
 /// A note
 #[derive(Debug, Clone, Default)]
 pub struct Note {
-    pub app: App,
+    pub application: Application,
     pub value: u64,
     /// old nullifier. Nonce which is a deterministically computed, unique nonce
     pub rho: Nullifier,
@@ -48,7 +48,7 @@ pub struct Note {
 impl Note {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        app: App,
+        application: Application,
         value: u64,
         rho: Nullifier,
         psi: pallas::Base,
@@ -56,7 +56,7 @@ impl Note {
         is_normal: bool,
     ) -> Self {
         Self {
-            app,
+            application,
             value,
             rho,
             psi,
@@ -71,12 +71,12 @@ impl Note {
     }
 
     pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
-        let app = App::dummy(&mut rng);
+        let application = Application::dummy(&mut rng);
         let value: u64 = rng.gen();
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         Self {
-            app,
+            application,
             value,
             rho,
             psi,
@@ -87,8 +87,8 @@ impl Note {
 
     // cm = SinsemillaCommit^rcm(user_address || app_vp || app_data || rho || psi || is_normal || value)
     pub fn commitment(&self) -> NoteCommitment {
-        let user_address = self.app.get_user_address();
-        let app_vp = self.app.get_vp();
+        let user_address = self.application.get_user_address();
+        let app_vp = self.application.get_vp();
         let ret = NOTE_COMMIT_DOMAIN
             .commit(
                 iter::empty()
@@ -101,7 +101,7 @@ impl Note {
                     )
                     .chain(app_vp.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
                     .chain(
-                        self.app
+                        self.application
                             .vp_data
                             .to_le_bits()
                             .iter()
@@ -130,7 +130,7 @@ impl Note {
     }
 
     pub fn get_nf(&self) -> Nullifier {
-        let nk = self.app.get_nk().unwrap();
+        let nk = self.application.get_nk().unwrap();
         let cm = self.commitment();
         Nullifier::derive_native(&nk, &self.rho.inner(), &self.psi, &cm)
     }
