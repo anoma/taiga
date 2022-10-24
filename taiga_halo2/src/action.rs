@@ -1,5 +1,5 @@
 use crate::{
-    app::App,
+    application::Application,
     circuit::action_circuit::ActionCircuit,
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{MerklePath, Node},
@@ -46,7 +46,7 @@ pub struct SpendInfo {
 
 #[derive(Debug, Clone)]
 pub struct OutputInfo {
-    app: App,
+    application: Application,
     // addr_send_closed: UserSendAddress,
     // addr_recv_vp: ValidityPredicateDescription,
     // app_vp: ValidityPredicateDescription,
@@ -89,7 +89,7 @@ impl ActionInfo {
         let psi = pallas::Base::random(&mut rng);
         let note_rcm = pallas::Scalar::random(&mut rng);
         let output_note = Note::new(
-            self.output.app,
+            self.output.application,
             self.output.value,
             nf,
             psi,
@@ -139,9 +139,9 @@ impl SpendInfo {
 }
 
 impl OutputInfo {
-    pub fn new(app: App, value: u64, is_normal: bool) -> Self {
+    pub fn new(application: Application, value: u64, is_normal: bool) -> Self {
         Self {
-            app,
+            application,
             value,
             is_normal,
         }
@@ -149,10 +149,10 @@ impl OutputInfo {
 
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
         use rand::Rng;
-        let app = App::dummy(&mut rng);
+        let application = Application::dummy(&mut rng);
         let value: u64 = rng.gen();
         Self {
-            app,
+            application,
             value,
             is_normal: true,
         }

@@ -5,13 +5,13 @@ use pasta_curves::pallas;
 use rand::RngCore;
 
 #[derive(Debug, Clone, Default)]
-pub struct App {
+pub struct Application {
     pub vp: ValidityPredicateDescription,
     pub vp_data: pallas::Base,
     user: User,
 }
 
-impl App {
+impl Application {
     pub fn new(vp: ValidityPredicateDescription, vp_data: pallas::Base, user: User) -> Self {
         Self { vp, vp_data, user }
     }
