@@ -7,7 +7,8 @@ use crate::constant::{
     NoteCommitmentHashDomain, NullifierK,
 };
 use crate::note::Note;
-use group::{Curve, Group};
+use ff::PrimeField;
+use group::Curve;
 use halo2_gadgets::{
     ecc::{
         chip::EccChip, FixedPoint, FixedPointBaseField, NonIdentityPoint, Point, ScalarFixed,
@@ -371,19 +372,31 @@ pub fn check_output_note(
     })
 }
 
-// TODO: hash_to_curve to derivate the value base
-// use the generator as value base temporarily
+// TODO: add hash_to_curve circuit to derivate the value base
 pub fn derivate_value_base(
     mut layouter: impl Layouter<pallas::Base>,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
-    _is_normal_spend: AssignedCell<pallas::Base, pallas::Base>,
-    _app_spend: AssignedCell<pallas::Base, pallas::Base>,
-    _data_spend: AssignedCell<pallas::Base, pallas::Base>,
+    is_normal: AssignedCell<pallas::Base, pallas::Base>,
+    app_vp: AssignedCell<pallas::Base, pallas::Base>,
+    app_data: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<NonIdentityPoint<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
+    let out_of_circuit_value_base = {
+        use halo2_proofs::arithmetic::CurveExt;
+        let hash = pallas::Point::hash_to_curve("taiga:test");
+        let mut bytes: Vec<u8> = vec![];
+        is_normal.value().map(|v| bytes.push(v.to_repr()[0]));
+        app_vp.value().map(|x| {
+            bytes.extend_from_slice(&x.to_repr());
+        });
+        app_data.value().map(|x| {
+            bytes.extend_from_slice(&x.to_repr());
+        });
+        hash(&bytes)
+    };
     NonIdentityPoint::new(
         ecc_chip,
         layouter.namespace(|| "derivate value base"),
-        Value::known(pallas::Point::generator().to_affine()),
+        Value::known(out_of_circuit_value_base.to_affine()),
     )
 }
 
