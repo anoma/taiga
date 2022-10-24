@@ -160,7 +160,7 @@ pub fn check_spend_note(
     let app_data = assign_free_advice(
         layouter.namespace(|| "witness app_vp_data"),
         advices[0],
-        Value::known(spend_note.application.vp_data),
+        Value::known(spend_note.application.get_vp_data()),
     )?;
 
     // Witness value(u64)
@@ -306,7 +306,7 @@ pub fn check_output_note(
     let app_data = assign_free_advice(
         layouter.namespace(|| "witness app_data"),
         advices[0],
-        Value::known(output_note.application.vp_data),
+        Value::known(output_note.application.get_vp_data()),
     )?;
 
     // Witness value(u64)

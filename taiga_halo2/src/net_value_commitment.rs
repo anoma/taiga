@@ -41,6 +41,6 @@ pub fn derivate_value_base(is_normal: bool, application: &Application) -> pallas
     let hash = pallas::Point::hash_to_curve("taiga:test");
     let mut bytes: Vec<u8> = vec![is_normal.into()];
     bytes.extend_from_slice(&application.get_vp().to_repr());
-    bytes.extend_from_slice(&application.vp_data.to_repr());
+    bytes.extend_from_slice(&application.get_vp_data().to_repr());
     hash(&bytes)
 }

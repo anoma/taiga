@@ -846,7 +846,7 @@ fn test_halo2_note_commitment_circuit() {
             let app_data = assign_free_advice(
                 layouter.namespace(|| "witness application vp_data"),
                 note_commit_config.advices[0],
-                Value::known(note.application.vp_data),
+                Value::known(note.application.get_vp_data()),
             )?;
 
             // Witness a random non-negative u64 note value
