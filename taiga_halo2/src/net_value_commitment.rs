@@ -11,13 +11,8 @@ pub struct NetValueCommitment(pallas::Point);
 
 impl NetValueCommitment {
     pub fn new(input_note: &Note, output_note: &Note, blind_r: &pallas::Scalar) -> Self {
-        let base_input =
-            derivate_value_base(input_note.is_normal, &input_note.app, &input_note.app.data);
-        let base_output = derivate_value_base(
-            output_note.is_normal,
-            &output_note.app,
-            &output_note.app.data,
-        );
+        let base_input = derivate_value_base(input_note.is_normal, &input_note.app);
+        let base_output = derivate_value_base(output_note.is_normal, &output_note.app);
         NetValueCommitment(
             base_input * pallas::Scalar::from(input_note.value)
                 - base_output * pallas::Scalar::from(output_note.value)
@@ -42,20 +37,10 @@ impl NetValueCommitment {
     }
 }
 
-// TODO: hash_to_curve to derivate the value base
-// use the generator as value base temporarily
-pub fn derivate_value_base(
-    _is_normal: bool,
-    _app_address: &App,
-    _data: &pallas::Base,
-) -> pallas::Point {
+pub fn derivate_value_base(is_normal: bool, app: &App) -> pallas::Point {
     let hash = pallas::Point::hash_to_curve("taiga:test");
-    let mut bytes: Vec<u8> = vec![_is_normal.into()];
-    _app_address.get_vp().to_repr().map(|x| {
-        bytes.push(x);
-    });
-    _app_address.data.to_repr().map(|x| {
-        bytes.push(x);
-    });
+    let mut bytes: Vec<u8> = vec![is_normal.into()];
+    bytes.extend_from_slice(&app.get_vp().to_repr());
+    bytes.extend_from_slice(&app.data.to_repr());
     hash(&bytes)
 }
