@@ -49,3 +49,9 @@ impl ValidityPredicateDescription {
         Self::Compressed(pallas::Base::random(rng))
     }
 }
+
+impl Default for ValidityPredicateDescription {
+    fn default() -> ValidityPredicateDescription {
+        ValidityPredicateDescription::Compressed(pallas::Base::one())
+    }
+}

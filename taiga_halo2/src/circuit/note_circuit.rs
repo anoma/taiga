@@ -811,7 +811,6 @@ fn test_halo2_note_commitment_circuit() {
                 NoteCommitmentFixedBases,
             >::load(note_commit_config.sinsemilla_config.clone(), &mut layouter)?;
             let note = Note::new(
-                self.user.clone(),
                 self.app.clone(),
                 self.value,
                 self.rho,
@@ -831,9 +830,9 @@ fn test_halo2_note_commitment_circuit() {
 
             // Witness user
             let user_address = assign_free_advice(
-                layouter.namespace(|| "witness rho"),
+                layouter.namespace(|| "witness user address"),
                 note_commit_config.advices[0],
-                Value::known(note.user.address()),
+                Value::known(note.app.get_user_address()),
             )?;
 
             // Witness app
@@ -845,9 +844,9 @@ fn test_halo2_note_commitment_circuit() {
 
             // Witness app_data
             let app_data = assign_free_advice(
-                layouter.namespace(|| "witness app app_data"),
+                layouter.namespace(|| "witness app vp_data"),
                 note_commit_config.advices[0],
-                Value::known(note.app.data),
+                Value::known(note.app.vp_data),
             )?;
 
             // Witness a random non-negative u64 note value

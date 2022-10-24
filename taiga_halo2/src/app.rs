@@ -1,35 +1,50 @@
+use crate::user::{NullifierDerivingKey, User};
 use crate::vp_description::ValidityPredicateDescription;
 use ff::Field;
 use pasta_curves::pallas;
 use rand::RngCore;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct App {
     pub vp: ValidityPredicateDescription,
-    pub data: pallas::Base,
+    pub vp_data: pallas::Base,
+    user: User,
 }
 
 impl App {
-    pub fn new(vp: ValidityPredicateDescription, data: pallas::Base) -> Self {
-        Self { vp, data }
+    pub fn new(vp: ValidityPredicateDescription, vp_data: pallas::Base, user: User) -> Self {
+        Self { vp, vp_data, user }
     }
 
-    pub fn dummy(rng: &mut impl RngCore) -> Self {
+    pub fn dummy<R: RngCore>(mut rng: R) -> Self {
         Self {
-            vp: ValidityPredicateDescription::dummy(rng),
-            data: pallas::Base::random(rng),
+            vp: ValidityPredicateDescription::dummy(&mut rng),
+            vp_data: pallas::Base::random(&mut rng),
+            user: User::dummy(&mut rng),
         }
     }
 
     pub fn get_vp(&self) -> pallas::Base {
         self.vp.get_compressed()
     }
-}
 
-impl Default for App {
-    fn default() -> App {
-        let vp = ValidityPredicateDescription::Compressed(pallas::Base::one());
-        let data = pallas::Base::one();
-        App { vp, data }
+    pub fn get_user_send_closed(&self) -> pallas::Base {
+        self.user.get_send_closed()
+    }
+
+    pub fn get_user_send_data(&self) -> Option<pallas::Base> {
+        self.user.get_send_data()
+    }
+
+    pub fn get_user_recv_data(&self) -> pallas::Base {
+        self.user.get_recv_data()
+    }
+
+    pub fn get_user_address(&self) -> pallas::Base {
+        self.user.address()
+    }
+
+    pub fn get_nk(&self) -> Option<NullifierDerivingKey> {
+        self.user.get_nk()
     }
 }
