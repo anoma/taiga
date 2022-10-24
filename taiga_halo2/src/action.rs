@@ -6,9 +6,6 @@ use crate::{
     net_value_commitment::NetValueCommitment,
     note::{Note, NoteCommitment},
     nullifier::Nullifier,
-    user::User,
-    user::UserSendAddress,
-    vp_description::ValidityPredicateDescription,
 };
 use ff::Field;
 use pasta_curves::pallas;
@@ -49,10 +46,11 @@ pub struct SpendInfo {
 
 #[derive(Debug, Clone)]
 pub struct OutputInfo {
-    addr_send_closed: UserSendAddress,
-    addr_recv_vp: ValidityPredicateDescription,
-    app_vp: ValidityPredicateDescription,
-    app_data: pallas::Base,
+    app: App,
+    // addr_send_closed: UserSendAddress,
+    // addr_recv_vp: ValidityPredicateDescription,
+    // app_vp: ValidityPredicateDescription,
+    // app_data: pallas::Base,
     value: u64,
     is_normal: bool,
 }
@@ -88,18 +86,10 @@ impl ActionInfo {
 
     pub fn build<R: RngCore>(self, mut rng: R) -> (ActionInstance, ActionCircuit) {
         let nf = self.spend.note.get_nf();
-
-        let user = User {
-            send_com: self.output.addr_send_closed,
-            recv_vp: self.output.addr_recv_vp,
-        };
-        let app = App::new(self.output.app_vp, self.output.app_data);
-
         let psi = pallas::Base::random(&mut rng);
         let note_rcm = pallas::Scalar::random(&mut rng);
         let output_note = Note::new(
-            user,
-            app,
+            self.output.app,
             self.output.value,
             nf,
             psi,
@@ -149,19 +139,9 @@ impl SpendInfo {
 }
 
 impl OutputInfo {
-    pub fn new(
-        addr_send_closed: UserSendAddress,
-        addr_recv_vp: ValidityPredicateDescription,
-        app_vp: ValidityPredicateDescription,
-        app_data: pallas::Base,
-        value: u64,
-        is_normal: bool,
-    ) -> Self {
+    pub fn new(app: App, value: u64, is_normal: bool) -> Self {
         Self {
-            addr_send_closed,
-            addr_recv_vp,
-            app_vp,
-            app_data,
+            app,
             value,
             is_normal,
         }
@@ -169,16 +149,10 @@ impl OutputInfo {
 
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
         use rand::Rng;
-        let addr_send_closed = UserSendAddress::from_closed(pallas::Base::random(&mut rng));
-        let addr_recv_vp = ValidityPredicateDescription::dummy(&mut rng);
-        let app_vp = ValidityPredicateDescription::dummy(&mut rng);
-        let app_data = pallas::Base::random(&mut rng);
+        let app = App::dummy(&mut rng);
         let value: u64 = rng.gen();
         Self {
-            addr_send_closed,
-            addr_recv_vp,
-            app_vp,
-            app_data,
+            app,
             value,
             is_normal: true,
         }
