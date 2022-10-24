@@ -47,10 +47,6 @@ pub struct SpendInfo {
 #[derive(Debug, Clone)]
 pub struct OutputInfo {
     application: Application,
-    // addr_send_closed: UserSendAddress,
-    // addr_recv_vp: ValidityPredicateDescription,
-    // app_vp: ValidityPredicateDescription,
-    // app_data: pallas::Base,
     value: u64,
     is_normal: bool,
 }
