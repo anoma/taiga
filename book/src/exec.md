@@ -58,36 +58,39 @@ The 'twin' intent token note of value [-1] balancing this token will only be cre
 If we look at the intent token notes as messages passing from one user (application) to another, the first [1] intent note can signal a message being sent, when the [-1] note will signal that the message has been received. See more about the idea of message passing [here](message_passing.md).
 
 ## Step 2: Gossip
-Once intentVP is specified and the initial partial transaction is created, the user sends the intent to the intent gossip network and solvers match intents in order to create full transactions and publish them on the blockchain. That implies that users need to give some information to the solvers (including the content of `intentVP`) that is sufficient to create partial transactions and transactions (proofs)
-
-To Do: what is the minimal amount of information needs to be revealed to the solver in order to match a transaction?
+Once the intentVP is specified and the initial partial transaction is created, the user sends everything to the intent gossip network. Gossip nodes send those intents to each other, spreading them around. Solvers listen to the intent gossip network and receive the intents.
 
 ## Step 3: Solve
-We are considering the model when a solver makes one step at a time and sends the step result to the next solver. In practice, the solver can send the result to themselves and continue solving if they have the intent to make the next step. It would be nice to merge the steps into one when possible, but for simplicity we ignore this detail here
+
+Solvers receive intents from the intent gossip network and match them together in order to create transactions. 
+
+**Note**: that implies that users need to give some information to the solvers (including the content of `intentVP`) that is sufficient to create partial transactions and transactions (to create proofs).
+
+We are considering the model where a solver makes one step at a time and sends the step result back to the gossip network, where the partial solution meets the next solver in the chain. In practice, the solver can continue solving instead of sending the result back to the gossip network if they can make the next step
 
 ### Create partial transactions
 
-When a solver has two intents that can be [partially] matched together, they [partially] match the intents by creating new partial transactions. The intentVPs or other partial transactions are not modified.
+When a solver has intents that can be [partially] matched together, they [partially] match the intents by creating new partial transactions. Solvers cannot modify the old data, only create new (e.g. new partial transactions).
 
 #### Prove
-Solvers are responsible for creation of all proofs (`Action`, `tokenVP`, etc) required for a state transition for their partial solutions.
-- solvers **have the authority** to spend and create the notes they receive and produce the proofs required to perform the action
-- solvers **know** the content of intentVPs of the users (necessary to be able to satisfy them)
-- solvers **don't know** the identities of the users
+Solvers are responsible for creation of all proofs (`Action`, `VP`, etc) required for their partial solutions. For that reason, solvers:
+- **have the authority** to spend and create the notes they receive and produce the proofs required to perform the action
+- **know** the content of intentVPs of the users (necessary to be able to satisfy them)
+- **don't know** the identities of the users
 
-When solvers receive partial transactions, they must check all of the proofs attached to them.
+When solvers receive partial solutions from the gossip network, they must check all of the proofs attached to them.
 
 #### Local `cm` trees
 
-To store note commitments `cm`, a local commitment tree `CMtree` is created. After the transaction is finalized, the tree will be published on the blockchain along with the transaction.
+To store note commitments of the created notes, a local commitment tree `CMtree` is created. After the transaction is finalized, the tree will be published on the blockchain along with the transaction.
 
 ### Partial vs final match
 
 After the solver matches the intents, two cases are possible:
-1. At least one of the total per-token balances computed by summing up the per-token balances of partial transactions doesn't equal the balancing value. The solver sends the data to the next solver
+1. At least one of the total per-token balances computed by summing up the per-token balances of partial transactions doesn't equal the balancing value. In this case, the solver sends the data to the gossip network
 2. All total per-token balances are equal to the balancing values. A valid transaction can be created and published
 
-**Note**: in the current implementation we assume a simpler model where only one solver can match n-party bartering intents (**no partial solving**).
+**Note**: in the current implementation we assume a simpler model with no partial solving.
 
 **Note**: solvers don't need to be identified as all actions are authorized by user/app VPs. However, if they want to receive fees, they need to have an address on the chain.
 
@@ -97,13 +100,17 @@ After the intents are matched with satisfaction of all involved parties, the tra
 
 ## Examples
 
-### Three-party barter
+Let's see how different use cases can be handled with this execution model.
 
-On the diagram below you can see an example of three-party bartering cycle in the execution model described in this document.
+### 1. Three-party barter
+
+Three parties, Alice, Bob, and Charlie, are looking for some assets in exchange for something else. Their intents can be matched into a three-party bartering cycle. Let's see step by step how this happens.
+
+**Note**: parties don't require three-party bartering explicitly
 
 ![img.png](img/exec_3_party.png)
 
-**Step 1-2**: The users (Alice, Bob, and Charlie) define their intents and create intentVPs. It doesn't have to happen at the same time for all users, but for simplicity we describe it as one step. The intentVPs of all three users have the same structure: users are willing to spend their asset (Alice - a star, Bob - a dolphin, Charlie - a tree) in exchange for some other asset. Once the user receives the desired asset, an intent token note of value [-1] is emitted. In addition to that, all three users also create their initial partial transactions spending the asset they are ready to give away (Alice ptx, Bob ptx, and Charlie ptx).
+**Step 1-2**: The users define their intents and create intentVPs. It doesn't have to happen at the same time for all users, but for simplicity we describe it as one step. The intentVPs of all three users have the same structure: users are willing to spend their asset (Alice - a star, Bob - a dolphin, Charlie - a tree) in exchange for some other asset. Once the user receives the desired asset, an intent token note of value [-1] is emitted. In addition to that, all three users also create their initial partial transactions spending the asset they are ready to give away (Alice ptx, Bob ptx, and Charlie ptx).
 
 **Step 3**: A solver sees Alice's ptx and Bob's ptx, matches them together, and creates a new partial transaction. Alice's intentVP is satisfied, [-1] intent token note is created. 
 
@@ -127,23 +134,23 @@ Total per-token balances:
 |green intent token|[1]+ [-1]|-|0|
 
 **Step 5**:
-The final transaction containing the spent and output notes from partial transactions is created. All proofs are attached.
+The final transaction containing the spent and output notes from partial transactions is created with all proofs attached.
 
-### Complex intentVP
+### 2. Complex intentVP
 
-Let's consider a situation where one of the parties has a more complex VP. Here Alice has two notes: [1] of token A and [2] of token B and wants to get a blue dolphin NFT in  exchange for one of them and get the other one back. Bob has a simple intentVP as in the example above.
+Let's consider the situation where one of the parties has a complex VP (compared to the VPs above). Here Alice has two notes: [1] of token A and [2] of token B and wants to get a blue dolphin NFT in  exchange for one of them and get the other one back. Bob has a simple intentVP as in the example above.
 
 ![img.png](img/exec_complex_vp.png)
 
-**Step 1-2**: Alice and Bob define their intents and create their intentVPs. They create their initial partial transactions. Alice spends both of the notes she is ready to give away, expecting to receive one of them back (and the other one goes to the former blue dolphin NFT owner).
+**Step 1-2**: Alice and Bob create their intentVPs and initial partial transactions. Alice spends both of the notes she is ready to give away, expecting to receive one of them back (the other one will go to the counterparty).
 
-**Step 3**: A solver sees Alice's and Bob's partial transactions and matches them together, creating new partial transactions. Alice receives the blue dolphin NFT and one of her notes ([1] of A) back, her intentVP is satisfied and the [-1] note of Alice's intent token is released. Bob get's [2]B note from Alice, his intentVP is satisfied, [-1] intent token note is released. All total per-token balances are equal to 0, and the final transaction can be created.
+**Step 3**: A solver sees Alice's and Bob's partial transactions and matches them together. Alice receives the blue dolphin NFT and one of her notes ([1] of A) back, her intentVP is satisfied and the [-1] note of Alice's intent token is released. Bob get's [2]B note from Alice, his intentVP is satisfied, [-1] intent token note is released. All total per-token balances are equal to 0, and the final transaction can be created.
 
-**Step 4**: The final transaction is created from the spent and output notes from the partial transactions. All proofs are attached.
+**Step 4**: The final transaction is created using the spent and output notes from the partial transactions.
 
-### One way to represent arbitrary states
+### 3. One way to represent arbitrary states
 
-For arbitrary application, notes store the state of the application. When the application needs to change its state, it (anyone who has the authority) can spend the old state and produce a new state.
+For an arbitrary application, notes store the state of the application. When the application needs to change its state, it (i.e. any party that has the authority) can spend the old state and produce a new state.
 If the state change is possible within one partial transaction, such a note has a value 0 and doesn't affect the total balance.
 ![img.png](img/exec_arbitrary_state_update.png)
 
