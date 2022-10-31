@@ -23,8 +23,6 @@ Two of the main requirements for an Anoma transaction to be valid are:
 1. VPs of all involved in the transaction parties must be satisfied
 2. The transaction must be **balanced** , i.e the value spent in the transaction minus the value output equals to some predefined value `v`, the **balancing value**
 
-**Note**: For simplicity in the examples and diagrams below we assume that the balancing value `v` is equal to zero
-
 We call a **partial transaction** a state transition where the first requirement is satisfied (all VPs evaluate to True), but the second one isn't (the state transition is unbalanced). Such a state transition isn't a valid transaction and cannot be published on the blockchain, 
 but can be combined with other partial transactions in order to build a valid transaction. 
 
@@ -101,6 +99,8 @@ After the intents are matched with satisfaction of all involved parties, the tra
 ## Examples
 
 Let's see how different use cases can be handled with this execution model.
+
+**Note**: For simplicity in the examples below we assume that the balancing value `v` is equal to zero
 
 ### 1. Three-party barter
 
