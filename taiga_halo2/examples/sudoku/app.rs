@@ -6,7 +6,6 @@ use halo2_proofs::{
 };
 use pasta_curves::{pallas, Fp};
 
-
 extern crate taiga_halo2;
 use halo2_gadgets::poseidon::{
     primitives::{self as poseidon, P128Pow5T3},

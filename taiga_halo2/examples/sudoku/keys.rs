@@ -1,6 +1,4 @@
-use halo2_proofs::{
-    plonk::{self, Circuit},
-};
+use halo2_proofs::plonk::{self, Circuit};
 use pasta_curves::{pallas, vesta};
 
 #[derive(Debug)]

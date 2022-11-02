@@ -9,8 +9,6 @@ use rand::RngCore;
 
 extern crate taiga_halo2;
 
-
-
 #[derive(Clone)]
 pub struct Proof(Vec<u8>);
 
