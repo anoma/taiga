@@ -11,8 +11,8 @@ fn main() {
 
     use crate::{
         app::AppCircuit,
+        keys::{ProvingKey, VerifyingKey},
         proof::Proof,
-        keys::{VerifyingKey, ProvingKey}
     };
 
     let sudoku = [

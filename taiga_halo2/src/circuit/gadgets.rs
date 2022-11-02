@@ -135,8 +135,6 @@ pub trait MulInstructions<F: FieldExt>: Chip<F> {
     ) -> Result<AssignedCell<F, F>, Error>;
 }
 
-
-
 #[derive(Clone, Debug)]
 pub struct MulConfig {
     advice: [Column<Advice>; 2],
@@ -162,13 +160,8 @@ impl<F: FieldExt> Chip<F> for MulChip<F> {
     }
 }
 
-
-
 impl<F: FieldExt> MulChip<F> {
-    pub fn configure(
-        meta: &mut ConstraintSystem<F>,
-        advice: [Column<Advice>; 2],
-    ) -> MulConfig {
+    pub fn configure(meta: &mut ConstraintSystem<F>, advice: [Column<Advice>; 2]) -> MulConfig {
         let s_mul = meta.selector();
         meta.create_gate("Field element multiplication: c = a * b", |meta| {
             let s_mul = meta.query_selector(s_mul);
@@ -183,7 +176,10 @@ impl<F: FieldExt> MulChip<F> {
     }
 
     pub fn construct(config: MulConfig) -> Self {
-        Self { config, _marker: PhantomData }
+        Self {
+            config,
+            _marker: PhantomData,
+        }
     }
 }
 

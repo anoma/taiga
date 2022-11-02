@@ -1,7 +1,7 @@
 use halo2_proofs::{
     arithmetic::FieldExt,
     circuit::{floor_planner, AssignedCell, Layouter, Value},
-    plonk::{self, Advice, Column, Instance as InstanceColumn, SingleVerifier, Circuit},
+    plonk::{self, Advice, Circuit, Column, Instance as InstanceColumn, SingleVerifier},
     transcript::{Blake2bRead, Blake2bWrite},
 };
 use pasta_curves::{pallas, vesta, Fp};
@@ -40,4 +40,3 @@ impl ProvingKey {
         ProvingKey { params, pk }
     }
 }
-
