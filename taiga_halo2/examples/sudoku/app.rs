@@ -2,11 +2,10 @@ use ff::PrimeField;
 use halo2_proofs::{
     arithmetic::FieldExt,
     circuit::{floor_planner, AssignedCell, Layouter, Value},
-    plonk::{self, Advice, Column, Instance as InstanceColumn, SingleVerifier},
-    transcript::{Blake2bRead, Blake2bWrite},
+    plonk::{self, Advice, Column, Instance as InstanceColumn},
 };
-use pasta_curves::{pallas, vesta, Fp};
-use rand::RngCore;
+use pasta_curves::{pallas, Fp};
+
 
 extern crate taiga_halo2;
 use halo2_gadgets::poseidon::{

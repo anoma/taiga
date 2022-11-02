@@ -1,22 +1,15 @@
 use crate::keys::{ProvingKey, VerifyingKey};
-use ff::PrimeField;
+
 use halo2_proofs::{
-    arithmetic::FieldExt,
-    circuit::{floor_planner, AssignedCell, Layouter, Value},
-    plonk::{self, Advice, Circuit, Column, Instance as InstanceColumn, SingleVerifier},
+    plonk::{self, Circuit, SingleVerifier},
     transcript::{Blake2bRead, Blake2bWrite},
 };
-use pasta_curves::{pallas, vesta, Fp};
+use pasta_curves::{pallas, vesta};
 use rand::RngCore;
 
 extern crate taiga_halo2;
-use halo2_gadgets::poseidon::{
-    primitives::{self as poseidon, P128Pow5T3},
-    Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
-};
-use taiga_halo2::circuit::gadgets::{
-    assign_free_advice, AddChip, AddConfig, AddInstructions, MulInstructions,
-};
+
+
 
 #[derive(Clone)]
 pub struct Proof(Vec<u8>);

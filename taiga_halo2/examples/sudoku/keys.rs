@@ -1,10 +1,7 @@
 use halo2_proofs::{
-    arithmetic::FieldExt,
-    circuit::{floor_planner, AssignedCell, Layouter, Value},
-    plonk::{self, Advice, Circuit, Column, Instance as InstanceColumn, SingleVerifier},
-    transcript::{Blake2bRead, Blake2bWrite},
+    plonk::{self, Circuit},
 };
-use pasta_curves::{pallas, vesta, Fp};
+use pasta_curves::{pallas, vesta};
 
 #[derive(Debug)]
 pub struct VerifyingKey {
