@@ -490,7 +490,7 @@ pub fn note_commitment_gadget(
         [RangeConstrained::bitrange_of(user_address.value(), 0..250)],
     )?;
 
-    // `a` = (bits 250..=255 of user) || (bits 0..=4 of app)
+    // `a` = (bits 250..=255 of user) || (bits 0..=4 of application)
     let (a, user_tail_bit5, app_pre_bit5) = Decompose5_5::decompose(
         &lookup_config,
         chip.clone(),
@@ -499,7 +499,7 @@ pub fn note_commitment_gadget(
         &app_vp,
     )?;
 
-    // `app_5_254` = bits 5..=254 of `app`
+    // `app_5_254` = bits 5..=254 of `application`
     let app_5_254 = MessagePiece::from_subpieces(
         chip.clone(),
         layouter.namespace(|| "app_5_254"),
@@ -695,7 +695,7 @@ impl NoteChip {
 fn test_halo2_note_commitment_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use crate::note::Note;
-    use crate::{app::App, nullifier::Nullifier, user::User};
+    use crate::{application::Application, nullifier::Nullifier, user::User};
     use ff::Field;
     use group::Curve;
     use halo2_gadgets::{
@@ -716,7 +716,7 @@ fn test_halo2_note_commitment_circuit() {
     #[derive(Default)]
     struct MyCircuit {
         user: User,
-        app: App,
+        application: Application,
         value: u64,
         rho: Nullifier,
         psi: pallas::Base,
@@ -811,8 +811,7 @@ fn test_halo2_note_commitment_circuit() {
                 NoteCommitmentFixedBases,
             >::load(note_commit_config.sinsemilla_config.clone(), &mut layouter)?;
             let note = Note::new(
-                self.user.clone(),
-                self.app.clone(),
+                self.application.clone(),
                 self.value,
                 self.rho,
                 self.psi,
@@ -831,23 +830,23 @@ fn test_halo2_note_commitment_circuit() {
 
             // Witness user
             let user_address = assign_free_advice(
-                layouter.namespace(|| "witness rho"),
+                layouter.namespace(|| "witness user address"),
                 note_commit_config.advices[0],
-                Value::known(note.user.address()),
+                Value::known(note.application.get_user_address()),
             )?;
 
-            // Witness app
+            // Witness application
             let app_vp = assign_free_advice(
                 layouter.namespace(|| "witness rho"),
                 note_commit_config.advices[0],
-                Value::known(note.app.get_vp()),
+                Value::known(note.application.get_vp()),
             )?;
 
             // Witness app_data
             let app_data = assign_free_advice(
-                layouter.namespace(|| "witness app app_data"),
+                layouter.namespace(|| "witness application vp_data"),
                 note_commit_config.advices[0],
-                Value::known(note.app.data),
+                Value::known(note.application.get_vp_data()),
             )?;
 
             // Witness a random non-negative u64 note value
@@ -918,7 +917,7 @@ fn test_halo2_note_commitment_circuit() {
     {
         let circuit = MyCircuit {
             user: User::dummy(&mut rng),
-            app: App::dummy(&mut rng),
+            application: Application::dummy(&mut rng),
             value: rng.next_u64(),
             rho: Nullifier::default(),
             psi: pallas::Base::random(&mut rng),
@@ -934,7 +933,7 @@ fn test_halo2_note_commitment_circuit() {
     {
         let circuit = MyCircuit {
             user: User::dummy(&mut rng),
-            app: App::dummy(&mut rng),
+            application: Application::dummy(&mut rng),
             value: rng.next_u64(),
             rho: Nullifier::default(),
             psi: pallas::Base::random(&mut rng),

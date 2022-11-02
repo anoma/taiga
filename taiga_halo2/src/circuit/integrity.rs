@@ -99,28 +99,23 @@ pub fn check_spend_note(
 ) -> Result<SpendNoteVar, Error> {
     // Check spend note user integrity: user_address = Com_r(Com_r(send_vp, nk), recv_vp_hash)
     let (user_address, nk) = {
-        // Witness send_vp
-        let send_vp = spend_note
-            .user
-            .send_com
-            .get_send_vp()
-            .unwrap()
-            .get_compressed();
+        // Witness send_data
+        let send_data = spend_note.application.get_user_send_data().unwrap();
         let send_vp_var = assign_free_advice(
-            layouter.namespace(|| "witness nk"),
+            layouter.namespace(|| "witness user send data"),
             advices[0],
-            Value::known(send_vp),
+            Value::known(send_data),
         )?;
 
         // Witness nk
-        let nk = spend_note.user.get_nk().unwrap();
+        let nk = spend_note.application.get_nk().unwrap();
         let nk_var = assign_free_advice(
             layouter.namespace(|| "witness nk"),
             advices[0],
             Value::known(nk.inner()),
         )?;
 
-        // send_com = Com_r(send_vp, nk)
+        // send_com = Com_r(send_data, nk)
         let send_com = {
             let poseidon_chip = PoseidonChip::construct(poseidon_config.clone());
             let poseidon_hasher =
@@ -132,14 +127,14 @@ pub fn check_spend_note(
             poseidon_hasher.hash(layouter.namespace(|| "send_com"), poseidon_message)?
         };
 
-        // Witness recv_vp_hash
-        let recv_vp_hash_var = assign_free_advice(
-            layouter.namespace(|| "witness nk"),
+        // Witness recv_data
+        let recv_data = assign_free_advice(
+            layouter.namespace(|| "witness user recv data"),
             advices[0],
-            Value::known(spend_note.user.recv_vp.get_compressed()),
+            Value::known(spend_note.application.get_user_recv_data()),
         )?;
 
-        // user_address = Com_r(send_com, recv_vp_hash_var)
+        // user_address = Com_r(send_com, recv_vp_data)
         let user_address = {
             let poseidon_chip = PoseidonChip::construct(poseidon_config.clone());
             let poseidon_hasher =
@@ -147,7 +142,7 @@ pub fn check_spend_note(
                     poseidon_chip,
                     layouter.namespace(|| "Poseidon init"),
                 )?;
-            let poseidon_message = [send_com, recv_vp_hash_var];
+            let poseidon_message = [send_com, recv_data];
             poseidon_hasher.hash(layouter.namespace(|| "user_address"), poseidon_message)?
         };
 
@@ -158,14 +153,14 @@ pub fn check_spend_note(
     let app_vp = assign_free_advice(
         layouter.namespace(|| "witness app_vp"),
         advices[0],
-        Value::known(spend_note.app.get_vp()),
+        Value::known(spend_note.application.get_vp()),
     )?;
 
     // Witness app_data
     let app_data = assign_free_advice(
-        layouter.namespace(|| "witness app_data"),
+        layouter.namespace(|| "witness app_vp_data"),
         advices[0],
-        Value::known(spend_note.app.data),
+        Value::known(spend_note.application.get_vp_data()),
     )?;
 
     // Witness value(u64)
@@ -276,18 +271,18 @@ pub fn check_output_note(
     old_nf: AssignedCell<pallas::Base, pallas::Base>,
     cm_row_idx: usize,
 ) -> Result<OutputNoteVar, Error> {
-    // Check output note user integrity: user_address = Com_r(, recv_vp_hash)
+    // Check output note user integrity: user_address = Com_r(send_com, recv_vp_hash)
     let user_address = {
         let send_com = assign_free_advice(
             layouter.namespace(|| "witness output send_com"),
             advices[0],
-            Value::known(output_note.user.send_com.get_closed()),
+            Value::known(output_note.application.get_user_send_closed()),
         )?;
-        // Witness recv_vp_hash
-        let recv_vp_hash_var = assign_free_advice(
-            layouter.namespace(|| "witness nk"),
+        // Witness recv data
+        let recv_data = assign_free_advice(
+            layouter.namespace(|| "witness user recv data"),
             advices[0],
-            Value::known(output_note.user.recv_vp.get_compressed()),
+            Value::known(output_note.application.get_user_recv_data()),
         )?;
 
         let poseidon_chip = PoseidonChip::construct(poseidon_config);
@@ -296,7 +291,7 @@ pub fn check_output_note(
                 poseidon_chip,
                 layouter.namespace(|| "Poseidon init"),
             )?;
-        let poseidon_message = [send_com, recv_vp_hash_var];
+        let poseidon_message = [send_com, recv_data];
         poseidon_hasher.hash(layouter.namespace(|| "user_address"), poseidon_message)?
     };
 
@@ -304,14 +299,14 @@ pub fn check_output_note(
     let app_vp = assign_free_advice(
         layouter.namespace(|| "witness app_vp"),
         advices[0],
-        Value::known(output_note.app.get_vp()),
+        Value::known(output_note.application.get_vp()),
     )?;
 
     // Witness app_data
     let app_data = assign_free_advice(
         layouter.namespace(|| "witness app_data"),
         advices[0],
-        Value::known(output_note.app.data),
+        Value::known(output_note.application.get_vp_data()),
     )?;
 
     // Witness value(u64)

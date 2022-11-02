@@ -205,7 +205,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             &self.auth_path,
         )?;
 
-        // TODO: user send address VP commitment and app VP commitment
+        // TODO: user send address VP commitment and application VP commitment
 
         // Output note
         let output_note_vars = check_output_note(
@@ -221,7 +221,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             ACTION_OUTPUT_CM_INSTANCE_ROW_IDX,
         )?;
 
-        // TODO: add user receive address VP commitment and app VP commitment
+        // TODO: add user receive address VP commitment and application VP commitment
 
         // TODO: add note verifiable encryption
 
