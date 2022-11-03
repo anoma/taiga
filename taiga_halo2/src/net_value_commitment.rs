@@ -38,7 +38,7 @@ impl NetValueCommitment {
 }
 
 pub fn derivate_value_base(is_normal: bool, application: &Application) -> pallas::Point {
-    let hash = pallas::Point::hash_to_curve("taiga:test");
+    let hash = pallas::Point::sha256_to_curve("taiga:value_base");
     let mut bytes: Vec<u8> = vec![is_normal.into()];
     bytes.extend_from_slice(&application.get_vp().to_repr());
     bytes.extend_from_slice(&application.get_vp_data().to_repr());

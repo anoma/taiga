@@ -377,7 +377,7 @@ pub fn derivate_value_base(
 ) -> Result<NonIdentityPoint<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
     let out_of_circuit_value_base = {
         use halo2_proofs::arithmetic::CurveExt;
-        let hash = pallas::Point::hash_to_curve("taiga:test");
+        let hash = pallas::Point::sha256_to_curve("taiga:value_base");
         let mut bytes: Vec<u8> = vec![];
         is_normal.value().map(|v| bytes.push(v.to_repr()[0]));
         app_vp.value().map(|x| {
