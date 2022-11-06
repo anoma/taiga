@@ -79,8 +79,8 @@ impl Circuit<pallas::Base> for ActionCircuit {
         let basic_checks_selector = meta.selector();
         meta.create_gate("Basic checks", |meta| {
             let basic_checks_selector = meta.query_selector(basic_checks_selector);
-            let is_normal_spend = meta.query_advice(advices[0], Rotation::cur());
-            let is_normal_output = meta.query_advice(advices[1], Rotation::cur());
+            let is_merkle_checked_spend = meta.query_advice(advices[0], Rotation::cur());
+            let is_merkle_checked_output = meta.query_advice(advices[1], Rotation::cur());
             let v_spend = meta.query_advice(advices[2], Rotation::cur());
             let v_output = meta.query_advice(advices[3], Rotation::cur());
 
@@ -90,8 +90,8 @@ impl Circuit<pallas::Base> for ActionCircuit {
             let one = Expression::Constant(pallas::Base::one());
 
             // if v_normal = 0, it's a dummy note.
-            let v_normal_spend = v_spend * is_normal_spend;
-            let v_normal_output = v_output * is_normal_output;
+            let v_normal_spend = v_spend * is_merkle_checked_spend;
+            let v_normal_output = v_output * is_merkle_checked_output;
 
             // `v_normal` zero check.
             // Constrain: v_normal(1 - v_normal * v_normal_inv) = 0, in which is_zero = (1 - v_normal * v_normal_inv)
@@ -229,11 +229,11 @@ impl Circuit<pallas::Base> for ActionCircuit {
         let net_value_commitment = compute_net_value_commitment(
             layouter.namespace(|| "net value commitment"),
             ecc_chip,
-            spend_note_vars.is_normal.clone(),
+            spend_note_vars.is_merkle_checked.clone(),
             spend_note_vars.app_vp.clone(),
             spend_note_vars.app_data.clone(),
             spend_note_vars.value.clone(),
-            output_note_vars.is_normal.clone(),
+            output_note_vars.is_merkle_checked.clone(),
             output_note_vars.app_vp.clone(),
             output_note_vars.app_data.clone(),
             output_note_vars.value.clone(),
@@ -254,14 +254,14 @@ impl Circuit<pallas::Base> for ActionCircuit {
         layouter.assign_region(
             || "Basic checks",
             |mut region| {
-                spend_note_vars.is_normal.copy_advice(
-                    || "is_normal_spend",
+                spend_note_vars.is_merkle_checked.copy_advice(
+                    || "is_merkle_checked_spend",
                     &mut region,
                     config.advices[0],
                     0,
                 )?;
-                output_note_vars.is_normal.copy_advice(
-                    || "is_normal_output",
+                output_note_vars.is_merkle_checked.copy_advice(
+                    || "is_merkle_checked_output",
                     &mut region,
                     config.advices[1],
                     0,
@@ -287,7 +287,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
                 )?;
                 root.copy_advice(|| "root", &mut region, config.advices[5], 0)?;
 
-                let v_normal_spend_inv = (spend_note_vars.is_normal.value()
+                let v_normal_spend_inv = (spend_note_vars.is_merkle_checked.value()
                     * spend_note_vars.value.value())
                 .into_field()
                 .invert();
@@ -297,7 +297,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
                     0,
                     || v_normal_spend_inv,
                 )?;
-                let v_normal_output_inv = (output_note_vars.is_normal.value()
+                let v_normal_output_inv = (output_note_vars.is_merkle_checked.value()
                     * output_note_vars.value.value())
                 .into_field()
                 .invert();

@@ -48,7 +48,7 @@ pub struct SpendInfo {
 pub struct OutputInfo {
     application: Application,
     value: u64,
-    is_normal: bool,
+    is_merkle_checked: bool,
 }
 
 impl ActionInstance {
@@ -90,12 +90,12 @@ impl ActionInfo {
             nf,
             psi,
             note_rcm,
-            self.output.is_normal,
+            self.output.is_merkle_checked,
         );
 
         let output_cm = output_note.commitment();
-        let enable_spend = (self.spend.note.is_normal as u64) * self.spend.note.value > 0;
-        let enable_output = (self.output.is_normal as u64) * self.output.value > 0;
+        let enable_spend = (self.spend.note.is_merkle_checked as u64) * self.spend.note.value > 0;
+        let enable_output = (self.output.is_merkle_checked as u64) * self.output.value > 0;
 
         let rcv = pallas::Scalar::random(&mut rng);
 
@@ -135,11 +135,11 @@ impl SpendInfo {
 }
 
 impl OutputInfo {
-    pub fn new(application: Application, value: u64, is_normal: bool) -> Self {
+    pub fn new(application: Application, value: u64, is_merkle_checked: bool) -> Self {
         Self {
             application,
             value,
-            is_normal,
+            is_merkle_checked,
         }
     }
 
@@ -150,7 +150,7 @@ impl OutputInfo {
         Self {
             application,
             value,
-            is_normal: true,
+            is_merkle_checked: true,
         }
     }
 }

@@ -75,7 +75,7 @@ pub struct SpendNoteVar {
     pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub nf: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
-    pub is_normal: AssignedCell<pallas::Base, pallas::Base>,
+    pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -191,11 +191,11 @@ pub fn check_spend_note(
         Value::known(spend_note.rcm),
     )?;
 
-    // Witness is_normal
-    let is_normal = assign_free_advice(
-        layouter.namespace(|| "witness is_normal"),
+    // Witness is_merkle_checked
+    let is_merkle_checked = assign_free_advice(
+        layouter.namespace(|| "witness is_merkle_checked"),
         advices[0],
-        Value::known(pallas::Base::from(spend_note.is_normal)),
+        Value::known(pallas::Base::from(spend_note.is_merkle_checked)),
     )?;
 
     // Check note commitment
@@ -211,7 +211,7 @@ pub fn check_spend_note(
         psi.clone(),
         value.clone(),
         rcm,
-        is_normal.clone(),
+        is_merkle_checked.clone(),
     )?;
 
     // Generate nullifier
@@ -237,7 +237,7 @@ pub fn check_spend_note(
         app_data,
         nf,
         cm,
-        is_normal,
+        is_merkle_checked,
     })
 }
 
@@ -249,7 +249,7 @@ pub struct OutputNoteVar {
     pub app_data: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
-    pub is_normal: AssignedCell<pallas::Base, pallas::Base>,
+    pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -330,11 +330,11 @@ pub fn check_output_note(
         Value::known(output_note.psi),
     )?;
 
-    // Witness is_normal
-    let is_normal = assign_free_advice(
-        layouter.namespace(|| "witness is_normal"),
+    // Witness is_merkle_checked
+    let is_merkle_checked = assign_free_advice(
+        layouter.namespace(|| "witness is_merkle_checked"),
         advices[0],
-        Value::known(pallas::Base::from(output_note.is_normal)),
+        Value::known(pallas::Base::from(output_note.is_merkle_checked)),
     )?;
 
     // Check note commitment
@@ -350,7 +350,7 @@ pub fn check_output_note(
         psi,
         value.clone(),
         rcm,
-        is_normal.clone(),
+        is_merkle_checked.clone(),
     )?;
 
     // Public cm
@@ -363,7 +363,7 @@ pub fn check_output_note(
         app_data,
         value,
         cm,
-        is_normal,
+        is_merkle_checked,
     })
 }
 
@@ -371,7 +371,7 @@ pub fn check_output_note(
 pub fn derivate_value_base(
     mut layouter: impl Layouter<pallas::Base>,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
-    is_normal: AssignedCell<pallas::Base, pallas::Base>,
+    is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
     app_vp: AssignedCell<pallas::Base, pallas::Base>,
     app_data: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<NonIdentityPoint<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
@@ -379,7 +379,9 @@ pub fn derivate_value_base(
         use halo2_proofs::arithmetic::CurveExt;
         let hash = pallas::Point::hash_to_curve("taiga:test");
         let mut bytes: Vec<u8> = vec![];
-        is_normal.value().map(|v| bytes.push(v.to_repr()[0]));
+        is_merkle_checked
+            .value()
+            .map(|v| bytes.push(v.to_repr()[0]));
         app_vp.value().map(|x| {
             bytes.extend_from_slice(&x.to_repr());
         });
@@ -399,11 +401,11 @@ pub fn derivate_value_base(
 pub fn compute_net_value_commitment(
     mut layouter: impl Layouter<pallas::Base>,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
-    is_normal_spend: AssignedCell<pallas::Base, pallas::Base>,
+    is_merkle_checked_spend: AssignedCell<pallas::Base, pallas::Base>,
     app_address_spend: AssignedCell<pallas::Base, pallas::Base>,
     data_spend: AssignedCell<pallas::Base, pallas::Base>,
     v_spend: AssignedCell<pallas::Base, pallas::Base>,
-    is_normal_output: AssignedCell<pallas::Base, pallas::Base>,
+    is_merkle_checked_output: AssignedCell<pallas::Base, pallas::Base>,
     app_address_output: AssignedCell<pallas::Base, pallas::Base>,
     data_output: AssignedCell<pallas::Base, pallas::Base>,
     v_output: AssignedCell<pallas::Base, pallas::Base>,
@@ -413,7 +415,7 @@ pub fn compute_net_value_commitment(
     let value_base_spend = derivate_value_base(
         layouter.namespace(|| "derivate spend value base"),
         ecc_chip.clone(),
-        is_normal_spend,
+        is_merkle_checked_spend,
         app_address_spend,
         data_spend,
     )?;
@@ -429,7 +431,7 @@ pub fn compute_net_value_commitment(
     let value_base_output = derivate_value_base(
         layouter.namespace(|| "derivate output value base"),
         ecc_chip.clone(),
-        is_normal_output,
+        is_merkle_checked_output,
         app_address_output,
         data_output,
     )?;

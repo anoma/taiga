@@ -11,8 +11,9 @@ pub struct NetValueCommitment(pallas::Point);
 
 impl NetValueCommitment {
     pub fn new(input_note: &Note, output_note: &Note, blind_r: &pallas::Scalar) -> Self {
-        let base_input = derivate_value_base(input_note.is_normal, &input_note.application);
-        let base_output = derivate_value_base(output_note.is_normal, &output_note.application);
+        let base_input = derivate_value_base(input_note.is_merkle_checked, &input_note.application);
+        let base_output =
+            derivate_value_base(output_note.is_merkle_checked, &output_note.application);
         NetValueCommitment(
             base_input * pallas::Scalar::from(input_note.value)
                 - base_output * pallas::Scalar::from(output_note.value)
@@ -37,9 +38,9 @@ impl NetValueCommitment {
     }
 }
 
-pub fn derivate_value_base(is_normal: bool, application: &Application) -> pallas::Point {
+pub fn derivate_value_base(is_merkle_checked: bool, application: &Application) -> pallas::Point {
     let hash = pallas::Point::hash_to_curve("taiga:test");
-    let mut bytes: Vec<u8> = vec![is_normal.into()];
+    let mut bytes: Vec<u8> = vec![is_merkle_checked.into()];
     bytes.extend_from_slice(&application.get_vp().to_repr());
     bytes.extend_from_slice(&application.get_vp_data().to_repr());
     hash(&bytes)
