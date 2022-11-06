@@ -20,10 +20,6 @@ pub struct ActionInstance {
     pub nf: Nullifier,
     /// The commitment of the output note.
     pub cm: NoteCommitment,
-    /// Enable spend
-    pub enable_spend: bool,
-    /// Enable output
-    pub enable_output: bool,
     /// net value commitment
     pub net_value_commitment: NetValueCommitment,
     // TODO: The EncryptedNote.
@@ -57,8 +53,6 @@ impl ActionInstance {
             self.nf.inner(),
             self.anchor,
             self.cm.get_x(),
-            pallas::Base::from(self.enable_spend),
-            pallas::Base::from(self.enable_output),
             self.net_value_commitment.get_x(),
             self.net_value_commitment.get_y(),
         ]
@@ -94,9 +88,6 @@ impl ActionInfo {
         );
 
         let output_cm = output_note.commitment();
-        let enable_spend = (self.spend.note.is_merkle_checked as u64) * self.spend.note.value > 0;
-        let enable_output = (self.output.is_merkle_checked as u64) * self.output.value > 0;
-
         let rcv = pallas::Scalar::random(&mut rng);
 
         let net_value_commitment = NetValueCommitment::new(&self.spend.note, &output_note, &rcv);
@@ -104,8 +95,6 @@ impl ActionInfo {
             nf,
             cm: output_cm,
             anchor: self.spend.root,
-            enable_spend,
-            enable_output,
             net_value_commitment,
         };
 
