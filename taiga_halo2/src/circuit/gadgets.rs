@@ -124,7 +124,6 @@ impl<F: FieldExt> AddInstructions<F> for AddChip<F> {
     }
 }
 
-
 /// An instruction set for multiplying two circuit words (field elements).
 pub trait MulInstructions<F: FieldExt>: Chip<F> {
     /// Constraints `a * b` and returns the multiplication.
