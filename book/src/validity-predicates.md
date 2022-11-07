@@ -1,61 +1,65 @@
-# Validity predicates
+# Validity predicate (VP)
 
-A **validity predicate** (VP) is a piece of code that authorizes transactions by checking its input and output notes. In order to be authorized, a transaction must satisfy all of the constraints of VPs of parties involved.
+A **validity predicate** (VP) is a piece of code that authorizes transactions. Users express their preferences (who to transact with, what actions are allowed, what tokens are accepted, etc) in VPs, and VPs check proposed state transitions to ensure that the user requirements are satisfied.
 
-Examples of such constraints would be a white list VP that allows only specific users to send notes to the VP owner, or a lower bound VP that restricts the smallest amount of asset that can be received.
 
-Taiga validity predicates are intended to be the private version of Anoma's transparent validity predicates. Similarly, Taiga VPs take as input stored state prior and posterior to a transaction execution and either authorize the state change or reject it. Unlike transparent VPs, which execute as WASM, Taiga VPs execute in a zero-knowledge proof/arithmetic circuit model of computation. Because of vastly different nature of the execution model, there are some differences between transparent and Taiga VPs, even if they have similar goals.
+A valid (can be published on the blockchain) transaction satisfy the VPs of all involved parties (but not only that, see [Transaction](transaction.md)).
 
-### Validity predicates in Taiga
+#### Examples of VPs
+- white list VP allows only specific users to send notes to the VP owner
+- lower bound VP restricts the smallest amount of asset that can be received
 
-Taiga uses a PLONK-based zero knowledge proof system, and validity predicates are given as [PLONK arithmetizations](https://zcash.github.io/halo2/concepts/arithmetization.html), which is a table of cells with polynomial constraints. For privacy of which validity predicate is used inside of a transaction, all Taiga validity predicates must share the same PLONK configuration (which can be thought of as the set of "gates" available). Different validity predicates are created by specifying the *selectors*.
 
-#### State model in Taiga
+Validity predicates exist in both transparent and shielded Anoma (Taiga). Unlike transparent Anoma  VPs that are represented as WASM code and publicly visible, Taiga VPs are arithmetic circuits hidden under ZKP. 
+To make sure that the state transition is allowed by the user, Taiga VPs take the current state (expressed by the spent notes) and the next proposed state (expressed by the output notes) as input and perform some checks.
 
-Unlike transparent Anoma, which operates on an account model, Taiga uses a note based model. In an account model, each account has associated state which is stored in a database, and updated according to that account's validity predicate. In the note model, however, state is sharded into an append-only set of *note commitments* and revealed *nullifiers*. Each note has exactly one associated nullifier, and the current state of the Taiga is the subset of notes whose nullifiers are not yet revealed, called unspent notes. The Action/Execute circuit, together with the transaction verifier, ensure that the Taiga state is consistent.
+## VP types in Taiga
 
-### PLONK circuit configuration for validity predicates in Taiga
+- intentVP
+- applicationVP
+- userVP (send/recvVP)
 
-The validity predicate configuration includes the following "gates" in the PLONK configuration:
+
+### Validity predicates as arithemtic circuits
+
+To prove that VPs are satisfied without revealing their content, ZKPs are used. Each transaction has VP proofs of involved parties attached to it, and whoever has the verifier key (VK), can verify the proof.
+
+![img.png](img/vp_img.png)
+
+Taiga uses a PLONK-based ZKP system (Halo2/ZK-Garage Plonk), and validity predicates are represented as [PLONKish circuits](https://zcash.github.io/halo2/concepts/arithmetization.html). For privacy reasons, all Taiga VPs share the same PLONK configuration (the set of "gates" available), and different VPs are created by specifying the *selectors*.
+
+
+#### PLONK circuit configuration for validity predicates in Taiga
+
+The VP configuration includes the following "gates" in the PLONK configuration:
 
 * Field addition/multiplication
 * Elliptic curve addition and scalar multiplication
 * Poseidon hash
 
-#### Addresses
+### VP checks
 
-Even though Taiga does not have *accounts*, it does have *addresses*. Each note is associated with one *user address* and one *app address*. Intuitively, a note belongs to the user address and is of a type given by the app address.
+TODO: something
 
-Currently, every [user](./users.md) in Taiga has two VPs: one that authorizes spending notes (`SendVP`), and one that authorizes receiving notes (`RecvVP`). [Apps](./app.md) in Taiga also have validity predicates, and spending or receiving a note of a particular app requires satisfying the `AppVP`.
-
-### Shielded VPs
-For each transaction, it must be proven that all of the VPs of parties and apps involved are satisfied. To preserve privacy, ZK proofs are used. The transaction is authorized only if all of the produced proofs are verified successfully.
-
-![img.png](img/vp_img.png)
-
-### Transactions
-
-Informally, transactions take a private subset of unspent notes from the Taiga note set, publicly reveal their nullifiers, and reveal a new set of note commitments to add to the Taiga note set. The Action/Execute circuit verifies consistency of this state transition, but does not check directly its validity. Instead, the validity predicate circuits must check the validity of the state transition. The following VPs are called:
+VPs take all of the transaction notes as input and are called once per transaction. 
 
 * The spending VP for every spent note
 * The app VP for every spent and created note
 * The receiving VP for every created note
 
-Each VP is called *once* per transaction, even if it is checking multiple *notes*. In addition, VPs are given all notes in the transaction as input, whether or not that note is associated with that *app type* or *user address*.
-
 ### VP interface
 
-For privacy and efficiency, all VPs must share the same *public input interface*. VPs may have different *private* inputs.
+For privacy and efficiency, all VPs share the same *public input interface*, but are allowed to have different *private* inputs.
 
 #### Public Inputs
 
-* $\{nf_i\}$, the set of revealed nullifiers in the transaction
-* $\{cm_i\}$, the set of new notes created in the transaction
-* $e$, the current Taiga epoch (used for time-tracking)
+* $\{nf_i\}$ - the set of revealed nullifiers in the transaction
+* $\{cm_i\}$ - the set of new notes created in the transaction
+* $e$ - the current Taiga epoch (used for time-tracking)
 
 TODO: This might include a public key as well
 
-#### Typical private inputs
+#### Private inputs
 
 While not required, most validity predicates will take a few typical private inputs:
 
