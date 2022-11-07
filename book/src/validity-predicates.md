@@ -15,10 +15,18 @@ To make sure that the state transition is allowed by the user, Taiga VPs take th
 
 ## VP types in Taiga
 
-- intentVP
-- applicationVP
-- userVP (send/recvVP)
+#### userVP (sendVP/recvVP)
+Users define their long-term preferences via `userVP`. Every transaction the user is involved into has to be approved by the user's VP in order to be considered valid. There are two types of VP exist:
+* `SendVP` defines the conditions on which notes can be sent (e.g. signature check)
+* `RecvVP` defines the conditions on which a note can be received by the user (e.g. whitelist of senders)
 
+TODO: is it up to date?
+
+#### intentVP
+`IntentVP` helps a user to express their ephemeral interests and control the satisfaction of the user's interests. Learn more about intents and `intentVP` [here](./exec.md)
+
+#### applicationVP
+Applications can define the conditions on which users can use the application via `applicationVP`. Everytime a notes of a certain application are created or spent in a transaction, `applicationVP` is called to validate the transaction.
 
 ### Validity predicates as arithemtic circuits
 
@@ -26,10 +34,11 @@ To prove that VPs are satisfied without revealing their content, ZKPs are used. 
 
 ![img.png](img/vp_img.png)
 
+#### PLONKish circuits for VPs
+
 Taiga uses a PLONK-based ZKP system (Halo2/ZK-Garage Plonk), and validity predicates are represented as [PLONKish circuits](https://zcash.github.io/halo2/concepts/arithmetization.html). For privacy reasons, all Taiga VPs share the same PLONK configuration (the set of "gates" available), and different VPs are created by specifying the *selectors*.
 
-
-#### PLONK circuit configuration for validity predicates in Taiga
+TODO: rephrase
 
 The VP configuration includes the following "gates" in the PLONK configuration:
 
@@ -61,12 +70,7 @@ TODO: This might include a public key as well
 
 #### Private inputs
 
-While not required, most validity predicates will take a few typical private inputs:
-
-* $\{(address, app, v, data, rho, psi, rcm)_i\}$ for each spent note in the transaction
-* $\{(address, app, v, data, rho, psi, rcm)_j\}$ for each created note in the transaction
-
-The validity predicate must verify (via standardized logic) that the contents of each note match the public $\{nf_i\}$ and $\{cm_i\}$.
+While not formally required, most validity predicates will have all spent and output notes (`address`, `app`, `v`, `data`, `rho`, `psi`, `rcm`) as private input and will verify that they match public input.
 
 ## Example
 
