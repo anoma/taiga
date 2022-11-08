@@ -14,6 +14,7 @@ use pasta_curves::pallas;
 use rand::RngCore;
 
 mod field_addition;
+mod field_multiplication;
 
 // DummyValidityPredicateCircuit with empty custom constraints.
 #[derive(Clone, Debug, Default)]

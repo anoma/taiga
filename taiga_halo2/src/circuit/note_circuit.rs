@@ -17,6 +17,8 @@ use halo2_proofs::{
 };
 use pasta_curves::{arithmetic::FieldExt, pallas};
 
+use super::gadgets::{MulConfig, MulChip};
+
 type NoteCommitPiece = MessagePiece<
     pallas::Affine,
     SinsemillaChip<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
@@ -603,6 +605,7 @@ pub struct NoteConfig {
     pub instances: Column<Instance>,
     pub advices: [Column<Advice>; 10],
     pub add_config: AddConfig,
+    pub mul_config: MulConfig,
     pub ecc_config: EccConfig<NoteCommitmentFixedBases>,
     pub poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
     pub sinsemilla_config:
@@ -622,6 +625,7 @@ impl NoteChip {
         advices: [Column<Advice>; 10],
     ) -> NoteConfig {
         let add_config = AddChip::configure(meta, advices[0..2].try_into().unwrap());
+        let mul_config = MulChip::configure(meta, advices[0..2].try_into().unwrap()); // TODO 0..2 is okay here?
 
         let table_idx = meta.lookup_table_column();
         let lookup = (
@@ -679,6 +683,7 @@ impl NoteChip {
             instances,
             advices,
             add_config,
+            mul_config,
             ecc_config,
             poseidon_config,
             sinsemilla_config,
