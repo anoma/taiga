@@ -14,14 +14,14 @@ Here is the high level description of the process, starting from creating intent
 ## Step 1: Create an intent
 
 Intents specify ephemeral interests of users. The step of intent creation consists of two parts:
-1. **Specify an intent**. `IntentVP` encodes the user interests in the [VP](./validity-predicates.md) form. As in a valid transaction all VPs must evaluate to `True`, the intent is guaranteed to be satisfied
-2. **Create the initial *partial transaction*** 
+1. **Specify an intent**. `IntentVP` encodes the user interests in the [VP](./validity-predicates.md) form. As in a valid transaction all VPs must evaluate to `True`, the intent is guaranteed to be satisfied.
+2. **Create the initial *partial transaction***.
 
 ### Partial transaction
 
 Two of the main requirements for an Anoma transaction to be valid are: 
-1. VPs of all involved in the transaction parties must be satisfied
-2. The transaction must be **balanced** , i.e the value spent in the transaction minus the value output equals to some predefined value `v`, the **balancing value**
+1. VPs of all involved in the transaction parties must be satisfied.
+2. The transaction must be **balanced** , i.e the value spent in the transaction minus the value output equals to some predefined value `v`, the **balancing value**.
 
 We call a **partial transaction** a state transition where the first requirement is satisfied (all VPs evaluate to True), but the second one isn't (the state transition is unbalanced). Such a state transition isn't a valid transaction and cannot be published on the blockchain, 
 but can be combined with other partial transactions in order to build a valid transaction. 
@@ -33,7 +33,7 @@ In principle, any party can create a partial transaction, if they can prove that
 
 **Initial partial transactions** are the partial transactions that users create at the beginning, spending the notes that will be given to the counterparty once the intents are matched.
 
-**Note**: For simplicity we assume that intents imply both sending notes and receving notes
+**Note**: For simplicity we assume that intents imply both sending notes and receving notes.
 
 As a part of the initial partial transaction, users also output **intent token notes**. 
 ### Intent tokens
@@ -60,7 +60,7 @@ Solvers receive intents from the intent gossip network and match them together i
 
 **Note**: that implies that users need to give some information to the solvers (including the content of `intentVP`) that is sufficient to create partial transactions and transactions (to create proofs).
 
-We are considering the model where a solver makes one step at a time and sends the step result back to the gossip network, where the partial solution meets the next solver in the chain. In practice, the solver can continue solving instead of sending the result back to the gossip network if they can make the next step
+We are considering the model where a solver makes one step at a time and sends the step result back to the gossip network, where the partial solution meets the next solver in the chain. In practice, the solver can continue solving instead of sending the result back to the gossip network if they can make the next step.
 
 ### Create partial transactions
 
@@ -68,9 +68,9 @@ When a solver has intents that can be [partially] matched together, they [partia
 
 #### Prove
 Solvers are responsible for creation of all proofs (`Action`, `VP`, etc) required for their partial solutions. For that reason, solvers:
-- **have the authority** to spend and create the notes they receive and produce the proofs required to perform the action
-- **know** the content of intentVPs of the users (necessary to be able to satisfy them)
-- **don't know** the identities of the users
+- **have the authority** to spend and create the notes they receive and produce the proofs required to perform the action,
+- **know** the content of intentVPs of the users (necessary to be able to satisfy them),
+- **don't know** the identities of the users.
 
 When solvers receive partial solutions from the gossip network, they must check all of the proofs attached to them.
 
@@ -81,8 +81,8 @@ To store note commitments of the created notes, a local commitment tree `CMtree`
 ### Partial vs final match
 
 After the solver matches the intents, two cases are possible:
-1. At least one of the total per-token balances computed by summing up the per-token balances of partial transactions doesn't equal the balancing value. In this case, the solver sends the data to the gossip network
-2. All total per-token balances are equal to the balancing values. A valid transaction can be created and published
+1. At least one of the total per-token balances computed by summing up the per-token balances of partial transactions doesn't equal the balancing value. In this case, the solver sends the data to the gossip network.
+2. All total per-token balances are equal to the balancing values. A valid transaction can be created and published.
 
 **Note**: in the current implementation we assume a simpler model with no partial solving.
 
@@ -96,13 +96,13 @@ After the intents are matched with satisfaction of all involved parties, the tra
 
 Let's see how different use cases can be handled with this execution model.
 
-**Note**: For simplicity in the examples below we assume that the balancing value `v` is equal to zero
+**Note**: For simplicity in the examples below we assume that the balancing value `v` is equal to zero.
 
 ### 1. Three-party barter
 
 Three parties, Alice, Bob, and Charlie, are looking for some assets in exchange for something else. Their intents can be matched into a three-party bartering cycle. Let's see step by step how this happens.
 
-**Note**: parties don't require three-party bartering explicitly
+**Note**: parties don't require three-party bartering explicitly.
 
 ![img.png](img/exec_3_party.png)
 
@@ -160,6 +160,6 @@ If the state change happens across partial transactions (meaning that the state 
 
 For simplicity, let's assume that the old state note has a 0 value. A zero-value note doesn't affect the total balance which is necessary for across-ptx communication. And so the first step is to turn a zero-value note into a non-zero value note (step 1 on the diagram).
 
-In the next partial transaction (step 2) we output [-1] value note to balance the old [1] state note, but if the state can be changed to final in the next partial transaction (step 2.1), a new state zero-value note is produced, total balance becomes zero, and the transaction can be finalized. If the state isn't final (step 2.2), another [1] value note with the new (but not final) state is produced, the total balance is non-zero and the transaction cannot be finalized. In that case, the step 2 is repeated until the final state is computed
+In the next partial transaction (step 2) we output [-1] value note to balance the old [1] state note, but if the state can be changed to final in the next partial transaction (step 2.1), a new state zero-value note is produced, total balance becomes zero, and the transaction can be finalized. If the state isn't final (step 2.2), another [1] value note with the new (but not final) state is produced, the total balance is non-zero and the transaction cannot be finalized. In that case, the step 2 is repeated until the final state is computed.
 
-**Note**: different states imply different token types, and the old state note cannot balance a new state note
+**Note**: different states imply different token types, and the old state note cannot balance a new state note.
