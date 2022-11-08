@@ -40,18 +40,16 @@ As a part of the initial partial transaction, users also output **intent token n
 
 **Intent tokens** are a mechanism that makes sure that the partial transaction is *unbalanced* until the corresponding intent is satisfied, making it impossible to publish the transaction.
 
-Intent token notes *cannot be spent*, only created. Instead of spending a note of such type, intent notes with *negative value* can be created.
+Intent token notes *cannot be spent*, only created. Instead of spending a note of such type, intent notes with *negative value* can be created. Intent token notes are **dummy** notes - meaning that unlike "normal" notes, the merkle path isn't checked for them (but they can have arbitrary value and stored in the CMtree, just like "normal"). 
 
 How intent tokens are used:
 1. Spending notes in the initial partial transaction, the user additionally spends an intent token note of value [1].
 The 'twin' intent token note of value [-1] balancing this token will only be created if the user's intent (intentVP) is satisfied.
-3. Once all of the parties involved in a state transition create their [-1] intent token notes (meaning that the intents of all of them are satisfied), the transaction is balanced and can be finalized.
+2. Once all of the parties involved in a state transition create their [-1] intent token notes (meaning that the intents of all of them are satisfied), the transaction is balanced and can be finalized.
 
 ![img.png](img/exec_intent_notes.png)
 
 **Note**: instead of using notes of negative value the user can instead spend a [1] intent token note (that hasn't been created before) in their initial partial transaction. Once the user's intent is satisfied, a [1] intent note will be output, balancing the initial spend.
-
-**Note**: intent token notes are not committed to in the global CMtree
 
 If we look at the intent token notes as messages passing from one user (application) to another, the first [1] intent note can signal a message being sent, when the [-1] note will signal that the message has been received. See more about the idea of message passing [here](message_passing.md).
 
