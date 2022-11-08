@@ -33,7 +33,7 @@ In principle, any party can create a partial transaction, if they can prove that
 
 **Initial partial transactions** are the partial transactions that users create at the beginning, spending the notes that will be given to the counterparty once the intents are matched.
 
-**Note**: For simplicity we assume that intents imply both sending notes and receving notes.
+**Note**: For simplicity we assume that intents imply both sending notes and recei1|ving notes.
 
 As a part of the initial partial transaction, users also output **intent token notes**. 
 ### Intent tokens
@@ -111,6 +111,7 @@ Three parties, Alice, Bob, and Charlie, are looking for some assets in exchange 
 **Step 3**: A solver sees Alice's ptx and Bob's ptx, matches them together, and creates a new partial transaction. Alice's intentVP is satisfied, [-1] intent token note is created. 
 
 Total per-token balances:
+
 |token|spent|output|spent - output|
 |-|-|-|-|
 |star NFT|1|0|1|
@@ -120,6 +121,7 @@ Total per-token balances:
 
 **Step 4**: A solver sees all previous partial transactions and the initial transaction created by Charlie. The solver matches them together and creates new partial transactions, sending the tree to Bob and the star to Charlie. VPs of Bob and Charlie are now satisfied, the corresponding notes of value [-1] are created. The  per-token balance of partial transactions is equal to zero, which means it is possible to create a transaction.
 Total per-token balances:
+
 |token|spent|output|spent - output|
 |-|-|-|-|
 |star NFT|1|1|0|
