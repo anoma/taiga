@@ -20,17 +20,15 @@ Users define their long-term preferences via `userVP`. Every transaction the use
 * `SendVP` defines the conditions on which notes can be sent (e.g. signature check)
 * `RecvVP` defines the conditions on which a note can be received by the user (e.g. whitelist of senders)
 
-TODO: is it up to date?
-
 #### intentVP
-`IntentVP` helps a user to express their ephemeral interests and control the satisfaction of the user's interests. Learn more about intents and `intentVP` [here](./exec.md)
+`IntentVP` helps a user to express their ephemeral interests and make sure the interests are satisfied. Learn more about intents and `intentVP` [here](./exec.md) (TODO: isn't merged yet).
 
 #### applicationVP
-Applications can define the conditions on which users can use the application via `applicationVP`. Everytime a notes of a certain application are created or spent in a transaction, `applicationVP` is called to validate the transaction.
+Applications can define the conditions on which users can use it via `applicationVP`. Everytime notes of a certain application are created or spent in a transaction, `applicationVP` is called to validate the transaction.
 
 ### Validity predicates as arithemtic circuits
 
-To prove that VPs are satisfied without revealing their content, ZKPs are used. Each transaction has VP proofs of involved parties attached to it, and whoever has the verifier key (VK), can verify the proof.
+To prove that VPs are satisfied without revealing their content, ZKPs are used. Each transaction has VP proofs of involved parties attached to it, and whoever has the verifier key (VK), can verify the proofs.
 
 ![img.png](img/vp_img.png)
 
@@ -38,23 +36,23 @@ To prove that VPs are satisfied without revealing their content, ZKPs are used. 
 
 Taiga uses a PLONK-based ZKP system (Halo2/ZK-Garage Plonk), and validity predicates are represented as [PLONKish circuits](https://zcash.github.io/halo2/concepts/arithmetization.html). For privacy reasons, all Taiga VPs share the same PLONK configuration (the set of "gates" available), and different VPs are created by specifying the *selectors*.
 
-TODO: rephrase
-
 The VP configuration includes the following "gates" in the PLONK configuration:
 
 * Field addition/multiplication
 * Elliptic curve addition and scalar multiplication
 * Poseidon hash
+  
+TODO: rephrase
 
-### VP checks
+### VP checks per transaction
 
-TODO: something
+In every transaction some notes are spent and some notes are created. 
+* For every spent note, `sendVP` of its owner is called
+* For every output note, `recvVP` of the recipient is called
+* `intentVP` of every user whose intent was involved in the tx is called
+* Every note belongs to some application. For every application that has its notes involved in the transaction, its `appVP` is called.
 
-VPs take all of the transaction notes as input and are called once per transaction. 
-
-* The spending VP for every spent note
-* The app VP for every spent and created note
-* The receiving VP for every created note
+Every VP has all spent and output in the transaction notes as input and is called once per transaction (meaning that if two notes of the same app exist, the `appVP` is called only once and is checking the state transitions for all notes at once). 
 
 ### VP interface
 
@@ -63,26 +61,28 @@ For privacy and efficiency, all VPs share the same *public input interface*, but
 #### Public Inputs
 
 * $\{nf_i\}$ - the set of revealed nullifiers in the transaction
-* $\{cm_i\}$ - the set of new notes created in the transaction
+* $\{cm_i\}$ - the set of new note commitments created in the transaction
 * $e$ - the current Taiga epoch (used for time-tracking)
 
 TODO: This might include a public key as well
 
+TODO: clarify
+
 #### Private inputs
 
-While not formally required, most validity predicates will have all spent and output notes (`address`, `app`, `v`, `data`, `rho`, `psi`, `rcm`) as private input and will verify that they match public input.
+While not formally required, most validity predicates will have all spent and output notes as private input and will verify that they match public input.
 
-## Example
+## Examples
 
-Every validity predicate structure has input and output notes of the transaction as the local data (to be checked against the constraints).
+Let's define a trivial VP that takes spent and output notes as input, checks nothing and returns true:
 ```rust
 pub struct TrivialValidityPredicate<CP: CircuitParameters> {
     input_notes: [Note<CP>; NUM_NOTE],
     output_notes: [Note<CP>; NUM_NOTE],
 }
-```
-Let's define a trivial VP that checks nothing and returns true:
-```rust
+
+...
+
 impl<CP: CircuitParameters> Circuit<CP::CurveScalarField, CP::InnerCurve> for TrivialValidityPredicate<CP>
 {
     ...
@@ -98,9 +98,8 @@ impl<CP: CircuitParameters> Circuit<CP::CurveScalarField, CP::InnerCurve> for Tr
    ... 
 }
 ```
-From this gadget representing the VP constraints, we can compute the VP proof and verify it:
+Now we can compute the proof for our VP and verify it:
 ```rust
-// creation of the VP
 let mut vp = TrivialValidityPredicate::<CP> { input_notes, output_notes };
 
 // setup of the proof system
@@ -123,8 +122,6 @@ verify_proof::<Fr, P, PC>(
 ).unwrap();
 ```
 
-This example can be run with [this file](https://github.com/anoma/taiga/blob/main/src/doc_examples/validity_predicate.rs) or with the command line
-```
-cargo test doc_examples::validity_predicate::test_vp_creation
-```
-Next: [App](./app.md)
+You can find the full example [here](https://github.com/anoma/taiga/blob/main/taiga_zk_garage/src/doc_examples/validity_predicate.rs)
+
+Next: [Application](./app.md)
