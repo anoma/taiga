@@ -49,7 +49,8 @@ This note will only be spent if the user's intent (intentVP) is satisfied.
 
 ![img.png](img/exec_intent_notes.png)
 
-If we look at the intent token notes as messages passing from one user (application) to another, the first [1] intent note can signal a message being sent, when the [-1] note will signal that the message has been received. See more about the idea of message passing [here](message_passing.md).
+
+If we look at the intent token notes as messages passing from one user (application) to another, the output [1] intent note can signal a message being sent, and spending of that note will signal that the message has been received. See more about the idea of message passing [here](message_passing.md).
 
 ## Step 2: Gossip
 Once the intentVP is specified and the initial partial transaction is created, the user sends everything to the intent gossip network. Gossip nodes send those intents to each other, spreading them around. Solvers listen to the intent gossip network and receive the intents.
@@ -106,9 +107,9 @@ Three parties, Alice, Bob, and Charlie, are looking for some assets in exchange 
 
 ![img.png](img/exec_3_party.png)
 
-**Step 1-2**: The users define their intents and create intentVPs. It doesn't have to happen at the same time for all users, but for simplicity we describe it as one step. The intentVPs of all three users have the same structure: users are willing to spend their asset (Alice - a star, Bob - a dolphin, Charlie - a tree) in exchange for some other asset. Once the user receives the desired asset, an intent token note of value [-1] is emitted. In addition to that, all three users also create their initial partial transactions spending the asset they are ready to give away (Alice ptx, Bob ptx, and Charlie ptx).
+**Step 1-2**: The users define their intents and create intentVPs. It doesn't have to happen at the same time for all users, but for simplicity we describe it as one step. The intentVPs of all three users have the same structure: users are willing to spend their asset (Alice - a star, Bob - a dolphin, Charlie - a tree) in exchange for some other asset. Once the user receives the desired asset, the intent token note is spent. In addition to that, all three users also create their initial partial transactions spending the asset they are ready to give away (Alice ptx, Bob ptx, and Charlie ptx).
 
-**Step 3**: A solver sees Alice's ptx and Bob's ptx, matches them together, and creates a new partial transaction. Alice's intentVP is satisfied, [-1] intent token note is created. 
+**Step 3**: A solver sees Alice's ptx and Bob's ptx, matches them together, and creates a new partial transaction. Alice's intentVP is satisfied, and her intent note is spent. 
 
 Total per-token balances:
 
@@ -116,20 +117,20 @@ Total per-token balances:
 |-|-|-|-|
 |star NFT|1|0|1|
 |blue dolphin NFT|1|1||
-|blue intent token|[1] + [-1]|-|0|
+|blue intent token|[1] - [1]|-|0|
 |yellow intent token|[1] |-|[1]|
 
-**Step 4**: A solver sees all previous partial transactions and the initial transaction created by Charlie. The solver matches them together and creates new partial transactions, sending the tree to Bob and the star to Charlie. VPs of Bob and Charlie are now satisfied, the corresponding notes of value [-1] are created. The  per-token balance of partial transactions is equal to zero, which means it is possible to create a transaction.
+**Step 4**: A solver sees all previous partial transactions and the initial transaction created by Charlie. The solver matches them together and creates new partial transactions, sending the tree to Bob and the star to Charlie. VPs of Bob and Charlie are now satisfied, the corresponding intent notes are spent. The  per-token balance of partial transactions is equal to zero, which means it is possible to create a transaction.
 Total per-token balances:
 
 |token|spent|output|spent - output|
 |-|-|-|-|
 |star NFT|1|1|0|
 |blue dolphin NFT|1|1|0|
-|blue intent token|[1] + [-1] = [0]|-|0|
-|yellow intent token|[1] + [-1]|-|0|
+|blue intent token|[1] - [1] = [0]|-|0|
+|yellow intent token|[1] - [1]|-|0|
 |tree NFT|1|1|0|
-|green intent token|[1]+ [-1]|-|0|
+|green intent token|[1] - [1]|-|0|
 
 **Step 5**:
 The final transaction containing the spent and output notes from partial transactions is created with all proofs attached.
@@ -142,7 +143,7 @@ Let's consider the situation where one of the parties has a complex VP (compared
 
 **Step 1-2**: Alice and Bob create their intentVPs and initial partial transactions. Alice spends both of the notes she is ready to give away, expecting to receive one of them back (the other one will go to the counterparty).
 
-**Step 3**: A solver sees Alice's and Bob's partial transactions and matches them together. Alice receives the blue dolphin NFT and one of her notes ([1] of A) back, her intentVP is satisfied and the [-1] note of Alice's intent token is released. Bob get's [2]B note from Alice, his intentVP is satisfied, [-1] intent token note is released. All total per-token balances are equal to 0, and the final transaction can be created.
+**Step 3**: A solver sees Alice's and Bob's partial transactions and matches them together. Alice receives the blue dolphin NFT and one of her notes ([1] of A) back, her intentVP is satisfied and Alice's intent token note is spent. Bob get's [2]B note from Alice, his intentVP is satisfied, his intent token note is spent. All total per-token balances are equal to 0, and the final transaction can be created.
 
 **Step 4**: The final transaction is created using the spent and output notes from the partial transactions.
 
@@ -158,10 +159,10 @@ If the state change happens across partial transactions (meaning that the state 
 
 
 
-![img_1.png](img/exec_arb_state_update_across_ptx.png)
+![img_1.png](img/exec_update.png)
 
 For simplicity, let's assume that the old state note has a 0 value. A zero-value note doesn't affect the total balance which is necessary for across-ptx communication. And so the first step is to turn a zero-value note into a non-zero value note (step 1 on the diagram).
 
-In the next partial transaction (step 2) we output [-1] value note to balance the old [1] state note, but if the state can be changed to final in the next partial transaction (step 2.1), a new state zero-value note is produced, total balance becomes zero, and the transaction can be finalized. If the state isn't final (step 2.2), another [1] value note with the new (but not final) state is produced, the total balance is non-zero and the transaction cannot be finalized. In that case, the step 2 is repeated until the final state is computed.
+In the next partial transaction (step 2) we spend a [1] value note to balance the created [1] state note, but if the state can be changed to final in the next partial transaction (step 2.1), a new state zero-value note is produced, total balance becomes zero, and the transaction can be finalized. If the state isn't final (step 2.2), another [1] value note with the new (but not final) state is produced, the total balance is non-zero and the transaction cannot be finalized. In that case, the step 2 is repeated until the final state is computed.
 
 **Note**: different states imply different token types, and the old state note cannot balance a new state note.
