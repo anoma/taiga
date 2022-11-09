@@ -33,7 +33,7 @@ In principle, any party can create a partial transaction, if they can prove that
 
 **Initial partial transactions** are the partial transactions that users create at the beginning, spending the notes that will be given to the counterparty once the intents are matched.
 
-**Note**: For simplicity we assume that intents imply both sending notes and recei1|ving notes.
+**Note**: For simplicity we assume that intents imply both sending notes and receiving notes.
 
 As a part of the initial partial transaction, users also output **intent token notes**. 
 ### Intent tokens
