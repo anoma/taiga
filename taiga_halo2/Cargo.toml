@@ -13,6 +13,7 @@ group = "0.12"
 halo2_gadgets = {version = "0.2", features = ["test-dependencies"]}
 halo2_proofs = "0.2"
 bitvec = "1"
+subtle = { version = "2.3", default-features = false }
 
 [dev-dependencies]
 criterion = "0.3"
