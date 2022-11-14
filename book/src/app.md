@@ -1,18 +1,22 @@
 # Application
 
-`App` define the type of note (e.g. XAN, ETH, BTC). Each application is identified by an address `appAddress` (the same way as user address identifies a user) and has its own VP `AppVP`.
+Similarly to Ethereum applications that are build on smart contracts, Taiga applications have VPs that define the application rules. Every application is identified by its address and has its own note type. Sending and receiving the notes of the app type is controlled by the `appVP`.
+
+#### Example
+- cryptocurrency application with a note type CUR (matches the token name) and `appVP` that makes sure that the balance is correct
 
 ### Application VP
-Each application has its own [validity predicate](./validity-predicates.md) `AppVP` that defines the conditions on which the application can be sent/received/etc (e.g. whitelist VP that only allows using the application a specified set of users). As with other VPs, `AppVP` checks that input and output notes of the tx satisfy certain constraints.
-It is required that the `AppVP` of the applications involved in a tx evaluated to `true`.
+Each application has its own [`appVP`](./validity-predicates.md) that defines the conditions on which the application can be used (i.e. the notes of the corresponding type can be sent or received). 
 
-In Taiga, VPs are shielded, so instead of showing that `AppVP` evaluates to `true` publicly, a ZK proof is created. To make sure that `AppVP`  evaluates to `true`, an observer can verify the proof (using the verifier key):
-
-```verify(AppVP_proof, app_VK) = True```
+Like all other VPs, `appVP` is required to evaluate to `true` in a valid transaction and shielded with the help of ZK proofs.
 
 ### Application Address
-Each app is identified by an address that is derived from its verifier key `app_VK`:
+Each application is identified by an address that is derived from its verifier key `app_VK` (that is itself derived from the `appVP`):
 `appAddress = Com(app_VK)`
+
+TODO: what is a verifier key, how are they computed
+
+TODO: App is basically identified by the appVP, but as it is shielded nobody can do that. Instead, the address is derived
 
 
 ### Example
