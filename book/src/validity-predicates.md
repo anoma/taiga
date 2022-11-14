@@ -120,5 +120,3 @@ verify_proof::<Fr, P, PC>(
 ```
 
 You can find the full example [here](https://github.com/anoma/taiga/blob/main/taiga_zk_garage/src/doc_examples/validity_predicate.rs).
-
-Next: [Application](./app.md)
