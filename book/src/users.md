@@ -1,25 +1,25 @@
 # User
 
-`User` in Taiga can own, send and receive notes. Each user has an **address** that identifies them, **validity predicates** that authorize their actions, and **keys** that are used to derive parameters.
+Each Taiga user has an **address** that identifies them, **validity predicates** that authorize their actions, and **keys** that are used to derive parameters.
 
 ### Validity predicates
-Each user has validity predicates that authorize spending and receiving notes. Validity predicates that authorize sending notes are called `SendVP`, and validity predicates that authorize receiving notes are called `RecvVP`.
+Each user has VPs that authorize spending (`sendVP`) and receiving (`recvVP`) notes and `intentVP` that is used to specify the intents of the user.
 
-These VPs check that input and output notes of the transactions satisfy certain constraints. When a user wants to spend a note, the satisfaction of his `SendVP` is required. Similarly, to receive a note, user's `RecvVP` must be satisfied.
+TODO: add intent link
 
-As VPs are shielded in Taiga, instead of showing that the VPs of the user evaluate to true publicly, ZK proofs are created. An observer can verify these proofs (using the verifier key).
+As VPs are shielded in Taiga, instead of showing that the VPs of the user evaluate to `true` publicly, ZK proofs are created. An observer can verify these proofs using the verifier key.
 
-### User keys
+### Keys
 Each user has a set of keys that allows to authorize various actions or generate parameters. One of such keys is a nullifier key `nk` used to compute [note nullifiers](./notes.md) that are necessary to spend notes.
 
-### User address
+### Address
 
 Each user has an address that allows others to send assets to the user. Address is derived from user's `SendVP`, `RecvVP`, and `nk`.
 
 ### Example
 
 Alice is a user of Taiga with validity predicates defined as follows:
-* `SendVP` is a check on the amount of her spent: she does not want to send more than 3XAN at a time.
+* `SendVP` is a check on the amount of her spent: she does not want to send more than 3XAN (Anoma native token) at a time.
 * `RecvVP` is a check on the amount she receives: she does not want to receive notes of less than 0.1XAN.
 
 ```rust
@@ -47,5 +47,3 @@ Alice is a user of Taiga with validity predicates defined as follows:
 This example is reproducible with [this file](../../src/doc_examples/user.rs) or with the command
 
 `cargo test doc_examples::user::test_app_creation`
-
-Next: [Note](./notes.md)
