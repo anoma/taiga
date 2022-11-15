@@ -21,7 +21,7 @@ Intents specify ephemeral interests of users. The step of intent creation consis
 
 Two of the main requirements for an Anoma transaction to be valid are: 
 1. VPs of all involved in the transaction parties must be satisfied.
-2. The transaction must be **balanced** , i.e the value spent in the transaction minus the value output equals to some predefined value `v`, the **balancing value**.
+2. The transaction must be **balanced** , i.e the value spent in the transaction minus the value output equals to some predefined value `v`, the **balancing value**. The balancing value is transparent (visible to observers) and can be involved in interactions with the transparent system.
 
 We call a **partial transaction** a state transition where the first requirement is satisfied (all VPs evaluate to True), but the second one isn't (the state transition is unbalanced). Such a state transition isn't a valid transaction and cannot be published on the blockchain, 
 but can be combined with other partial transactions in order to build a valid transaction. 
@@ -59,7 +59,11 @@ Once the intentVP is specified and the initial partial transaction is created, t
 
 Solvers receive intents from the intent gossip network and match them together in order to create transactions. 
 
-**Note**: that implies that users need to give some information to the solvers (including the content of `intentVP`) that is sufficient to create partial transactions and transactions (to create proofs).
+That implies that users need to give some information to the solvers that is sufficient to create partial transactions and transactions (to create proofs). In order to match two intents, the solver needs to know:
+- intentVPs of both matching parties
+- note commitments and nullifiers from prior partial transactions (to be chained)
+- proofs from prior partial transactions (to be chained)
+- for the notes spent/output in the new partial transaction: nullifier key, commitments to the sender/receiver VPs, note fields
 
 We are considering the model where a solver makes one step at a time and sends the step result back to the gossip network, where the partial solution meets the next solver in the chain. In practice, the solver can continue solving instead of sending the result back to the gossip network if they can make the next step.
 
