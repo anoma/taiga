@@ -316,22 +316,6 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
         //     })
         //     .collect();
 
-        // Check that every entry in the sudoku puzzle is a number from 0 to 9
-        let sudoku_cells_reduced_2: Vec<AssignedCell<_, _>> = self
-            .sudoku
-            .concat()
-            .into_iter()
-            .filter(|x| 1 <= *x)
-            .map(|x| {
-                assign_free_advice(
-                    layouter.namespace(|| "another cell"),
-                    config.advices[0],
-                    Value::known(pallas::Base::from_u128(x as u128)),
-                )
-                .unwrap()
-            })
-            .collect();
-
         // TODO: Take the filtered rows instead of [rows, cols, squares]
         for (cpt, perm) in [rows, cols, squares].concat().iter().enumerate() {
             let mut cell_lhs = assign_free_advice(
