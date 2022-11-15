@@ -10,7 +10,7 @@ fn main() {
     use rand::rngs::OsRng;
 
     use crate::{
-        app::AppCircuit,
+        app::valid_sudoku::SudokuCircuit,
         keys::{ProvingKey, VerifyingKey},
         proof::Proof,
     };
@@ -27,7 +27,7 @@ fn main() {
         [3, 2, 5, 1, 9, 7, 8, 4, 6],
     ];
 
-    let circuit = AppCircuit { sudoku };
+    let circuit = SudokuCircuit { sudoku };
     const K: u32 = 13;
     assert_eq!(
         MockProver::run(13, &circuit, vec![vec![pallas::Base::zero(); 27]])
