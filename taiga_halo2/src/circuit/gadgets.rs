@@ -1,6 +1,6 @@
 use ff::{Field, PrimeField};
 use halo2_gadgets::{
-    ecc::chip::NonIdentityEccPoint,
+    // ecc::chip::EccPoint,
     utilities::{bool_check, ternary},
 };
 use halo2_proofs::{
@@ -9,13 +9,13 @@ use halo2_proofs::{
     poly::Rotation,
 };
 use pasta_curves::{
-    arithmetic::CurveAffine,
+    // arithmetic::CurveAffine,
     arithmetic::{CurveExt, FieldExt, SqrtRatio},
     pallas,
 };
 use std::marker::PhantomData;
 use subtle::ConditionallySelectable;
-use subtle::ConstantTimeEq;
+// use subtle::ConstantTimeEq;
 
 pub fn assign_free_advice<F: Field, V: Copy>(
     mut layouter: impl Layouter<F>,
@@ -140,12 +140,8 @@ pub struct MapToCurveConfig {
     pub u: Column<Advice>,
     pub x: Column<Advice>,
     pub y: Column<Advice>,
-    sqrt_a: Column<Advice>,
-    sqrt_b: Column<Advice>,
     u_sgn0: Column<Advice>,
     u_other_bits: Column<Advice>,
-    y_sgn0: Column<Advice>,
-    y_other_bits: Column<Advice>,
     alpha: Column<Advice>,
     beta: Column<Advice>,
     gamma: Column<Advice>,
@@ -160,12 +156,8 @@ impl MapToCurveConfig {
         u: Column<Advice>,
         x: Column<Advice>,
         y: Column<Advice>,
-        sqrt_a: Column<Advice>,
-        sqrt_b: Column<Advice>,
         u_sgn0: Column<Advice>,
         u_other_bits: Column<Advice>,
-        y_sgn0: Column<Advice>,
-        y_other_bits: Column<Advice>,
         alpha: Column<Advice>,
         beta: Column<Advice>,
         gamma: Column<Advice>,
@@ -173,19 +165,16 @@ impl MapToCurveConfig {
         epsilon: Column<Advice>,
     ) -> Self {
         meta.enable_equality(u);
+        meta.enable_equality(x);
+        meta.enable_equality(y);
 
         let config = Self {
             q_map_to_curve: meta.selector(),
             u,
             x,
             y,
-            sqrt_a,
-            sqrt_b,
             u_sgn0,
             u_other_bits,
-            y_sgn0,
-            y_other_bits,
-
             alpha,
             beta,
             gamma,
@@ -209,20 +198,23 @@ impl MapToCurveConfig {
             let beta = meta.query_advice(self.beta, Rotation::cur());
             // gamma = inv0(num_gx1)
             let gamma = meta.query_advice(self.gamma, Rotation::cur());
-            let sqrt_a = meta.query_advice(self.sqrt_a, Rotation::cur());
+            let sqrt_a = meta.query_advice(self.x, Rotation::next());
             // delta = inv0(a - sqrt_a * sqrt_a)
             let delta = meta.query_advice(self.delta, Rotation::cur());
-            let sqrt_b = meta.query_advice(self.sqrt_b, Rotation::cur());
+            let sqrt_b = meta.query_advice(self.y, Rotation::next());
             // epsilon = inv0(b - sqrt_b * sqrt_b)
             let epsilon = meta.query_advice(self.epsilon, Rotation::cur());
 
             let u_sgn0 = meta.query_advice(self.u_sgn0, Rotation::cur());
             let u_other_bits = meta.query_advice(self.u_other_bits, Rotation::cur());
-            let y_sgn0 = meta.query_advice(self.y_sgn0, Rotation::cur());
-            let y_other_bits = meta.query_advice(self.y_other_bits, Rotation::cur());
+            let y_sgn0 = meta.query_advice(self.u_sgn0, Rotation::next());
+            let y_other_bits = meta.query_advice(self.u_other_bits, Rotation::next());
 
-            let x_affine = meta.query_advice(self.x, Rotation::cur());
-            let y_affine = meta.query_advice(self.y, Rotation::cur());
+            // let x_affine = meta.query_advice(self.x, Rotation::cur());
+            // let y_affine = meta.query_advice(self.y, Rotation::cur());
+            let x_jac = meta.query_advice(self.x, Rotation::cur());
+            let y_jac = meta.query_advice(self.y, Rotation::cur());
+            let z_jac = meta.query_advice(self.u, Rotation::next());
 
             // 1. tv1 = inv0(Z^2 * u^4 + Z * u^2)
             // 2. x1 = (-B / A) * (1 + tv1)
@@ -241,15 +233,15 @@ impl MapToCurveConfig {
             // let num_gx1 = (num2_x1 + a * div2) * num_x1 + b * div3;
             let zero = Expression::Constant(pallas::Base::zero());
             let one = Expression::Constant(pallas::Base::one());
-            let a = Expression::Constant(pallas::Affine::a());
-            let b = Expression::Constant(pallas::Affine::b());
+            let a = Expression::Constant(pallas::Iso::a());
+            let b = Expression::Constant(pallas::Iso::b());
             let z = Expression::Constant(pallas::Point::Z);
             let z_u2 = z.clone() * u.clone().square();
             let ta = z_u2.clone().square() + z_u2.clone();
             let num_x1 = b.clone() * (ta.clone() + one.clone());
             let ta_is_zero = one.clone() - alpha * ta.clone();
             let poly1 = ta.clone() * ta_is_zero.clone();
-            let div = a.clone() * ternary(ta_is_zero, zero.clone() - ta.clone(), z.clone());
+            let div = a.clone() * ternary(ta_is_zero, z, zero.clone() - ta);
             let num2_x1 = num_x1.clone().square();
             let div2 = div.clone().square();
             let div3 = div2.clone() * div.clone();
@@ -263,9 +255,9 @@ impl MapToCurveConfig {
             // 8. Else set x = x2 and y = sqrt(gx2)
             // sqrt_ratio(num_gx1, div3)
             // let (gx1_square, y1) = F::sqrt_ratio(&num_gx1, &div3);
-            let div3_is_zero = one.clone() - div3.clone() * beta;
-            let poly2 = div3 * div3_is_zero.clone();
-            let a = ternary(div3_is_zero.clone(), zero.clone() - ta, z);
+            let div3_is_zero = one.clone() - div3.clone() * beta.clone();
+            let poly2 = div3.clone() * div3_is_zero.clone();
+            let a = beta * num_gx1.clone();
             let root_of_unity = Expression::Constant(pallas::Base::root_of_unity());
             let b = a.clone() * root_of_unity;
             let num_gx1_is_zero = one.clone() - num_gx1.clone() * gamma;
@@ -304,13 +296,16 @@ impl MapToCurveConfig {
             let y_check = y.clone() - (y_other_bits * two.clone() + y_sgn0.clone());
             let u_sgn0_xor_y_sgn0 = u_sgn0.clone() + y_sgn0.clone() - two * u_sgn0 * y_sgn0;
 
-            let poly7 = x_affine.clone() * div - num_x;
-            let poly8 = y_affine.clone() - ternary(u_sgn0_xor_y_sgn0, zero - y.clone(), y);
+            // let poly7 = x_affine.clone() * div - num_x;
+            // let poly8 = y_affine.clone() - ternary(u_sgn0_xor_y_sgn0, zero - y.clone(), y);
+            let poly7 = x_jac - num_x * div.clone();
+            let poly8 = y_jac - ternary(u_sgn0_xor_y_sgn0, zero - y.clone(), y) * div3;
+            let poly9 = z_jac - div;
 
             // Check that (x, y) is on the curve
-            let on_curve = y_affine.square()
-                - x_affine.clone().square() * x_affine
-                - Expression::Constant(pallas::Affine::b());
+            // let on_curve = y_affine.square()
+            //     - x_affine.clone().square() * x_affine
+            //     - Expression::Constant(pallas::Affine::b());
             Constraints::with_selector(
                 q_map_to_curve,
                 [
@@ -329,7 +324,8 @@ impl MapToCurveConfig {
                     ("y check", y_check),
                     ("x", poly7),
                     ("y", poly8),
-                    ("on-curve", on_curve),
+                    ("z", poly9),
+                    // ("on-curve", on_curve),
                 ],
             )
         });
@@ -340,7 +336,15 @@ impl MapToCurveConfig {
         u: &AssignedCell<pallas::Base, pallas::Base>,
         offset: usize,
         region: &mut Region<'_, pallas::Base>,
-    ) -> Result<NonIdentityEccPoint, Error> {
+        // ) -> Result<EccPoint, Error> {
+    ) -> Result<
+        (
+            AssignedCell<pallas::Base, pallas::Base>,
+            AssignedCell<pallas::Base, pallas::Base>,
+            AssignedCell<pallas::Base, pallas::Base>,
+        ),
+        Error,
+    > {
         // Enable `q_map_to_curve` selector
         self.q_map_to_curve.enable(region, offset)?;
         u.copy_advice(|| "u", region, self.u, offset)?;
@@ -353,8 +357,8 @@ impl MapToCurveConfig {
         let alpha = ta.map(|ta| ta.invert().unwrap_or(pallas::Base::zero()));
         region.assign_advice(|| "alpha", self.alpha, offset, || alpha)?;
 
-        let a = pallas::Affine::a();
-        let b = pallas::Affine::b();
+        let a = pallas::Iso::a();
+        let b = pallas::Iso::b();
         let div = ta.map(|ta| a * pallas::Base::conditional_select(&-ta, &z, ta.is_zero()));
         let div3 = div.map(|div| div.square() * div);
 
@@ -373,7 +377,7 @@ impl MapToCurveConfig {
             .zip(div3)
             .map(|(num, div)| div.invert().unwrap_or_else(pallas::Base::zero) * num);
         let sqrt_a = a.map(|a| a.sqrt().unwrap_or(pallas::Base::zero()));
-        region.assign_advice(|| "sqrt_a", self.sqrt_a, offset, || sqrt_a)?;
+        region.assign_advice(|| "sqrt_a", self.x, offset + 1, || sqrt_a)?;
         let delta = a.zip(sqrt_a).map(|(a, sqrt_a)| {
             (a - sqrt_a.square())
                 .invert()
@@ -382,7 +386,7 @@ impl MapToCurveConfig {
         region.assign_advice(|| "delta", self.delta, offset, || delta)?;
         let b = a.map(|a| a * pallas::Base::root_of_unity());
         let sqrt_b = b.map(|b| b.sqrt().unwrap_or(pallas::Base::zero()));
-        region.assign_advice(|| "sqrt_b", self.sqrt_b, offset, || sqrt_b)?;
+        region.assign_advice(|| "sqrt_b", self.y, offset + 1, || sqrt_b)?;
         let epsilon = b.zip(sqrt_b).map(|(b, sqrt_b)| {
             (b - sqrt_b.square())
                 .invert()
@@ -423,36 +427,123 @@ impl MapToCurveConfig {
                 });
 
         let y_sgn0 = xy.map(|(_, y)| pallas::Base::from((y.to_repr()[0] & 1) as u64));
-        region.assign_advice(|| "y_sgn0", self.y_sgn0, offset, || y_sgn0)?;
+        region.assign_advice(|| "y_sgn0", self.u_sgn0, offset + 1, || y_sgn0)?;
 
         let y_other_bits = xy
             .zip(y_sgn0)
             .map(|((_, y), y_sgn0)| (y - y_sgn0) * pallas::Base::from(2).invert().unwrap());
         region.assign_advice(
             || "y_other_bits",
-            self.y_other_bits,
-            offset,
+            self.u_other_bits,
+            offset + 1,
             || y_other_bits,
         )?;
 
-        // use pasta_curves::hashtocurve::map_to_curve_simple_swu;
-        // let xy_affine = u.value().map(|u| {
-        //     let xy_yacobian: CurveExt::<pallas::Base> = map_to_curve_simple_swu(u, theta, z);
+        let x = xy.zip(div).map(|((x, _), div)| x * div);
+        let y = xy.zip(div3).map(|((_, y), div3)| y * div3);
+        let x = region.assign_advice(|| "x", self.x, offset, || x)?;
+        let y = region.assign_advice(|| "y", self.y, offset, || y)?;
+        let z = region.assign_advice(|| "z", self.u, offset + 1, || div)?;
+        let result = (x, y, z);
+
+        // let x_affine: Value<Assigned<pallas::Base>> = xy.zip(div).map(|((x, _), div)| {
+        //     let x = x * div.invert().unwrap();
+        //     x.into()
         // });
+        // let x = region.assign_advice(|| "x_affine", self.x, offset, || x_affine)?;
+        // let y_affine: Value<Assigned<pallas::Base>> = xy.zip(u.value()).map(|((_, y), u)| {
+        //     let y = pallas::Base::conditional_select(&(-y), &y, u.is_odd().ct_eq(&y.is_odd()));
+        //     y.into()
+        // });
+        // let y = region.assign_advice(|| "y_affine", self.y, offset, || y_affine)?;
 
-        let x_affine: Value<Assigned<pallas::Base>> = xy.zip(div).map(|((x, _), div)| {
-            let x = x * div.invert().unwrap();
-            x.into()
-        });
-        let x = region.assign_advice(|| "x_affine", self.x, offset, || x_affine)?;
-        let y_affine: Value<Assigned<pallas::Base>> = xy.zip(u.value()).map(|((_, y), u)| {
-            let y = pallas::Base::conditional_select(&(-y), &y, u.is_odd().ct_eq(&y.is_odd()));
-            y.into()
-        });
-        let y = region.assign_advice(|| "y_affine", self.y, offset, || y_affine)?;
-
-        let result = NonIdentityEccPoint::from_coordinates_unchecked(x, y);
+        // let result = EccPoint::from_coordinates_unchecked(x, y);
 
         Ok(result)
     }
+}
+
+#[test]
+fn test_map_to_curve_circuit() {
+    use halo2_proofs::{
+        circuit::{Layouter, SimpleFloorPlanner, Value},
+        dev::MockProver,
+        plonk::{Advice, Circuit, Column, ConstraintSystem, Error},
+    };
+
+    #[derive(Default)]
+    struct MyCircuit {}
+
+    impl Circuit<pallas::Base> for MyCircuit {
+        type Config = (MapToCurveConfig, [Column<Advice>; 10]);
+        type FloorPlanner = SimpleFloorPlanner;
+
+        fn without_witnesses(&self) -> Self {
+            Self::default()
+        }
+
+        fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self::Config {
+            let advices = [
+                meta.advice_column(),
+                meta.advice_column(),
+                meta.advice_column(),
+                meta.advice_column(),
+                meta.advice_column(),
+                meta.advice_column(),
+                meta.advice_column(),
+                meta.advice_column(),
+                meta.advice_column(),
+                meta.advice_column(),
+            ];
+
+            (
+                MapToCurveConfig::configure(
+                    meta, advices[0], advices[1], advices[2], advices[3], advices[4], advices[5],
+                    advices[6], advices[7], advices[8], advices[9],
+                ),
+                advices,
+            )
+        }
+
+        fn synthesize(
+            &self,
+            config: Self::Config,
+            mut layouter: impl Layouter<pallas::Base>,
+        ) -> Result<(), Error> {
+            let u = assign_free_advice(
+                layouter.namespace(|| "u"),
+                config.1[0],
+                Value::known(pallas::Base::zero()),
+            )?;
+            let ret = layouter.assign_region(
+                || "map_to_curve",
+                |mut region| config.0.assign_region(&u, 0, &mut region),
+            )?;
+            ret.0.value().map(|x| {
+                assert!(
+                    format!("{:?}", x)
+                        == "0x28c1a6a534f56c52e25295b339129a8af5f42525dea727f485ca3433519b096e"
+                );
+            });
+            ret.1.value().map(|y| {
+                assert!(
+                    format!("{:?}", y)
+                        == "0x3bfc658bee6653c63c7d7f0927083fd315d29c270207b7c7084fa1ee6ac5ae8d"
+                );
+            });
+            ret.2.value().map(|z| {
+                assert!(
+                    format!("{:?}", z)
+                        == "0x054b3ba10416dc104157b1318534a19d5d115472da7d746f8a5f250cd8cdef36"
+                );
+            });
+
+            Ok(())
+        }
+    }
+
+    let circuit = MyCircuit {};
+
+    let prover = MockProver::run(11, &circuit, vec![]).unwrap();
+    assert_eq!(prover.verify(), Ok(()))
 }
