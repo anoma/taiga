@@ -42,6 +42,8 @@ As a part of the initial partial transaction, users also output **intent token n
 
 Intent token notes are **dummy** notes - meaning that unlike "normal" notes, the merkle path isn't checked for them (but they can have arbitrary value and stored in the CMtree, just like "normal"). 
 
+**Note**: being a dummy note and having zero value are two independent concepts in Taiga. Zero value notes aren't necessarily dummy, dummy notes can have non-zero value.
+
 How intent tokens are used:
 1. Spending notes in the initial partial transaction, the user additionally outputs intent token note of value [1].
 This note will only be spent if the user's intent (intentVP) is satisfied.
