@@ -1,8 +1,5 @@
 use ff::{Field, PrimeField};
-use halo2_gadgets::{
-    // ecc::chip::EccPoint,
-    utilities::{bool_check, ternary},
-};
+use halo2_gadgets::utilities::{bool_check, ternary};
 use halo2_proofs::{
     circuit::{AssignedCell, Chip, Layouter, Region, Value},
     plonk::{Advice, Assigned, Column, ConstraintSystem, Constraints, Error, Expression, Selector},
@@ -11,6 +8,7 @@ use halo2_proofs::{
 use pasta_curves::{
     // arithmetic::CurveAffine,
     arithmetic::{CurveExt, FieldExt, SqrtRatio},
+    hashtocurve::iso_map,
     pallas,
 };
 use std::marker::PhantomData;
@@ -458,6 +456,126 @@ impl MapToCurveConfig {
         // let y = region.assign_advice(|| "y_affine", self.y, offset, || y_affine)?;
 
         // let result = EccPoint::from_coordinates_unchecked(x, y);
+
+        Ok(result)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct IsoMapConfig {
+    q_iso_map: Selector,
+    x: Column<Advice>,
+    y: Column<Advice>,
+    z: Column<Advice>,
+}
+
+impl IsoMapConfig {
+    #[allow(clippy::too_many_arguments)]
+    pub fn configure(
+        meta: &mut ConstraintSystem<pallas::Base>,
+        x: Column<Advice>,
+        y: Column<Advice>,
+        z: Column<Advice>,
+    ) -> Self {
+        meta.enable_equality(x);
+        meta.enable_equality(y);
+        meta.enable_equality(z);
+
+        let config = Self {
+            q_iso_map: meta.selector(),
+            x,
+            y,
+            z,
+        };
+
+        config.create_gate(meta);
+
+        config
+    }
+
+    fn create_gate(&self, meta: &mut ConstraintSystem<pallas::Base>) {
+        meta.create_gate("iso map", |meta| {
+            let q_iso_map = meta.query_selector(self.q_iso_map);
+            let x = meta.query_advice(self.x, Rotation::cur());
+            let y = meta.query_advice(self.y, Rotation::cur());
+            let z = meta.query_advice(self.z, Rotation::cur());
+            let xo = meta.query_advice(self.x, Rotation::next());
+            let yo = meta.query_advice(self.y, Rotation::next());
+            let zo = meta.query_advice(self.z, Rotation::next());
+
+            let iso: Vec<Expression<pallas::Base>> = pallas::Point::ISOGENY_CONSTANTS
+                .iter()
+                .map(|&v| Expression::Constant(v))
+                .collect();
+            let z2 = z.clone().square();
+            let z3 = z2.clone() * z;
+            let z4 = z2.clone().square();
+            let z6 = z3.clone().square();
+            let num_x = ((iso[0].clone() * x.clone() + iso[1].clone() * z2.clone()) * x.clone()
+                + iso[2].clone() * z4.clone())
+                * x.clone()
+                + iso[3].clone() * z6.clone();
+            let div_x = (z2.clone() * x.clone() + iso[4].clone() * z4.clone()) * x.clone()
+                + iso[5].clone() * z6.clone();
+
+            let num_y = (((iso[6].clone() * x.clone() + iso[7].clone() * z2.clone()) * x.clone()
+                + iso[8].clone() * z4.clone())
+                * x.clone()
+                + iso[9].clone() * z6.clone())
+                * y;
+            let div_y = (((x.clone() + iso[10].clone() * z2) * x.clone() + iso[11].clone() * z4)
+                * x
+                + iso[12].clone() * z6)
+                * z3;
+
+            let poly1 = div_x.clone() * div_y.clone() - zo.clone();
+            let poly2 = num_x * div_y * zo.clone() - xo;
+            let poly3 = num_y * div_x * zo.square() - yo;
+
+            Constraints::with_selector(q_iso_map, [("z", poly1), ("x", poly2), ("y", poly3)])
+        });
+    }
+
+    pub(super) fn assign_region(
+        &self,
+        x: &AssignedCell<pallas::Base, pallas::Base>,
+        y: &AssignedCell<pallas::Base, pallas::Base>,
+        z: &AssignedCell<pallas::Base, pallas::Base>,
+        offset: usize,
+        region: &mut Region<'_, pallas::Base>,
+        // ) -> Result<EccPoint, Error> {
+    ) -> Result<
+        (
+            AssignedCell<pallas::Base, pallas::Base>,
+            AssignedCell<pallas::Base, pallas::Base>,
+            AssignedCell<pallas::Base, pallas::Base>,
+        ),
+        Error,
+    > {
+        // Enable `q_iso_map` selector
+        self.q_iso_map.enable(region, offset)?;
+        x.copy_advice(|| "x", region, self.x, offset)?;
+        y.copy_advice(|| "y", region, self.y, offset)?;
+        z.copy_advice(|| "z", region, self.z, offset)?;
+
+        let p = x
+            .value()
+            .zip(y.value())
+            .zip(z.value())
+            .map(|((&x, &y), &z)| {
+                let r = pallas::Iso::new_jacobian(x, y, z).unwrap();
+                let p: pallas::Iso = iso_map(&r, &pallas::Point::ISOGENY_CONSTANTS);
+                p.jacobian_coordinates()
+            });
+
+        let xo = p.map(|p| p.0);
+        let yo = p.map(|p| p.1);
+        let zo = p.map(|p| p.2);
+
+        let xo_cell = region.assign_advice(|| "xo", self.x, offset + 1, || xo)?;
+        let yo_cell = region.assign_advice(|| "yo", self.y, offset + 1, || yo)?;
+        let zo_cell = region.assign_advice(|| "zo", self.z, offset + 1, || zo)?;
+        let result = (xo_cell, yo_cell, zo_cell);
 
         Ok(result)
     }
