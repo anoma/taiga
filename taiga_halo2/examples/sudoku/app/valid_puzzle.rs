@@ -271,11 +271,57 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
         }
 
 
-
-        
         // Check that the sum of revealed entries (i.e. entries that contain numbers from 1 to 9) is at least 17, since this is required for a puzzle to be solvable
+        let mut counter = 0;
+        for i in self.sudoku.concat() {
+            if (i != 0) {
+                counter = counter + 1;
+            }
+        }
+
+        let cell_counter = assign_free_advice(
+            layouter.namespace(|| "counter"),
+            config.advices[0],
+            Value::known(pallas::Base::from_u128(counter as u128)),
+        )
+        .unwrap();
 
 
+        let mut cell_lhs = assign_free_advice(
+            layouter.namespace(|| "lhs init"),
+            config.advices[0],
+            Value::known(Fp::one()),
+        )
+        .unwrap();
+
+        for i in 17..82 {
+            let cell_rhs = assign_free_advice(
+                layouter.namespace(|| "rhs"),
+                config.advices[0],
+                Value::known(pallas::Base::from_u128(i as u128)),
+            )
+            .unwrap();
+
+            let diff = SubInstructions::sub(
+                &config.sub_chip(),
+                layouter.namespace(|| "diff"),
+                &cell_counter,
+                &cell_rhs,
+            )
+            .unwrap();
+
+            cell_lhs = MulInstructions::mul(
+                &config.mul_chip(),
+                layouter.namespace(|| "lhs * diff"),
+                &cell_lhs,
+                &diff,
+            )
+            .unwrap();
+        }
+
+        layouter
+                .constrain_instance(cell_lhs.cell(), config.primary, 0)
+                .unwrap();
         Ok(())
     }
 }
@@ -294,27 +340,8 @@ mod tests {
         proof::Proof,
     };
 
-    // use sudokugen::{Puzzle, BoardSize};
-
-    
-    // fn convert_puzzle(puzzle: Puzzle) -> [[u8; 9]; 9] {
-    //     for l in 0..puzzle.base_size.pow(2) {
-    //         for c in 0..puzzle.base_size.pow(2) {
-    //             if let Some(value) = puzzle.cells[l * puzzle.base_size.pow(2) + c] {
-    //                 value
-    //             } else {
-    //                 0
-    //             }
-    //         }
-    //     }
-    // }
     #[test]
     fn test_puzzle() {
-        // let puzzle = Puzzle::generate(BoardSize::NineByNine);
-        // pub sudoku: [[u8; 9]; 9],
-    
-        // let puzzle = convert_puzzle(puzzle);
-    
         let puzzle = [
             [7, 0, 9, 5, 3, 8, 1, 2, 4],
             [2, 0, 3, 7, 1, 9, 6, 5, 8],
