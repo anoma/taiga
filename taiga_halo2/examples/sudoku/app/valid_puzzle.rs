@@ -111,8 +111,7 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
                     Value::known(pallas::Base::from_u128(x as u128)),
                 )
                 .unwrap()
-            })
-            .collect();
+            });
 
         let cell_lhs = assign_free_advice(
             layouter.namespace(|| "lhs init"),
@@ -251,7 +250,7 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
         let mut counter = 0;
         for i in self.sudoku.concat() {
             if i != 0 {
-                counter = counter + 1;
+                counter += 1;
             }
         }
 
