@@ -111,7 +111,8 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
                     Value::known(pallas::Base::from_u128(x as u128)),
                 )
                 .unwrap()
-            });
+            })
+            .collect();
 
         let cell_lhs = assign_free_advice(
             layouter.namespace(|| "lhs init"),
