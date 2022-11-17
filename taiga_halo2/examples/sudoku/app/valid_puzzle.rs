@@ -1,5 +1,5 @@
 extern crate taiga_halo2;
-use ff::PrimeField;
+
 use halo2_proofs::{
     arithmetic::FieldExt,
     circuit::{floor_planner, AssignedCell, Layouter, Value},
@@ -97,32 +97,6 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
             - The sum of revealed entries (i.e. entries that contain numbers from 1 to 9) is at least 17, since this is required for a puzzle to be solvable
         */
 
-        let sudoku_cells: Vec<AssignedCell<_, _>> = self
-            .sudoku
-            .concat()
-            .iter()
-            .map(|x| {
-                assign_free_advice(
-                    layouter.namespace(|| "sudoku_cell"),
-                    config.advices[0],
-                    Value::known(pallas::Base::from_u128(*x as u128)),
-                )
-                .unwrap()
-            })
-            .collect();
-
-        // cells for (1..10)
-        let cell_integers: Vec<AssignedCell<_, _>> = (1..10)
-            .map(|i| {
-                assign_free_advice(
-                    layouter.namespace(|| "cell i"),
-                    config.advices[0],
-                    Value::known(pallas::Base::from(i)),
-                )
-                .unwrap()
-            })
-            .collect();
-
         // Check that every entry in the sudoku puzzle is a number from 0 to 9
         let sudoku_cells_reduced: Vec<AssignedCell<_, _>> = self
             .sudoku
@@ -180,7 +154,7 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
             .into_iter()
             .enumerate()
             .map(|(i, x)| {
-                if (x == 0) {
+                if x == 0 {
                     assign_free_advice(
                         layouter.namespace(|| "non-zero sudoku_cell"),
                         config.advices[0],
@@ -225,7 +199,7 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
             }
         }
 
-        for (cpt, perm) in [rows, cols, squares].concat().iter().enumerate() {
+        for perm in [rows, cols, squares].concat().iter() {
             let mut cell_lhs = assign_free_advice(
                 layouter.namespace(|| "lhs init"),
                 config.advices[0],
@@ -274,7 +248,7 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
         // Check that the sum of revealed entries (i.e. entries that contain numbers from 1 to 9) is at least 17, since this is required for a puzzle to be solvable
         let mut counter = 0;
         for i in self.sudoku.concat() {
-            if (i != 0) {
+            if i != 0 {
                 counter = counter + 1;
             }
         }
