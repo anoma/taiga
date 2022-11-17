@@ -6,7 +6,7 @@
 Here is the high level description of the process, starting from creating intents and ending up publishing a blockchain transaction representing the desired state transition:
 1. **Create**: A user creates an intent, publishing the information of what they have and what they want
 2. **Gossip**: The intent goes to the intent gossip network and is gossiped around the solver nodes
-3. **Solve**: Solvers find matching intents and update the intent with partial transactions until the intent is fully satisfied
+3. **Solve**: Solvers find matching intents and create partial transactions until the intent is fully satisfied
 4. **Finalize**: When the intent is satisfied, a transaction is created and published on the blockchain
 
 ![exec_high.png](img/exec_high.png)
@@ -51,6 +51,11 @@ This note will only be spent if the user's intent (intentVP) is satisfied.
 
 ![img.png](img/exec_intent_notes.png)
 
+### IntentVP
+
+To validate a transaction, it is required that `userVP` of each involved user was satisfied. The part of the userVP that is responsible for validating the future transaction (satisfying the user's intent) is exposed in the intentVP, along with the description of the intent (so that the solver knows what it takes to satisfy the user interests). Later IntentVP is checked in the circuit, validating the state transition.  
+
+### Message passing
 
 If we look at the intent token notes as messages passing from one user (application) to another, the output [1] intent note can signal a message being sent, and spending of that note will signal that the message has been received. See more about the idea of message passing [here](message_passing.md).
 
