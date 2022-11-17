@@ -126,7 +126,6 @@ impl<F: FieldExt> AddInstructions<F> for AddChip<F> {
 
 /// ----------------------------
 
-
 #[derive(Clone, Debug)]
 pub struct SubChip<F: FieldExt> {
     config: SubConfig,

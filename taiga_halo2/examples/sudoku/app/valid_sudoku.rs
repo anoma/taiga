@@ -319,8 +319,6 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use std::time::Instant;
@@ -337,8 +335,6 @@ mod tests {
 
     #[test]
     fn test_sudoku() {
-
-    
         let sudoku = [
             [7, 6, 9, 5, 3, 8, 1, 2, 4],
             [2, 4, 3, 7, 1, 9, 6, 5, 8],
@@ -350,7 +346,7 @@ mod tests {
             [9, 7, 4, 2, 8, 6, 5, 3, 1],
             [3, 2, 5, 1, 9, 7, 8, 4, 6],
         ];
-    
+
         let circuit = SudokuCircuit { sudoku };
         const K: u32 = 13;
         assert_eq!(
@@ -359,7 +355,7 @@ mod tests {
                 .verify(),
             Ok(())
         );
-    
+
         let time = Instant::now();
         let vk = VerifyingKey::build(&circuit, K);
         let pk = ProvingKey::build(&circuit, K);
@@ -367,12 +363,12 @@ mod tests {
             "key generation: \t{:?}ms",
             (Instant::now() - time).as_millis()
         );
-    
+
         let mut rng = OsRng;
         let time = Instant::now();
         let proof = Proof::create(&pk, circuit, &[&[pallas::Base::zero(); 27]], &mut rng).unwrap();
         println!("proof: \t\t\t{:?}ms", (Instant::now() - time).as_millis());
-    
+
         let time = Instant::now();
         assert!(proof.verify(&vk, &[&[pallas::Base::zero(); 27]]).is_ok());
         println!(

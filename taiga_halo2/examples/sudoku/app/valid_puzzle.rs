@@ -8,7 +8,8 @@ use halo2_proofs::{
 use pasta_curves::{pallas, Fp};
 
 use taiga_halo2::circuit::gadgets::{
-    assign_free_advice, AddChip, AddConfig, AddInstructions, SubChip, SubConfig, SubInstructions, MulChip, MulConfig, MulInstructions,
+    assign_free_advice, AddChip, AddConfig, AddInstructions, MulChip, MulConfig, MulInstructions,
+    SubChip, SubConfig, SubInstructions,
 };
 
 use ff::Field;
@@ -173,8 +174,10 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
             .collect();
 
         // rows
-        let rows: Vec<Vec<AssignedCell<Fp, Fp>>> =
-        non_zero_sudoku_cells.chunks(9).map(|row| row.to_vec()).collect();
+        let rows: Vec<Vec<AssignedCell<Fp, Fp>>> = non_zero_sudoku_cells
+            .chunks(9)
+            .map(|row| row.to_vec())
+            .collect();
         // cols
         let cols: Vec<Vec<AssignedCell<Fp, Fp>>> = (1..10)
             .map(|i| {
@@ -190,7 +193,7 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
         for i in 1..4 {
             for j in 1..4 {
                 let sub_lines = &rows[(i - 1) * 3..i * 3];
-    
+
                 let square: Vec<&[AssignedCell<Fp, Fp>]> = sub_lines
                     .iter()
                     .map(|line| &line[(j - 1) * 3..j * 3])
@@ -207,7 +210,7 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
             )
             .unwrap();
             for i in 0..9 {
-                for j in (i+1)..9 {
+                for j in (i + 1)..9 {
                     let diff = SubInstructions::sub(
                         &config.sub_chip(),
                         layouter.namespace(|| "diff"),
@@ -228,7 +231,8 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
                 layouter.namespace(|| "non-zero sudoku_cell"),
                 config.advices[0],
                 cell_lhs.value().map(|x| x.invert().unwrap()),
-            ).unwrap();
+            )
+            .unwrap();
 
             let cell_div = MulInstructions::mul(
                 &config.mul_chip(),
@@ -238,12 +242,10 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
             )
             .unwrap();
 
- 
             layouter
                 .constrain_instance(cell_div.cell(), config.primary, 1)
                 .unwrap();
         }
-
 
         // Check that the sum of revealed entries (i.e. entries that contain numbers from 1 to 9) is at least 17, since this is required for a puzzle to be solvable
         let mut counter = 0;
@@ -259,7 +261,6 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
             Value::known(pallas::Base::from_u128(counter as u128)),
         )
         .unwrap();
-
 
         let mut cell_lhs = assign_free_advice(
             layouter.namespace(|| "lhs init"),
@@ -294,8 +295,8 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
         }
 
         layouter
-                .constrain_instance(cell_lhs.cell(), config.primary, 0)
-                .unwrap();
+            .constrain_instance(cell_lhs.cell(), config.primary, 0)
+            .unwrap();
         Ok(())
     }
 }
@@ -331,12 +332,16 @@ mod tests {
         const K: u32 = 13;
         let public_inputs = [pallas::Base::zero(), pallas::Base::one()];
         assert_eq!(
-            MockProver::run(K, &circuit, vec![vec![pallas::Base::zero(), pallas::Base::one()]])
-                .unwrap()
-                .verify(),
+            MockProver::run(
+                K,
+                &circuit,
+                vec![vec![pallas::Base::zero(), pallas::Base::one()]]
+            )
+            .unwrap()
+            .verify(),
             Ok(())
         );
-    
+
         let time = Instant::now();
         let vk = VerifyingKey::build(&circuit, K);
         let pk = ProvingKey::build(&circuit, K);
@@ -344,13 +349,13 @@ mod tests {
             "key generation: \t{:?}ms",
             (Instant::now() - time).as_millis()
         );
-    
+
         let mut rng = OsRng;
         let time = Instant::now();
 
         let proof = Proof::create(&pk, circuit, &[&public_inputs], &mut rng).unwrap();
         println!("proof: \t\t\t{:?}ms", (Instant::now() - time).as_millis());
-    
+
         let time = Instant::now();
         assert!(proof.verify(&vk, &[&public_inputs]).is_ok());
         println!(
