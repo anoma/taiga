@@ -1,12 +1,16 @@
 use ff::{Field, PrimeField};
-use halo2_gadgets::utilities::{bool_check, ternary};
+use group::Curve;
+use halo2_gadgets::{
+    ecc::chip::EccPoint,
+    utilities::{bool_check, ternary},
+};
 use halo2_proofs::{
     circuit::{AssignedCell, Chip, Layouter, Region, Value},
     plonk::{Advice, Assigned, Column, ConstraintSystem, Constraints, Error, Expression, Selector},
     poly::Rotation,
 };
 use pasta_curves::{
-    // arithmetic::CurveAffine,
+    arithmetic::CurveAffine,
     arithmetic::{CurveExt, FieldExt, SqrtRatio},
     hashtocurve::iso_map,
     pallas,
@@ -131,6 +135,12 @@ impl<F: FieldExt> AddInstructions<F> for AddChip<F> {
         )
     }
 }
+
+type JacobianCoordinates = (
+    AssignedCell<pallas::Base, pallas::Base>,
+    AssignedCell<pallas::Base, pallas::Base>,
+    AssignedCell<pallas::Base, pallas::Base>,
+);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MapToCurveConfig {
@@ -335,14 +345,7 @@ impl MapToCurveConfig {
         offset: usize,
         region: &mut Region<'_, pallas::Base>,
         // ) -> Result<EccPoint, Error> {
-    ) -> Result<
-        (
-            AssignedCell<pallas::Base, pallas::Base>,
-            AssignedCell<pallas::Base, pallas::Base>,
-            AssignedCell<pallas::Base, pallas::Base>,
-        ),
-        Error,
-    > {
+    ) -> Result<JacobianCoordinates, Error> {
         // Enable `q_map_to_curve` selector
         self.q_map_to_curve.enable(region, offset)?;
         u.copy_advice(|| "u", region, self.u, offset)?;
@@ -544,14 +547,7 @@ impl IsoMapConfig {
         offset: usize,
         region: &mut Region<'_, pallas::Base>,
         // ) -> Result<EccPoint, Error> {
-    ) -> Result<
-        (
-            AssignedCell<pallas::Base, pallas::Base>,
-            AssignedCell<pallas::Base, pallas::Base>,
-            AssignedCell<pallas::Base, pallas::Base>,
-        ),
-        Error,
-    > {
+    ) -> Result<JacobianCoordinates, Error> {
         // Enable `q_iso_map` selector
         self.q_iso_map.enable(region, offset)?;
         x.copy_advice(|| "x", region, self.x, offset)?;
@@ -564,7 +560,7 @@ impl IsoMapConfig {
             .zip(z.value())
             .map(|((&x, &y), &z)| {
                 let r = pallas::Iso::new_jacobian(x, y, z).unwrap();
-                let p: pallas::Iso = iso_map(&r, &pallas::Point::ISOGENY_CONSTANTS);
+                let p: pallas::Point = iso_map(&r, &pallas::Point::ISOGENY_CONSTANTS);
                 p.jacobian_coordinates()
             });
 
@@ -576,6 +572,117 @@ impl IsoMapConfig {
         let yo_cell = region.assign_advice(|| "yo", self.y, offset + 1, || yo)?;
         let zo_cell = region.assign_advice(|| "zo", self.z, offset + 1, || zo)?;
         let result = (xo_cell, yo_cell, zo_cell);
+
+        Ok(result)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ToAffineConfig {
+    q_to_affine: Selector,
+    x: Column<Advice>,
+    y: Column<Advice>,
+    z: Column<Advice>,
+}
+
+impl ToAffineConfig {
+    #[allow(clippy::too_many_arguments)]
+    pub fn configure(
+        meta: &mut ConstraintSystem<pallas::Base>,
+        x: Column<Advice>,
+        y: Column<Advice>,
+        z: Column<Advice>,
+    ) -> Self {
+        meta.enable_equality(x);
+        meta.enable_equality(y);
+        meta.enable_equality(z);
+
+        let config = Self {
+            q_to_affine: meta.selector(),
+            x,
+            y,
+            z,
+        };
+
+        config.create_gate(meta);
+
+        config
+    }
+
+    fn create_gate(&self, meta: &mut ConstraintSystem<pallas::Base>) {
+        meta.create_gate("to affine", |meta| {
+            let q_to_affine = meta.query_selector(self.q_to_affine);
+            let x_jacobian = meta.query_advice(self.x, Rotation::cur());
+            let y_jacobian = meta.query_advice(self.y, Rotation::cur());
+            let z_jacobian = meta.query_advice(self.z, Rotation::cur());
+            let x_affine = meta.query_advice(self.x, Rotation::next());
+            let y_affine = meta.query_advice(self.y, Rotation::next());
+            let z_inv = meta.query_advice(self.z, Rotation::next());
+
+            let zero = Expression::Constant(pallas::Base::zero());
+            let one = Expression::Constant(pallas::Base::one());
+            let z_is_zero = one - z_jacobian.clone() * z_inv.clone();
+            let poly1 = z_jacobian * z_is_zero.clone();
+            let poly2 = z_is_zero.clone() * (x_affine.clone() - zero.clone());
+            let poly3 = z_is_zero.clone() * (y_affine.clone() - zero);
+
+            let zinv2 = z_inv.clone().square();
+            let poly4 = z_is_zero.clone() * (x_jacobian * zinv2.clone() - x_affine);
+            let zinv3 = zinv2 * z_inv;
+            let poly5 = z_is_zero * (y_jacobian * zinv3 - y_affine);
+
+            Constraints::with_selector(
+                q_to_affine,
+                [
+                    ("z is zero", poly1),
+                    ("x: identity point", poly2),
+                    ("y: identity point", poly3),
+                    ("x: non-identity point", poly4),
+                    ("y: non-identity point", poly5),
+                ],
+            )
+        });
+    }
+
+    pub(super) fn assign_region(
+        &self,
+        x: &AssignedCell<pallas::Base, pallas::Base>,
+        y: &AssignedCell<pallas::Base, pallas::Base>,
+        z: &AssignedCell<pallas::Base, pallas::Base>,
+        offset: usize,
+        region: &mut Region<'_, pallas::Base>,
+    ) -> Result<EccPoint, Error> {
+        // Enable `q_to_affine` selector
+        self.q_to_affine.enable(region, offset)?;
+        x.copy_advice(|| "x", region, self.x, offset)?;
+        y.copy_advice(|| "y", region, self.y, offset)?;
+        z.copy_advice(|| "z", region, self.z, offset)?;
+
+        let p = x
+            .value()
+            .zip(y.value())
+            .zip(z.value())
+            .map(|((&x, &y), &z)| {
+                let r = pallas::Point::new_jacobian(x, y, z)
+                    .unwrap()
+                    .to_affine()
+                    .coordinates();
+                (
+                    r.map(|c| *c.x()).unwrap_or_else(pallas::Base::zero),
+                    r.map(|c| *c.y()).unwrap_or_else(pallas::Base::zero),
+                )
+            });
+
+        let x_affine: Value<Assigned<pallas::Base>> = p.map(|p| p.0.into());
+        let y_affine: Value<Assigned<pallas::Base>> = p.map(|p| p.1.into());
+        let z_inv = z
+            .value()
+            .map(|z| z.invert().unwrap_or(pallas::Base::zero()));
+
+        let x_affine = region.assign_advice(|| "x_affine", self.x, offset + 1, || x_affine)?;
+        let y_affine = region.assign_advice(|| "y_affine", self.y, offset + 1, || y_affine)?;
+        region.assign_advice(|| "z_inv", self.z, offset + 1, || z_inv)?;
+        let result = EccPoint::from_coordinates_unchecked(x_affine, y_affine);
 
         Ok(result)
     }
