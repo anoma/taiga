@@ -8,7 +8,6 @@ members = [
 ark-serialize = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }
 ark-ff = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }
 ark-ec = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }
-halo2_gadgets = { path="../halo2/halo2_gadgets"}
-halo2_proofs = { path="../halo2/halo2_proofs"}
-pasta_curves = { path="../pasta_curves"}
-# pasta_curves = { git="https://github.com/XuyangSong/pasta_curves", branch="taiga"}
+halo2_gadgets = { git="https://github.com/heliaxdev/halo2", branch="taiga"}
+halo2_proofs = { git="https://github.com/heliaxdev/halo2", branch="taiga"}
+pasta_curves = { git="https://github.com/heliaxdev/pasta_curves", branch="taiga"}
