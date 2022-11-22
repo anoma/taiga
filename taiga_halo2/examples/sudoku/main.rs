@@ -43,24 +43,23 @@ fn main() {
         .concat()
         .iter()
         .map(|cell| pallas::Base::from_u128(*cell as u128)).collect();
+
     let circuit = SudokuCircuit { sudoku };
 
     const K: u32 = 13;
-    let zero = pallas::Base::zero();
-    let mut pub_instance_vec = vec![zero];
+    let zeros = [pallas::Base::zero(); 27];
+    let mut pub_instance_vec = zeros.to_vec();
     pub_instance_vec.append(&mut vec_puzzle);
-    // println!("{:?}", vec![pub_instance_vec]);
-    // println!("{:?}", vec![vec![zero; 82]]);
     assert_eq!(
         MockProver::run(
             13, 
             &circuit,
-            vec![pub_instance_vec])
-            // vec![vec![zero; 82]])
+            vec![pub_instance_vec.clone()])
             .unwrap()
             .verify(),
         Ok(())
     );
+    let pub_instance: [pallas::Base; 108] = pub_instance_vec.try_into().unwrap();
 
     println!("Success!");
     let time = Instant::now();
@@ -71,13 +70,14 @@ fn main() {
         (Instant::now() - time).as_millis()
     );
 
+
     let mut rng = OsRng;
     let time = Instant::now();
-    let proof = Proof::create(&pk, circuit, &[&[pallas::Base::zero()]], &mut rng).unwrap();
+    let proof = Proof::create(&pk, circuit, &[&pub_instance], &mut rng).unwrap();
     println!("proof: \t\t\t{:?}ms", (Instant::now() - time).as_millis());
 
     let time = Instant::now();
-    assert!(proof.verify(&vk, &[&[pallas::Base::zero()]]).is_ok());
+    assert!(proof.verify(&vk, &[&pub_instance]).is_ok());
     println!(
         "verification: \t\t{:?}ms",
         (Instant::now() - time).as_millis()
