@@ -12,8 +12,8 @@ use halo2_gadgets::poseidon::{
     Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
 };
 use taiga_halo2::circuit::gadgets::{
-    assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip, MulConfig, MulInstructions,
-    SubChip, SubConfig, SubInstructions,
+    assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
+    MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
 };
 
 #[derive(Clone, Debug)]
@@ -333,8 +333,9 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
                     layouter.namespace(|| "instance"),
                     config.primary,
                     i + 27,
-                    config.advices[0]
-                ).unwrap();
+                    config.advices[0],
+                )
+                .unwrap();
 
                 // puzzle_cell * (solution_cell - puzzle_cell) = 0
 
@@ -355,9 +356,9 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
                 .unwrap();
 
                 layouter
-                .constrain_instance(expected_zero.cell(), config.primary, 0)
-                .unwrap();
-            }); 
+                    .constrain_instance(expected_zero.cell(), config.primary, 0)
+                    .unwrap();
+            });
         Ok(())
     }
 }
@@ -366,12 +367,12 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
 mod tests {
     use std::time::Instant;
 
-    use halo2_proofs::{dev::MockProver, arithmetic::FieldExt};
+    use halo2_proofs::{arithmetic::FieldExt, dev::MockProver};
     use pasta_curves::pallas;
     use rand::rngs::OsRng;
 
     use crate::{
-        app::{valid_sudoku::SudokuCircuit, valid_puzzle::PuzzleCircuit},
+        app::{valid_puzzle::PuzzleCircuit, valid_sudoku::SudokuCircuit},
         keys::{ProvingKey, VerifyingKey},
         proof::Proof,
     };
@@ -403,47 +404,44 @@ mod tests {
         ];
 
         let mut vec_puzzle: Vec<pallas::Base> = puzzle
-        .concat()
-        .iter()
-        .map(|cell| pallas::Base::from_u128(*cell as u128)).collect();
+            .concat()
+            .iter()
+            .map(|cell| pallas::Base::from_u128(*cell as u128))
+            .collect();
 
-    let circuit = SudokuCircuit { sudoku };
+        let circuit = SudokuCircuit { sudoku };
 
-    const K: u32 = 13;
-    let zeros = [pallas::Base::zero(); 27];
-    let mut pub_instance_vec = zeros.to_vec();
-    pub_instance_vec.append(&mut vec_puzzle);
-    assert_eq!(
-        MockProver::run(
-            13, 
-            &circuit,
-            vec![pub_instance_vec.clone()])
-            .unwrap()
-            .verify(),
-        Ok(())
-    );
-    let pub_instance: [pallas::Base; 108] = pub_instance_vec.try_into().unwrap();
+        const K: u32 = 13;
+        let zeros = [pallas::Base::zero(); 27];
+        let mut pub_instance_vec = zeros.to_vec();
+        pub_instance_vec.append(&mut vec_puzzle);
+        assert_eq!(
+            MockProver::run(13, &circuit, vec![pub_instance_vec.clone()])
+                .unwrap()
+                .verify(),
+            Ok(())
+        );
+        let pub_instance: [pallas::Base; 108] = pub_instance_vec.try_into().unwrap();
 
-    println!("Success!");
-    let time = Instant::now();
-    let vk = VerifyingKey::build(&circuit, K);
-    let pk = ProvingKey::build(&circuit, K);
-    println!(
-        "key generation: \t{:?}ms",
-        (Instant::now() - time).as_millis()
-    );
+        println!("Success!");
+        let time = Instant::now();
+        let vk = VerifyingKey::build(&circuit, K);
+        let pk = ProvingKey::build(&circuit, K);
+        println!(
+            "key generation: \t{:?}ms",
+            (Instant::now() - time).as_millis()
+        );
 
+        let mut rng = OsRng;
+        let time = Instant::now();
+        let proof = Proof::create(&pk, circuit, &[&pub_instance], &mut rng).unwrap();
+        println!("proof: \t\t\t{:?}ms", (Instant::now() - time).as_millis());
 
-    let mut rng = OsRng;
-    let time = Instant::now();
-    let proof = Proof::create(&pk, circuit, &[&pub_instance], &mut rng).unwrap();
-    println!("proof: \t\t\t{:?}ms", (Instant::now() - time).as_millis());
-
-    let time = Instant::now();
-    assert!(proof.verify(&vk, &[&pub_instance]).is_ok());
-    println!(
-        "verification: \t\t{:?}ms",
-        (Instant::now() - time).as_millis()
-    );
+        let time = Instant::now();
+        assert!(proof.verify(&vk, &[&pub_instance]).is_ok());
+        println!(
+            "verification: \t\t{:?}ms",
+            (Instant::now() - time).as_millis()
+        );
     }
 }

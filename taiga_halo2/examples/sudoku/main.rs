@@ -6,7 +6,7 @@ fn main() {
     use std::time::Instant;
 
     use halo2_proofs::dev::MockProver;
-    use pasta_curves::{pallas, {arithmetic::FieldExt}};
+    use pasta_curves::{arithmetic::FieldExt, pallas};
     use rand::rngs::OsRng;
 
     use crate::{
@@ -42,7 +42,8 @@ fn main() {
     let mut vec_puzzle: Vec<pallas::Base> = puzzle
         .concat()
         .iter()
-        .map(|cell| pallas::Base::from_u128(*cell as u128)).collect();
+        .map(|cell| pallas::Base::from_u128(*cell as u128))
+        .collect();
 
     let circuit = SudokuCircuit { sudoku };
 
@@ -51,10 +52,7 @@ fn main() {
     let mut pub_instance_vec = zeros.to_vec();
     pub_instance_vec.append(&mut vec_puzzle);
     assert_eq!(
-        MockProver::run(
-            13, 
-            &circuit,
-            vec![pub_instance_vec.clone()])
+        MockProver::run(13, &circuit, vec![pub_instance_vec.clone()])
             .unwrap()
             .verify(),
         Ok(())
@@ -69,7 +67,6 @@ fn main() {
         "key generation: \t{:?}ms",
         (Instant::now() - time).as_millis()
     );
-
 
     let mut rng = OsRng;
     let time = Instant::now();

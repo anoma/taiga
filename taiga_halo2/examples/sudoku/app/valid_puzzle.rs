@@ -330,9 +330,7 @@ mod tests {
         ];
         let circuit = PuzzleCircuit { sudoku: puzzle };
         const K: u32 = 13;
-        let public_inputs = [
-            pallas::Base::zero(), 
-            pallas::Base::one()];
+        let public_inputs = [pallas::Base::zero(), pallas::Base::one()];
         assert_eq!(
             MockProver::run(
                 K,
