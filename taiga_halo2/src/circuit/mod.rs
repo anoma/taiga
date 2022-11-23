@@ -7,3 +7,4 @@ pub mod note_circuit;
 pub mod vp_circuit;
 pub mod hash_to_curve;
 pub mod vp_examples;
+pub mod condition_circuit;
