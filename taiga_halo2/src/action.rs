@@ -3,9 +3,9 @@ use crate::{
     circuit::action_circuit::ActionCircuit,
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{MerklePath, Node},
-    net_value_commitment::NetValueCommitment,
     note::{Note, NoteCommitment},
     nullifier::Nullifier,
+    value_commitment::ValueCommitment,
 };
 use ff::Field;
 use pasta_curves::pallas;
@@ -21,7 +21,7 @@ pub struct ActionInstance {
     /// The commitment of the output note.
     pub cm: NoteCommitment,
     /// net value commitment
-    pub net_value_commitment: NetValueCommitment,
+    pub cv_net: ValueCommitment,
     // TODO: The EncryptedNote.
     // encrypted_note,
 }
@@ -53,8 +53,8 @@ impl ActionInstance {
             self.nf.inner(),
             self.anchor,
             self.cm.get_x(),
-            self.net_value_commitment.get_x(),
-            self.net_value_commitment.get_y(),
+            self.cv_net.get_x(),
+            self.cv_net.get_y(),
         ]
     }
 }
@@ -90,12 +90,12 @@ impl ActionInfo {
         let output_cm = output_note.commitment();
         let rcv = pallas::Scalar::random(&mut rng);
 
-        let net_value_commitment = NetValueCommitment::new(&self.spend.note, &output_note, &rcv);
+        let cv_net = ValueCommitment::new(&self.spend.note, &output_note, &rcv);
         let action = ActionInstance {
             nf,
             cm: output_cm,
             anchor: self.spend.root,
-            net_value_commitment,
+            cv_net,
         };
 
         let action_circuit = ActionCircuit {

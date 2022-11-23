@@ -398,7 +398,7 @@ pub fn derivate_value_base(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn compute_net_value_commitment(
+pub fn compute_value_commitment(
     mut layouter: impl Layouter<pallas::Base>,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
     is_merkle_checked_spend: AssignedCell<pallas::Base, pallas::Base>,

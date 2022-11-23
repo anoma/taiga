@@ -7,14 +7,14 @@ use halo2_proofs::arithmetic::{CurveAffine, CurveExt};
 use pasta_curves::pallas;
 
 #[derive(Copy, Clone, Debug)]
-pub struct NetValueCommitment(pallas::Point);
+pub struct ValueCommitment(pallas::Point);
 
-impl NetValueCommitment {
+impl ValueCommitment {
     pub fn new(input_note: &Note, output_note: &Note, blind_r: &pallas::Scalar) -> Self {
         let base_input = derivate_value_base(input_note.is_merkle_checked, &input_note.application);
         let base_output =
             derivate_value_base(output_note.is_merkle_checked, &output_note.application);
-        NetValueCommitment(
+        ValueCommitment(
             base_input * pallas::Scalar::from(input_note.value)
                 - base_output * pallas::Scalar::from(output_note.value)
                 + NOTE_COMMITMENT_R_GENERATOR.to_curve() * blind_r,

@@ -1,7 +1,5 @@
 use crate::circuit::gadgets::AddChip;
-use crate::circuit::integrity::{
-    check_output_note, check_spend_note, compute_net_value_commitment,
-};
+use crate::circuit::integrity::{check_output_note, check_spend_note, compute_value_commitment};
 use crate::circuit::merkle_circuit::{
     merkle_poseidon_gadget, MerklePoseidonChip, MerklePoseidonConfig,
 };
@@ -179,7 +177,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
         // TODO: add note verifiable encryption
 
         // compute and public net value commitment(spend_value_commitment - output_value_commitment)
-        let net_value_commitment = compute_net_value_commitment(
+        let cv_net = compute_value_commitment(
             layouter.namespace(|| "net value commitment"),
             ecc_chip,
             spend_note_vars.is_merkle_checked.clone(),
@@ -193,12 +191,12 @@ impl Circuit<pallas::Base> for ActionCircuit {
             self.rcv,
         )?;
         layouter.constrain_instance(
-            net_value_commitment.inner().x().cell(),
+            cv_net.inner().x().cell(),
             config.instances,
             ACTION_NET_VALUE_CM_X_INSTANCE_ROW_IDX,
         )?;
         layouter.constrain_instance(
-            net_value_commitment.inner().y().cell(),
+            cv_net.inner().y().cell(),
             config.instances,
             ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX,
         )?;
