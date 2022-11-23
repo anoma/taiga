@@ -99,44 +99,54 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
         */
 
         // Check that every entry in the sudoku puzzle is a number from 0 to 9
-        let sudoku_cells_reduced: Vec<AssignedCell<_, _>> = self
+        
+
+        let mut cell_lhs = assign_free_advice(
+            layouter.namespace(|| "lhs init"),
+            config.advices[0],
+            Value::known(Fp::one()),
+        )
+        .unwrap();
+        self
             .sudoku
             .concat()
             .into_iter()
-            .filter(|x| *x < 10)
-            .map(|x| {
-                assign_free_advice(
+            .for_each(|x| {
+                let sudoku_cell = assign_free_advice(
                     layouter.namespace(|| "sudoku_cell"),
                     config.advices[0],
                     Value::known(pallas::Base::from_u128(x as u128)),
                 )
-                .unwrap()
-            })
-            .collect();
+                .unwrap();
 
-        let cell_lhs = assign_free_advice(
-            layouter.namespace(|| "lhs init"),
-            config.advices[0],
-            Value::known(Fp::from(sudoku_cells_reduced.len() as u64)),
-        )
-        .unwrap();
-        let cell_rhs = assign_free_advice(
-            layouter.namespace(|| "rhs init"),
-            config.advices[1],
-            Value::known(-Fp::from(81)),
-        )
-        .unwrap();
+                for i in 0..10 {
+                    let valid_number_cell = assign_free_advice(
+                        layouter.namespace(|| "valid number"),
+                        config.advices[0],
+                        Value::known(Fp::from(i as u64)),
+                    )
+                    .unwrap();
 
-        let expected_zero = AddInstructions::add(
-            &config.add_chip(),
-            layouter.namespace(|| "final add"),
-            &cell_lhs,
-            &cell_rhs,
-        )
-        .unwrap();
+                    let diff = SubInstructions::sub(
+                        &config.sub_chip(),
+                        layouter.namespace(|| "diff"),
+                        &sudoku_cell,
+                        &valid_number_cell,
+                    )
+                    .unwrap();
+
+                    cell_lhs = MulInstructions::mul(
+                        &config.mul_chip(),
+                        layouter.namespace(|| "lhs * (x - i)"),
+                        &cell_lhs,
+                        &diff,
+                    )
+                    .unwrap();
+                }
+            });
 
         layouter
-            .constrain_instance(expected_zero.cell(), config.primary, 0)
+            .constrain_instance(cell_lhs.cell(), config.primary, 0)
             .unwrap();
 
         // Check that numbers from 1 to 9 do not repeat on each row, column and square
