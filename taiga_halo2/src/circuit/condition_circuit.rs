@@ -135,17 +135,6 @@ fn test_condition_circuit() {
 
             let cond_config = ConditionalConfig::configure(meta, advices[0], advices[1]);
 
-            // let lagrange_coeffs = [
-            //     meta.fixed_column(),
-            //     meta.fixed_column(),
-            //     meta.fixed_column(),
-            //     meta.fixed_column(),
-            //     meta.fixed_column(),
-            //     meta.fixed_column(),
-            //     meta.fixed_column(),
-            //     meta.fixed_column(),
-            // ];
-
             // let table_idx = meta.lookup_table_column();
             let constants = meta.fixed_column();
             meta.enable_constant(constants);
@@ -166,20 +155,20 @@ fn test_condition_circuit() {
                 assign_free_advice(layouter.namespace(|| "x"), advices[0], Value::known(self.x))?;
 
             let ret = layouter.assign_region(
-                || "test simon",
+                || "x cell",
                 |mut region| config.1.assign_region(&x_cell, 0, &mut region),
             )?;
 
-            let expect_ret = if self.x == Fp::zero() {
-                Value::<Fp>::known(Fp::from(12))
-            } else {
-                Value::<Fp>::known(Fp::from(34))
-            };
+            let expect_ret = assign_free_advice(
+                layouter.namespace(|| "expected ret"),
+                advices[1],
+                Value::known(self.output),
+            )?;
 
-            expect_ret.zip(ret.value()).map(|(a, b)| {
-                assert_eq!(a, *b);
-            });
-            Ok(())
+            layouter.assign_region(
+                || "equality constrain",
+                |mut region| region.constrain_equal(ret.cell(), expect_ret.cell()),
+            )
         }
     }
 
@@ -187,7 +176,19 @@ fn test_condition_circuit() {
         x: Fp::one(), // this is non-zero ;-)
         output: Fp::from(34),
     };
+    let circuit2 = MyCircuit {
+        x: Fp::zero(), // this is zero ;-)
+        output: Fp::from(12),
+    };
+    let circuit3 = MyCircuit {
+        x: Fp::zero(), // this is zero ;-)
+        output: Fp::from(34),
+    };
 
-    let prover = MockProver::run(11, &circuit, vec![]).unwrap();
-    assert_eq!(prover.verify(), Ok(()))
+    let prover = MockProver::run(4, &circuit, vec![]).unwrap();
+    let prover2 = MockProver::run(4, &circuit2, vec![]).unwrap();
+    let prover3 = MockProver::run(4, &circuit3, vec![]).unwrap();
+    assert_eq!(prover.verify(), Ok(()));
+    assert_eq!(prover2.verify(), Ok(()));
+    assert_ne!(prover3.verify(), Ok(()));
 }
