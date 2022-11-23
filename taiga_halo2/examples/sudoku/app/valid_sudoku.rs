@@ -12,7 +12,8 @@ use halo2_gadgets::poseidon::{
     Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
 };
 use taiga_halo2::circuit::gadgets::{
-    assign_free_advice, AddChip, AddConfig, AddInstructions, MulChip, MulConfig, MulInstructions,
+    assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
+    MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
 };
 
 #[derive(Clone, Debug)]
@@ -20,6 +21,7 @@ pub struct SudokuConfig {
     primary: Column<InstanceColumn>,
     advices: [Column<Advice>; 5],
     add_config: AddConfig,
+    sub_config: SubConfig,
     mul_config: MulConfig,
     poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
 }
@@ -27,6 +29,10 @@ pub struct SudokuConfig {
 impl SudokuConfig {
     pub(super) fn add_chip(&self) -> AddChip<pallas::Base> {
         AddChip::construct(self.add_config.clone(), ())
+    }
+
+    pub(super) fn sub_chip(&self) -> SubChip<pallas::Base> {
+        SubChip::construct(self.sub_config.clone(), ())
     }
 
     pub(super) fn mul_chip(&self) -> MulChip<pallas::Base> {
@@ -63,6 +69,8 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
 
         // Addition of two field elements.
         let add_config = AddChip::configure(meta, [advices[0], advices[1]]);
+
+        let sub_config = SubChip::configure(meta, [advices[0], advices[1]]);
 
         // Multiplication of two field elements.
         let mul_config = MulChip::configure(meta, [advices[0], advices[1]]);
@@ -113,6 +121,7 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
             primary,
             advices,
             add_config,
+            sub_config,
             mul_config,
             poseidon_config,
         }
@@ -315,6 +324,41 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
                 .unwrap();
         }
 
+        // Check the solution corresponds to the given puzzle
+        sudoku_cells
+            .iter()
+            .enumerate()
+            .for_each(|(i, solution_cell)| {
+                let puzzle_cell = assign_free_instance(
+                    layouter.namespace(|| "instance"),
+                    config.primary,
+                    i + 27,
+                    config.advices[0],
+                )
+                .unwrap();
+
+                // puzzle_cell * (solution_cell - puzzle_cell) = 0
+
+                let diff = SubInstructions::sub(
+                    &config.sub_chip(),
+                    layouter.namespace(|| "diff"),
+                    &solution_cell,
+                    &puzzle_cell,
+                )
+                .unwrap();
+
+                let expected_zero = MulInstructions::mul(
+                    &config.mul_chip(),
+                    layouter.namespace(|| "rhs * u"),
+                    &puzzle_cell,
+                    &diff,
+                )
+                .unwrap();
+
+                layouter
+                    .constrain_instance(expected_zero.cell(), config.primary, 0)
+                    .unwrap();
+            });
         Ok(())
     }
 }
@@ -323,12 +367,12 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
 mod tests {
     use std::time::Instant;
 
-    use halo2_proofs::dev::MockProver;
+    use halo2_proofs::{arithmetic::FieldExt, dev::MockProver};
     use pasta_curves::pallas;
     use rand::rngs::OsRng;
 
     use crate::{
-        app::valid_sudoku::SudokuCircuit,
+        app::{valid_puzzle::PuzzleCircuit, valid_sudoku::SudokuCircuit},
         keys::{ProvingKey, VerifyingKey},
         proof::Proof,
     };
@@ -347,15 +391,39 @@ mod tests {
             [3, 2, 5, 1, 9, 7, 8, 4, 6],
         ];
 
+        let puzzle = [
+            [7, 0, 9, 5, 3, 8, 1, 2, 4],
+            [2, 0, 3, 7, 1, 9, 6, 5, 8],
+            [8, 0, 1, 4, 6, 2, 9, 7, 3],
+            [4, 0, 6, 9, 7, 5, 3, 1, 2],
+            [5, 0, 7, 6, 2, 1, 4, 8, 9],
+            [1, 0, 2, 8, 4, 3, 7, 6, 5],
+            [6, 0, 8, 3, 5, 4, 2, 9, 7],
+            [9, 0, 4, 2, 8, 6, 5, 3, 1],
+            [3, 0, 5, 1, 9, 7, 8, 4, 6],
+        ];
+
+        let mut vec_puzzle: Vec<pallas::Base> = puzzle
+            .concat()
+            .iter()
+            .map(|cell| pallas::Base::from_u128(*cell as u128))
+            .collect();
+
         let circuit = SudokuCircuit { sudoku };
+
         const K: u32 = 13;
+        let zeros = [pallas::Base::zero(); 27];
+        let mut pub_instance_vec = zeros.to_vec();
+        pub_instance_vec.append(&mut vec_puzzle);
         assert_eq!(
-            MockProver::run(13, &circuit, vec![vec![pallas::Base::zero(); 27]])
+            MockProver::run(13, &circuit, vec![pub_instance_vec.clone()])
                 .unwrap()
                 .verify(),
             Ok(())
         );
+        let pub_instance: [pallas::Base; 108] = pub_instance_vec.try_into().unwrap();
 
+        println!("Success!");
         let time = Instant::now();
         let vk = VerifyingKey::build(&circuit, K);
         let pk = ProvingKey::build(&circuit, K);
@@ -366,11 +434,11 @@ mod tests {
 
         let mut rng = OsRng;
         let time = Instant::now();
-        let proof = Proof::create(&pk, circuit, &[&[pallas::Base::zero(); 27]], &mut rng).unwrap();
+        let proof = Proof::create(&pk, circuit, &[&pub_instance], &mut rng).unwrap();
         println!("proof: \t\t\t{:?}ms", (Instant::now() - time).as_millis());
 
         let time = Instant::now();
-        assert!(proof.verify(&vk, &[&[pallas::Base::zero(); 27]]).is_ok());
+        assert!(proof.verify(&vk, &[&pub_instance]).is_ok());
         println!(
             "verification: \t\t{:?}ms",
             (Instant::now() - time).as_millis()
