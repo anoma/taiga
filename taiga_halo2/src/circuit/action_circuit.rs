@@ -1,19 +1,21 @@
 use crate::circuit::gadgets::AddChip;
-use crate::circuit::integrity::{check_output_note, check_spend_note};
+use crate::circuit::integrity::{check_output_note, check_spend_note, compute_value_commitment};
 use crate::circuit::merkle_circuit::{
     merkle_poseidon_gadget, MerklePoseidonChip, MerklePoseidonConfig,
 };
 use crate::circuit::note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig};
 use crate::constant::{
     NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain,
-    ACTION_NF_INSTANCE_ROW_IDX, ACTION_OUTPUT_CM_INSTANCE_ROW_IDX, ACTION_ROOT_INSTANCE_ROW_IDX,
-    TAIGA_COMMITMENT_TREE_DEPTH,
+    ACTION_ANCHOR_INSTANCE_ROW_IDX, ACTION_NET_VALUE_CM_X_INSTANCE_ROW_IDX,
+    ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX, ACTION_NF_INSTANCE_ROW_IDX,
+    ACTION_OUTPUT_CM_INSTANCE_ROW_IDX, TAIGA_COMMITMENT_TREE_DEPTH,
 };
 use crate::note::Note;
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
     circuit::{floor_planner, Layouter},
-    plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Instance},
+    plonk::{Advice, Circuit, Column, ConstraintSystem, Constraints, Error, Instance, Selector},
+    poly::Rotation,
 };
 use pasta_curves::pallas;
 
@@ -23,6 +25,7 @@ pub struct ActionConfig {
     advices: [Column<Advice>; 10],
     note_config: NoteConfig,
     merkle_config: MerklePoseidonConfig,
+    merkle_path_selector: Selector,
 }
 
 /// The Action circuit.
@@ -34,6 +37,8 @@ pub struct ActionCircuit {
     pub auth_path: [(pallas::Base, bool); TAIGA_COMMITMENT_TREE_DEPTH],
     /// Output note
     pub output_note: Note,
+    /// random scalar for net value commitment
+    pub rcv: pallas::Scalar,
 }
 
 impl Circuit<pallas::Base> for ActionCircuit {
@@ -65,6 +70,22 @@ impl Circuit<pallas::Base> for ActionCircuit {
             meta.enable_equality(*advice);
         }
 
+        let merkle_path_selector = meta.selector();
+        meta.create_gate("merkle path check", |meta| {
+            let merkle_path_selector = meta.query_selector(merkle_path_selector);
+            let is_merkle_checked_spend = meta.query_advice(advices[0], Rotation::cur());
+            let anchor = meta.query_advice(advices[1], Rotation::cur());
+            let root = meta.query_advice(advices[2], Rotation::cur());
+
+            Constraints::with_selector(
+                merkle_path_selector,
+                [(
+                    "is_merkle_checked is false, or root = anchor",
+                    is_merkle_checked_spend * (root - anchor),
+                )],
+            )
+        });
+
         let note_config = NoteChip::configure(meta, instances, advices);
 
         let merkle_config = MerklePoseidonChip::configure(
@@ -78,6 +99,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             advices,
             note_config,
             merkle_config,
+            merkle_path_selector,
         }
     }
 
@@ -111,61 +133,95 @@ impl Circuit<pallas::Base> for ActionCircuit {
         let merkle_chip = MerklePoseidonChip::construct(config.merkle_config);
 
         // Spend note
-        let nf = {
-            // Check the spend note commitment
-            let spend_note_vars = check_spend_note(
-                layouter.namespace(|| "check spend note"),
-                config.advices,
-                config.instances,
-                ecc_chip.clone(),
-                sinsemilla_chip.clone(),
-                note_commit_chip.clone(),
-                config.note_config.poseidon_config.clone(),
-                add_chip,
-                self.spend_note.clone(),
-                ACTION_NF_INSTANCE_ROW_IDX,
-            )?;
+        // Check the spend note commitment
+        let spend_note_vars = check_spend_note(
+            layouter.namespace(|| "check spend note"),
+            config.advices,
+            config.instances,
+            ecc_chip.clone(),
+            sinsemilla_chip.clone(),
+            note_commit_chip.clone(),
+            config.note_config.poseidon_config.clone(),
+            add_chip,
+            self.spend_note.clone(),
+            ACTION_NF_INSTANCE_ROW_IDX,
+        )?;
 
-            // Check the merkle tree path validity and public the root
-            let leaf = spend_note_vars.cm.extract_p().inner().clone();
-            let root = merkle_poseidon_gadget(
-                layouter.namespace(|| "poseidon merkle"),
-                merkle_chip,
-                leaf,
-                &self.auth_path,
-            )?;
+        // Check the merkle tree path validity and public the root
+        let leaf = spend_note_vars.cm.extract_p().inner().clone();
+        let root = merkle_poseidon_gadget(
+            layouter.namespace(|| "poseidon merkle"),
+            merkle_chip,
+            leaf,
+            &self.auth_path,
+        )?;
 
-            // Public root
-            layouter.constrain_instance(
-                root.cell(),
-                config.instances,
-                ACTION_ROOT_INSTANCE_ROW_IDX,
-            )?;
-
-            // TODO: user send address VP commitment and token VP commitment
-
-            spend_note_vars.nf
-        };
+        // TODO: user send address VP commitment and application VP commitment
 
         // Output note
-        {
-            let _output_note_vars = check_output_note(
-                layouter.namespace(|| "check output note"),
-                config.advices,
-                config.instances,
-                ecc_chip,
-                sinsemilla_chip,
-                note_commit_chip,
-                config.note_config.poseidon_config,
-                self.output_note.clone(),
-                nf,
-                ACTION_OUTPUT_CM_INSTANCE_ROW_IDX,
-            )?;
+        let output_note_vars = check_output_note(
+            layouter.namespace(|| "check output note"),
+            config.advices,
+            config.instances,
+            ecc_chip.clone(),
+            sinsemilla_chip,
+            note_commit_chip,
+            config.note_config.poseidon_config,
+            self.output_note.clone(),
+            spend_note_vars.nf,
+            ACTION_OUTPUT_CM_INSTANCE_ROW_IDX,
+        )?;
 
-            // TODO: add user receive address VP commitment and token VP commitment
+        // TODO: add user receive address VP commitment and application VP commitment
 
-            // TODO: add note verifiable encryption
-        }
+        // TODO: add note verifiable encryption
+
+        // compute and public net value commitment(spend_value_commitment - output_value_commitment)
+        let cv_net = compute_value_commitment(
+            layouter.namespace(|| "net value commitment"),
+            ecc_chip,
+            spend_note_vars.is_merkle_checked.clone(),
+            spend_note_vars.app_vp.clone(),
+            spend_note_vars.app_data.clone(),
+            spend_note_vars.value.clone(),
+            output_note_vars.is_merkle_checked.clone(),
+            output_note_vars.app_vp.clone(),
+            output_note_vars.app_data.clone(),
+            output_note_vars.value,
+            self.rcv,
+        )?;
+        layouter.constrain_instance(
+            cv_net.inner().x().cell(),
+            config.instances,
+            ACTION_NET_VALUE_CM_X_INSTANCE_ROW_IDX,
+        )?;
+        layouter.constrain_instance(
+            cv_net.inner().y().cell(),
+            config.instances,
+            ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX,
+        )?;
+
+        // merkle path check
+        layouter.assign_region(
+            || "merkle path check",
+            |mut region| {
+                spend_note_vars.is_merkle_checked.copy_advice(
+                    || "is_merkle_checked_spend",
+                    &mut region,
+                    config.advices[0],
+                    0,
+                )?;
+                region.assign_advice_from_instance(
+                    || "anchor",
+                    config.instances,
+                    ACTION_ANCHOR_INSTANCE_ROW_IDX,
+                    config.advices[1],
+                    0,
+                )?;
+                root.copy_advice(|| "root", &mut region, config.advices[2], 0)?;
+                config.merkle_path_selector.enable(&mut region, 0)
+            },
+        )?;
 
         Ok(())
     }

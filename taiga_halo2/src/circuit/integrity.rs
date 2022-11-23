@@ -1,11 +1,19 @@
+use std::ops::Neg;
+
 use crate::circuit::gadgets::{assign_free_advice, AddChip, AddInstructions};
 use crate::circuit::note_circuit::{note_commitment_gadget, NoteCommitmentChip};
 use crate::constant::{
-    NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain, NullifierK,
+    NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentFixedBasesFull,
+    NoteCommitmentHashDomain, NullifierK,
 };
 use crate::note::Note;
+use ff::PrimeField;
+use group::Curve;
 use halo2_gadgets::{
-    ecc::{chip::EccChip, FixedPointBaseField, Point, ScalarFixed},
+    ecc::{
+        chip::EccChip, FixedPoint, FixedPointBaseField, NonIdentityPoint, Point, ScalarFixed,
+        ScalarVar,
+    },
     poseidon::{
         primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
         Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
@@ -62,11 +70,12 @@ pub fn nullifier_circuit(
 #[derive(Debug)]
 pub struct SpendNoteVar {
     pub user_address: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_address: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_vp: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_data: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
-    pub data: AssignedCell<pallas::Base, pallas::Base>,
     pub nf: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
+    pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -90,28 +99,23 @@ pub fn check_spend_note(
 ) -> Result<SpendNoteVar, Error> {
     // Check spend note user integrity: user_address = Com_r(Com_r(send_vp, nk), recv_vp_hash)
     let (user_address, nk) = {
-        // Witness send_vp
-        let send_vp = spend_note
-            .user
-            .send_com
-            .get_send_vp()
-            .unwrap()
-            .get_compressed();
+        // Witness send_data
+        let send_data = spend_note.application.get_user_send_data().unwrap();
         let send_vp_var = assign_free_advice(
-            layouter.namespace(|| "witness nk"),
+            layouter.namespace(|| "witness user send data"),
             advices[0],
-            Value::known(send_vp),
+            Value::known(send_data),
         )?;
 
         // Witness nk
-        let nk = spend_note.user.get_nk().unwrap();
+        let nk = spend_note.application.get_nk().unwrap();
         let nk_var = assign_free_advice(
             layouter.namespace(|| "witness nk"),
             advices[0],
             Value::known(nk.inner()),
         )?;
 
-        // send_com = Com_r(send_vp, nk)
+        // send_com = Com_r(send_data, nk)
         let send_com = {
             let poseidon_chip = PoseidonChip::construct(poseidon_config.clone());
             let poseidon_hasher =
@@ -123,14 +127,14 @@ pub fn check_spend_note(
             poseidon_hasher.hash(layouter.namespace(|| "send_com"), poseidon_message)?
         };
 
-        // Witness recv_vp_hash
-        let recv_vp_hash_var = assign_free_advice(
-            layouter.namespace(|| "witness nk"),
+        // Witness recv_data
+        let recv_data = assign_free_advice(
+            layouter.namespace(|| "witness user recv data"),
             advices[0],
-            Value::known(spend_note.user.recv_vp.get_compressed()),
+            Value::known(spend_note.application.get_user_recv_data()),
         )?;
 
-        // user_address = Com_r(send_com, recv_vp_hash_var)
+        // user_address = Com_r(send_com, recv_vp_data)
         let user_address = {
             let poseidon_chip = PoseidonChip::construct(poseidon_config.clone());
             let poseidon_hasher =
@@ -138,35 +142,33 @@ pub fn check_spend_note(
                     poseidon_chip,
                     layouter.namespace(|| "Poseidon init"),
                 )?;
-            let poseidon_message = [send_com, recv_vp_hash_var];
+            let poseidon_message = [send_com, recv_data];
             poseidon_hasher.hash(layouter.namespace(|| "user_address"), poseidon_message)?
         };
 
         (user_address, nk_var)
     };
 
-    // Witness app_address
-    let app_address = assign_free_advice(
-        layouter.namespace(|| "witness app_address"),
+    // Witness app_vp
+    let app_vp = assign_free_advice(
+        layouter.namespace(|| "witness app_vp"),
         advices[0],
-        Value::known(spend_note.app.address()),
+        Value::known(spend_note.application.get_vp()),
     )?;
 
-    // Witness data
-    let data = assign_free_advice(
-        layouter.namespace(|| "witness rho"),
+    // Witness app_data
+    let app_data = assign_free_advice(
+        layouter.namespace(|| "witness app_vp_data"),
         advices[0],
-        Value::known(spend_note.data),
+        Value::known(spend_note.application.get_vp_data()),
     )?;
 
     // Witness value(u64)
-    let value = {
-        assign_free_advice(
-            layouter.namespace(|| "witness value"),
-            advices[0],
-            Value::known(pallas::Base::from(spend_note.value)),
-        )?
-    };
+    let value = assign_free_advice(
+        layouter.namespace(|| "witness value"),
+        advices[0],
+        Value::known(pallas::Base::from(spend_note.value)),
+    )?;
 
     // Witness rho
     let rho = assign_free_advice(
@@ -177,7 +179,7 @@ pub fn check_spend_note(
 
     // Witness psi
     let psi = assign_free_advice(
-        layouter.namespace(|| "witness psi_input"),
+        layouter.namespace(|| "witness psi_spend"),
         advices[0],
         Value::known(spend_note.psi),
     )?;
@@ -189,6 +191,13 @@ pub fn check_spend_note(
         Value::known(spend_note.rcm),
     )?;
 
+    // Witness is_merkle_checked
+    let is_merkle_checked = assign_free_advice(
+        layouter.namespace(|| "witness is_merkle_checked"),
+        advices[0],
+        Value::known(pallas::Base::from(spend_note.is_merkle_checked)),
+    )?;
+
     // Check note commitment
     let cm = note_commitment_gadget(
         layouter.namespace(|| "Hash NoteCommit pieces"),
@@ -196,12 +205,13 @@ pub fn check_spend_note(
         ecc_chip.clone(),
         note_commit_chip,
         user_address.clone(),
-        app_address.clone(),
-        data.clone(),
+        app_vp.clone(),
+        app_data.clone(),
         rho.clone(),
         psi.clone(),
         value.clone(),
         rcm,
+        is_merkle_checked.clone(),
     )?;
 
     // Generate nullifier
@@ -222,11 +232,12 @@ pub fn check_spend_note(
 
     Ok(SpendNoteVar {
         user_address,
-        app_address,
+        app_vp,
         value,
-        data,
+        app_data,
         nf,
         cm,
+        is_merkle_checked,
     })
 }
 
@@ -234,10 +245,11 @@ pub fn check_spend_note(
 #[derive(Debug)]
 pub struct OutputNoteVar {
     pub user_address: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_address: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_vp: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_data: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
-    pub data: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
+    pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -259,18 +271,18 @@ pub fn check_output_note(
     old_nf: AssignedCell<pallas::Base, pallas::Base>,
     cm_row_idx: usize,
 ) -> Result<OutputNoteVar, Error> {
-    // Check output note user integrity: user_address = Com_r(, recv_vp_hash)
+    // Check output note user integrity: user_address = Com_r(send_com, recv_vp_hash)
     let user_address = {
         let send_com = assign_free_advice(
             layouter.namespace(|| "witness output send_com"),
             advices[0],
-            Value::known(output_note.user.send_com.get_closed()),
+            Value::known(output_note.application.get_user_send_closed()),
         )?;
-        // Witness recv_vp_hash
-        let recv_vp_hash_var = assign_free_advice(
-            layouter.namespace(|| "witness nk"),
+        // Witness recv data
+        let recv_data = assign_free_advice(
+            layouter.namespace(|| "witness user recv data"),
             advices[0],
-            Value::known(output_note.user.recv_vp.get_compressed()),
+            Value::known(output_note.application.get_user_recv_data()),
         )?;
 
         let poseidon_chip = PoseidonChip::construct(poseidon_config);
@@ -279,32 +291,30 @@ pub fn check_output_note(
                 poseidon_chip,
                 layouter.namespace(|| "Poseidon init"),
             )?;
-        let poseidon_message = [send_com, recv_vp_hash_var];
+        let poseidon_message = [send_com, recv_data];
         poseidon_hasher.hash(layouter.namespace(|| "user_address"), poseidon_message)?
     };
 
-    // Witness app_address
-    let app_address = assign_free_advice(
-        layouter.namespace(|| "witness app_address"),
+    // Witness app_vp
+    let app_vp = assign_free_advice(
+        layouter.namespace(|| "witness app_vp"),
         advices[0],
-        Value::known(output_note.app.address()),
+        Value::known(output_note.application.get_vp()),
     )?;
 
-    // Witness data
-    let data = assign_free_advice(
-        layouter.namespace(|| "witness data"),
+    // Witness app_data
+    let app_data = assign_free_advice(
+        layouter.namespace(|| "witness app_data"),
         advices[0],
-        Value::known(output_note.data),
+        Value::known(output_note.application.get_vp_data()),
     )?;
 
     // Witness value(u64)
-    let value = {
-        assign_free_advice(
-            layouter.namespace(|| "witness value"),
-            advices[0],
-            Value::known(pallas::Base::from(output_note.value)),
-        )?
-    };
+    let value = assign_free_advice(
+        layouter.namespace(|| "witness value"),
+        advices[0],
+        Value::known(pallas::Base::from(output_note.value)),
+    )?;
 
     // Witness rcm
     let rcm = ScalarFixed::new(
@@ -314,13 +324,18 @@ pub fn check_output_note(
     )?;
 
     // Witness psi
-    let psi = {
-        assign_free_advice(
-            layouter.namespace(|| "witness psi_output"),
-            advices[0],
-            Value::known(output_note.psi),
-        )?
-    };
+    let psi = assign_free_advice(
+        layouter.namespace(|| "witness psi_output"),
+        advices[0],
+        Value::known(output_note.psi),
+    )?;
+
+    // Witness is_merkle_checked
+    let is_merkle_checked = assign_free_advice(
+        layouter.namespace(|| "witness is_merkle_checked"),
+        advices[0],
+        Value::known(pallas::Base::from(output_note.is_merkle_checked)),
+    )?;
 
     // Check note commitment
     let cm = note_commitment_gadget(
@@ -329,12 +344,13 @@ pub fn check_output_note(
         ecc_chip,
         note_commit_chip,
         user_address.clone(),
-        app_address.clone(),
-        data.clone(),
+        app_vp.clone(),
+        app_data.clone(),
         old_nf,
         psi,
         value.clone(),
         rcm,
+        is_merkle_checked.clone(),
     )?;
 
     // Public cm
@@ -343,11 +359,130 @@ pub fn check_output_note(
 
     Ok(OutputNoteVar {
         user_address,
-        app_address,
+        app_vp,
+        app_data,
         value,
-        data,
         cm,
+        is_merkle_checked,
     })
+}
+
+// TODO: add hash_to_curve circuit to derivate the value base
+pub fn derivate_value_base(
+    mut layouter: impl Layouter<pallas::Base>,
+    ecc_chip: EccChip<NoteCommitmentFixedBases>,
+    is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
+    app_vp: AssignedCell<pallas::Base, pallas::Base>,
+    app_data: AssignedCell<pallas::Base, pallas::Base>,
+) -> Result<NonIdentityPoint<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
+    let out_of_circuit_value_base = {
+        use halo2_proofs::arithmetic::CurveExt;
+        let hash = pallas::Point::hash_to_curve("taiga:test");
+        let mut bytes: Vec<u8> = vec![];
+        is_merkle_checked
+            .value()
+            .map(|v| bytes.push(v.to_repr()[0]));
+        app_vp.value().map(|x| {
+            bytes.extend_from_slice(&x.to_repr());
+        });
+        app_data.value().map(|x| {
+            bytes.extend_from_slice(&x.to_repr());
+        });
+        hash(&bytes)
+    };
+    NonIdentityPoint::new(
+        ecc_chip,
+        layouter.namespace(|| "derivate value base"),
+        Value::known(out_of_circuit_value_base.to_affine()),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn compute_value_commitment(
+    mut layouter: impl Layouter<pallas::Base>,
+    ecc_chip: EccChip<NoteCommitmentFixedBases>,
+    is_merkle_checked_spend: AssignedCell<pallas::Base, pallas::Base>,
+    app_address_spend: AssignedCell<pallas::Base, pallas::Base>,
+    data_spend: AssignedCell<pallas::Base, pallas::Base>,
+    v_spend: AssignedCell<pallas::Base, pallas::Base>,
+    is_merkle_checked_output: AssignedCell<pallas::Base, pallas::Base>,
+    app_address_output: AssignedCell<pallas::Base, pallas::Base>,
+    data_output: AssignedCell<pallas::Base, pallas::Base>,
+    v_output: AssignedCell<pallas::Base, pallas::Base>,
+    rcv: pallas::Scalar,
+) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
+    // spend value point
+    let value_base_spend = derivate_value_base(
+        layouter.namespace(|| "derivate spend value base"),
+        ecc_chip.clone(),
+        is_merkle_checked_spend,
+        app_address_spend,
+        data_spend,
+    )?;
+    let v_spend_scalar = ScalarVar::from_base(
+        ecc_chip.clone(),
+        layouter.namespace(|| "ScalarVar from_base"),
+        &v_spend,
+    )?;
+    let (value_point_spend, _) =
+        value_base_spend.mul(layouter.namespace(|| "spend value point"), v_spend_scalar)?;
+
+    // output value point
+    let value_base_output = derivate_value_base(
+        layouter.namespace(|| "derivate output value base"),
+        ecc_chip.clone(),
+        is_merkle_checked_output,
+        app_address_output,
+        data_output,
+    )?;
+    let v_output_scalar = ScalarVar::from_base(
+        ecc_chip.clone(),
+        layouter.namespace(|| "ScalarVar from_base"),
+        &v_output,
+    )?;
+    let (value_point_output, _) =
+        value_base_output.mul(layouter.namespace(|| "output value point"), v_output_scalar)?;
+
+    // Get and constrain the negative output value point
+    let neg_v_point_output = Point::new(
+        ecc_chip.clone(),
+        layouter.namespace(|| "negative output value point"),
+        value_point_output.inner().point().neg(),
+    )?;
+
+    let zero_point = value_point_output.add(
+        layouter.namespace(|| "value_point + neg_value_point"),
+        &neg_v_point_output,
+    )?;
+    layouter.assign_region(
+        || "constrain zero point",
+        |mut region| {
+            // Constrain x-coordinates
+            region.constrain_constant(zero_point.inner().x().cell(), pallas::Base::zero())?;
+            // Constrain y-coordinates
+            region.constrain_constant(zero_point.inner().y().cell(), pallas::Base::zero())
+        },
+    )?;
+
+    let commitment_v = value_point_spend.add(
+        layouter.namespace(|| "v_pioint_spend - v_point_output"),
+        &neg_v_point_output,
+    )?;
+
+    // blind point
+    let blind_scalar = ScalarFixed::new(
+        ecc_chip.clone(),
+        layouter.namespace(|| "blind scalar"),
+        Value::known(rcv),
+    )?;
+
+    let blind_base = FixedPoint::from_inner(ecc_chip, NoteCommitmentFixedBasesFull);
+    let (blind, _) = blind_base.mul(
+        layouter.namespace(|| "blind_scalar * blind_base"),
+        &blind_scalar,
+    )?;
+
+    commitment_v.add(layouter.namespace(|| "net value commitment"), &blind)
 }
 
 #[test]

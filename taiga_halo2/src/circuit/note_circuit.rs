@@ -8,10 +8,10 @@ use halo2_gadgets::{
         chip::{SinsemillaChip, SinsemillaConfig},
         CommitDomain, Message, MessagePiece,
     },
-    utilities::{lookup_range_check::LookupRangeCheckConfig, RangeConstrained},
+    utilities::{bool_check, lookup_range_check::LookupRangeCheckConfig, RangeConstrained},
 };
 use halo2_proofs::{
-    circuit::{AssignedCell, Chip, Layouter, Value},
+    circuit::{AssignedCell, Chip, Layouter},
     plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Instance, Selector},
     poly::Rotation,
 };
@@ -141,6 +141,134 @@ impl Decompose5_5 {
                     .inner()
                     .copy_advice(|| "bit5_2", &mut region, self.col_r, 0)?;
 
+                Ok(())
+            },
+        )
+    }
+}
+
+/// bit10 = (bits 250..=255) || (1 bit) || (bits 64)
+///
+/// | A_6 | A_7 |q_notecommit_5_1_64 |
+/// ------------------------------------
+/// | bit70 | bit5 |       1        |
+/// | bit1 | bit64 |       0        |
+///
+#[derive(Clone, Debug)]
+struct Decompose5_1_64 {
+    q_notecommit_5_1_64: Selector,
+    col_l: Column<Advice>,
+    col_m: Column<Advice>,
+}
+
+impl Decompose5_1_64 {
+    fn configure(
+        meta: &mut ConstraintSystem<pallas::Base>,
+        col_l: Column<Advice>,
+        col_m: Column<Advice>,
+        two_pow_5: pallas::Base,
+        two_pow_6: pallas::Base,
+    ) -> Self {
+        let q_notecommit_5_1_64 = meta.selector();
+
+        meta.create_gate("NoteCommit MessagePiece bit70", |meta| {
+            let q_notecommit_5_1_64 = meta.query_selector(q_notecommit_5_1_64);
+
+            // bit70 has been constrained to 70 bits by the Sinsemilla hash.
+            let bit70 = meta.query_advice(col_l, Rotation::cur());
+            // bit5 has been constrained to 5 bits outside this gate.
+            let bit5 = meta.query_advice(col_m, Rotation::cur());
+            // bit1 has been constrained to 1 bit outside this gate.
+            let bit1 = meta.query_advice(col_l, Rotation::next());
+            // bit64 has been constrained to 64 bits outside this gate.
+            let bit64 = meta.query_advice(col_m, Rotation::next());
+
+            // bit10 = bit5 + (2^5) * bit1 + (2^6) * bit64
+            let decomposition_check = bit70 - (bit5 + bit1.clone() * two_pow_5 + bit64 * two_pow_6);
+
+            Constraints::with_selector(
+                q_notecommit_5_1_64,
+                [
+                    ("bool_check is_merkle_checked bit", bool_check(bit1)),
+                    ("decomposition", decomposition_check),
+                ],
+            )
+        });
+
+        Self {
+            q_notecommit_5_1_64,
+            col_l,
+            col_m,
+        }
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn decompose(
+        lookup_config: &LookupRangeCheckConfig<pallas::Base, 10>,
+        chip: SinsemillaChip<
+            NoteCommitmentHashDomain,
+            NoteCommitmentDomain,
+            NoteCommitmentFixedBases,
+        >,
+        layouter: &mut impl Layouter<pallas::Base>,
+        first: &AssignedCell<pallas::Base, pallas::Base>,
+        is_merkle_checked: &AssignedCell<pallas::Base, pallas::Base>,
+        value: &AssignedCell<pallas::Base, pallas::Base>,
+    ) -> Result<
+        (
+            NoteCommitPiece,
+            RangeConstrained<pallas::Base, AssignedCell<pallas::Base, pallas::Base>>,
+        ),
+        Error,
+    > {
+        // Constrain bit5 to be 5 bits.
+        let bit5 = RangeConstrained::witness_short(
+            lookup_config,
+            layouter.namespace(|| "bit5"),
+            first.value(),
+            250..255,
+        )?;
+
+        // bit1 is the boolean_constrained is_merkle_checked
+        let bit1 = RangeConstrained::bitrange_of(is_merkle_checked.value(), 0..1);
+
+        let bit64 = RangeConstrained::bitrange_of(value.value(), 0..64);
+
+        let bit70 = MessagePiece::from_subpieces(
+            chip,
+            layouter.namespace(|| "bit70"),
+            [bit5.value(), bit1, bit64],
+        )?;
+
+        Ok((bit70, bit5))
+    }
+
+    fn assign(
+        &self,
+        layouter: &mut impl Layouter<pallas::Base>,
+        bit70: NoteCommitPiece,
+        bit5: RangeConstrained<pallas::Base, AssignedCell<pallas::Base, pallas::Base>>,
+        is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
+        value: AssignedCell<pallas::Base, pallas::Base>,
+    ) -> Result<(), Error> {
+        layouter.assign_region(
+            || "NoteCommit MessagePiece bit70",
+            |mut region| {
+                self.q_notecommit_5_1_64.enable(&mut region, 0)?;
+
+                bit70
+                    .inner()
+                    .cell_value()
+                    .copy_advice(|| "bit70", &mut region, self.col_l, 0)?;
+                bit5.inner()
+                    .copy_advice(|| "bit5", &mut region, self.col_m, 0)?;
+                is_merkle_checked.copy_advice(
+                    || "is_merkle_checked bit1",
+                    &mut region,
+                    self.col_l,
+                    1,
+                )?;
+                value.copy_advice(|| "value 64bit", &mut region, self.col_m, 1)?;
                 Ok(())
             },
         )
@@ -287,6 +415,7 @@ impl BaseCanonicity5 {
 pub struct NoteCommitmentConfig {
     advices: [Column<Advice>; 10],
     decompose5_5: Decompose5_5,
+    decompose5_1_64: Decompose5_1_64,
     base_canonicity_250_5: BaseCanonicity250_5,
     base_canonicity_5: BaseCanonicity5,
     pub sinsemilla_config:
@@ -309,14 +438,18 @@ impl NoteCommitmentChip {
         >,
     ) -> NoteCommitmentConfig {
         let two_pow_5 = pallas::Base::from(1 << 5);
+        let two_pow_6 = pallas::Base::from(1 << 6);
         let two_pow_250 = pallas::Base::from_u128(1 << 125).square();
 
         let col_l = advices[6];
         let col_m = advices[7];
         let col_r = advices[8];
 
-        // Decompose configure
+        // Decompose5_5 configure
         let decompose5_5 = Decompose5_5::configure(meta, col_l, col_m, col_r, two_pow_5);
+
+        // Decompose5_1_64 configure
+        let decompose5_1_64 = Decompose5_1_64::configure(meta, col_l, col_m, two_pow_5, two_pow_6);
 
         // Base canonicity configure
         let base_canonicity_250_5 =
@@ -325,6 +458,7 @@ impl NoteCommitmentChip {
 
         NoteCommitmentConfig {
             decompose5_5,
+            decompose5_1_64,
             base_canonicity_250_5,
             base_canonicity_5,
             advices,
@@ -344,12 +478,13 @@ pub fn note_commitment_gadget(
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
     note_commit_chip: NoteCommitmentChip,
     user_address: AssignedCell<pallas::Base, pallas::Base>,
-    app_address: AssignedCell<pallas::Base, pallas::Base>,
-    data: AssignedCell<pallas::Base, pallas::Base>,
+    app_vp: AssignedCell<pallas::Base, pallas::Base>,
+    app_data: AssignedCell<pallas::Base, pallas::Base>,
     rho: AssignedCell<pallas::Base, pallas::Base>,
     psi: AssignedCell<pallas::Base, pallas::Base>,
     value: AssignedCell<pallas::Base, pallas::Base>,
     rcm: ScalarFixed<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
+    is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
     let lookup_config = chip.config().lookup_config();
 
@@ -360,32 +495,32 @@ pub fn note_commitment_gadget(
         [RangeConstrained::bitrange_of(user_address.value(), 0..250)],
     )?;
 
-    // `a` = (bits 250..=255 of user) || (bits 0..=4 of app)
+    // `a` = (bits 250..=255 of user) || (bits 0..=4 of application)
     let (a, user_tail_bit5, app_pre_bit5) = Decompose5_5::decompose(
         &lookup_config,
         chip.clone(),
         &mut layouter,
         &user_address,
-        &app_address,
+        &app_vp,
     )?;
 
-    // `app_5_254` = bits 5..=254 of `app`
+    // `app_5_254` = bits 5..=254 of `application`
     let app_5_254 = MessagePiece::from_subpieces(
         chip.clone(),
         layouter.namespace(|| "app_5_254"),
-        [RangeConstrained::bitrange_of(app_address.value(), 5..255)],
+        [RangeConstrained::bitrange_of(app_vp.value(), 5..255)],
     )?;
 
-    // `data_0_249` = bits 0..=249 of `data`
+    // `data_0_249` = bits 0..=249 of `app_data`
     let data_0_249 = MessagePiece::from_subpieces(
         chip.clone(),
         layouter.namespace(|| "data_0_249"),
-        [RangeConstrained::bitrange_of(data.value(), 0..250)],
+        [RangeConstrained::bitrange_of(app_data.value(), 0..250)],
     )?;
 
-    // b = (bits 250..=255 of data) || (bits 0..=4 of rho)
+    // b = (bits 250..=255 of app_data) || (bits 0..=4 of rho)
     let (b, data_tail_bit5, rho_pre_bit5) =
-        Decompose5_5::decompose(&lookup_config, chip.clone(), &mut layouter, &data, &rho)?;
+        Decompose5_5::decompose(&lookup_config, chip.clone(), &mut layouter, &app_data, &rho)?;
 
     // `rho_5_254` = bits 5..=254 of `rho`
     let rho_5_254 = MessagePiece::from_subpieces(
@@ -401,21 +536,17 @@ pub fn note_commitment_gadget(
         [RangeConstrained::bitrange_of(psi.value(), 0..250)],
     )?;
 
-    // `c` = (bits 250..=255 of psi) || (bits 0..=4 of value)
-    let (c, psi_tail_bit5, value_pre_bit5) =
-        Decompose5_5::decompose(&lookup_config, chip.clone(), &mut layouter, &psi, &value)?;
-
-    // `d` = (bits 5..=63 of value) || 0
-    let d = MessagePiece::from_subpieces(
+    // `c` = (bits 250..=255 of psi) || (is_merkle_checked bit) || (64 bits of value)
+    let (c, psi_tail_bit5) = Decompose5_1_64::decompose(
+        &lookup_config,
         chip.clone(),
-        layouter.namespace(|| "d"),
-        [
-            RangeConstrained::bitrange_of(value.value(), 5..64),
-            RangeConstrained::bitrange_of(Value::known(&pallas::Base::zero()), 0..1),
-        ],
+        &mut layouter,
+        &psi,
+        &is_merkle_checked,
+        &value,
     )?;
 
-    // cm = NoteCommit^rcm(user_address || app_address || data || rho || psi || value)
+    // cm = NoteCommit^rcm(user_address || app_vp || app_data || rho || psi || is_merkle_checked || value)
     let (cm, _zs) = {
         let message = Message::from_pieces(
             chip.clone(),
@@ -428,7 +559,6 @@ pub fn note_commitment_gadget(
                 rho_5_254.clone(),
                 psi_0_249.clone(),
                 c.clone(),
-                d.clone(),
             ],
         );
         let domain = CommitDomain::new(chip, ecc_chip, &NoteCommitmentDomain);
@@ -456,25 +586,24 @@ pub fn note_commitment_gadget(
         rho_pre_bit5.clone(),
     )?;
 
-    cfg.decompose5_5.assign(
+    cfg.decompose5_1_64.assign(
         &mut layouter,
         c,
         psi_tail_bit5.clone(),
-        value_pre_bit5.clone(),
+        is_merkle_checked,
+        value,
     )?;
 
     cfg.base_canonicity_250_5
         .assign(&mut layouter, user_address, user_0_249, user_tail_bit5)?;
     cfg.base_canonicity_5
-        .assign(&mut layouter, app_address, app_5_254, app_pre_bit5)?;
+        .assign(&mut layouter, app_vp, app_5_254, app_pre_bit5)?;
     cfg.base_canonicity_250_5
-        .assign(&mut layouter, data, data_0_249, data_tail_bit5)?;
+        .assign(&mut layouter, app_data, data_0_249, data_tail_bit5)?;
     cfg.base_canonicity_5
         .assign(&mut layouter, rho, rho_5_254, rho_pre_bit5)?;
     cfg.base_canonicity_250_5
         .assign(&mut layouter, psi, psi_0_249, psi_tail_bit5)?;
-    cfg.base_canonicity_5
-        .assign(&mut layouter, value, d, value_pre_bit5)?;
 
     Ok(cm)
 }
@@ -576,7 +705,7 @@ impl NoteChip {
 fn test_halo2_note_commitment_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use crate::note::Note;
-    use crate::{app::App, nullifier::Nullifier, user::User};
+    use crate::{application::Application, nullifier::Nullifier, user::User};
     use ff::Field;
     use group::Curve;
     use halo2_gadgets::{
@@ -597,12 +726,12 @@ fn test_halo2_note_commitment_circuit() {
     #[derive(Default)]
     struct MyCircuit {
         user: User,
-        app: App,
+        application: Application,
         value: u64,
         rho: Nullifier,
-        data: pallas::Base,
         psi: pallas::Base,
         rcm: pallas::Scalar,
+        is_merkle_checked: bool,
     }
 
     impl Circuit<pallas::Base> for MyCircuit {
@@ -692,13 +821,12 @@ fn test_halo2_note_commitment_circuit() {
                 NoteCommitmentFixedBases,
             >::load(note_commit_config.sinsemilla_config.clone(), &mut layouter)?;
             let note = Note::new(
-                self.user.clone(),
-                self.app.clone(),
+                self.application.clone(),
                 self.value,
                 self.rho,
-                self.data,
                 self.psi,
                 self.rcm,
+                self.is_merkle_checked,
             );
             // Construct a Sinsemilla chip
             let sinsemilla_chip =
@@ -712,23 +840,23 @@ fn test_halo2_note_commitment_circuit() {
 
             // Witness user
             let user_address = assign_free_advice(
-                layouter.namespace(|| "witness rho"),
+                layouter.namespace(|| "witness user address"),
                 note_commit_config.advices[0],
-                Value::known(note.user.address()),
+                Value::known(note.application.get_user_address()),
             )?;
 
-            // Witness app
-            let app_address = assign_free_advice(
+            // Witness application
+            let app_vp = assign_free_advice(
                 layouter.namespace(|| "witness rho"),
                 note_commit_config.advices[0],
-                Value::known(note.app.address()),
+                Value::known(note.application.get_vp()),
             )?;
 
-            // Witness data
-            let data = assign_free_advice(
-                layouter.namespace(|| "witness rho"),
+            // Witness app_data
+            let app_data = assign_free_advice(
+                layouter.namespace(|| "witness application vp_data"),
                 note_commit_config.advices[0],
-                Value::known(note.data),
+                Value::known(note.application.get_vp_data()),
             )?;
 
             // Witness a random non-negative u64 note value
@@ -761,18 +889,25 @@ fn test_halo2_note_commitment_circuit() {
                 Value::known(note.rcm),
             )?;
 
+            let is_normail_var = assign_free_advice(
+                layouter.namespace(|| "witness is_merkle_checked"),
+                note_commit_config.advices[0],
+                Value::known(pallas::Base::from(note.is_merkle_checked)),
+            )?;
+
             let cm = note_commitment_gadget(
                 layouter.namespace(|| "Hash NoteCommit pieces"),
                 sinsemilla_chip,
                 ecc_chip.clone(),
                 note_commit_chip,
                 user_address,
-                app_address,
-                data,
+                app_vp,
+                app_data,
                 rho,
                 psi,
                 value_var,
                 rcm,
+                is_normail_var,
             )?;
             let expected_cm = {
                 let point = note.commitment().inner().to_affine();
@@ -787,16 +922,36 @@ fn test_halo2_note_commitment_circuit() {
     }
 
     let mut rng = OsRng;
-    let circuit = MyCircuit {
-        user: User::dummy(&mut rng),
-        app: App::dummy(&mut rng),
-        value: rng.next_u64(),
-        rho: Nullifier::default(),
-        data: pallas::Base::random(&mut rng),
-        psi: pallas::Base::random(&mut rng),
-        rcm: pallas::Scalar::random(&mut rng),
-    };
 
-    let prover = MockProver::<pallas::Base>::run(11, &circuit, vec![]).unwrap();
-    assert_eq!(prover.verify(), Ok(()));
+    // Test note with flase is_merkle_checked flag
+    {
+        let circuit = MyCircuit {
+            user: User::dummy(&mut rng),
+            application: Application::dummy(&mut rng),
+            value: rng.next_u64(),
+            rho: Nullifier::default(),
+            psi: pallas::Base::random(&mut rng),
+            rcm: pallas::Scalar::random(&mut rng),
+            is_merkle_checked: false,
+        };
+
+        let prover = MockProver::<pallas::Base>::run(11, &circuit, vec![]).unwrap();
+        assert_eq!(prover.verify(), Ok(()));
+    }
+
+    // Test note with true is_merkle_checked flag
+    {
+        let circuit = MyCircuit {
+            user: User::dummy(&mut rng),
+            application: Application::dummy(&mut rng),
+            value: rng.next_u64(),
+            rho: Nullifier::default(),
+            psi: pallas::Base::random(&mut rng),
+            rcm: pallas::Scalar::random(&mut rng),
+            is_merkle_checked: true,
+        };
+
+        let prover = MockProver::<pallas::Base>::run(11, &circuit, vec![]).unwrap();
+        assert_eq!(prover.verify(), Ok(()));
+    }
 }

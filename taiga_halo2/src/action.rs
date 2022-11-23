@@ -1,13 +1,11 @@
 use crate::{
-    app::App,
+    application::Application,
     circuit::action_circuit::ActionCircuit,
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{MerklePath, Node},
     note::{Note, NoteCommitment},
     nullifier::Nullifier,
-    user::User,
-    user::UserSendAddress,
-    vp_description::ValidityPredicateDescription,
+    value_commitment::ValueCommitment,
 };
 use ff::Field;
 use pasta_curves::pallas;
@@ -17,11 +15,13 @@ use rand::RngCore;
 #[derive(Copy, Debug, Clone)]
 pub struct ActionInstance {
     /// The root of the note commitment Merkle tree.
-    pub root: pallas::Base,
+    pub anchor: pallas::Base,
     /// The nullifier of the spend note.
     pub nf: Nullifier,
     /// The commitment of the output note.
     pub cm: NoteCommitment,
+    /// net value commitment
+    pub cv_net: ValueCommitment,
     // TODO: The EncryptedNote.
     // encrypted_note,
 }
@@ -42,16 +42,20 @@ pub struct SpendInfo {
 
 #[derive(Debug, Clone)]
 pub struct OutputInfo {
-    addr_send_closed: UserSendAddress,
-    addr_recv_vp: ValidityPredicateDescription,
-    addr_app_vp: ValidityPredicateDescription,
+    application: Application,
     value: u64,
-    data: pallas::Base,
+    is_merkle_checked: bool,
 }
 
 impl ActionInstance {
     pub fn to_instance(&self) -> Vec<pallas::Base> {
-        vec![self.nf.inner(), self.root, self.cm.get_x()]
+        vec![
+            self.nf.inner(),
+            self.anchor,
+            self.cm.get_x(),
+            self.cv_net.get_x(),
+            self.cv_net.get_y(),
+        ]
     }
 }
 
@@ -72,38 +76,33 @@ impl ActionInfo {
 
     pub fn build<R: RngCore>(self, mut rng: R) -> (ActionInstance, ActionCircuit) {
         let nf = self.spend.note.get_nf();
-
-        let user = User {
-            send_com: self.output.addr_send_closed,
-            recv_vp: self.output.addr_recv_vp,
-        };
-        let app = App {
-            app_vp: self.output.addr_app_vp,
-        };
-
         let psi = pallas::Base::random(&mut rng);
         let note_rcm = pallas::Scalar::random(&mut rng);
         let output_note = Note::new(
-            user,
-            app,
+            self.output.application,
             self.output.value,
             nf,
-            self.output.data,
             psi,
             note_rcm,
+            self.output.is_merkle_checked,
         );
 
         let output_cm = output_note.commitment();
+        let rcv = pallas::Scalar::random(&mut rng);
+
+        let cv_net = ValueCommitment::new(&self.spend.note, &output_note, &rcv);
         let action = ActionInstance {
             nf,
             cm: output_cm,
-            root: self.spend.root,
+            anchor: self.spend.root,
+            cv_net,
         };
 
         let action_circuit = ActionCircuit {
             spend_note: self.spend.note,
             auth_path: self.spend.auth_path,
             output_note,
+            rcv,
         };
 
         (action, action_circuit)
@@ -125,35 +124,22 @@ impl SpendInfo {
 }
 
 impl OutputInfo {
-    pub fn new(
-        addr_send_closed: UserSendAddress,
-        addr_recv_vp: ValidityPredicateDescription,
-        addr_app_vp: ValidityPredicateDescription,
-        value: u64,
-        data: pallas::Base,
-    ) -> Self {
+    pub fn new(application: Application, value: u64, is_merkle_checked: bool) -> Self {
         Self {
-            addr_send_closed,
-            addr_recv_vp,
-            addr_app_vp,
+            application,
             value,
-            data,
+            is_merkle_checked,
         }
     }
 
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
         use rand::Rng;
-        let addr_send_closed = UserSendAddress::from_closed(pallas::Base::random(&mut rng));
-        let addr_recv_vp = ValidityPredicateDescription::dummy(&mut rng);
-        let addr_app_vp = ValidityPredicateDescription::dummy(&mut rng);
+        let application = Application::dummy(&mut rng);
         let value: u64 = rng.gen();
-        let data = pallas::Base::random(rng);
         Self {
-            addr_send_closed,
-            addr_recv_vp,
-            addr_app_vp,
+            application,
             value,
-            data,
+            is_merkle_checked: true,
         }
     }
 }
