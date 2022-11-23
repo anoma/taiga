@@ -1,3 +1,5 @@
+use ff::Field;
+use halo2_gadgets::utilities::ternary;
 use halo2_proofs::{
     circuit::{AssignedCell, Region},
     plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Expression, Selector},
@@ -49,22 +51,21 @@ impl ConditionalConfig {
             // 2. We create an expression corresponding to the boolean 1-x*x_inv
             // 3. We create an expression corresponding to 12 if x==0 and 34 if x != 0
             // 4. We impose the corresponding constrain
+            let cond = meta.query_selector(self.cond);
             let x = meta.query_advice(self.x, Rotation::cur());
             let x_inv = meta.query_advice(self.x, Rotation::next());
+            let ret = meta.query_advice(self.ret, Rotation::cur());
 
             let one = Expression::Constant(pallas::Base::one());
-            let x_is_zero = one.clone() - x.clone() * x_inv.clone();
+            let x_is_zero = one - x.clone() * x_inv;
             let twelve = Expression::Constant(pallas::Base::from(12));
             let thirtyfour = Expression::Constant(pallas::Base::from(34));
-            let poly = x_is_zero.clone() * twelve + (one.clone() - x_is_zero.clone()) * thirtyfour;
-
-            let cond = meta.query_selector(self.cond);
+            // The same to:  let poly = ret - ternary(x_is_zero, twelve, thirtyfour);
+            let poly = ternary(x_is_zero.clone(), ret.clone() - twelve, ret - thirtyfour);
 
             Constraints::with_selector(
                 cond,
-                [
-                    ("12 if x=0 else 34", poly),
-                ],
+                [("x is zero", x * x_is_zero), ("12 if x=0 else 34", poly)],
             )
         });
     }
@@ -77,30 +78,32 @@ impl ConditionalConfig {
     ) -> Result<AssignedCell<Fp, Fp>, Error> {
         // this function set the value of x, and also of x_inv, needed for the circuit
         self.cond.enable(region, offset).unwrap();
+        x.copy_advice(|| "x", region, self.x, offset)?;
+        let x_inv = x
+            .value()
+            .map(|x| x.invert().unwrap_or(pallas::Base::zero()));
+        region.assign_advice(|| "x_inv", self.x, offset + 1, || x_inv)?;
 
         let ret = x.value().map(|x| {
-            let a = if *x == Fp::zero() {
+            if *x == Fp::zero() {
                 Fp::from(12)
-            }
-            else {
+            } else {
                 Fp::from(34)
-            };
-            a
+            }
         });
-        let ret_final = region.assign_advice(|| "ret", self.ret, offset, || ret).unwrap();
+        let ret_final = region.assign_advice(|| "ret", self.ret, offset, || ret)?;
         Ok(ret_final)
     }
 }
 
 #[test]
 fn test_condition_circuit() {
+    use crate::circuit::gadgets::assign_free_advice;
     use halo2_proofs::{
         circuit::{Layouter, SimpleFloorPlanner, Value},
         dev::MockProver,
         plonk::{Advice, Circuit, Column, ConstraintSystem, Error},
     };
-    use crate::circuit::gadgets::assign_free_advice;
-
 
     #[derive(Default)]
     struct MyCircuit {
@@ -109,10 +112,7 @@ fn test_condition_circuit() {
     }
 
     impl Circuit<pallas::Base> for MyCircuit {
-        type Config = (
-            [Column<Advice>; 10],
-            ConditionalConfig,
-        );
+        type Config = ([Column<Advice>; 10], ConditionalConfig);
         type FloorPlanner = SimpleFloorPlanner;
 
         fn without_witnesses(&self) -> Self {
@@ -150,7 +150,6 @@ fn test_condition_circuit() {
             let constants = meta.fixed_column();
             meta.enable_constant(constants);
 
-
             (advices, cond_config)
         }
 
@@ -163,19 +162,12 @@ fn test_condition_circuit() {
 
             // compute the output in and out of the circuit
 
-            let x_cell = assign_free_advice(
-                layouter.namespace(|| "x"),
-                advices[0],
-                Value::known(self.x),
-            )?;
+            let x_cell =
+                assign_free_advice(layouter.namespace(|| "x"), advices[0], Value::known(self.x))?;
 
             let ret = layouter.assign_region(
                 || "test simon",
-                |mut region| {
-                    config
-                        .1
-                        .assign_region(&x_cell, 0, &mut region)
-                },
+                |mut region| config.1.assign_region(&x_cell, 0, &mut region),
             )?;
 
             let expect_ret = if self.x == Fp::zero() {
@@ -184,16 +176,15 @@ fn test_condition_circuit() {
                 Value::<Fp>::known(Fp::from(34))
             };
 
-            expect_ret.zip(ret.value()).map(|(a,b)| {
+            expect_ret.zip(ret.value()).map(|(a, b)| {
                 assert_eq!(a, *b);
             });
             Ok(())
-            
         }
     }
 
     let circuit = MyCircuit {
-        x:Fp::one(), // this is non-zero ;-)
+        x: Fp::one(), // this is non-zero ;-)
         output: Fp::from(34),
     };
 
