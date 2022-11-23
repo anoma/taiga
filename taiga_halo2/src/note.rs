@@ -1,8 +1,7 @@
 use crate::{
-    app::App,
+    application::Application,
     constant::{BASE_BITS_NUM, NOTE_COMMIT_DOMAIN},
     nullifier::Nullifier,
-    user::User,
     utils::extract_p,
 };
 use bitvec::{array::BitArray, order::Lsb0};
@@ -35,37 +34,34 @@ impl Default for NoteCommitment {
 /// A note
 #[derive(Debug, Clone, Default)]
 pub struct Note {
-    /// Owner of the note
-    pub user: User,
-    pub app: App,
+    pub application: Application,
     pub value: u64,
-    /// for NFT or whatever. TODO: to be decided the value format.
-    pub data: pallas::Base,
     /// old nullifier. Nonce which is a deterministically computed, unique nonce
     pub rho: Nullifier,
     /// computed from spent_note_nf and rcm by using a PRF
     pub psi: pallas::Base,
     pub rcm: pallas::Scalar,
+    /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of the spent note will be checked in ActionProof.
+    pub is_merkle_checked: bool,
 }
 
 impl Note {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        user: User,
-        app: App,
+        application: Application,
         value: u64,
         rho: Nullifier,
-        data: pallas::Base,
         psi: pallas::Base,
         rcm: pallas::Scalar,
+        is_merkle_checked: bool,
     ) -> Self {
         Self {
-            user,
-            app,
+            application,
             value,
-            data,
             rho,
             psi,
             rcm,
+            is_merkle_checked,
         }
     }
 
@@ -75,27 +71,24 @@ impl Note {
     }
 
     pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
-        let user = User::dummy(&mut rng);
-        let app = App::dummy(&mut rng);
+        let application = Application::dummy(&mut rng);
         let value: u64 = rng.gen();
-        let data = pallas::Base::random(&mut rng);
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         Self {
-            user,
-            app,
+            application,
             value,
-            data,
             rho,
             psi,
             rcm,
+            is_merkle_checked: true,
         }
     }
 
-    // cm = SinsemillaCommit^rcm(user_address || app_address || data || rho || psi || value)
+    // cm = SinsemillaCommit^rcm(user_address || app_vp || app_data || rho || psi || is_merkle_checked || value)
     pub fn commitment(&self) -> NoteCommitment {
-        let user_address = self.user.address();
-        let app_address = self.app.address();
+        let user_address = self.application.get_user_address();
+        let app_vp = self.application.get_vp();
         let ret = NOTE_COMMIT_DOMAIN
             .commit(
                 iter::empty()
@@ -106,14 +99,15 @@ impl Note {
                             .by_vals()
                             .take(BASE_BITS_NUM),
                     )
+                    .chain(app_vp.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
                     .chain(
-                        app_address
+                        self.application
+                            .get_vp_data()
                             .to_le_bits()
                             .iter()
                             .by_vals()
                             .take(BASE_BITS_NUM),
                     )
-                    .chain(self.data.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
                     .chain(
                         self.rho
                             .inner()
@@ -123,6 +117,7 @@ impl Note {
                             .take(BASE_BITS_NUM),
                     )
                     .chain(self.psi.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
+                    .chain([self.is_merkle_checked])
                     .chain(
                         BitArray::<_, Lsb0>::new(self.value.to_le())
                             .iter()
@@ -135,7 +130,7 @@ impl Note {
     }
 
     pub fn get_nf(&self) -> Nullifier {
-        let nk = self.user.get_nk().unwrap();
+        let nk = self.application.get_nk().unwrap();
         let cm = self.commitment();
         Nullifier::derive_native(&nk, &self.rho.inner(), &self.psi, &cm)
     }

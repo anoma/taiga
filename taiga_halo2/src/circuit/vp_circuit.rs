@@ -73,12 +73,12 @@ pub trait ValidityPredicateCircuit {
         // Construct an add chip
         let add_chip = AddChip::<pallas::Base>::construct(note_config.add_config, ());
 
-        let input_notes = self.get_input_notes();
+        let spend_notes = self.get_spend_notes();
         let output_notes = self.get_output_notes();
-        let mut input_note_variables = vec![];
+        let mut spend_note_variables = vec![];
         let mut output_note_variables = vec![];
         for i in 0..NUM_NOTE {
-            let input_note_var = check_spend_note(
+            let spend_note_var = check_spend_note(
                 layouter.namespace(|| "check spend note"),
                 note_config.advices,
                 note_config.instances,
@@ -87,11 +87,11 @@ pub trait ValidityPredicateCircuit {
                 note_commit_chip.clone(),
                 note_config.poseidon_config.clone(),
                 add_chip.clone(),
-                input_notes[i].clone(),
+                spend_notes[i].clone(),
                 i * 2,
             )?;
 
-            // The old_nf may not be from above input note
+            // The old_nf may not be from above spend note
             let old_nf = assign_free_advice(
                 layouter.namespace(|| "old nf"),
                 note_config.advices[0],
@@ -109,23 +109,23 @@ pub trait ValidityPredicateCircuit {
                 old_nf,
                 i * 2 + 1,
             )?;
-            input_note_variables.push(input_note_var);
+            spend_note_variables.push(spend_note_var);
             output_note_variables.push(output_note_var);
         }
 
-        Ok((input_note_variables, output_note_variables))
+        Ok((spend_note_variables, output_note_variables))
     }
 
     // VP designer need to implement the following functions.
-    // `get_input_notes` and `get_output_notes` will be used in `basic_constraints` to get the basic note info.
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE];
+    // `get_spend_notes` and `get_output_notes` will be used in `basic_constraints` to get the basic note info.
+    fn get_spend_notes(&self) -> &[Note; NUM_NOTE];
     fn get_output_notes(&self) -> &[Note; NUM_NOTE];
     // Add custom constraints on basic note variables and user-defined variables.
     fn custom_constraints(
         &self,
         _config: Self::Config,
         mut _layouter: impl Layouter<pallas::Base>,
-        _input_note_variables: &[SpendNoteVar],
+        _spend_note_variables: &[SpendNoteVar],
         _output_note_variables: &[OutputNoteVar],
     ) -> Result<(), Error> {
         Ok(())
@@ -152,14 +152,14 @@ macro_rules! vp_circuit_impl {
                 config: Self::Config,
                 mut layouter: impl Layouter<pallas::Base>,
             ) -> Result<(), Error> {
-                let (input_note_variables, output_note_variables) = self.basic_constraints(
+                let (spend_note_variables, output_note_variables) = self.basic_constraints(
                     config.clone(),
                     layouter.namespace(|| "basic constraints"),
                 )?;
                 self.custom_constraints(
                     config,
                     layouter.namespace(|| "custom constraints"),
-                    &input_note_variables,
+                    &spend_note_variables,
                     &output_note_variables,
                 )?;
                 Ok(())

@@ -18,7 +18,7 @@ mod field_addition;
 // DummyValidityPredicateCircuit with empty custom constraints.
 #[derive(Clone, Debug, Default)]
 pub struct DummyValidityPredicateCircuit {
-    input_notes: [Note; NUM_NOTE],
+    spend_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
 }
 
@@ -40,21 +40,21 @@ impl ValidityPredicateConfig for DummyValidityPredicateConfig {
 
 impl DummyValidityPredicateCircuit {
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let spend_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         Self {
-            input_notes,
+            spend_notes,
             output_notes,
         }
     }
 
     pub fn get_instances(&self) -> Vec<pallas::Base> {
         let mut instances = vec![];
-        self.input_notes
+        self.spend_notes
             .iter()
             .zip(self.output_notes.iter())
-            .for_each(|(input_note, output_note)| {
-                let nf = input_note.get_nf().inner();
+            .for_each(|(spend_note, output_note)| {
+                let nf = spend_note.get_nf().inner();
                 instances.push(nf);
                 let cm = output_note.commitment();
                 instances.push(cm.get_x());
@@ -67,8 +67,8 @@ impl DummyValidityPredicateCircuit {
 impl ValidityPredicateCircuit for DummyValidityPredicateCircuit {
     type Config = DummyValidityPredicateConfig;
 
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.input_notes
+    fn get_spend_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.spend_notes
     }
 
     fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
