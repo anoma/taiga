@@ -14,16 +14,19 @@ To make sure that the state transition is allowed by the user, Taiga VPs take th
 
 ## VP types in Taiga
 
-#### userVP (sendVP/recvVP)
-Users define their long-term preferences via `userVP`. Every transaction the user is involved into has to be approved by the user's VP in order to be considered valid. There are two types of `userVP`:
+There are two main VP types in Taiga: `applicationVP` and `userVP`. `ApplicationVP` makes sure that every proposed state transition that affects the application state doesn't violate the application rules (e.g. a currency application makes sure that there are no double-spent coins), and `userVP` makes sure that the users' preferences who are affected by the proposed state transition are satisfied.
+
+### ApplicationVP
+Applications can define the conditions on which they can be used via `applicationVP`. Everytime notes of a certain application are created or spent in a transaction, the `applicationVP` is called to validate the transaction.
+
+### UserVP
+#### sendVP/recvVP
+Users define their long-term preferences with `sendVP` and `recvVP`. Every transaction the user is involved into has to be approved by the user's VP in order to be considered valid.
 * `SendVP` defines the conditions on which notes can be sent (e.g. signature check)
 * `RecvVP` defines the conditions on which a note can be received by the user (e.g. sender whitelist)
 
 #### intentVP
-`IntentVP` helps a user to express their ephemeral interests and make sure the interests are satisfied. Learn more about intents and `intentVP` [here](./exec.md) (TODO: isn't merged yet).
-
-#### applicationVP
-Applications can define the conditions on which they can be used via `applicationVP`. Everytime notes of a certain application are created or spent in a transaction, the `applicationVP` is called to validate the transaction.
+`IntentVP` helps a user to express their ephemeral interests and make sure the interests are satisfied. Intent VP checks are enforced through **intent notes**. Learn more about intents, `intentVP`, and intent notes [here](./exec.md).
 
 ### Validity predicates as arithemtic circuits
 
@@ -41,17 +44,17 @@ The VP configuration includes the following "gates" in the PLONK configuration:
 * Elliptic curve addition and scalar multiplication
 * Poseidon hash
   
-TODO: rephrase
+TODO: update the gate info
 
 ### VP checks per transaction
 
 In every transaction some notes are spent and some notes are created. 
 * For every spent note, `sendVP` of its owner is called
 * For every output note, `recvVP` of the recipient is called
-* `intentVP` of every user whose intent was involved in the tx is called
+* For every intent note, `intentVP` of the owner is called
 * Every note belongs to some application. For every application that has its notes involved in the transaction, its `appVP` is called.
 
-Every VP has all spent and output in the transaction notes as input and is called once per transaction (e.g. if two notes of the same app exist, the `appVP` is called only once and is checking the state transitions for both notes at once). 
+Every VP is called **once** per transaction to validate the state transition (e.g. if two notes of the same app exist, the `appVP` is called only once and is checking the state transitions for both notes at once). 
 
 ### VP interface
 
