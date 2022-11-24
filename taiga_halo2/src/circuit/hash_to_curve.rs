@@ -651,10 +651,13 @@ impl ToAffineConfig {
     ) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
         // Enable `q_to_affine` selector
         self.q_to_affine.enable(region, offset)?;
+
+        // copy x, y and z into the advice columns
         x.copy_advice(|| "x", region, self.x, offset)?;
         y.copy_advice(|| "y", region, self.y, offset)?;
         z.copy_advice(|| "z", region, self.z, offset)?;
 
+        // create the corresponding affine point
         let p = x
             .value()
             .zip(y.value())
@@ -684,6 +687,100 @@ impl ToAffineConfig {
 
         Ok(point)
     }
+}
+
+#[test]
+fn test_to_affine_circuit() {
+    use halo2_proofs::{
+        plonk::Circuit,
+        circuit::SimpleFloorPlanner,
+    };
+    use pallas::Base as Fp;
+
+    #[derive(Default)]
+    struct MyCircuit {
+        x: Fp,
+        y: Fp,
+        z: Fp,
+    }
+
+    impl Circuit<pallas::Base> for MyCircuit {
+        type Config = (
+            [Column<Advice>; 10],
+            ToAffineConfig,
+        );
+        type FloorPlanner = SimpleFloorPlanner;
+
+        fn without_witnesses(&self) -> Self {
+            Self::default()
+        }
+
+        fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self::Config {
+            let advices = [
+                meta.advice_column(),
+                meta.advice_column(),
+                meta.advice_column(),
+                meta.advice_column(),
+                meta.advice_column(),
+                meta.advice_column(),
+                meta.advice_column(),
+                meta.advice_column(),
+                meta.advice_column(),
+                meta.advice_column(),
+            ];
+
+            let to_affine_config = ToAffineConfig::configure(meta, advices[0], advices[1], advices[2]);
+
+            (advices, to_affine_config)
+        }
+
+        fn synthesize(
+            &self,
+            config: Self::Config,
+            mut layouter: impl Layouter<pallas::Base>,
+        ) -> Result<(), Error> {
+            let (advices, to_affine_config) = config;
+
+
+
+            let input_message = [0u8; 32];
+            let mut us = [Field::zero(); 2];
+            // TODO: add hash circuit here
+            hashtocurve::sha256_to_field("pallas", "taiga:value_base", &input_message, &mut us);
+            let u_0 = assign_free_advice(
+                layouter.namespace(|| "u_0"),
+                advices[0],
+                Value::known(us[0]),
+            )?;
+            let u_1 = assign_free_advice(
+                layouter.namespace(|| "u_1"),
+                advices[1],
+                Value::known(us[1]),
+            )?;
+            let messages = vec![u_0, u_1];
+            let ret = hash_to_curve_circuit(
+                layouter.namespace(|| "hash to curve"),
+                hash_to_curve_config,
+                &messages,
+                ecc_chip.clone(),
+            )?;
+            let expect_ret = {
+                let hash = pallas::Point::sha256_to_curve("taiga:value_base");
+                let expect_point = hash(&input_message);
+                Point::new(
+                    ecc_chip,
+                    layouter.namespace(|| "expect_point"),
+                    Value::known(expect_point.to_affine()),
+                )
+            }?;
+            ret.constrain_equal(layouter, &expect_ret)
+        }
+    }
+
+    let circuit = MyCircuit {};
+
+    let prover = MockProver::run(11, &circuit, vec![]).unwrap();
+    assert_eq!(prover.verify(), Ok(()))
 }
 
 #[test]
