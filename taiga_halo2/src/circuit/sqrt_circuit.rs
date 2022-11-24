@@ -1,8 +1,7 @@
 use ff::Field;
-use halo2_gadgets::utilities::ternary;
 use halo2_proofs::{
     circuit::{AssignedCell, Region},
-    plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Expression, Selector},
+    plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Selector},
     poly::Rotation,
 };
 use pasta_curves::{pallas, Fp};
@@ -121,11 +120,11 @@ fn test_sqrt_circuit() {
         ) -> Result<(), Error> {
             let (advices, _) = config;
 
-            // compute the output in and out of the circuit
-
+            // create a cell for x
             let x_cell =
                 assign_free_advice(layouter.namespace(|| "x"), advices[0], Value::known(self.x))?;
 
+            // create a cell for sqrt(x) in-circuit using SqrtConfig.assign_region()
             layouter.assign_region(
                 || "sqrt(x) in-circuit",
                 |mut region| config.1.assign_region(&x_cell, 0, &mut region),
@@ -140,8 +139,8 @@ fn test_sqrt_circuit() {
         x: Fp::from(5), // 5 is not a square in Pallas::BaseField.
     };
 
-    let prover1 = MockProver::run(4, &circuit1, vec![]).unwrap();
-    let prover2 = MockProver::run(4, &circuit2, vec![]).unwrap();
+    let prover1 = MockProver::run(3, &circuit1, vec![]).unwrap();
+    let prover2 = MockProver::run(3, &circuit2, vec![]).unwrap();
 
     assert_eq!(prover1.verify(), Ok(()));
     assert_ne!(prover2.verify(), Ok(()));
