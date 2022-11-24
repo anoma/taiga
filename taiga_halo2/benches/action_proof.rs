@@ -12,7 +12,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
     let mut rng = OsRng;
     let action_info = ActionInfo::dummy(&mut rng);
     let (action, action_circuit) = action_info.build(&mut rng);
-    let params = Params::new(11);
+    let params = Params::new(12);
     let empty_circuit: ActionCircuit = Default::default();
     let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
     let pk = keygen_pk(&params, vk, &empty_circuit).expect("keygen_pk should not fail");

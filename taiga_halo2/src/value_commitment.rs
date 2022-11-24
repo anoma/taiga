@@ -1,9 +1,9 @@
 use crate::application::Application;
-use crate::constant::NOTE_COMMITMENT_R_GENERATOR;
+use crate::constant::{NOTE_COMMITMENT_R_GENERATOR, POSEIDON_TO_CURVE_INPUT_LEN};
 use crate::note::Note;
-use ff::PrimeField;
+use crate::utils::poseidon_to_curve;
 use group::{cofactor::CofactorCurveAffine, Curve, Group};
-use halo2_proofs::arithmetic::{CurveAffine, CurveExt};
+use halo2_proofs::arithmetic::CurveAffine;
 use pasta_curves::pallas;
 
 #[derive(Copy, Clone, Debug)]
@@ -39,9 +39,10 @@ impl ValueCommitment {
 }
 
 pub fn derivate_value_base(is_merkle_checked: bool, application: &Application) -> pallas::Point {
-    let hash = pallas::Point::hash_to_curve("taiga:test");
-    let mut bytes: Vec<u8> = vec![is_merkle_checked.into()];
-    bytes.extend_from_slice(&application.get_vp().to_repr());
-    bytes.extend_from_slice(&application.get_vp_data().to_repr());
-    hash(&bytes)
+    let inputs = [
+        pallas::Base::from(is_merkle_checked),
+        application.get_vp(),
+        application.get_vp_data(),
+    ];
+    poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&inputs)
 }

@@ -30,6 +30,7 @@ pub const ACTION_OUTPUT_CM_INSTANCE_ROW_IDX: usize = 2;
 pub const ACTION_NET_VALUE_CM_X_INSTANCE_ROW_IDX: usize = 3;
 pub const ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX: usize = 4;
 
+pub const POSEIDON_TO_CURVE_INPUT_LEN: usize = 4;
 pub const CURVE_ID: &str = "pallas";
 pub const VALUE_BASE_DOMAIN_PREFIX: &str = "Taiga-ValueBase";
 lazy_static! {

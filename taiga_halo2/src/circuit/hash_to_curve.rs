@@ -1,10 +1,17 @@
-use crate::constant::NoteCommitmentFixedBases;
+use crate::constant::{
+    NoteCommitmentFixedBases, POSEIDON_TO_CURVE_INPUT_LEN, POSEIDON_TO_FIELD_U_0_POSTFIX,
+    POSEIDON_TO_FIELD_U_1_POSTFIX,
+};
 use ff::{Field, PrimeField};
 use group::Curve;
 use halo2_gadgets::{
     ecc::{
         chip::{EccChip, EccPoint},
         Point,
+    },
+    poseidon::{
+        primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
+        Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
     },
     utilities::{bool_check, ternary},
 };
@@ -71,17 +78,96 @@ type JacobianCoordinates = (
 pub fn hash_to_curve_circuit(
     mut layouter: impl Layouter<pallas::Base>,
     config: HashToCurveConfig,
-    messages: &[AssignedCell<pallas::Base, pallas::Base>],
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
+    messages: &[AssignedCell<pallas::Base, pallas::Base>],
 ) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
-    // TODO: add hash circuit
+    // hash to u_0
+    let u_0 = {
+        let poseidon_chip = PoseidonChip::construct(config.poseidon_config.clone());
+        let poseidon_hasher =
+            PoseidonHash::<
+                _,
+                _,
+                poseidon::P128Pow5T3,
+                ConstantLength<POSEIDON_TO_CURVE_INPUT_LEN>,
+                3,
+                2,
+            >::init(poseidon_chip, layouter.namespace(|| "Poseidon init u_0"))?;
+        let u_0_postfix: Vec<AssignedCell<pallas::Base, pallas::Base>> =
+            POSEIDON_TO_FIELD_U_0_POSTFIX
+                .iter()
+                .map(|&v| {
+                    layouter
+                        .assign_region(
+                            || "load constant",
+                            |mut region| {
+                                region.assign_advice_from_constant(
+                                    || "constant value",
+                                    config.advices[0],
+                                    0,
+                                    v,
+                                )
+                            },
+                        )
+                        .unwrap()
+                })
+                .collect();
+        poseidon_hasher.hash(
+            layouter.namespace(|| "get u_0"),
+            [messages, &u_0_postfix]
+                .concat()
+                .try_into()
+                .expect("slice with incorrect length"),
+        )?
+    };
+
+    // hash to u_1
+    let u_1 = {
+        let poseidon_chip = PoseidonChip::construct(config.poseidon_config.clone());
+        let poseidon_hasher =
+            PoseidonHash::<
+                _,
+                _,
+                poseidon::P128Pow5T3,
+                ConstantLength<POSEIDON_TO_CURVE_INPUT_LEN>,
+                3,
+                2,
+            >::init(poseidon_chip, layouter.namespace(|| "Poseidon init u_1"))?;
+        let u_1_postfix: Vec<AssignedCell<pallas::Base, pallas::Base>> =
+            POSEIDON_TO_FIELD_U_1_POSTFIX
+                .iter()
+                .map(|&v| {
+                    layouter
+                        .assign_region(
+                            || "load constant",
+                            |mut region| {
+                                region.assign_advice_from_constant(
+                                    || "constant value",
+                                    config.advices[1],
+                                    0,
+                                    v,
+                                )
+                            },
+                        )
+                        .unwrap()
+                })
+                .collect();
+        poseidon_hasher.hash(
+            layouter.namespace(|| "get u_1"),
+            [messages, &u_1_postfix]
+                .concat()
+                .try_into()
+                .expect("slice with incorrect length"),
+        )?
+    };
+
     // Use messages as u_0 and u_1
     let q_0 = layouter.assign_region(
         || "u_0 map_to_curve",
         |mut region| {
             config
                 .map_to_curve_config
-                .assign_region(&messages[0], 0, &mut region)
+                .assign_region(&u_0, 0, &mut region)
         },
     )?;
 
@@ -113,7 +199,7 @@ pub fn hash_to_curve_circuit(
         |mut region| {
             config
                 .map_to_curve_config
-                .assign_region(&messages[1], 0, &mut region)
+                .assign_region(&u_1, 0, &mut region)
         },
     )?;
 
@@ -143,9 +229,10 @@ pub fn hash_to_curve_circuit(
     k_0.add(layouter.namespace(|| "k_0 + k_1"), &k_1)
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct HashToCurveConfig {
-    // TODO: add hash config
+    advices: [Column<Advice>; 10],
+    poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
     map_to_curve_config: MapToCurveConfig,
     iso_map_config: IsoMapConfig,
     to_affine_config: ToAffineConfig,
@@ -155,6 +242,7 @@ impl HashToCurveConfig {
     pub fn configure(
         meta: &mut ConstraintSystem<pallas::Base>,
         advices: [Column<Advice>; 10],
+        poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
     ) -> Self {
         let map_to_curve_config = MapToCurveConfig::configure(
             meta, advices[0], advices[1], advices[2], advices[3], advices[4], advices[5],
@@ -164,6 +252,8 @@ impl HashToCurveConfig {
         let to_affine_config = ToAffineConfig::configure(meta, advices[3], advices[4], advices[5]);
 
         Self {
+            advices,
+            poseidon_config,
             map_to_curve_config,
             iso_map_config,
             to_affine_config,
@@ -688,6 +778,8 @@ impl ToAffineConfig {
 
 #[test]
 fn test_hash_to_curve_circuit() {
+    use crate::circuit::gadgets::assign_free_advice;
+    use crate::utils::poseidon_to_curve;
     use halo2_gadgets::{
         ecc::chip::EccConfig, utilities::lookup_range_check::LookupRangeCheckConfig,
     };
@@ -696,9 +788,6 @@ fn test_hash_to_curve_circuit() {
         dev::MockProver,
         plonk::{Advice, Circuit, Column, ConstraintSystem, Error},
     };
-
-    use crate::circuit::gadgets::assign_free_advice;
-
     #[derive(Default)]
     struct MyCircuit {}
 
@@ -727,9 +816,6 @@ fn test_hash_to_curve_circuit() {
                 meta.advice_column(),
                 meta.advice_column(),
             ];
-
-            let hash_to_curve_config = HashToCurveConfig::configure(meta, advices);
-
             let lagrange_coeffs = [
                 meta.fixed_column(),
                 meta.fixed_column(),
@@ -740,10 +826,19 @@ fn test_hash_to_curve_circuit() {
                 meta.fixed_column(),
                 meta.fixed_column(),
             ];
+            meta.enable_constant(lagrange_coeffs[0]);
+
+            let poseidon_config = PoseidonChip::configure::<poseidon::P128Pow5T3>(
+                meta,
+                advices[6..9].try_into().unwrap(),
+                advices[5],
+                lagrange_coeffs[2..5].try_into().unwrap(),
+                lagrange_coeffs[5..8].try_into().unwrap(),
+            );
+
+            let hash_to_curve_config = HashToCurveConfig::configure(meta, advices, poseidon_config);
 
             let table_idx = meta.lookup_table_column();
-            let constants = meta.fixed_column();
-            meta.enable_constant(constants);
 
             let range_check = LookupRangeCheckConfig::configure(meta, advices[9], table_idx);
 
@@ -765,30 +860,22 @@ fn test_hash_to_curve_circuit() {
             let (advices, hash_to_curve_config, ecc_config) = config;
             let ecc_chip = EccChip::construct(ecc_config);
 
-            let input_message = [0u8; 32];
-            let mut us = [Field::zero(); 2];
-            // TODO: add hash circuit here
-            hashtocurve::sha256_to_field("pallas", "taiga:value_base", &input_message, &mut us);
-            let u_0 = assign_free_advice(
-                layouter.namespace(|| "u_0"),
-                advices[0],
-                Value::known(us[0]),
-            )?;
-            let u_1 = assign_free_advice(
-                layouter.namespace(|| "u_1"),
-                advices[1],
-                Value::known(us[1]),
-            )?;
-            let messages = vec![u_0, u_1];
+            let messages = [pallas::Base::zero(); 3];
+            let messages_vars = messages
+                .into_iter()
+                .map(|v| {
+                    assign_free_advice(layouter.namespace(|| "u_0"), advices[0], Value::known(v))
+                        .unwrap()
+                })
+                .collect::<Vec<_>>();
             let ret = hash_to_curve_circuit(
                 layouter.namespace(|| "hash to curve"),
                 hash_to_curve_config,
-                &messages,
                 ecc_chip.clone(),
+                &messages_vars,
             )?;
             let expect_ret = {
-                let hash = pallas::Point::sha256_to_curve("taiga:value_base");
-                let expect_point = hash(&input_message);
+                let expect_point = poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&messages);
                 Point::new(
                     ecc_chip,
                     layouter.namespace(|| "expect_point"),
