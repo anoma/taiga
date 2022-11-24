@@ -2,9 +2,11 @@ extern crate taiga_halo2;
 
 use halo2_proofs::{
     arithmetic::FieldExt,
-    circuit::{floor_planner, AssignedCell, Layouter, Value},
-    plonk::{self, Advice, Column, Instance as InstanceColumn},
+    circuit::{floor_planner, AssignedCell, Layouter, Value, Region},
+    plonk::{self, Advice, Column, Selector, Expression, ConstraintSystem, Constraints, Error, Instance as InstanceColumn},
+    poly::Rotation
 };
+use halo2_gadgets::utilities::ternary;
 use pasta_curves::{pallas, Fp};
 
 use taiga_halo2::circuit::gadgets::{
@@ -21,6 +23,10 @@ pub struct SudokuConfig {
     add_config: AddConfig,
     sub_config: SubConfig,
     mul_config: MulConfig,
+    x: Column<Advice>,
+    i: Column<Advice>,
+    ret: Column<Advice>,
+    cond: Selector,
 }
 
 impl SudokuConfig {
@@ -34,6 +40,55 @@ impl SudokuConfig {
 
     pub(super) fn mul_chip(&self) -> MulChip<pallas::Base> {
         MulChip::construct(self.mul_config.clone())
+    }
+
+    fn create_condition_gate(&self, meta: &mut ConstraintSystem<pallas::Base>) {
+        meta.create_gate("condition", |meta| {
+            // 1. We get x and x_inv from the column `self.x` at `cur` and `next`
+            // 2. We create an expression corresponding to the boolean 1-x*x_inv
+            // 4. We impose the corresponding constraint
+            let cond = meta.query_selector(self.cond);
+            let x = meta.query_advice(self.x, Rotation::cur());
+            let i = meta.query_advice(self.i, Rotation::cur());
+            let x_inv = meta.query_advice(self.x, Rotation::next());
+            let ret = meta.query_advice(self.ret, Rotation::cur());
+
+            let one = Expression::Constant(pallas::Base::one());
+            let ten = Expression::Constant(pallas::Base::from(10));
+            let x_is_zero = one - x.clone() * x_inv;
+            // The same to:  let poly = ret - ternary(x_is_zero, twelve, thirtyfour);
+            let poly = ternary(x_is_zero.clone(), ret.clone() - (ten + i), ret - x.clone());
+
+            Constraints::with_selector(
+                cond,
+                [("x is zero", x * x_is_zero), ("12 if x=0 else 34", poly)],
+            )
+        });
+    }
+
+    pub fn assign_region(
+        &self,
+        x: &AssignedCell<pallas::Base, pallas::Base>,
+        i: usize,
+        offset: usize,
+        region: &mut Region<'_, pallas::Base>,
+    ) -> Result<AssignedCell<Fp, Fp>, Error> {
+        // this function set the value of x, and also of x_inv, needed for the circuit
+        self.cond.enable(region, offset).unwrap();
+        let x_inv = x
+            .value()
+            .map(|x| x.invert().unwrap_or(pallas::Base::zero()));
+        region.assign_advice(|| "x_inv", self.x, offset + 1, || x_inv)?;
+
+        let ret = x.value().map(|x| {
+            if *x == Fp::zero() {
+                Fp::from_u128(10 + i as u128)
+            } else {
+                *x
+            }
+        });
+        let ret_final = region.assign_advice(|| "ret", self.ret, offset, || ret)?;
+        Ok(ret_final)
     }
 }
 
@@ -76,9 +131,25 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
             meta.enable_equality(*advice);
         }
 
+        let x = meta.advice_column();
+        meta.enable_equality(x);
+
+        let i = meta.advice_column();
+        meta.enable_equality(i);
+
+        let ret = meta.advice_column();
+        meta.enable_equality(ret);
+
+        let cond = meta.selector();
+
+
         SudokuConfig {
             primary,
             advices,
+            x,
+            i,
+            ret,
+            cond,
             add_config,
             sub_config,
             mul_config,
@@ -153,33 +224,30 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
         // The idea is that once we filter the zeroes (i.e. the non-revealed numbers of the puzzle),
         // a list has unique elements if the product of the differences of all pairs of elements is not zero.
         // That is Prod(l[i] - l[j]) != 0 if i != j
-        // E.g. [0, 0, 1, 3, 7, 0, 4, 8, 0] turns into [1,3,7,4,8]
-        // and (1-3)(1-7)(1-4)(1-8)
-        //          (3-7)(3-4)(3-8)
-        //               (7-4)(7-8)
-        //                    (4-8) =? 0
-        // This is computed in n! operations
+        // E.g. [0, 0, 1, 3, 7, 0, 4, 8, 0] turns into [10, 11, 1, 3, 7, 15, 4, 8, 18]
         let non_zero_sudoku_cells: Vec<AssignedCell<_, _>> = self
             .sudoku
             .concat()
             .into_iter()
             .enumerate()
             .map(|(i, x)| {
-                if x == 0 {
-                    assign_free_advice(
-                        layouter.namespace(|| "non-zero sudoku_cell"),
-                        config.advices[0],
-                        Value::known(pallas::Base::from_u128(10 * i as u128)),
-                    )
-                    .unwrap()
-                } else {
-                    assign_free_advice(
-                        layouter.namespace(|| "non-zero sudoku_cell"),
-                        config.advices[0],
-                        Value::known(pallas::Base::from_u128(x as u128)),
-                    )
-                    .unwrap()
-                }
+                let x_cell =
+                assign_free_advice(
+                    layouter.namespace(|| "non-zero sudoku_cell"), 
+                    config.x, 
+                    Value::known(pallas::Base::from_u128(x as u128))).unwrap();
+
+                assign_free_advice(
+                        layouter.namespace(|| "non-zero sudoku_cell"), 
+                        config.i, 
+                        Value::known(pallas::Base::from_u128(i as u128))).unwrap();
+    
+                let ret = layouter.assign_region(
+                    || "x cell",
+                    |mut region| config.assign_region(&x_cell, i, 0, &mut region),
+                ).unwrap();
+
+                ret
             })
             .collect();
 
@@ -339,7 +407,7 @@ mod tests {
             [3, 0, 5, 1, 9, 7, 8, 4, 6],
         ];
         let circuit = PuzzleCircuit { sudoku: puzzle };
-        const K: u32 = 13;
+        const K: u32 = 14;
         let public_inputs = [pallas::Base::zero(), pallas::Base::one()];
         assert_eq!(
             MockProver::run(
@@ -351,6 +419,8 @@ mod tests {
             .verify(),
             Ok(())
         );
+
+        println!("Success!");
 
         let time = Instant::now();
         let vk = VerifyingKey::build(&circuit, K);
