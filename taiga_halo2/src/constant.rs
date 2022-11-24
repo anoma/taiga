@@ -1,3 +1,4 @@
+use crate::utils::to_field_elements;
 use group::Curve;
 use halo2_gadgets::{
     ecc::{
@@ -30,6 +31,29 @@ pub const ACTION_ENABLE_SPEND_INSTANCE_ROW_IDX: usize = 3;
 pub const ACTION_ENABLE_OUTPUT_INSTANCE_ROW_IDX: usize = 4;
 pub const ACTION_NET_VALUE_CM_X_INSTANCE_ROW_IDX: usize = 5;
 pub const ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX: usize = 6;
+
+pub const CURVE_ID: &str = "pallas";
+pub const VALUE_BASE_DOMAIN_PREFIX: &str = "Taiga-ValueBase";
+lazy_static! {
+    pub static ref POSEIDON_TO_FIELD_U_0_POSTFIX: Vec<pallas::Base> = {
+        let mut postfix = format!(
+            "{}{}{}{}{}",
+            VALUE_BASE_DOMAIN_PREFIX, "-", CURVE_ID, "-", 0,
+        )
+        .into_bytes();
+        postfix.push((4 + CURVE_ID.len() + VALUE_BASE_DOMAIN_PREFIX.len()) as u8);
+        to_field_elements(&postfix)
+    };
+    pub static ref POSEIDON_TO_FIELD_U_1_POSTFIX: Vec<pallas::Base> = {
+        let mut postfix = format!(
+            "{}{}{}{}{}",
+            VALUE_BASE_DOMAIN_PREFIX, "-", CURVE_ID, "-", 1,
+        )
+        .into_bytes();
+        postfix.push((4 + CURVE_ID.len() + VALUE_BASE_DOMAIN_PREFIX.len()) as u8);
+        to_field_elements(&postfix)
+    };
+}
 
 // SinsemillaCommit parameters
 lazy_static! {
