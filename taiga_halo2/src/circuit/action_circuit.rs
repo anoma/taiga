@@ -1,26 +1,20 @@
 use crate::circuit::gadgets::AddChip;
-use crate::circuit::integrity::{
-    check_output_note, check_spend_note, compute_net_value_commitment,
-};
+use crate::circuit::integrity::{check_output_note, check_spend_note, compute_value_commitment};
 use crate::circuit::merkle_circuit::{
     merkle_poseidon_gadget, MerklePoseidonChip, MerklePoseidonConfig,
 };
 use crate::circuit::note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig};
 use crate::constant::{
     NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain,
-    ACTION_ANCHOR_INSTANCE_ROW_IDX, ACTION_ENABLE_OUTPUT_INSTANCE_ROW_IDX,
-    ACTION_ENABLE_SPEND_INSTANCE_ROW_IDX, ACTION_NET_VALUE_CM_X_INSTANCE_ROW_IDX,
+    ACTION_ANCHOR_INSTANCE_ROW_IDX, ACTION_NET_VALUE_CM_X_INSTANCE_ROW_IDX,
     ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX, ACTION_NF_INSTANCE_ROW_IDX,
     ACTION_OUTPUT_CM_INSTANCE_ROW_IDX, TAIGA_COMMITMENT_TREE_DEPTH,
 };
 use crate::note::Note;
-use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip, utilities::bool_check};
+use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
     circuit::{floor_planner, Layouter},
-    plonk::{
-        Advice, Circuit, Column, ConstraintSystem, Constraints, Error, Expression, Instance,
-        Selector,
-    },
+    plonk::{Advice, Circuit, Column, ConstraintSystem, Constraints, Error, Instance, Selector},
     poly::Rotation,
 };
 use pasta_curves::pallas;
@@ -31,7 +25,7 @@ pub struct ActionConfig {
     advices: [Column<Advice>; 10],
     note_config: NoteConfig,
     merkle_config: MerklePoseidonConfig,
-    basic_checks_selector: Selector,
+    merkle_path_selector: Selector,
 }
 
 /// The Action circuit.
@@ -76,62 +70,19 @@ impl Circuit<pallas::Base> for ActionCircuit {
             meta.enable_equality(*advice);
         }
 
-        let basic_checks_selector = meta.selector();
-        meta.create_gate("Basic checks", |meta| {
-            let basic_checks_selector = meta.query_selector(basic_checks_selector);
-            let is_normal_spend = meta.query_advice(advices[0], Rotation::cur());
-            let is_normal_output = meta.query_advice(advices[1], Rotation::cur());
-            let v_spend = meta.query_advice(advices[2], Rotation::cur());
-            let v_output = meta.query_advice(advices[3], Rotation::cur());
-
-            let anchor = meta.query_advice(advices[4], Rotation::cur());
-            let root = meta.query_advice(advices[5], Rotation::cur());
-
-            let one = Expression::Constant(pallas::Base::one());
-
-            // if v_normal = 0, it's a dummy note.
-            let v_normal_spend = v_spend * is_normal_spend;
-            let v_normal_output = v_output * is_normal_output;
-
-            // `v_normal` zero check.
-            // Constrain: v_normal(1 - v_normal * v_normal_inv) = 0, in which is_zero = (1 - v_normal * v_normal_inv)
-            let v_normal_spend_inv = meta.query_advice(advices[6], Rotation::cur());
-            let is_dummy_spend = one.clone() - v_normal_spend.clone() * v_normal_spend_inv;
-            let v_normal_output_inv = meta.query_advice(advices[7], Rotation::cur());
-            let is_dummy_output = one.clone() - v_normal_output.clone() * v_normal_output_inv;
-
-            let enable_spend = meta.query_advice(advices[8], Rotation::cur());
-            let enable_output = meta.query_advice(advices[9], Rotation::cur());
+        let merkle_path_selector = meta.selector();
+        meta.create_gate("merkle path check", |meta| {
+            let merkle_path_selector = meta.query_selector(merkle_path_selector);
+            let is_merkle_checked_spend = meta.query_advice(advices[0], Rotation::cur());
+            let anchor = meta.query_advice(advices[1], Rotation::cur());
+            let root = meta.query_advice(advices[2], Rotation::cur());
 
             Constraints::with_selector(
-                basic_checks_selector,
-                [
-                    (
-                        "dummy spend note, or root = anchor",
-                        v_normal_spend.clone() * (root - anchor),
-                    ),
-                    (
-                        "v_normal_spend zero check",
-                        v_normal_spend * is_dummy_spend.clone(),
-                    ),
-                    ("bool check enable_spend", bool_check(enable_spend.clone())),
-                    (
-                        "check enable spend: not relation",
-                        is_dummy_spend + enable_spend - one.clone(),
-                    ),
-                    (
-                        "v_normal_output zero check",
-                        v_normal_output * is_dummy_output.clone(),
-                    ),
-                    (
-                        "bool check enable_output",
-                        bool_check(enable_output.clone()),
-                    ),
-                    (
-                        "check enable output: not relation",
-                        is_dummy_output + enable_output - one,
-                    ),
-                ],
+                merkle_path_selector,
+                [(
+                    "is_merkle_checked is false, or root = anchor",
+                    is_merkle_checked_spend * (root - anchor),
+                )],
             )
         });
 
@@ -148,7 +99,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             advices,
             note_config,
             merkle_config,
-            basic_checks_selector,
+            merkle_path_selector,
         }
     }
 
@@ -226,105 +177,49 @@ impl Circuit<pallas::Base> for ActionCircuit {
         // TODO: add note verifiable encryption
 
         // compute and public net value commitment(spend_value_commitment - output_value_commitment)
-        let net_value_commitment = compute_net_value_commitment(
+        let cv_net = compute_value_commitment(
             layouter.namespace(|| "net value commitment"),
             ecc_chip,
-            spend_note_vars.is_normal.clone(),
+            spend_note_vars.is_merkle_checked.clone(),
             spend_note_vars.app_vp.clone(),
             spend_note_vars.app_data.clone(),
             spend_note_vars.value.clone(),
-            output_note_vars.is_normal.clone(),
+            output_note_vars.is_merkle_checked.clone(),
             output_note_vars.app_vp.clone(),
             output_note_vars.app_data.clone(),
-            output_note_vars.value.clone(),
+            output_note_vars.value,
             self.rcv,
         )?;
         layouter.constrain_instance(
-            net_value_commitment.inner().x().cell(),
+            cv_net.inner().x().cell(),
             config.instances,
             ACTION_NET_VALUE_CM_X_INSTANCE_ROW_IDX,
         )?;
         layouter.constrain_instance(
-            net_value_commitment.inner().y().cell(),
+            cv_net.inner().y().cell(),
             config.instances,
             ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX,
         )?;
 
-        // Basic checks
+        // merkle path check
         layouter.assign_region(
-            || "Basic checks",
+            || "merkle path check",
             |mut region| {
-                spend_note_vars.is_normal.copy_advice(
-                    || "is_normal_spend",
+                spend_note_vars.is_merkle_checked.copy_advice(
+                    || "is_merkle_checked_spend",
                     &mut region,
                     config.advices[0],
-                    0,
-                )?;
-                output_note_vars.is_normal.copy_advice(
-                    || "is_normal_output",
-                    &mut region,
-                    config.advices[1],
-                    0,
-                )?;
-                spend_note_vars.value.copy_advice(
-                    || "v_spend",
-                    &mut region,
-                    config.advices[2],
-                    0,
-                )?;
-                output_note_vars.value.copy_advice(
-                    || "v_output",
-                    &mut region,
-                    config.advices[3],
                     0,
                 )?;
                 region.assign_advice_from_instance(
                     || "anchor",
                     config.instances,
                     ACTION_ANCHOR_INSTANCE_ROW_IDX,
-                    config.advices[4],
+                    config.advices[1],
                     0,
                 )?;
-                root.copy_advice(|| "root", &mut region, config.advices[5], 0)?;
-
-                let v_normal_spend_inv = (spend_note_vars.is_normal.value()
-                    * spend_note_vars.value.value())
-                .into_field()
-                .invert();
-                region.assign_advice(
-                    || "v_normal_spend_inv",
-                    config.advices[6],
-                    0,
-                    || v_normal_spend_inv,
-                )?;
-                let v_normal_output_inv = (output_note_vars.is_normal.value()
-                    * output_note_vars.value.value())
-                .into_field()
-                .invert();
-                region.assign_advice(
-                    || "v_normal_output_inv",
-                    config.advices[7],
-                    0,
-                    || v_normal_output_inv,
-                )?;
-
-                region.assign_advice_from_instance(
-                    || "enable spend",
-                    config.instances,
-                    ACTION_ENABLE_SPEND_INSTANCE_ROW_IDX,
-                    config.advices[8],
-                    0,
-                )?;
-
-                region.assign_advice_from_instance(
-                    || "enable output",
-                    config.instances,
-                    ACTION_ENABLE_OUTPUT_INSTANCE_ROW_IDX,
-                    config.advices[9],
-                    0,
-                )?;
-
-                config.basic_checks_selector.enable(&mut region, 0)
+                root.copy_advice(|| "root", &mut region, config.advices[2], 0)?;
+                config.merkle_path_selector.enable(&mut region, 0)
             },
         )?;
 
