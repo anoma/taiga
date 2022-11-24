@@ -363,7 +363,6 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::time::Instant;

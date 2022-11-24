@@ -1,12 +1,15 @@
 extern crate taiga_halo2;
 
+use halo2_gadgets::utilities::ternary;
 use halo2_proofs::{
     arithmetic::FieldExt,
-    circuit::{floor_planner, AssignedCell, Layouter, Value, Region},
-    plonk::{self, Advice, Column, Selector, Expression, ConstraintSystem, Constraints, Error, Instance as InstanceColumn},
-    poly::Rotation
+    circuit::{floor_planner, AssignedCell, Layouter, Region, Value},
+    plonk::{
+        self, Advice, Column, ConstraintSystem, Constraints, Error, Expression,
+        Instance as InstanceColumn, Selector,
+    },
+    poly::Rotation,
 };
-use halo2_gadgets::utilities::ternary;
 use pasta_curves::{pallas, Fp};
 
 use taiga_halo2::circuit::gadgets::{
@@ -142,7 +145,6 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
 
         let cond = meta.selector();
 
-
         SudokuConfig {
             primary,
             advices,
@@ -170,7 +172,6 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
         */
 
         // Check that every entry in the sudoku puzzle is a number from 0 to 9
-        
 
         let mut cell_lhs = assign_free_advice(
             layouter.namespace(|| "lhs init"),
@@ -178,43 +179,39 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
             Value::known(Fp::one()),
         )
         .unwrap();
-        self
-            .sudoku
-            .concat()
-            .into_iter()
-            .for_each(|x| {
-                let sudoku_cell = assign_free_advice(
-                    layouter.namespace(|| "sudoku_cell"),
+        self.sudoku.concat().into_iter().for_each(|x| {
+            let sudoku_cell = assign_free_advice(
+                layouter.namespace(|| "sudoku_cell"),
+                config.advices[0],
+                Value::known(pallas::Base::from_u128(x as u128)),
+            )
+            .unwrap();
+
+            for i in 0..10 {
+                let valid_number_cell = assign_free_advice(
+                    layouter.namespace(|| "valid number"),
                     config.advices[0],
-                    Value::known(pallas::Base::from_u128(x as u128)),
+                    Value::known(Fp::from(i as u64)),
                 )
                 .unwrap();
 
-                for i in 0..10 {
-                    let valid_number_cell = assign_free_advice(
-                        layouter.namespace(|| "valid number"),
-                        config.advices[0],
-                        Value::known(Fp::from(i as u64)),
-                    )
-                    .unwrap();
+                let diff = SubInstructions::sub(
+                    &config.sub_chip(),
+                    layouter.namespace(|| "diff"),
+                    &sudoku_cell,
+                    &valid_number_cell,
+                )
+                .unwrap();
 
-                    let diff = SubInstructions::sub(
-                        &config.sub_chip(),
-                        layouter.namespace(|| "diff"),
-                        &sudoku_cell,
-                        &valid_number_cell,
-                    )
-                    .unwrap();
-
-                    cell_lhs = MulInstructions::mul(
-                        &config.mul_chip(),
-                        layouter.namespace(|| "lhs * (x - i)"),
-                        &cell_lhs,
-                        &diff,
-                    )
-                    .unwrap();
-                }
-            });
+                cell_lhs = MulInstructions::mul(
+                    &config.mul_chip(),
+                    layouter.namespace(|| "lhs * (x - i)"),
+                    &cell_lhs,
+                    &diff,
+                )
+                .unwrap();
+            }
+        });
 
         layouter
             .constrain_instance(cell_lhs.cell(), config.primary, 0)
@@ -231,21 +228,26 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
             .into_iter()
             .enumerate()
             .map(|(i, x)| {
-                let x_cell =
-                assign_free_advice(
-                    layouter.namespace(|| "non-zero sudoku_cell"), 
-                    config.x, 
-                    Value::known(pallas::Base::from_u128(x as u128))).unwrap();
+                let x_cell = assign_free_advice(
+                    layouter.namespace(|| "non-zero sudoku_cell"),
+                    config.x,
+                    Value::known(pallas::Base::from_u128(x as u128)),
+                )
+                .unwrap();
 
                 assign_free_advice(
-                        layouter.namespace(|| "non-zero sudoku_cell"), 
-                        config.i, 
-                        Value::known(pallas::Base::from_u128(i as u128))).unwrap();
-    
-                let ret = layouter.assign_region(
-                    || "x cell",
-                    |mut region| config.assign_region(&x_cell, i, 0, &mut region),
-                ).unwrap();
+                    layouter.namespace(|| "non-zero sudoku_cell"),
+                    config.i,
+                    Value::known(pallas::Base::from_u128(i as u128)),
+                )
+                .unwrap();
+
+                let ret = layouter
+                    .assign_region(
+                        || "x cell",
+                        |mut region| config.assign_region(&x_cell, i, 0, &mut region),
+                    )
+                    .unwrap();
 
                 ret
             })
