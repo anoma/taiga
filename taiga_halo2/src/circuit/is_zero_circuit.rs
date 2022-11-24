@@ -9,22 +9,23 @@ use pasta_curves::{pallas, Fp};
 
 /*
 This file is for educational purpose.
-We want to create a conditional gate in-circuit.
-We take the example of the circuit of:
+We want to create a condition gate in-circuit corresponding to:
+```
 if x == 0 :
     return 12
 else :
     return 34
+```
 */
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ConditionalConfig {
-    cond: Selector,
+pub struct IsZeroConfig {
+    is_zero: Selector,
     x: Column<Advice>,
     ret: Column<Advice>,
 }
 
-impl ConditionalConfig {
+impl IsZeroConfig {
     #[allow(clippy::too_many_arguments)]
     pub fn configure(
         meta: &mut ConstraintSystem<pallas::Base>,
@@ -35,7 +36,7 @@ impl ConditionalConfig {
         meta.enable_equality(ret);
 
         let config = Self {
-            cond: meta.selector(),
+            is_zero: meta.selector(),
             x,
             ret,
         };
@@ -46,12 +47,12 @@ impl ConditionalConfig {
     }
 
     fn create_gate(&self, meta: &mut ConstraintSystem<pallas::Base>) {
-        meta.create_gate("condition", |meta| {
+        meta.create_gate("is_zero", |meta| {
             // 1. We get x and x_inv from the column `self.x` at `cur` and `next`
             // 2. We create an expression corresponding to the boolean 1-x*x_inv
             // 3. We create an expression corresponding to 12 if x==0 and 34 if x != 0
             // 4. We impose the corresponding constrain
-            let cond = meta.query_selector(self.cond);
+            let is_zero = meta.query_selector(self.is_zero);
             let x = meta.query_advice(self.x, Rotation::cur());
             let x_inv = meta.query_advice(self.x, Rotation::next());
             let ret = meta.query_advice(self.ret, Rotation::cur());
@@ -64,7 +65,7 @@ impl ConditionalConfig {
             let poly = ternary(x_is_zero.clone(), ret.clone() - twelve, ret - thirtyfour);
 
             Constraints::with_selector(
-                cond,
+                is_zero,
                 [("x is zero", x * x_is_zero), ("12 if x=0 else 34", poly)],
             )
         });
@@ -77,7 +78,7 @@ impl ConditionalConfig {
         region: &mut Region<'_, pallas::Base>,
     ) -> Result<AssignedCell<Fp, Fp>, Error> {
         // this function set the value of x, and also of x_inv, needed for the circuit
-        self.cond.enable(region, offset).unwrap();
+        self.is_zero.enable(region, offset).unwrap();
         x.copy_advice(|| "x", region, self.x, offset)?;
         let x_inv = x
             .value()
@@ -97,7 +98,7 @@ impl ConditionalConfig {
 }
 
 #[test]
-fn test_condition_circuit() {
+fn test_is_zero_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use halo2_proofs::{
         circuit::{Layouter, SimpleFloorPlanner, Value},
@@ -112,7 +113,7 @@ fn test_condition_circuit() {
     }
 
     impl Circuit<pallas::Base> for MyCircuit {
-        type Config = ([Column<Advice>; 10], ConditionalConfig);
+        type Config = ([Column<Advice>; 10], IsZeroConfig);
         type FloorPlanner = SimpleFloorPlanner;
 
         fn without_witnesses(&self) -> Self {
@@ -133,13 +134,13 @@ fn test_condition_circuit() {
                 meta.advice_column(),
             ];
 
-            let cond_config = ConditionalConfig::configure(meta, advices[0], advices[1]);
+            let is_zero_config = IsZeroConfig::configure(meta, advices[0], advices[1]);
 
             // let table_idx = meta.lookup_table_column();
             let constants = meta.fixed_column();
             meta.enable_constant(constants);
 
-            (advices, cond_config)
+            (advices, is_zero_config)
         }
 
         fn synthesize(
