@@ -8,7 +8,6 @@ pub mod app;
 pub mod circuit;
 pub mod constant;
 pub mod doc_examples;
-pub mod el_gamal;
 pub mod error;
 pub mod merkle_tree;
 pub mod note;
