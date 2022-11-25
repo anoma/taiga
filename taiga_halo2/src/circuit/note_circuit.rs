@@ -189,7 +189,7 @@ impl Decompose5_1_64 {
             Constraints::with_selector(
                 q_notecommit_5_1_64,
                 [
-                    ("bool_check is_normal bit", bool_check(bit1)),
+                    ("bool_check is_merkle_checked bit", bool_check(bit1)),
                     ("decomposition", decomposition_check),
                 ],
             )
@@ -212,7 +212,7 @@ impl Decompose5_1_64 {
         >,
         layouter: &mut impl Layouter<pallas::Base>,
         first: &AssignedCell<pallas::Base, pallas::Base>,
-        is_normal: &AssignedCell<pallas::Base, pallas::Base>,
+        is_merkle_checked: &AssignedCell<pallas::Base, pallas::Base>,
         value: &AssignedCell<pallas::Base, pallas::Base>,
     ) -> Result<
         (
@@ -229,8 +229,8 @@ impl Decompose5_1_64 {
             250..255,
         )?;
 
-        // bit1 is the boolean_constrained is_normal
-        let bit1 = RangeConstrained::bitrange_of(is_normal.value(), 0..1);
+        // bit1 is the boolean_constrained is_merkle_checked
+        let bit1 = RangeConstrained::bitrange_of(is_merkle_checked.value(), 0..1);
 
         let bit64 = RangeConstrained::bitrange_of(value.value(), 0..64);
 
@@ -248,7 +248,7 @@ impl Decompose5_1_64 {
         layouter: &mut impl Layouter<pallas::Base>,
         bit70: NoteCommitPiece,
         bit5: RangeConstrained<pallas::Base, AssignedCell<pallas::Base, pallas::Base>>,
-        is_normal: AssignedCell<pallas::Base, pallas::Base>,
+        is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
         value: AssignedCell<pallas::Base, pallas::Base>,
     ) -> Result<(), Error> {
         layouter.assign_region(
@@ -262,7 +262,12 @@ impl Decompose5_1_64 {
                     .copy_advice(|| "bit70", &mut region, self.col_l, 0)?;
                 bit5.inner()
                     .copy_advice(|| "bit5", &mut region, self.col_m, 0)?;
-                is_normal.copy_advice(|| "is_normal bit1", &mut region, self.col_l, 1)?;
+                is_merkle_checked.copy_advice(
+                    || "is_merkle_checked bit1",
+                    &mut region,
+                    self.col_l,
+                    1,
+                )?;
                 value.copy_advice(|| "value 64bit", &mut region, self.col_m, 1)?;
                 Ok(())
             },
@@ -479,7 +484,7 @@ pub fn note_commitment_gadget(
     psi: AssignedCell<pallas::Base, pallas::Base>,
     value: AssignedCell<pallas::Base, pallas::Base>,
     rcm: ScalarFixed<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
-    is_normal: AssignedCell<pallas::Base, pallas::Base>,
+    is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
     let lookup_config = chip.config().lookup_config();
 
@@ -531,17 +536,17 @@ pub fn note_commitment_gadget(
         [RangeConstrained::bitrange_of(psi.value(), 0..250)],
     )?;
 
-    // `c` = (bits 250..=255 of psi) || (is_normal bit) || (64 bits of value)
+    // `c` = (bits 250..=255 of psi) || (is_merkle_checked bit) || (64 bits of value)
     let (c, psi_tail_bit5) = Decompose5_1_64::decompose(
         &lookup_config,
         chip.clone(),
         &mut layouter,
         &psi,
-        &is_normal,
+        &is_merkle_checked,
         &value,
     )?;
 
-    // cm = NoteCommit^rcm(user_address || app_vp || app_data || rho || psi || is_normal || value)
+    // cm = NoteCommit^rcm(user_address || app_vp || app_data || rho || psi || is_merkle_checked || value)
     let (cm, _zs) = {
         let message = Message::from_pieces(
             chip.clone(),
@@ -581,8 +586,13 @@ pub fn note_commitment_gadget(
         rho_pre_bit5.clone(),
     )?;
 
-    cfg.decompose5_1_64
-        .assign(&mut layouter, c, psi_tail_bit5.clone(), is_normal, value)?;
+    cfg.decompose5_1_64.assign(
+        &mut layouter,
+        c,
+        psi_tail_bit5.clone(),
+        is_merkle_checked,
+        value,
+    )?;
 
     cfg.base_canonicity_250_5
         .assign(&mut layouter, user_address, user_0_249, user_tail_bit5)?;
@@ -721,7 +731,7 @@ fn test_halo2_note_commitment_circuit() {
         rho: Nullifier,
         psi: pallas::Base,
         rcm: pallas::Scalar,
-        is_normal: bool,
+        is_merkle_checked: bool,
     }
 
     impl Circuit<pallas::Base> for MyCircuit {
@@ -816,7 +826,7 @@ fn test_halo2_note_commitment_circuit() {
                 self.rho,
                 self.psi,
                 self.rcm,
-                self.is_normal,
+                self.is_merkle_checked,
             );
             // Construct a Sinsemilla chip
             let sinsemilla_chip =
@@ -880,9 +890,9 @@ fn test_halo2_note_commitment_circuit() {
             )?;
 
             let is_normail_var = assign_free_advice(
-                layouter.namespace(|| "witness is_normal"),
+                layouter.namespace(|| "witness is_merkle_checked"),
                 note_commit_config.advices[0],
-                Value::known(pallas::Base::from(note.is_normal)),
+                Value::known(pallas::Base::from(note.is_merkle_checked)),
             )?;
 
             let cm = note_commitment_gadget(
@@ -913,7 +923,7 @@ fn test_halo2_note_commitment_circuit() {
 
     let mut rng = OsRng;
 
-    // Normal note test
+    // Test note with flase is_merkle_checked flag
     {
         let circuit = MyCircuit {
             user: User::dummy(&mut rng),
@@ -922,14 +932,14 @@ fn test_halo2_note_commitment_circuit() {
             rho: Nullifier::default(),
             psi: pallas::Base::random(&mut rng),
             rcm: pallas::Scalar::random(&mut rng),
-            is_normal: false,
+            is_merkle_checked: false,
         };
 
         let prover = MockProver::<pallas::Base>::run(11, &circuit, vec![]).unwrap();
         assert_eq!(prover.verify(), Ok(()));
     }
 
-    // Non-normal note test
+    // Test note with true is_merkle_checked flag
     {
         let circuit = MyCircuit {
             user: User::dummy(&mut rng),
@@ -938,7 +948,7 @@ fn test_halo2_note_commitment_circuit() {
             rho: Nullifier::default(),
             psi: pallas::Base::random(&mut rng),
             rcm: pallas::Scalar::random(&mut rng),
-            is_normal: true,
+            is_merkle_checked: true,
         };
 
         let prover = MockProver::<pallas::Base>::run(11, &circuit, vec![]).unwrap();

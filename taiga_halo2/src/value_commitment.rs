@@ -1,19 +1,20 @@
 use crate::application::Application;
-use crate::constant::NOTE_COMMITMENT_R_GENERATOR;
+use crate::constant::{NOTE_COMMITMENT_R_GENERATOR, POSEIDON_TO_CURVE_INPUT_LEN};
 use crate::note::Note;
-use ff::PrimeField;
+use crate::utils::poseidon_to_curve;
 use group::{cofactor::CofactorCurveAffine, Curve, Group};
-use halo2_proofs::arithmetic::{CurveAffine, CurveExt};
+use halo2_proofs::arithmetic::CurveAffine;
 use pasta_curves::pallas;
 
 #[derive(Copy, Clone, Debug)]
-pub struct NetValueCommitment(pallas::Point);
+pub struct ValueCommitment(pallas::Point);
 
-impl NetValueCommitment {
+impl ValueCommitment {
     pub fn new(input_note: &Note, output_note: &Note, blind_r: &pallas::Scalar) -> Self {
-        let base_input = derivate_value_base(input_note.is_normal, &input_note.application);
-        let base_output = derivate_value_base(output_note.is_normal, &output_note.application);
-        NetValueCommitment(
+        let base_input = derivate_value_base(input_note.is_merkle_checked, &input_note.application);
+        let base_output =
+            derivate_value_base(output_note.is_merkle_checked, &output_note.application);
+        ValueCommitment(
             base_input * pallas::Scalar::from(input_note.value)
                 - base_output * pallas::Scalar::from(output_note.value)
                 + NOTE_COMMITMENT_R_GENERATOR.to_curve() * blind_r,
@@ -37,10 +38,11 @@ impl NetValueCommitment {
     }
 }
 
-pub fn derivate_value_base(is_normal: bool, application: &Application) -> pallas::Point {
-    let hash = pallas::Point::sha256_to_curve("taiga:value_base");
-    let mut bytes: Vec<u8> = vec![is_normal.into()];
-    bytes.extend_from_slice(&application.get_vp().to_repr());
-    bytes.extend_from_slice(&application.get_vp_data().to_repr());
-    hash(&bytes)
+pub fn derivate_value_base(is_merkle_checked: bool, application: &Application) -> pallas::Point {
+    let inputs = [
+        pallas::Base::from(is_merkle_checked),
+        application.get_vp(),
+        application.get_vp_data(),
+    ];
+    poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&inputs)
 }

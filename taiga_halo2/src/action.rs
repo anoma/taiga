@@ -3,9 +3,9 @@ use crate::{
     circuit::action_circuit::ActionCircuit,
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{MerklePath, Node},
-    net_value_commitment::NetValueCommitment,
     note::{Note, NoteCommitment},
     nullifier::Nullifier,
+    value_commitment::ValueCommitment,
 };
 use ff::Field;
 use pasta_curves::pallas;
@@ -20,12 +20,8 @@ pub struct ActionInstance {
     pub nf: Nullifier,
     /// The commitment of the output note.
     pub cm: NoteCommitment,
-    /// Enable spend
-    pub enable_spend: bool,
-    /// Enable output
-    pub enable_output: bool,
     /// net value commitment
-    pub net_value_commitment: NetValueCommitment,
+    pub cv_net: ValueCommitment,
     // TODO: The EncryptedNote.
     // encrypted_note,
 }
@@ -48,7 +44,7 @@ pub struct SpendInfo {
 pub struct OutputInfo {
     application: Application,
     value: u64,
-    is_normal: bool,
+    is_merkle_checked: bool,
 }
 
 impl ActionInstance {
@@ -57,10 +53,8 @@ impl ActionInstance {
             self.nf.inner(),
             self.anchor,
             self.cm.get_x(),
-            pallas::Base::from(self.enable_spend),
-            pallas::Base::from(self.enable_output),
-            self.net_value_commitment.get_x(),
-            self.net_value_commitment.get_y(),
+            self.cv_net.get_x(),
+            self.cv_net.get_y(),
         ]
     }
 }
@@ -90,23 +84,18 @@ impl ActionInfo {
             nf,
             psi,
             note_rcm,
-            self.output.is_normal,
+            self.output.is_merkle_checked,
         );
 
         let output_cm = output_note.commitment();
-        let enable_spend = (self.spend.note.is_normal as u64) * self.spend.note.value > 0;
-        let enable_output = (self.output.is_normal as u64) * self.output.value > 0;
-
         let rcv = pallas::Scalar::random(&mut rng);
 
-        let net_value_commitment = NetValueCommitment::new(&self.spend.note, &output_note, &rcv);
+        let cv_net = ValueCommitment::new(&self.spend.note, &output_note, &rcv);
         let action = ActionInstance {
             nf,
             cm: output_cm,
             anchor: self.spend.root,
-            enable_spend,
-            enable_output,
-            net_value_commitment,
+            cv_net,
         };
 
         let action_circuit = ActionCircuit {
@@ -135,11 +124,11 @@ impl SpendInfo {
 }
 
 impl OutputInfo {
-    pub fn new(application: Application, value: u64, is_normal: bool) -> Self {
+    pub fn new(application: Application, value: u64, is_merkle_checked: bool) -> Self {
         Self {
             application,
             value,
-            is_normal,
+            is_merkle_checked,
         }
     }
 
@@ -150,7 +139,7 @@ impl OutputInfo {
         Self {
             application,
             value,
-            is_normal: true,
+            is_merkle_checked: true,
         }
     }
 }

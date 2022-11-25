@@ -41,8 +41,8 @@ pub struct Note {
     /// computed from spent_note_nf and rcm by using a PRF
     pub psi: pallas::Base,
     pub rcm: pallas::Scalar,
-    /// Only normal-type note will be stored in commitment tree.
-    pub is_normal: bool,
+    /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of the spent note will be checked in ActionProof.
+    pub is_merkle_checked: bool,
 }
 
 impl Note {
@@ -53,7 +53,7 @@ impl Note {
         rho: Nullifier,
         psi: pallas::Base,
         rcm: pallas::Scalar,
-        is_normal: bool,
+        is_merkle_checked: bool,
     ) -> Self {
         Self {
             application,
@@ -61,7 +61,7 @@ impl Note {
             rho,
             psi,
             rcm,
-            is_normal,
+            is_merkle_checked,
         }
     }
 
@@ -81,11 +81,11 @@ impl Note {
             rho,
             psi,
             rcm,
-            is_normal: true,
+            is_merkle_checked: true,
         }
     }
 
-    // cm = SinsemillaCommit^rcm(user_address || app_vp || app_data || rho || psi || is_normal || value)
+    // cm = SinsemillaCommit^rcm(user_address || app_vp || app_data || rho || psi || is_merkle_checked || value)
     pub fn commitment(&self) -> NoteCommitment {
         let user_address = self.application.get_user_address();
         let app_vp = self.application.get_vp();
@@ -117,7 +117,7 @@ impl Note {
                             .take(BASE_BITS_NUM),
                     )
                     .chain(self.psi.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
-                    .chain([self.is_normal])
+                    .chain([self.is_merkle_checked])
                     .chain(
                         BitArray::<_, Lsb0>::new(self.value.to_le())
                             .iter()
