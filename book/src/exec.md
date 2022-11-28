@@ -38,7 +38,7 @@ In principle, any party can create a partial transaction, if they can prove that
 As a part of the initial partial transaction, users also output **intent token notes**. 
 ### Intent tokens
 
-**Intent tokens** are a mechanism that makes sure that the partial transaction is *unbalanced* until the corresponding intent is satisfied, making it impossible to publish the transaction.
+**Intent tokens** are a mechanism that makes sure that the partial transaction is *unbalanced* until the corresponding intent is satisfied, making it impossible to publish the transaction. Intent tokens are also a way to enforce the `intentVP` check.
 
 Intent token notes are **dummy** notes - meaning that unlike "normal" notes, the merkle path isn't checked for them (but they can have arbitrary value and stored in the CMtree, just like "normal"). 
 
@@ -53,7 +53,7 @@ This note will only be spent if the user's intent (intentVP) is satisfied.
 
 ### IntentVP
 
-To validate a transaction, it is required that `userVP` of each involved user was satisfied. The part of the userVP that is responsible for validating the future transaction (satisfying the user's intent) is exposed in the intentVP, along with the description of the intent (so that the solver knows what it takes to satisfy the user interests). Later IntentVP is checked in the circuit, validating the state transition.  
+To validate a transaction, it is required that `userVP` of each involved user was satisfied. The part of the userVP that is responsible for validating the future transaction (satisfying the user's intent) is exposed in the `intentVP`, along with the description of the intent (so that the solver knows what it takes to satisfy the user interests). Later `intentVP` is checked in the circuit, validating the state transition. The `intentVP` check is enforced by the use of intent token notes. Spending an intent token note is only allowed if the `intentVP` tied to the note is satisfied.
 
 ### Message passing
 
