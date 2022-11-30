@@ -342,7 +342,7 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
                 let diff = SubInstructions::sub(
                     &config.sub_chip(),
                     layouter.namespace(|| "diff"),
-                    &solution_cell,
+                    solution_cell,
                     &puzzle_cell,
                 )
                 .unwrap();

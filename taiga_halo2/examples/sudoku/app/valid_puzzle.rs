@@ -242,14 +242,12 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
                 )
                 .unwrap();
 
-                let ret = layouter
+                layouter
                     .assign_region(
                         || "x cell",
                         |mut region| config.assign_region(&x_cell, i, 0, &mut region),
                     )
                     .unwrap();
-
-                ret
             })
             .collect();
 
