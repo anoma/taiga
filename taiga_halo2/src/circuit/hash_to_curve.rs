@@ -15,7 +15,9 @@ use halo2_proofs::{
 };
 use pasta_curves::pallas;
 
-use super::curve::{iso_map::MapToCurveConfig, map_to_curve::IsoMapConfig, to_affine::ToAffineConfig};
+use super::curve::{
+    iso_map::MapToCurveConfig, map_to_curve::IsoMapConfig, to_affine::ToAffineConfig,
+};
 
 // TODO: make HashToCurve a chip
 // pub trait HashToCurveInstructions<F: FieldExt>: Chip<F> {

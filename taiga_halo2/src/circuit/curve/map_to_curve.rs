@@ -122,8 +122,8 @@ impl IsoMapConfig {
 
 #[test]
 fn test_map_to_curve_circuit() {
-    use crate::circuit::gadgets::assign_free_advice;
     use crate::circuit::curve::iso_map::MapToCurveConfig;
+    use crate::circuit::gadgets::assign_free_advice;
     use ff::Field;
 
     use halo2_proofs::{
