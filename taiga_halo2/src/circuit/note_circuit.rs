@@ -822,6 +822,7 @@ fn test_halo2_note_commitment_circuit() {
             >::load(note_commit_config.sinsemilla_config.clone(), &mut layouter)?;
             let note = Note::new(
                 self.application.clone(),
+                self.user.clone(),
                 self.value,
                 self.rho,
                 self.psi,
@@ -842,7 +843,7 @@ fn test_halo2_note_commitment_circuit() {
             let user_address = assign_free_advice(
                 layouter.namespace(|| "witness user address"),
                 note_commit_config.advices[0],
-                Value::known(note.application.get_user_address()),
+                Value::known(note.user.address()),
             )?;
 
             // Witness application

@@ -2,6 +2,7 @@ use crate::{
     application::Application,
     constant::{BASE_BITS_NUM, NOTE_COMMIT_DOMAIN},
     nullifier::Nullifier,
+    user::User,
     utils::extract_p,
 };
 use bitvec::{array::BitArray, order::Lsb0};
@@ -35,6 +36,7 @@ impl Default for NoteCommitment {
 #[derive(Debug, Clone, Default)]
 pub struct Note {
     pub application: Application,
+    pub user: User,
     pub value: u64,
     /// old nullifier. Nonce which is a deterministically computed, unique nonce
     pub rho: Nullifier,
@@ -49,6 +51,7 @@ impl Note {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         application: Application,
+        user: User,
         value: u64,
         rho: Nullifier,
         psi: pallas::Base,
@@ -57,6 +60,7 @@ impl Note {
     ) -> Self {
         Self {
             application,
+            user,
             value,
             rho,
             psi,
@@ -72,11 +76,13 @@ impl Note {
 
     pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
         let application = Application::dummy(&mut rng);
+        let user = User::dummy(&mut rng);
         let value: u64 = rng.gen();
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         Self {
             application,
+            user,
             value,
             rho,
             psi,
@@ -87,7 +93,7 @@ impl Note {
 
     // cm = SinsemillaCommit^rcm(user_address || app_vp || app_data || rho || psi || is_merkle_checked || value)
     pub fn commitment(&self) -> NoteCommitment {
-        let user_address = self.application.get_user_address();
+        let user_address = self.user.address();
         let app_vp = self.application.get_vp();
         let ret = NOTE_COMMIT_DOMAIN
             .commit(
@@ -130,7 +136,7 @@ impl Note {
     }
 
     pub fn get_nf(&self) -> Nullifier {
-        let nk = self.application.get_nk().unwrap();
+        let nk = self.user.get_nk().unwrap();
         let cm = self.commitment();
         Nullifier::derive_native(&nk, &self.rho.inner(), &self.psi, &cm)
     }

@@ -5,6 +5,7 @@ use crate::{
     merkle_tree::{MerklePath, Node},
     note::{Note, NoteCommitment},
     nullifier::Nullifier,
+    user::User,
     value_commitment::ValueCommitment,
 };
 use ff::Field;
@@ -43,6 +44,7 @@ pub struct SpendInfo {
 #[derive(Debug, Clone)]
 pub struct OutputInfo {
     application: Application,
+    user: User,
     value: u64,
     is_merkle_checked: bool,
 }
@@ -80,6 +82,7 @@ impl ActionInfo {
         let note_rcm = pallas::Scalar::random(&mut rng);
         let output_note = Note::new(
             self.output.application,
+            self.output.user,
             self.output.value,
             nf,
             psi,
@@ -124,9 +127,10 @@ impl SpendInfo {
 }
 
 impl OutputInfo {
-    pub fn new(application: Application, value: u64, is_merkle_checked: bool) -> Self {
+    pub fn new(application: Application, user: User, value: u64, is_merkle_checked: bool) -> Self {
         Self {
             application,
+            user,
             value,
             is_merkle_checked,
         }
@@ -135,9 +139,11 @@ impl OutputInfo {
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
         use rand::Rng;
         let application = Application::dummy(&mut rng);
+        let user = User::dummy(&mut rng);
         let value: u64 = rng.gen();
         Self {
             application,
+            user,
             value,
             is_merkle_checked: true,
         }
