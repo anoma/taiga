@@ -1,5 +1,6 @@
 pub mod app;
 pub mod keys;
+pub mod note;
 pub mod proof;
 
 fn main() {
@@ -9,8 +10,10 @@ fn main() {
     use pasta_curves::{arithmetic::FieldExt, pallas};
     use rand::rngs::OsRng;
 
+
+
     use crate::{
-        app::valid_sudoku::SudokuCircuit,
+        app::valid_sudoku::{circuit::SudokuCircuit, vp::SudokuVP},
         keys::{ProvingKey, VerifyingKey},
         proof::Proof,
     };

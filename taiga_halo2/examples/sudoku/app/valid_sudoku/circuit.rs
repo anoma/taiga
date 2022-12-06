@@ -11,9 +11,13 @@ use halo2_gadgets::poseidon::{
     primitives::{self as poseidon, P128Pow5T3},
     Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
 };
-use taiga_halo2::circuit::gadgets::{
+use taiga_halo2::{
+    note::Note,
+    constant::NUM_NOTE,
+    circuit::gadgets::{
     assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
     MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
+    }
 };
 
 #[derive(Clone, Debug)]
@@ -363,6 +367,8 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
     }
 }
 
+
+
 #[cfg(test)]
 mod tests {
     use std::time::Instant;
@@ -372,7 +378,7 @@ mod tests {
     use rand::rngs::OsRng;
 
     use crate::{
-        app::{valid_puzzle::PuzzleCircuit, valid_sudoku::SudokuCircuit},
+        app::{valid_puzzle::circuit::PuzzleCircuit, valid_sudoku::circuit::SudokuCircuit},
         keys::{ProvingKey, VerifyingKey},
         proof::Proof,
     };

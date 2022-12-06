@@ -222,7 +222,7 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
         // a list has unique elements if the product of the differences of all pairs of elements is not zero.
         // That is Prod(l[i] - l[j]) != 0 if i != j
         // E.g. [0, 0, 1, 3, 7, 0, 4, 8, 0] turns into [10, 11, 1, 3, 7, 15, 4, 8, 18]
-        let non_zero_sudoku_cells: Vec<AssignedCell<_, _>> = self
+        let non_zero_sudoku_cells: Vec<AssignedCell<Fp, Fp>> = self
             .sudoku
             .concat()
             .into_iter()
@@ -247,7 +247,7 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
                         || "x cell",
                         |mut region| config.assign_region(&x_cell, i, 0, &mut region),
                     )
-                    .unwrap();
+                    .unwrap()
             })
             .collect();
 
@@ -388,7 +388,7 @@ mod tests {
     use rand::rngs::OsRng;
 
     use crate::{
-        app::valid_puzzle::PuzzleCircuit,
+        app::valid_puzzle::circuit::PuzzleCircuit,
         keys::{ProvingKey, VerifyingKey},
         proof::Proof,
     };
