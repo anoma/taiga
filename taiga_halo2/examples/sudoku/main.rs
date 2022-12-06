@@ -9,8 +9,6 @@ fn main() {
     use pasta_curves::{arithmetic::FieldExt, pallas};
     use rand::rngs::OsRng;
 
-
-
     use crate::{
         app::valid_sudoku::{circuit::SudokuCircuit, vp::SudokuVP},
         keys::{ProvingKey, VerifyingKey},

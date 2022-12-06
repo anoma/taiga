@@ -12,12 +12,12 @@ use halo2_gadgets::poseidon::{
     Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
 };
 use taiga_halo2::{
-    note::Note,
-    constant::NUM_NOTE,
     circuit::gadgets::{
-    assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
-    MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
-    }
+        assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
+        MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
+    },
+    constant::NUM_NOTE,
+    note::Note,
 };
 
 #[derive(Clone, Debug)]
@@ -366,8 +366,6 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
         Ok(())
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {
