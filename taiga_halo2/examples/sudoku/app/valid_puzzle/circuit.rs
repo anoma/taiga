@@ -23,7 +23,7 @@ use ff::Field;
 pub struct SudokuConfig {
     primary: Column<InstanceColumn>,
     advices: [Column<Advice>; 5],
-    #[allow(dead_code)] 
+    #[allow(dead_code)]
     add_config: AddConfig,
     sub_config: SubConfig,
     mul_config: MulConfig,
@@ -34,7 +34,7 @@ pub struct SudokuConfig {
 }
 
 impl SudokuConfig {
-    #[allow(dead_code)] 
+    #[allow(dead_code)]
     pub(super) fn add_chip(&self) -> AddChip<pallas::Base> {
         AddChip::construct(self.add_config.clone(), ())
     }
@@ -47,7 +47,7 @@ impl SudokuConfig {
         MulChip::construct(self.mul_config.clone())
     }
 
-    #[allow(dead_code)] 
+    #[allow(dead_code)]
     fn create_condition_gate(&self, meta: &mut ConstraintSystem<pallas::Base>) {
         meta.create_gate("condition", |meta| {
             // 1. We get x and x_inv from the column `self.x` at `cur` and `next`
