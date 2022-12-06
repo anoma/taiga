@@ -16,8 +16,6 @@ use taiga_halo2::{
         assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
         MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
     },
-    constant::NUM_NOTE,
-    note::Note,
 };
 
 #[derive(Clone, Debug)]

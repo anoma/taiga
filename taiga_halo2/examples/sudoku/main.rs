@@ -10,7 +10,7 @@ fn main() {
     use rand::rngs::OsRng;
 
     use crate::{
-        app::valid_sudoku::{circuit::SudokuCircuit, vp::SudokuVP},
+        app::valid_sudoku::{circuit::SudokuCircuit},
         keys::{ProvingKey, VerifyingKey},
         proof::Proof,
     };

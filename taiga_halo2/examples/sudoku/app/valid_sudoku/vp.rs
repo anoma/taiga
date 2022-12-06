@@ -1,22 +1,13 @@
-use ff::PrimeField;
-use halo2_proofs::{
-    arithmetic::FieldExt,
-    circuit::{floor_planner, AssignedCell, Layouter, Value},
-    plonk::{self, Advice, Column, ConstraintSystem, Instance as InstanceColumn, VerifyingKey},
-};
-use pasta_curves::{pallas, Fp};
 
-use halo2_gadgets::poseidon::{
-    primitives::{self as poseidon, P128Pow5T3},
-    Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
+use halo2_proofs::{
+    plonk::{ConstraintSystem},
 };
+use pasta_curves::{pallas};
+
+
 extern crate taiga_halo2;
 use taiga_halo2::{
     circuit::{
-        gadgets::{
-            assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
-            MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
-        },
         note_circuit::NoteConfig,
         vp_circuit::{ValidityPredicateCircuit, ValidityPredicateConfig},
     },
@@ -24,7 +15,7 @@ use taiga_halo2::{
     note::Note,
 };
 
-use crate::app::valid_sudoku::circuit::{SudokuCircuit, SudokuConfig};
+use crate::app::valid_sudoku::circuit::{SudokuCircuit};
 
 #[derive(Clone, Debug)]
 pub struct SudokuVPConfig {
