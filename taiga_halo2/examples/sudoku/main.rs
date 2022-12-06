@@ -1,6 +1,5 @@
 pub mod app;
 pub mod keys;
-pub mod note;
 pub mod proof;
 
 fn main() {
