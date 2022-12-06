@@ -1,9 +1,5 @@
-
-use halo2_proofs::{
-    plonk::{ConstraintSystem},
-};
-use pasta_curves::{pallas};
-
+use halo2_proofs::plonk::ConstraintSystem;
+use pasta_curves::pallas;
 
 extern crate taiga_halo2;
 use taiga_halo2::{
@@ -15,7 +11,7 @@ use taiga_halo2::{
     note::Note,
 };
 
-use crate::app::valid_sudoku::circuit::{SudokuCircuit};
+use crate::app::valid_sudoku::circuit::SudokuCircuit;
 
 #[derive(Clone, Debug)]
 pub struct SudokuVPConfig {
