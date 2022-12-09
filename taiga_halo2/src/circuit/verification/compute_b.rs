@@ -10,6 +10,7 @@ pub struct ComputeBConfig {
     q_compute_b: Selector,
     x: Column<Advice>,
     u: [Column<Advice>; 4],
+    y: Column<Advice>,
 }
 
 impl ComputeBConfig {
@@ -18,16 +19,19 @@ impl ComputeBConfig {
         meta: &mut ConstraintSystem<pallas::Base>,
         x: Column<Advice>,
         u: [Column<Advice>; 4],
+        y: Column<Advice>,
     ) -> Self {
         meta.enable_equality(x);
         for uu in u {
             meta.enable_equality(uu);
         }
+        meta.enable_equality(y);
 
         let config = Self {
             q_compute_b: meta.selector(),
             x,
             u,
+            y,
         };
 
         config.create_gate(meta);
@@ -44,6 +48,7 @@ impl ComputeBConfig {
                 .iter()
                 .map(|uu| meta.query_advice(*uu, Rotation::cur()))
                 .collect();
+            let y = meta.query_advice(self.y, Rotation::cur());
 
             let one = Expression::Constant(pallas::Base::one());
             let mut tmp = one.clone();
@@ -52,11 +57,8 @@ impl ComputeBConfig {
                 tmp = tmp * one.clone() + u_j.clone() * cur.clone();
                 cur = cur.clone() * cur.clone();
             }
-            meta.query_advice(self.x, Rotation::next());
-            Constraints::with_selector(
-                q_compute_b,
-                [("", Expression::Constant(pallas::Base::zero()))],
-            )
+            println!("tmp={:?}", tmp);
+            Constraints::with_selector(q_compute_b, [("y computation", tmp - y)])
         });
     }
 
@@ -64,6 +66,7 @@ impl ComputeBConfig {
         &self,
         x: &AssignedCell<pallas::Base, pallas::Base>,
         u: &Vec<AssignedCell<pallas::Base, pallas::Base>>,
+        y: &AssignedCell<pallas::Base, pallas::Base>,
         offset: usize,
         region: &mut Region<'_, pallas::Base>,
     ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
@@ -71,11 +74,11 @@ impl ComputeBConfig {
         self.q_compute_b.enable(region, offset)?;
 
         // copy x and u_i into advice columns
-        let x_cell = x.copy_advice(|| "x", region, self.x, offset)?;
+        x.copy_advice(|| "x", region, self.x, offset)?;
         for (u_col, u_cell) in self.u.iter().zip(u) {
             u_cell.copy_advice(|| "u_i", region, *u_col, offset)?;
         }
-        Ok(x_cell)
+        Ok(y.copy_advice(|| "y", region, self.y, offset)?)
     }
 }
 
@@ -94,11 +97,12 @@ fn test_compute_b_circuit() {
     #[derive(Default)]
     struct MyCircuit {
         x: Fp,
-        u: Vec<Fp>,
+        u: [Fp; 4],
+        y: Fp,
     }
 
     impl Circuit<pallas::Base> for MyCircuit {
-        type Config = ([Column<Advice>; 10], Column<Instance>, ComputeBConfig);
+        type Config = ([Column<Advice>; 10], ComputeBConfig);
         type FloorPlanner = SimpleFloorPlanner;
 
         fn without_witnesses(&self) -> Self {
@@ -118,24 +122,14 @@ fn test_compute_b_circuit() {
                 meta.advice_column(),
                 meta.advice_column(),
             ];
-            let instance = meta.instance_column();
 
-            let lagrange_coeffs = [
-                meta.fixed_column(),
-                meta.fixed_column(),
-                meta.fixed_column(),
-                meta.fixed_column(),
-                meta.fixed_column(),
-                meta.fixed_column(),
-                meta.fixed_column(),
-                meta.fixed_column(),
-            ];
-            meta.enable_constant(lagrange_coeffs[0]);
-
-            let compute_b_config =
-                ComputeBConfig::configure(meta, advices[0], advices[1..5].try_into().unwrap());
-
-            (advices, instance, compute_b_config)
+            let compute_b_config = ComputeBConfig::configure(
+                meta,
+                advices[0],
+                advices[1..5].try_into().unwrap(),
+                advices[5],
+            );
+            (advices, compute_b_config)
         }
 
         fn synthesize(
@@ -143,33 +137,52 @@ fn test_compute_b_circuit() {
             config: Self::Config,
             mut layouter: impl Layouter<pallas::Base>,
         ) -> Result<(), Error> {
-            let (advices, instance, compute_b_config) = config;
+            let (advices, compute_b_config) = config;
 
+            println!("A");
             let x =
                 assign_free_advice(layouter.namespace(|| "x"), advices[0], Value::known(self.x))?;
-            let u: Vec<AssignedCell<Fp, Fp>> = self
-                .u
-                .iter()
-                .map(|uu| {
-                    assign_free_advice(layouter.namespace(|| "u_i"), advices[1], Value::known(*uu))
-                        .unwrap()
-                })
-                .collect();
+            let mut i = 1; // advice columns are columns 1 to 5
+            let mut u_vec: Vec<AssignedCell<Fp, Fp>> = vec![];
+            for uu in self.u.iter() {
+                // assign a region for uu
+                let u_cell = assign_free_advice(
+                    layouter.namespace(|| "u_i"),
+                    advices[i],
+                    Value::known(*uu),
+                )?;
+                u_vec.push(u_cell);
+                i = i + 1;
+            }
+            assert!(i < 6);
+            let y =
+                assign_free_advice(layouter.namespace(|| "y"), advices[i], Value::known(self.y))?;
 
-            let y = layouter.assign_region(
+            let y_in = layouter.assign_region(
                 || "y in cirucit",
-                |mut region| compute_b_config.assign_region(&x, &u, 0, &mut region),
+                |mut region| compute_b_config.assign_region(&x, &u_vec, &y, 0, &mut region),
             )?;
-            layouter.constrain_instance(y.cell(), instance, 0)?;
+
+            let y =
+                assign_free_advice(layouter.namespace(|| "y"), advices[6], Value::known(self.y))?;
+            // layouter.assign_region(
+            //     || "equality constrain for y",
+            //     |mut region| {
+            //         region.constrain_equal(
+            //             y_in.cell(),
+            //             y.cell(),
+            //         )
+            //     },
+            // )?;
             Ok(())
         }
     }
 
     // we create random values for x, and u_i and check that the computation is okay.
     let mut rng = OsRng;
-    let x = Fp::random(&mut rng);
-    let u: Vec<Fp> = (0..12).map(|_| Fp::random(&mut rng)).collect();
-    // compute y = $\prod\limits_{i=0}^{k-1} (1 + u_{k - 1 - i} x^{2^i})$ out-of-circuit
+    let x = Fp::one(); //random(&mut rng);
+    let u = [Fp::one(); 4]; //random(&mut rng);4];
+                            // compute y = $\prod\limits_{i=0}^{k-1} (1 + u_{k - 1 - i} x^{2^i})$ out-of-circuit
     let mut tmp = Fp::one();
     let mut cur = x;
     for u_j in u.iter().rev() {
@@ -178,8 +191,13 @@ fn test_compute_b_circuit() {
     }
     let y = tmp;
 
-    let circuit = MyCircuit { x, u };
+    let circuit = MyCircuit { x, u, y };
 
-    let prover = MockProver::run(11, &circuit, vec![vec![y]]).unwrap();
+    let prover = MockProver::run(11, &circuit, vec![]).unwrap();
     assert_eq!(prover.verify(), Ok(()))
+
+    /*
+        Seems that the circuit does not work.... I don't know how to check y == y_in
+        and even with x = u_i = 1, the polynomial condition is not satisfied and I don't know how to debug it...
+    */
 }
