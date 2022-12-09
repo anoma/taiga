@@ -237,10 +237,12 @@ impl Circuit<pallas::Base> for ActionCircuit {
 #[test]
 fn test_halo2_action_circuit() {
     use crate::action::ActionInfo;
-    use crate::constant::{ACTION_CIRCUIT_PARAMS_SIZE, SETUP_PARAMS_MAP};
+    use crate::constant::{
+        ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, SETUP_PARAMS_MAP,
+    };
     use halo2_proofs::{
         dev::MockProver,
-        plonk::{create_proof, keygen_pk, keygen_vk, verify_proof, SingleVerifier},
+        plonk::{create_proof, verify_proof, SingleVerifier},
         transcript::{Blake2bRead, Blake2bWrite},
     };
     use pasta_curves::vesta;
@@ -258,13 +260,10 @@ fn test_halo2_action_circuit() {
     // Create action proof
     {
         let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
-        let empty_circuit: ActionCircuit = Default::default();
-        let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
-        let pk = keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail");
         let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
         create_proof(
             params,
-            &pk,
+            &ACTION_PROVING_KEY,
             &[action_circuit],
             &[&[&action.to_instance()]],
             &mut rng,
@@ -277,7 +276,7 @@ fn test_halo2_action_circuit() {
         let mut transcript = Blake2bRead::init(&proof[..]);
         assert!(verify_proof(
             params,
-            pk.get_vk(),
+            &ACTION_VERIFYING_KEY,
             strategy,
             &[&[&action.to_instance()]],
             &mut transcript

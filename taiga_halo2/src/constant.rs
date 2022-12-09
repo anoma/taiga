@@ -1,4 +1,5 @@
 use crate::utils::to_field_elements;
+use crate::circuit::action_circuit::ActionCircuit;
 use group::Curve;
 use halo2_gadgets::{
     ecc::{
@@ -10,7 +11,10 @@ use halo2_gadgets::{
     },
     sinsemilla::{primitives::CommitDomain, CommitDomains, HashDomains},
 };
-use halo2_proofs::poly::commitment::Params;
+use halo2_proofs::{
+    plonk::{keygen_pk, keygen_vk, ProvingKey, VerifyingKey},
+    poly::commitment::Params,
+};
 use lazy_static::lazy_static;
 use pasta_curves::{pallas, vesta};
 use std::collections::HashMap;
@@ -73,6 +77,16 @@ lazy_static! {
 }
 
 // Action proving key and verifying key
+lazy_static! {
+    pub static ref ACTION_VERIFYING_KEY: VerifyingKey<vesta::Affine> =
+        ACTION_PROVING_KEY.get_vk().clone();
+    pub static ref ACTION_PROVING_KEY: ProvingKey<vesta::Affine> = {
+        let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
+        let empty_circuit: ActionCircuit = Default::default();
+        let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
+        keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail")
+    };
+}
 
 // SinsemillaCommit parameters
 lazy_static! {

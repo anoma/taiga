@@ -1,14 +1,15 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use halo2_proofs::{
-    plonk::{create_proof, keygen_pk, keygen_vk, verify_proof, SingleVerifier},
+    plonk::{create_proof, verify_proof, SingleVerifier},
     transcript::{Blake2bRead, Blake2bWrite},
 };
 use pasta_curves::vesta;
 use rand::rngs::OsRng;
 use taiga_halo2::{
     action::ActionInfo,
-    circuit::action_circuit::ActionCircuit,
-    constant::{ACTION_CIRCUIT_PARAMS_SIZE, SETUP_PARAMS_MAP},
+    constant::{
+        ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, SETUP_PARAMS_MAP,
+    },
 };
 
 fn bench_action_proof(name: &str, c: &mut Criterion) {
@@ -16,9 +17,6 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
     let action_info = ActionInfo::dummy(&mut rng);
     let (action, action_circuit) = action_info.build(&mut rng);
     let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
-    let empty_circuit: ActionCircuit = Default::default();
-    let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
-    let pk = keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail");
 
     // Prover bench
     let prover_name = name.to_string() + "-prover";
@@ -27,7 +25,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
             let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
             create_proof(
                 params,
-                &pk,
+                &ACTION_PROVING_KEY,
                 &[action_circuit.clone()],
                 &[&[&action.to_instance()]],
                 &mut rng,
@@ -44,7 +42,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
         let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
         create_proof(
             params,
-            &pk,
+            &ACTION_PROVING_KEY,
             &[action_circuit],
             &[&[&action.to_instance()]],
             &mut rng,
@@ -61,7 +59,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
             let mut transcript = Blake2bRead::init(&proof[..]);
             assert!(verify_proof(
                 params,
-                pk.get_vk(),
+                &ACTION_VERIFYING_KEY,
                 strategy,
                 &[&[&action.to_instance()]],
                 &mut transcript
