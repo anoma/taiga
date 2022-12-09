@@ -21,8 +21,8 @@ pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
 
 pub const BASE_BITS_NUM: usize = 255;
 
-/// The number of notes in a tx.
-pub const NUM_NOTE: usize = 4;
+/// The number of notes in a (partial)tx.
+pub const NUM_NOTE: usize = 2;
 
 pub const ACTION_NF_INSTANCE_ROW_IDX: usize = 0;
 pub const ACTION_ANCHOR_INSTANCE_ROW_IDX: usize = 1;

@@ -1,7 +1,10 @@
 use crate::{
     circuit::{
         note_circuit::NoteConfig,
-        vp_circuit::{ValidityPredicateCircuit, ValidityPredicateConfig},
+        vp_circuit::{
+            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
+            ValidityPredicateInfo,
+        },
     },
     constant::NUM_NOTE,
     note::Note,
@@ -13,7 +16,7 @@ use halo2_proofs::{
 use pasta_curves::pallas;
 use rand::RngCore;
 
-mod field_addition;
+// mod field_addition;
 
 // DummyValidityPredicateCircuit with empty custom constraints.
 #[derive(Clone, Debug, Default)]
@@ -47,26 +50,9 @@ impl DummyValidityPredicateCircuit {
             output_notes,
         }
     }
-
-    pub fn get_instances(&self) -> Vec<pallas::Base> {
-        let mut instances = vec![];
-        self.spend_notes
-            .iter()
-            .zip(self.output_notes.iter())
-            .for_each(|(spend_note, output_note)| {
-                let nf = spend_note.get_nf().inner();
-                instances.push(nf);
-                let cm = output_note.commitment();
-                instances.push(cm.get_x());
-            });
-
-        instances
-    }
 }
 
-impl ValidityPredicateCircuit for DummyValidityPredicateCircuit {
-    type Config = DummyValidityPredicateConfig;
-
+impl ValidityPredicateInfo for DummyValidityPredicateCircuit {
     fn get_spend_notes(&self) -> &[Note; NUM_NOTE] {
         &self.spend_notes
     }
@@ -74,6 +60,47 @@ impl ValidityPredicateCircuit for DummyValidityPredicateCircuit {
     fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
         &self.output_notes
     }
+
+    fn get_instances(&self) -> Vec<pallas::Base> {
+        self.get_note_instances()
+    }
+
+    fn get_verifying_info(&self) -> VPVerifyingInfo {
+        use halo2_proofs::{
+            plonk::{create_proof, keygen_pk, keygen_vk},
+            poly::commitment::Params,
+            transcript::Blake2bWrite,
+        };
+        use pasta_curves::vesta;
+        use rand::rngs::OsRng;
+
+        let mut rng = OsRng;
+        let params = Params::new(12);
+        let vk = keygen_vk(&params, self).expect("keygen_vk should not fail");
+        let pk = keygen_pk(&params, vk.clone(), self).expect("keygen_pk should not fail");
+        let instance = self.get_instances();
+        let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
+        create_proof(
+            &params,
+            &pk,
+            &[self.clone()],
+            &[&[&instance]],
+            &mut rng,
+            &mut transcript,
+        )
+        .unwrap();
+        let proof = transcript.finalize();
+        VPVerifyingInfo {
+            param_size: 12,
+            vk,
+            proof,
+            instance,
+        }
+    }
+}
+
+impl ValidityPredicateCircuit for DummyValidityPredicateCircuit {
+    type VPConfig = DummyValidityPredicateConfig;
 }
 
 vp_circuit_impl!(DummyValidityPredicateCircuit);

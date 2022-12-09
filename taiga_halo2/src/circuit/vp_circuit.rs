@@ -9,12 +9,38 @@ use crate::{
     },
     note::Note,
 };
+use dyn_clone::{clone_trait_object, DynClone};
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
     circuit::{Layouter, Value},
-    plonk::{ConstraintSystem, Error},
+    plonk::{verify_proof, Circuit, ConstraintSystem, Error, SingleVerifier, VerifyingKey},
+    poly::commitment::Params,
+    transcript::Blake2bRead,
 };
-use pasta_curves::pallas;
+use pasta_curves::{pallas, vesta};
+
+#[derive(Debug, Clone)]
+pub struct VPVerifyingInfo {
+    pub param_size: u32,
+    pub vk: VerifyingKey<vesta::Affine>,
+    pub proof: Vec<u8>,
+    pub instance: Vec<pallas::Base>,
+}
+
+impl VPVerifyingInfo {
+    pub fn verify(&self) -> Result<(), Error> {
+        let params: Params<vesta::Affine> = Params::new(12);
+        let strategy = SingleVerifier::new(&params);
+        let mut transcript = Blake2bRead::init(&self.proof[..]);
+        verify_proof(
+            &params,
+            &self.vk,
+            strategy,
+            &[&[&self.instance]],
+            &mut transcript,
+        )
+    }
+}
 
 pub trait ValidityPredicateConfig {
     fn configure_note(meta: &mut ConstraintSystem<pallas::Base>) -> NoteConfig {
@@ -43,13 +69,37 @@ pub trait ValidityPredicateConfig {
     fn get_note_config(&self) -> NoteConfig;
     fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self;
 }
-pub trait ValidityPredicateCircuit {
-    type Config: ValidityPredicateConfig + Clone;
+
+pub trait ValidityPredicateInfo: DynClone {
+    fn get_spend_notes(&self) -> &[Note; NUM_NOTE];
+    fn get_output_notes(&self) -> &[Note; NUM_NOTE];
+    fn get_note_instances(&self) -> Vec<pallas::Base> {
+        let mut instances = vec![];
+        self.get_spend_notes()
+            .iter()
+            .zip(self.get_output_notes().iter())
+            .for_each(|(spend_note, output_note)| {
+                let nf = spend_note.get_nf().inner();
+                instances.push(nf);
+                let cm = output_note.commitment();
+                instances.push(cm.get_x());
+            });
+
+        instances
+    }
+    fn get_instances(&self) -> Vec<pallas::Base>;
+    fn get_verifying_info(&self) -> VPVerifyingInfo;
+}
+
+clone_trait_object!(ValidityPredicateInfo);
+
+pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateInfo {
+    type VPConfig: ValidityPredicateConfig + Clone;
     // Default implementation, constrains the notes integrity.
     // TODO: how to enforce the constraints in vp circuit?
     fn basic_constraints(
         &self,
-        config: Self::Config,
+        config: Self::VPConfig,
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<(Vec<SpendNoteVar>, Vec<OutputNoteVar>), Error> {
         let note_config = config.get_note_config();
@@ -118,12 +168,11 @@ pub trait ValidityPredicateCircuit {
 
     // VP designer need to implement the following functions.
     // `get_spend_notes` and `get_output_notes` will be used in `basic_constraints` to get the basic note info.
-    fn get_spend_notes(&self) -> &[Note; NUM_NOTE];
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE];
+
     // Add custom constraints on basic note variables and user-defined variables.
     fn custom_constraints(
         &self,
-        _config: Self::Config,
+        _config: Self::VPConfig,
         mut _layouter: impl Layouter<pallas::Base>,
         _spend_note_variables: &[SpendNoteVar],
         _output_note_variables: &[OutputNoteVar],
@@ -136,7 +185,7 @@ pub trait ValidityPredicateCircuit {
 macro_rules! vp_circuit_impl {
     ($name:ident) => {
         impl Circuit<pallas::Base> for $name {
-            type Config = <Self as ValidityPredicateCircuit>::Config;
+            type Config = <Self as ValidityPredicateCircuit>::VPConfig;
             type FloorPlanner = floor_planner::V1;
 
             fn without_witnesses(&self) -> Self {

@@ -6,6 +6,7 @@ use halo2_proofs::{
 };
 use pasta_curves::vesta;
 use rand::rngs::OsRng;
+use taiga_halo2::circuit::vp_circuit::ValidityPredicateInfo;
 use taiga_halo2::circuit::vp_examples::DummyValidityPredicateCircuit;
 
 fn bench_vp_proof(name: &str, c: &mut Criterion) {

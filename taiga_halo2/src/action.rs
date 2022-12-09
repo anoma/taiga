@@ -1,6 +1,6 @@
 use crate::{
     application::Application,
-    circuit::action_circuit::ActionCircuit,
+    circuit::{action_circuit::ActionCircuit, vp_circuit::ValidityPredicateInfo},
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{MerklePath, Node},
     note::{Note, NoteCommitment},
@@ -27,24 +27,28 @@ pub struct ActionInstance {
 }
 
 /// The information to build ActionInstance and ActionCircuit.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ActionInfo {
-    spend: SpendInfo,
-    output: OutputInfo,
+    spend: SpendNoteInfo,
+    output: OutputNoteInfo,
 }
 
-#[derive(Debug, Clone)]
-pub struct SpendInfo {
+#[derive(Clone)]
+pub struct SpendNoteInfo {
     note: Note,
     auth_path: [(pallas::Base, bool); TAIGA_COMMITMENT_TREE_DEPTH],
     root: pallas::Base,
+    app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
+    app_logic_vp_proving_info: Vec<Box<dyn ValidityPredicateInfo>>,
 }
 
-#[derive(Debug, Clone)]
-pub struct OutputInfo {
+#[derive(Clone)]
+pub struct OutputNoteInfo {
     application: Application,
     value: u64,
     is_merkle_checked: bool,
+    app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
+    app_logic_vp_proving_info: Vec<Box<dyn ValidityPredicateInfo>>,
 }
 
 impl ActionInstance {
@@ -60,16 +64,24 @@ impl ActionInstance {
 }
 
 impl ActionInfo {
-    pub fn new(spend: SpendInfo, output: OutputInfo) -> Self {
+    pub fn new(spend: SpendNoteInfo, output: OutputNoteInfo) -> Self {
         Self { spend, output }
     }
 
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
+        use crate::circuit::vp_examples::DummyValidityPredicateCircuit;
         let spend_note = Note::dummy(&mut rng);
         let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let spend_info = SpendInfo::new(spend_note, merkle_path);
+        let app_vp_proving_info = Box::new(DummyValidityPredicateCircuit::dummy(&mut rng));
+        let app_logic_vp_proving_info = vec![];
+        let spend_info = SpendNoteInfo::new(
+            spend_note,
+            merkle_path,
+            app_vp_proving_info,
+            app_logic_vp_proving_info,
+        );
 
-        let output_info = OutputInfo::dummy(&mut rng);
+        let output_info = OutputNoteInfo::dummy(&mut rng);
 
         ActionInfo::new(spend_info, output_info)
     }
@@ -109,8 +121,13 @@ impl ActionInfo {
     }
 }
 
-impl SpendInfo {
-    pub fn new(note: Note, merkle_path: MerklePath) -> Self {
+impl SpendNoteInfo {
+    pub fn new(
+        note: Note,
+        merkle_path: MerklePath,
+        app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
+        app_logic_vp_proving_info: Vec<Box<dyn ValidityPredicateInfo>>,
+    ) -> Self {
         let cm_node = Node::new(note.commitment().get_x());
         let root = merkle_path.root(cm_node).inner();
         let auth_path: [(pallas::Base, bool); TAIGA_COMMITMENT_TREE_DEPTH] =
@@ -119,27 +136,58 @@ impl SpendInfo {
             note,
             auth_path,
             root,
+            app_vp_proving_info,
+            app_logic_vp_proving_info,
         }
+    }
+
+    pub fn get_app_vp_proving_info(&self) -> Box<dyn ValidityPredicateInfo> {
+        self.app_vp_proving_info.clone()
+    }
+
+    pub fn get_app_logic_vp_proving_info(&self) -> Vec<Box<dyn ValidityPredicateInfo>> {
+        self.app_logic_vp_proving_info.clone()
     }
 }
 
-impl OutputInfo {
-    pub fn new(application: Application, value: u64, is_merkle_checked: bool) -> Self {
+impl OutputNoteInfo {
+    pub fn new(
+        application: Application,
+        value: u64,
+        is_merkle_checked: bool,
+        app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
+        app_logic_vp_proving_info: Vec<Box<dyn ValidityPredicateInfo>>,
+    ) -> Self {
         Self {
             application,
             value,
             is_merkle_checked,
+            app_vp_proving_info,
+            app_logic_vp_proving_info,
         }
     }
 
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
+        use crate::circuit::vp_examples::DummyValidityPredicateCircuit;
         use rand::Rng;
         let application = Application::dummy(&mut rng);
         let value: u64 = rng.gen();
+        let app_vp_proving_info = Box::new(DummyValidityPredicateCircuit::dummy(&mut rng));
+        let app_logic_vp_proving_info = vec![];
         Self {
             application,
             value,
             is_merkle_checked: true,
+            app_vp_proving_info,
+            app_logic_vp_proving_info,
         }
+    }
+
+    pub fn get_app_vp_proving_info(&self) -> Box<dyn ValidityPredicateInfo> {
+        self.app_vp_proving_info.clone()
+    }
+
+    pub fn get_app_logic_vp_proving_info(&self) -> Vec<Box<dyn ValidityPredicateInfo>> {
+        self.app_logic_vp_proving_info.clone()
     }
 }
