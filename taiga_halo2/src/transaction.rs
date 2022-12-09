@@ -1,10 +1,10 @@
-use crate::action::{ActionInfo, ActionInstance, OutputNoteInfo, SpendNoteInfo};
+use crate::action::{ActionInfo, ActionInstance};
 use crate::circuit::vp_circuit::{VPVerifyingInfo, ValidityPredicateInfo};
 use crate::constant::{
     ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, NUM_NOTE,
     SETUP_PARAMS_MAP,
 };
-use crate::note::NoteCommitment;
+use crate::note::{NoteCommitment, OutputNoteInfo, SpendNoteInfo};
 use crate::nullifier::Nullifier;
 use crate::value_commitment::ValueCommitment;
 use halo2_proofs::{
@@ -261,3 +261,6 @@ impl NoteVPVerifyingInfoSet {
         Ok(())
     }
 }
+
+#[test]
+fn test_transaction_creation() {}

@@ -1,6 +1,8 @@
 use crate::{
     application::Application,
-    constant::{BASE_BITS_NUM, NOTE_COMMIT_DOMAIN},
+    circuit::vp_circuit::ValidityPredicateInfo,
+    constant::{BASE_BITS_NUM, NOTE_COMMIT_DOMAIN, TAIGA_COMMITMENT_TREE_DEPTH},
+    merkle_tree::{MerklePath, Node},
     nullifier::Nullifier,
     utils::extract_p,
 };
@@ -43,6 +45,24 @@ pub struct Note {
     pub rcm: pallas::Scalar,
     /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of the spent note will be checked in ActionProof.
     pub is_merkle_checked: bool,
+}
+
+#[derive(Clone)]
+pub struct SpendNoteInfo {
+    pub note: Note,
+    pub auth_path: [(pallas::Base, bool); TAIGA_COMMITMENT_TREE_DEPTH],
+    pub root: pallas::Base,
+    app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
+    app_logic_vp_proving_info: Vec<Box<dyn ValidityPredicateInfo>>,
+}
+
+#[derive(Clone)]
+pub struct OutputNoteInfo {
+    pub application: Application,
+    pub value: u64,
+    pub is_merkle_checked: bool,
+    app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
+    app_logic_vp_proving_info: Vec<Box<dyn ValidityPredicateInfo>>,
 }
 
 impl Note {
@@ -133,5 +153,75 @@ impl Note {
         let nk = self.application.get_nk().unwrap();
         let cm = self.commitment();
         Nullifier::derive_native(&nk, &self.rho.inner(), &self.psi, &cm)
+    }
+}
+
+impl SpendNoteInfo {
+    pub fn new(
+        note: Note,
+        merkle_path: MerklePath,
+        app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
+        app_logic_vp_proving_info: Vec<Box<dyn ValidityPredicateInfo>>,
+    ) -> Self {
+        let cm_node = Node::new(note.commitment().get_x());
+        let root = merkle_path.root(cm_node).inner();
+        let auth_path: [(pallas::Base, bool); TAIGA_COMMITMENT_TREE_DEPTH] =
+            merkle_path.get_path().as_slice().try_into().unwrap();
+        Self {
+            note,
+            auth_path,
+            root,
+            app_vp_proving_info,
+            app_logic_vp_proving_info,
+        }
+    }
+
+    pub fn get_app_vp_proving_info(&self) -> Box<dyn ValidityPredicateInfo> {
+        self.app_vp_proving_info.clone()
+    }
+
+    pub fn get_app_logic_vp_proving_info(&self) -> Vec<Box<dyn ValidityPredicateInfo>> {
+        self.app_logic_vp_proving_info.clone()
+    }
+}
+
+impl OutputNoteInfo {
+    pub fn new(
+        application: Application,
+        value: u64,
+        is_merkle_checked: bool,
+        app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
+        app_logic_vp_proving_info: Vec<Box<dyn ValidityPredicateInfo>>,
+    ) -> Self {
+        Self {
+            application,
+            value,
+            is_merkle_checked,
+            app_vp_proving_info,
+            app_logic_vp_proving_info,
+        }
+    }
+
+    pub fn dummy<R: RngCore>(mut rng: R) -> Self {
+        use crate::circuit::vp_examples::DummyValidityPredicateCircuit;
+        let application = Application::dummy(&mut rng);
+        let value: u64 = rng.gen();
+        let app_vp_proving_info = Box::new(DummyValidityPredicateCircuit::dummy(&mut rng));
+        let app_logic_vp_proving_info = vec![];
+        Self {
+            application,
+            value,
+            is_merkle_checked: true,
+            app_vp_proving_info,
+            app_logic_vp_proving_info,
+        }
+    }
+
+    pub fn get_app_vp_proving_info(&self) -> Box<dyn ValidityPredicateInfo> {
+        self.app_vp_proving_info.clone()
+    }
+
+    pub fn get_app_logic_vp_proving_info(&self) -> Vec<Box<dyn ValidityPredicateInfo>> {
+        self.app_logic_vp_proving_info.clone()
     }
 }
