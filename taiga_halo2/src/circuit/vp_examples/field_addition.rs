@@ -10,13 +10,19 @@ use crate::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
+    vp_description::ValidityPredicateDescription,
 };
 use ff::Field;
 use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
-    plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Instance},
+    plonk::{
+        create_proof, keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error,
+        Instance,
+    },
+    transcript::Blake2bWrite,
 };
-use pasta_curves::pallas;
+use pasta_curves::{pallas, vesta};
+use rand::rngs::OsRng;
 use rand::RngCore;
 
 // FieldAdditionValidityPredicateCircuit with a trivial constraint a + b = c.
@@ -92,13 +98,6 @@ impl ValidityPredicateInfo for FieldAdditionValidityPredicateCircuit {
     }
 
     fn get_verifying_info(&self) -> VPVerifyingInfo {
-        use halo2_proofs::{
-            plonk::{create_proof, keygen_pk, keygen_vk},
-            transcript::Blake2bWrite,
-        };
-        use pasta_curves::vesta;
-        use rand::rngs::OsRng;
-
         let mut rng = OsRng;
         let params = SETUP_PARAMS_MAP.get(&12).unwrap();
         let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
@@ -121,6 +120,12 @@ impl ValidityPredicateInfo for FieldAdditionValidityPredicateCircuit {
             proof,
             instance,
         }
+    }
+
+    fn get_vp_description(&self) -> ValidityPredicateDescription {
+        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
+        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
+        ValidityPredicateDescription::from_vk(vk)
     }
 }
 

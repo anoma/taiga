@@ -8,19 +8,25 @@ use crate::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
+    vp_description::ValidityPredicateDescription,
 };
 use halo2_proofs::{
     circuit::{floor_planner, Layouter},
     plonk::{Circuit, ConstraintSystem, Error},
 };
-use pasta_curves::pallas;
+use halo2_proofs::{
+    plonk::{create_proof, keygen_pk, keygen_vk},
+    transcript::Blake2bWrite,
+};
+use pasta_curves::{pallas, vesta};
+use rand::rngs::OsRng;
 use rand::RngCore;
 
 mod field_addition;
 
-// DummyValidityPredicateCircuit with empty custom constraints.
+// TrivialValidityPredicateCircuit with empty custom constraints.
 #[derive(Clone, Debug, Default)]
-pub struct DummyValidityPredicateCircuit {
+pub struct TrivialValidityPredicateCircuit {
     spend_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
 }
@@ -41,7 +47,7 @@ impl ValidityPredicateConfig for DummyValidityPredicateConfig {
     }
 }
 
-impl DummyValidityPredicateCircuit {
+impl TrivialValidityPredicateCircuit {
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
         let spend_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
@@ -52,7 +58,7 @@ impl DummyValidityPredicateCircuit {
     }
 }
 
-impl ValidityPredicateInfo for DummyValidityPredicateCircuit {
+impl ValidityPredicateInfo for TrivialValidityPredicateCircuit {
     fn get_spend_notes(&self) -> &[Note; NUM_NOTE] {
         &self.spend_notes
     }
@@ -66,13 +72,6 @@ impl ValidityPredicateInfo for DummyValidityPredicateCircuit {
     }
 
     fn get_verifying_info(&self) -> VPVerifyingInfo {
-        use halo2_proofs::{
-            plonk::{create_proof, keygen_pk, keygen_vk},
-            transcript::Blake2bWrite,
-        };
-        use pasta_curves::vesta;
-        use rand::rngs::OsRng;
-
         let mut rng = OsRng;
         let params = SETUP_PARAMS_MAP.get(&12).unwrap();
         let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
@@ -96,13 +95,19 @@ impl ValidityPredicateInfo for DummyValidityPredicateCircuit {
             instance,
         }
     }
+
+    fn get_vp_description(&self) -> ValidityPredicateDescription {
+        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
+        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
+        ValidityPredicateDescription::from_vk(vk)
+    }
 }
 
-impl ValidityPredicateCircuit for DummyValidityPredicateCircuit {
+impl ValidityPredicateCircuit for TrivialValidityPredicateCircuit {
     type VPConfig = DummyValidityPredicateConfig;
 }
 
-vp_circuit_impl!(DummyValidityPredicateCircuit);
+vp_circuit_impl!(TrivialValidityPredicateCircuit);
 
 #[test]
 fn test_halo2_dummy_vp_circuit() {
@@ -110,7 +115,7 @@ fn test_halo2_dummy_vp_circuit() {
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
-    let circuit = DummyValidityPredicateCircuit::dummy(&mut rng);
+    let circuit = TrivialValidityPredicateCircuit::dummy(&mut rng);
     let instances = circuit.get_instances();
 
     let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances]).unwrap();

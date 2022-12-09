@@ -9,6 +9,7 @@ use crate::{
         SETUP_PARAMS_MAP,
     },
     note::Note,
+    vp_description::ValidityPredicateDescription,
 };
 use dyn_clone::{clone_trait_object, DynClone};
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
@@ -89,6 +90,7 @@ pub trait ValidityPredicateInfo: DynClone {
     }
     fn get_instances(&self) -> Vec<pallas::Base>;
     fn get_verifying_info(&self) -> VPVerifyingInfo;
+    fn get_vp_description(&self) -> ValidityPredicateDescription;
 }
 
 clone_trait_object!(ValidityPredicateInfo);

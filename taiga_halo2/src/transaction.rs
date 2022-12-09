@@ -14,7 +14,7 @@ use halo2_proofs::{
 use pasta_curves::{pallas, vesta};
 use rand::RngCore;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Transaction {
     partial_txs: Vec<PartialTransaction>,
     // TODO: add binding signature to check sum balance
@@ -42,6 +42,9 @@ pub struct NoteVPVerifyingInfoSet {
 }
 
 impl Transaction {
+    pub fn add_partial_tx(&mut self, ptx: PartialTransaction) {
+        self.partial_txs.push(ptx);
+    }
     pub fn get_nullifiers(&self) -> Vec<Nullifier> {
         self.partial_txs
             .iter()
@@ -263,4 +266,89 @@ impl NoteVPVerifyingInfoSet {
 }
 
 #[test]
-fn test_transaction_creation() {}
+fn test_transaction_creation() {
+    use crate::{
+        application::Application,
+        circuit::vp_examples::TrivialValidityPredicateCircuit,
+        constant::TAIGA_COMMITMENT_TREE_DEPTH,
+        merkle_tree::MerklePath,
+        note::{Note, OutputNoteInfo, SpendNoteInfo},
+        nullifier::Nullifier,
+        user::User,
+    };
+    use ff::Field;
+    use rand::rngs::OsRng;
+    use rand::Rng;
+
+    let mut rng = OsRng;
+
+    let trivial_vp_circuit = TrivialValidityPredicateCircuit::default();
+    let trivail_vp_description = trivial_vp_circuit.get_vp_description();
+
+    // Generate notes
+    let spend_note_1 = {
+        let vp_data = pallas::Base::random(&mut rng);
+        // TODO: add real user vps(application logic vps) later.
+        let user = User::dummy(&mut rng);
+        let application = Application::new(trivail_vp_description.clone(), vp_data, user);
+        let rho = Nullifier::new(pallas::Base::random(&mut rng));
+        let value: u64 = rng.gen();
+        let rcm = pallas::Scalar::random(&mut rng);
+        let psi = pallas::Base::random(&mut rng);
+        let is_merkle_checked = true;
+        Note::new(application, value, rho, psi, rcm, is_merkle_checked)
+    };
+    let output_note_1 = {
+        let vp_data = pallas::Base::random(&mut rng);
+        // TODO: add real user vps(application logic vps) later.
+        let user = User::dummy(&mut rng);
+        let application = Application::new(trivail_vp_description, vp_data, user);
+        let rho = spend_note_1.get_nf();
+        let value: u64 = rng.gen();
+        let rcm = pallas::Scalar::random(&mut rng);
+        let psi = pallas::Base::random(&mut rng);
+        let is_merkle_checked = true;
+        Note::new(application, value, rho, psi, rcm, is_merkle_checked)
+    };
+    let spend_note_2 = spend_note_1.clone();
+    let output_note_2 = output_note_1.clone();
+
+    // Generate note info
+    let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+    let app_vp_proving_info = Box::new(TrivialValidityPredicateCircuit::dummy(&mut rng));
+    let app_logic_vp_proving_info = vec![];
+    let spend_note_info_1 = SpendNoteInfo::new(
+        spend_note_1,
+        merkle_path.clone(),
+        app_vp_proving_info.clone(),
+        app_logic_vp_proving_info.clone(),
+    );
+    let spend_note_info_2 = SpendNoteInfo::new(
+        spend_note_2,
+        merkle_path,
+        app_vp_proving_info.clone(),
+        app_logic_vp_proving_info.clone(),
+    );
+    let output_note_info_1 = OutputNoteInfo::new(
+        output_note_1,
+        app_vp_proving_info.clone(),
+        app_logic_vp_proving_info.clone(),
+    );
+    let output_note_info_2 = OutputNoteInfo::new(
+        output_note_2,
+        app_vp_proving_info,
+        app_logic_vp_proving_info,
+    );
+
+    // Create partial tx
+    let ptx = PartialTransaction::build(
+        [spend_note_info_1, spend_note_info_2],
+        [output_note_info_1, output_note_info_2],
+        &mut rng,
+    );
+
+    // Create tx
+    let mut tx = Transaction::default();
+    tx.add_partial_tx(ptx);
+    tx.execute().unwrap();
+}

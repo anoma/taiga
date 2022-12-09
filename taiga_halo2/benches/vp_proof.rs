@@ -6,15 +6,15 @@ use halo2_proofs::{
 use pasta_curves::vesta;
 use rand::rngs::OsRng;
 use taiga_halo2::circuit::vp_circuit::ValidityPredicateInfo;
-use taiga_halo2::circuit::vp_examples::DummyValidityPredicateCircuit;
+use taiga_halo2::circuit::vp_examples::TrivialValidityPredicateCircuit;
 use taiga_halo2::constant::SETUP_PARAMS_MAP;
 
 fn bench_vp_proof(name: &str, c: &mut Criterion) {
     let mut rng = OsRng;
 
-    let vp_circuit = DummyValidityPredicateCircuit::dummy(&mut rng);
+    let vp_circuit = TrivialValidityPredicateCircuit::dummy(&mut rng);
     let params = SETUP_PARAMS_MAP.get(&12).unwrap();
-    let empty_circuit: DummyValidityPredicateCircuit = Default::default();
+    let empty_circuit: TrivialValidityPredicateCircuit = Default::default();
     let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
     let pk = keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail");
     let instances = vp_circuit.get_instances();

@@ -50,10 +50,11 @@ impl ActionInfo {
     }
 
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        use crate::circuit::vp_examples::DummyValidityPredicateCircuit;
+        use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
         let spend_note = Note::dummy(&mut rng);
+        let output_info = OutputNoteInfo::dummy(&mut rng, spend_note.get_nf());
         let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let app_vp_proving_info = Box::new(DummyValidityPredicateCircuit::dummy(&mut rng));
+        let app_vp_proving_info = Box::new(TrivialValidityPredicateCircuit::dummy(&mut rng));
         let app_logic_vp_proving_info = vec![];
         let spend_info = SpendNoteInfo::new(
             spend_note,
@@ -62,28 +63,20 @@ impl ActionInfo {
             app_logic_vp_proving_info,
         );
 
-        let output_info = OutputNoteInfo::dummy(&mut rng);
-
         ActionInfo::new(spend_info, output_info)
     }
 
     pub fn build<R: RngCore>(self, mut rng: R) -> (ActionInstance, ActionCircuit) {
         let nf = self.spend.note.get_nf();
-        let psi = pallas::Base::random(&mut rng);
-        let note_rcm = pallas::Scalar::random(&mut rng);
-        let output_note = Note::new(
-            self.output.application,
-            self.output.value,
-            nf,
-            psi,
-            note_rcm,
-            self.output.is_merkle_checked,
+        assert_eq!(
+            nf, self.output.note.rho,
+            "The nf of spend note should be equal to the rho of output note"
         );
 
-        let output_cm = output_note.commitment();
+        let output_cm = self.output.note.commitment();
         let rcv = pallas::Scalar::random(&mut rng);
 
-        let cv_net = ValueCommitment::new(&self.spend.note, &output_note, &rcv);
+        let cv_net = ValueCommitment::new(&self.spend.note, &self.output.note, &rcv);
         let action = ActionInstance {
             nf,
             cm: output_cm,
@@ -94,7 +87,7 @@ impl ActionInfo {
         let action_circuit = ActionCircuit {
             spend_note: self.spend.note,
             auth_path: self.spend.auth_path,
-            output_note,
+            output_note: self.output.note,
             rcv,
         };
 

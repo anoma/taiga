@@ -8,7 +8,7 @@ use group::cofactor::CofactorCurveAffine;
 use pasta_curves::pallas;
 
 /// The unique nullifier.
-#[derive(Copy, Debug, Clone)]
+#[derive(Copy, Debug, Clone, PartialEq, Eq)]
 pub struct Nullifier(pallas::Base);
 
 impl Nullifier {

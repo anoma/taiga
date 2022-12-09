@@ -58,9 +58,7 @@ pub struct SpendNoteInfo {
 
 #[derive(Clone)]
 pub struct OutputNoteInfo {
-    pub application: Application,
-    pub value: u64,
-    pub is_merkle_checked: bool,
+    pub note: Note,
     app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
     app_logic_vp_proving_info: Vec<Box<dyn ValidityPredicateInfo>>,
 }
@@ -187,31 +185,24 @@ impl SpendNoteInfo {
 
 impl OutputNoteInfo {
     pub fn new(
-        application: Application,
-        value: u64,
-        is_merkle_checked: bool,
+        note: Note,
         app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
         app_logic_vp_proving_info: Vec<Box<dyn ValidityPredicateInfo>>,
     ) -> Self {
         Self {
-            application,
-            value,
-            is_merkle_checked,
+            note,
             app_vp_proving_info,
             app_logic_vp_proving_info,
         }
     }
 
-    pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        use crate::circuit::vp_examples::DummyValidityPredicateCircuit;
-        let application = Application::dummy(&mut rng);
-        let value: u64 = rng.gen();
-        let app_vp_proving_info = Box::new(DummyValidityPredicateCircuit::dummy(&mut rng));
+    pub fn dummy<R: RngCore>(mut rng: R, nf: Nullifier) -> Self {
+        use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
+        let note = Note::dummy_from_rho(&mut rng, nf);
+        let app_vp_proving_info = Box::new(TrivialValidityPredicateCircuit::dummy(&mut rng));
         let app_logic_vp_proving_info = vec![];
         Self {
-            application,
-            value,
-            is_merkle_checked: true,
+            note,
             app_vp_proving_info,
             app_logic_vp_proving_info,
         }
