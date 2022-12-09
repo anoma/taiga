@@ -16,7 +16,7 @@ use halo2_proofs::{
 use pasta_curves::pallas;
 use rand::RngCore;
 
-// mod field_addition;
+mod field_addition;
 
 // DummyValidityPredicateCircuit with empty custom constraints.
 #[derive(Clone, Debug, Default)]

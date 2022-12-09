@@ -3,7 +3,10 @@ use crate::{
         gadgets::{assign_free_advice, AddChip, AddConfig, AddInstructions},
         integrity::{OutputNoteVar, SpendNoteVar},
         note_circuit::NoteConfig,
-        vp_circuit::{ValidityPredicateCircuit, ValidityPredicateConfig, ValidityPredicateInfo},
+        vp_circuit::{
+            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
+            ValidityPredicateInfo,
+        },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
@@ -88,30 +91,36 @@ impl ValidityPredicateInfo for FieldAdditionValidityPredicateCircuit {
         instances
     }
 
-    fn generate_proof(&self) -> Vec<u8> {
+    fn get_verifying_info(&self) -> VPVerifyingInfo {
         use halo2_proofs::{
             plonk::{create_proof, keygen_pk, keygen_vk},
-            poly::commitment::Params,
-            transcript:: Blake2bWrite,
+            transcript::Blake2bWrite,
         };
-        use rand::rngs::OsRng;
         use pasta_curves::vesta;
+        use rand::rngs::OsRng;
 
         let mut rng = OsRng;
         let params = SETUP_PARAMS_MAP.get(&12).unwrap();
         let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
-        let pk = keygen_pk(params, vk, self).expect("keygen_pk should not fail");
+        let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
+        let instance = self.get_instances();
         let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
         create_proof(
             params,
             &pk,
             &[self.clone()],
-            &[&[&self.get_instances()]],
+            &[&[&instance]],
             &mut rng,
             &mut transcript,
         )
         .unwrap();
-        transcript.finalize()
+        let proof = transcript.finalize();
+        VPVerifyingInfo {
+            param_size: 12,
+            vk,
+            proof,
+            instance,
+        }
     }
 }
 
