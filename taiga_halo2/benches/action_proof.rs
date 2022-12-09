@@ -1,21 +1,24 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use halo2_proofs::{
     plonk::{create_proof, keygen_pk, keygen_vk, verify_proof, SingleVerifier},
-    poly::commitment::Params,
     transcript::{Blake2bRead, Blake2bWrite},
 };
 use pasta_curves::vesta;
 use rand::rngs::OsRng;
-use taiga_halo2::{action::ActionInfo, circuit::action_circuit::ActionCircuit};
+use taiga_halo2::{
+    action::ActionInfo,
+    circuit::action_circuit::ActionCircuit,
+    constant::{ACTION_CIRCUIT_PARAMS_SIZE, SETUP_PARAMS_MAP},
+};
 
 fn bench_action_proof(name: &str, c: &mut Criterion) {
     let mut rng = OsRng;
     let action_info = ActionInfo::dummy(&mut rng);
     let (action, action_circuit) = action_info.build(&mut rng);
-    let params = Params::new(12);
+    let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
     let empty_circuit: ActionCircuit = Default::default();
-    let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
-    let pk = keygen_pk(&params, vk, &empty_circuit).expect("keygen_pk should not fail");
+    let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
+    let pk = keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail");
 
     // Prover bench
     let prover_name = name.to_string() + "-prover";
@@ -23,7 +26,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
         b.iter(|| {
             let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
             create_proof(
-                &params,
+                params,
                 &pk,
                 &[action_circuit.clone()],
                 &[&[&action.to_instance()]],
@@ -40,7 +43,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
     let proof = {
         let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
         create_proof(
-            &params,
+            params,
             &pk,
             &[action_circuit],
             &[&[&action.to_instance()]],
@@ -54,10 +57,10 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
     let verifier_name = name.to_string() + "-verifier";
     c.bench_function(&verifier_name, |b| {
         b.iter(|| {
-            let strategy = SingleVerifier::new(&params);
+            let strategy = SingleVerifier::new(params);
             let mut transcript = Blake2bRead::init(&proof[..]);
             assert!(verify_proof(
-                &params,
+                params,
                 pk.get_vk(),
                 strategy,
                 &[&[&action.to_instance()]],

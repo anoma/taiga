@@ -10,8 +10,10 @@ use halo2_gadgets::{
     },
     sinsemilla::{primitives::CommitDomain, CommitDomains, HashDomains},
 };
+use halo2_proofs::poly::commitment::Params;
 use lazy_static::lazy_static;
-use pasta_curves::pallas;
+use pasta_curves::{pallas, vesta};
+use std::collections::HashMap;
 
 /// SWU hash-to-curve personalization for the note commitment generator
 pub const NOTE_COMMITMENT_PERSONALIZATION: &str = "Taiga-NoteCommit";
@@ -53,6 +55,24 @@ lazy_static! {
         to_field_elements(&postfix)
     };
 }
+
+pub const CIRCUIT_PARAMS_SIZE_11: u32 = 11;
+pub const CIRCUIT_PARAMS_SIZE_12: u32 = 12;
+pub const ACTION_CIRCUIT_PARAMS_SIZE: u32 = 12;
+
+// Setup params map
+lazy_static! {
+    pub static ref SETUP_PARAMS_MAP: HashMap<u32, Params<vesta::Affine>> = {
+        let mut m = HashMap::new();
+        for circuit_size in [CIRCUIT_PARAMS_SIZE_11, CIRCUIT_PARAMS_SIZE_12] {
+            let params = Params::new(circuit_size);
+            m.insert(circuit_size, params);
+        }
+        m
+    };
+}
+
+// Action proving key and verifying key
 
 // SinsemillaCommit parameters
 lazy_static! {

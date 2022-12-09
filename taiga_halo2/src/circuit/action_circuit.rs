@@ -237,10 +237,10 @@ impl Circuit<pallas::Base> for ActionCircuit {
 #[test]
 fn test_halo2_action_circuit() {
     use crate::action::ActionInfo;
+    use crate::constant::{ACTION_CIRCUIT_PARAMS_SIZE, SETUP_PARAMS_MAP};
     use halo2_proofs::{
         dev::MockProver,
         plonk::{create_proof, keygen_pk, keygen_vk, verify_proof, SingleVerifier},
-        poly::commitment::Params,
         transcript::{Blake2bRead, Blake2bWrite},
     };
     use pasta_curves::vesta;
@@ -251,19 +251,19 @@ fn test_halo2_action_circuit() {
     let (action, action_circuit) = action_info.build(&mut rng);
     let instances = vec![action.to_instance()];
     {
-        let prover = MockProver::<pallas::Base>::run(12, &action_circuit, instances).unwrap();
+        let prover = MockProver::<pallas::Base>::run(ACTION_CIRCUIT_PARAMS_SIZE, &action_circuit, instances).unwrap();
         assert_eq!(prover.verify(), Ok(()));
     }
 
     // Create action proof
     {
-        let params = Params::new(12);
+        let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
         let empty_circuit: ActionCircuit = Default::default();
-        let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
-        let pk = keygen_pk(&params, vk, &empty_circuit).expect("keygen_pk should not fail");
+        let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
+        let pk = keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail");
         let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
         create_proof(
-            &params,
+            params,
             &pk,
             &[action_circuit],
             &[&[&action.to_instance()]],
@@ -273,10 +273,10 @@ fn test_halo2_action_circuit() {
         .unwrap();
         let proof = transcript.finalize();
 
-        let strategy = SingleVerifier::new(&params);
+        let strategy = SingleVerifier::new(params);
         let mut transcript = Blake2bRead::init(&proof[..]);
         assert!(verify_proof(
-            &params,
+            params,
             pk.get_vk(),
             strategy,
             &[&[&action.to_instance()]],

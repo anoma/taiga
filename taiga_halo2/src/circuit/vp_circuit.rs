@@ -6,6 +6,7 @@ use crate::{
     },
     constant::{
         NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain, NUM_NOTE,
+        SETUP_PARAMS_MAP,
     },
     note::Note,
 };
@@ -14,7 +15,6 @@ use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
     circuit::{Layouter, Value},
     plonk::{verify_proof, Circuit, ConstraintSystem, Error, SingleVerifier, VerifyingKey},
-    poly::commitment::Params,
     transcript::Blake2bRead,
 };
 use pasta_curves::{pallas, vesta};
@@ -29,11 +29,11 @@ pub struct VPVerifyingInfo {
 
 impl VPVerifyingInfo {
     pub fn verify(&self) -> Result<(), Error> {
-        let params: Params<vesta::Affine> = Params::new(12);
-        let strategy = SingleVerifier::new(&params);
+        let params = SETUP_PARAMS_MAP.get(&self.param_size).unwrap();
+        let strategy = SingleVerifier::new(params);
         let mut transcript = Blake2bRead::init(&self.proof[..]);
         verify_proof(
-            &params,
+            params,
             &self.vk,
             strategy,
             &[&[&self.instance]],

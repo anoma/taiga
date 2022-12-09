@@ -5,7 +5,7 @@ use crate::{
         note_circuit::NoteConfig,
         vp_circuit::{ValidityPredicateCircuit, ValidityPredicateConfig, ValidityPredicateInfo},
     },
-    constant::NUM_NOTE,
+    constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
 };
 use ff::Field;
@@ -98,12 +98,12 @@ impl ValidityPredicateInfo for FieldAdditionValidityPredicateCircuit {
         use pasta_curves::vesta;
 
         let mut rng = OsRng;
-        let params = Params::new(11);
-        let vk = keygen_vk(&params, self).expect("keygen_vk should not fail");
-        let pk = keygen_pk(&params, vk, self).expect("keygen_pk should not fail");
+        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
+        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
+        let pk = keygen_pk(params, vk, self).expect("keygen_pk should not fail");
         let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
         create_proof(
-            &params,
+            params,
             &pk,
             &[self.clone()],
             &[&[&self.get_instances()]],

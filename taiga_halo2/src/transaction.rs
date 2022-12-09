@@ -1,13 +1,12 @@
 use crate::action::{ActionInfo, ActionInstance, OutputNoteInfo, SpendNoteInfo};
 use crate::circuit::action_circuit::ActionCircuit;
 use crate::circuit::vp_circuit::{VPVerifyingInfo, ValidityPredicateInfo};
-use crate::constant::NUM_NOTE;
+use crate::constant::{ACTION_CIRCUIT_PARAMS_SIZE, NUM_NOTE, SETUP_PARAMS_MAP};
 use crate::note::NoteCommitment;
 use crate::nullifier::Nullifier;
 use crate::value_commitment::ValueCommitment;
 use halo2_proofs::{
     plonk::{create_proof, keygen_pk, keygen_vk, verify_proof, Error, SingleVerifier},
-    poly::commitment::Params,
     transcript::{Blake2bRead, Blake2bWrite},
 };
 use pasta_curves::vesta;
@@ -146,13 +145,13 @@ impl PartialTransaction {
 impl ActionVerifyingInfo {
     pub fn create<R: RngCore>(action_info: ActionInfo, mut rng: R) -> Result<Self, Error> {
         let (action_instance, circuit) = action_info.build(&mut rng);
-        let params = Params::new(11);
+        let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
         let empty_circuit: ActionCircuit = Default::default();
-        let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
-        let pk = keygen_pk(&params, vk, &empty_circuit).expect("keygen_pk should not fail");
+        let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
+        let pk = keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail");
         let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
         create_proof(
-            &params,
+            params,
             &pk,
             &[circuit],
             &[&[&action_instance.to_instance()]],
@@ -167,13 +166,13 @@ impl ActionVerifyingInfo {
     }
 
     pub fn verify(&self) -> Result<(), Error> {
-        let params: Params<vesta::Affine> = Params::new(11);
+        let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
         let empty_circuit: ActionCircuit = Default::default();
-        let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
-        let strategy = SingleVerifier::new(&params);
+        let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
+        let strategy = SingleVerifier::new(params);
         let mut transcript = Blake2bRead::init(&self.action_proof[..]);
         verify_proof(
-            &params,
+            params,
             &vk,
             strategy,
             &[&[&self.action_instance.to_instance()]],

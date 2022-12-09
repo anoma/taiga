@@ -6,7 +6,7 @@ use crate::{
             ValidityPredicateInfo,
         },
     },
-    constant::NUM_NOTE,
+    constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
 };
 use halo2_proofs::{
@@ -68,20 +68,19 @@ impl ValidityPredicateInfo for DummyValidityPredicateCircuit {
     fn get_verifying_info(&self) -> VPVerifyingInfo {
         use halo2_proofs::{
             plonk::{create_proof, keygen_pk, keygen_vk},
-            poly::commitment::Params,
             transcript::Blake2bWrite,
         };
         use pasta_curves::vesta;
         use rand::rngs::OsRng;
 
         let mut rng = OsRng;
-        let params = Params::new(12);
-        let vk = keygen_vk(&params, self).expect("keygen_vk should not fail");
-        let pk = keygen_pk(&params, vk.clone(), self).expect("keygen_pk should not fail");
+        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
+        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
+        let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
         let instance = self.get_instances();
         let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
         create_proof(
-            &params,
+            params,
             &pk,
             &[self.clone()],
             &[&[&instance]],
