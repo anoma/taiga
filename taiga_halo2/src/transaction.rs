@@ -11,7 +11,7 @@ use halo2_proofs::{
     plonk::{create_proof, verify_proof, Error, SingleVerifier},
     transcript::{Blake2bRead, Blake2bWrite},
 };
-use pasta_curves::vesta;
+use pasta_curves::{pallas, vesta};
 use rand::RngCore;
 
 #[derive(Debug, Clone)]
@@ -61,6 +61,40 @@ impl Transaction {
             .iter()
             .flat_map(|ptx| ptx.get_value_commitments())
             .collect()
+    }
+
+    pub fn get_value_anchors(&self) -> Vec<pallas::Base> {
+        self.partial_txs
+            .iter()
+            .flat_map(|ptx| ptx.get_anchors())
+            .collect()
+    }
+
+    //
+    pub fn verify(&self) -> Result<(), Error> {
+        for partial_tx in self.partial_txs.iter() {
+            partial_tx.verify()?;
+        }
+
+        Ok(())
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn execute(
+        &self,
+    ) -> Result<(Vec<Nullifier>, Vec<NoteCommitment>, Vec<pallas::Base>), Error> {
+        // Verify proofs
+        self.verify()?;
+
+        // TODO: Verify binding signature
+        let _value_commitments = self.get_value_commitments();
+
+        // Return Nullifiers to check double-spent, NoteCommitments to store, anchors to check the root-existence
+        Ok((
+            self.get_nullifiers(),
+            self.get_output_cms(),
+            self.get_value_anchors(),
+        ))
     }
 }
 
@@ -140,6 +174,13 @@ impl PartialTransaction {
         self.actions
             .iter()
             .map(|action| action.action_instance.cv_net)
+            .collect()
+    }
+
+    pub fn get_anchors(&self) -> Vec<pallas::Base> {
+        self.actions
+            .iter()
+            .map(|action| action.action_instance.anchor)
             .collect()
     }
 }
