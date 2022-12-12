@@ -253,7 +253,9 @@ fn test_halo2_action_circuit() {
     let (action, action_circuit) = action_info.build(&mut rng);
     let instances = vec![action.to_instance()];
     {
-        let prover = MockProver::<pallas::Base>::run(ACTION_CIRCUIT_PARAMS_SIZE, &action_circuit, instances).unwrap();
+        let prover =
+            MockProver::<pallas::Base>::run(ACTION_CIRCUIT_PARAMS_SIZE, &action_circuit, instances)
+                .unwrap();
         assert_eq!(prover.verify(), Ok(()));
     }
 

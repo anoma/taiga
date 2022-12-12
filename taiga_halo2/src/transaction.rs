@@ -291,25 +291,43 @@ fn test_transaction_creation() {
         let vp_data = pallas::Base::random(&mut rng);
         // TODO: add real user vps(application logic vps) later.
         let user = User::dummy(&mut rng);
-        let application = Application::new(trivail_vp_description.clone(), vp_data, user);
+        let application = Application::new(trivail_vp_description.clone());
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
         let value: u64 = rng.gen();
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let is_merkle_checked = true;
-        Note::new(application, value, rho, psi, rcm, is_merkle_checked)
+        Note::new(
+            application,
+            value,
+            rho,
+            psi,
+            rcm,
+            is_merkle_checked,
+            vp_data,
+            user,
+        )
     };
     let output_note_1 = {
         let vp_data = pallas::Base::random(&mut rng);
         // TODO: add real user vps(application logic vps) later.
         let user = User::dummy(&mut rng);
-        let application = Application::new(trivail_vp_description, vp_data, user);
+        let application = Application::new(trivail_vp_description);
         let rho = spend_note_1.get_nf();
         let value: u64 = rng.gen();
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let is_merkle_checked = true;
-        Note::new(application, value, rho, psi, rcm, is_merkle_checked)
+        Note::new(
+            application,
+            value,
+            rho,
+            psi,
+            rcm,
+            is_merkle_checked,
+            vp_data,
+            user,
+        )
     };
     let spend_note_2 = spend_note_1.clone();
     let output_note_2 = output_note_1.clone();

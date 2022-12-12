@@ -732,6 +732,7 @@ fn test_halo2_note_commitment_circuit() {
         psi: pallas::Base,
         rcm: pallas::Scalar,
         is_merkle_checked: bool,
+        vp_data: pallas::Base,
     }
 
     impl Circuit<pallas::Base> for MyCircuit {
@@ -827,6 +828,8 @@ fn test_halo2_note_commitment_circuit() {
                 self.psi,
                 self.rcm,
                 self.is_merkle_checked,
+                self.vp_data,
+                self.user.clone(),
             );
             // Construct a Sinsemilla chip
             let sinsemilla_chip =
@@ -842,7 +845,7 @@ fn test_halo2_note_commitment_circuit() {
             let user_address = assign_free_advice(
                 layouter.namespace(|| "witness user address"),
                 note_commit_config.advices[0],
-                Value::known(note.application.get_user_address()),
+                Value::known(note.get_user_address()),
             )?;
 
             // Witness application
@@ -856,7 +859,7 @@ fn test_halo2_note_commitment_circuit() {
             let app_data = assign_free_advice(
                 layouter.namespace(|| "witness application vp_data"),
                 note_commit_config.advices[0],
-                Value::known(note.application.get_vp_data()),
+                Value::known(note.vp_data),
             )?;
 
             // Witness a random non-negative u64 note value
@@ -933,6 +936,7 @@ fn test_halo2_note_commitment_circuit() {
             psi: pallas::Base::random(&mut rng),
             rcm: pallas::Scalar::random(&mut rng),
             is_merkle_checked: false,
+            vp_data: pallas::Base::random(&mut rng),
         };
 
         let prover = MockProver::<pallas::Base>::run(11, &circuit, vec![]).unwrap();
@@ -949,6 +953,7 @@ fn test_halo2_note_commitment_circuit() {
             psi: pallas::Base::random(&mut rng),
             rcm: pallas::Scalar::random(&mut rng),
             is_merkle_checked: true,
+            vp_data: pallas::Base::random(&mut rng),
         };
 
         let prover = MockProver::<pallas::Base>::run(11, &circuit, vec![]).unwrap();

@@ -1,10 +1,13 @@
 use crate::{
     application::Application,
     circuit::vp_circuit::ValidityPredicateInfo,
-    constant::{BASE_BITS_NUM, NOTE_COMMIT_DOMAIN, TAIGA_COMMITMENT_TREE_DEPTH},
+    constant::{
+        BASE_BITS_NUM, NOTE_COMMIT_DOMAIN, POSEIDON_TO_CURVE_INPUT_LEN, TAIGA_COMMITMENT_TREE_DEPTH,
+    },
     merkle_tree::{MerklePath, Node},
     nullifier::Nullifier,
-    utils::extract_p,
+    user::{NullifierDerivingKey, User},
+    utils::{extract_p, poseidon_to_curve},
 };
 use bitvec::{array::BitArray, order::Lsb0};
 use core::iter;
@@ -45,6 +48,11 @@ pub struct Note {
     pub rcm: pallas::Scalar,
     /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of the spent note will be checked in ActionProof.
     pub is_merkle_checked: bool,
+    /// vp_data is the data defined in application vp and will be used to deriate value base
+    pub vp_data: pallas::Base,
+    /// user denotes the user's info including nullifier key, send vp and receive vp.
+    /// TODO: user will be generalized to `vp_data_nonhashed`
+    pub user: User,
 }
 
 #[derive(Clone)]
@@ -72,6 +80,8 @@ impl Note {
         psi: pallas::Base,
         rcm: pallas::Scalar,
         is_merkle_checked: bool,
+        vp_data: pallas::Base,
+        user: User,
     ) -> Self {
         Self {
             application,
@@ -80,6 +90,8 @@ impl Note {
             psi,
             rcm,
             is_merkle_checked,
+            vp_data,
+            user,
         }
     }
 
@@ -93,6 +105,8 @@ impl Note {
         let value: u64 = rng.gen();
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
+        let vp_data = pallas::Base::random(&mut rng);
+        let user = User::dummy(&mut rng);
         Self {
             application,
             value,
@@ -100,12 +114,14 @@ impl Note {
             psi,
             rcm,
             is_merkle_checked: true,
+            vp_data,
+            user,
         }
     }
 
     // cm = SinsemillaCommit^rcm(user_address || app_vp || app_data || rho || psi || is_merkle_checked || value)
     pub fn commitment(&self) -> NoteCommitment {
-        let user_address = self.application.get_user_address();
+        let user_address = self.get_user_address();
         let app_vp = self.application.get_vp();
         let ret = NOTE_COMMIT_DOMAIN
             .commit(
@@ -119,8 +135,7 @@ impl Note {
                     )
                     .chain(app_vp.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
                     .chain(
-                        self.application
-                            .get_vp_data()
+                        self.vp_data
                             .to_le_bits()
                             .iter()
                             .by_vals()
@@ -148,9 +163,38 @@ impl Note {
     }
 
     pub fn get_nf(&self) -> Nullifier {
-        let nk = self.application.get_nk().unwrap();
+        let nk = self.get_nk().unwrap();
         let cm = self.commitment();
         Nullifier::derive_native(&nk, &self.rho.inner(), &self.psi, &cm)
+    }
+
+    pub fn get_user_send_closed(&self) -> pallas::Base {
+        self.user.get_send_closed()
+    }
+
+    pub fn get_user_send_data(&self) -> Option<pallas::Base> {
+        self.user.get_send_data()
+    }
+
+    pub fn get_user_recv_data(&self) -> pallas::Base {
+        self.user.get_recv_data()
+    }
+
+    pub fn get_user_address(&self) -> pallas::Base {
+        self.user.address()
+    }
+
+    pub fn get_nk(&self) -> Option<NullifierDerivingKey> {
+        self.user.get_nk()
+    }
+
+    pub fn derivate_value_base(&self) -> pallas::Point {
+        let inputs = [
+            pallas::Base::from(self.is_merkle_checked),
+            self.application.get_vp(),
+            self.vp_data,
+        ];
+        poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&inputs)
     }
 }
 

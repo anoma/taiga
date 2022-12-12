@@ -1,5 +1,5 @@
-use crate::utils::to_field_elements;
 use crate::circuit::action_circuit::ActionCircuit;
+use crate::utils::to_field_elements;
 use group::Curve;
 use halo2_gadgets::{
     ecc::{
