@@ -27,8 +27,8 @@ mod field_addition;
 // TrivialValidityPredicateCircuit with empty custom constraints.
 #[derive(Clone, Debug, Default)]
 pub struct TrivialValidityPredicateCircuit {
-    spend_notes: [Note; NUM_NOTE],
-    output_notes: [Note; NUM_NOTE],
+    pub spend_notes: [Note; NUM_NOTE],
+    pub output_notes: [Note; NUM_NOTE],
 }
 
 #[derive(Clone, Debug)]

@@ -282,6 +282,7 @@ fn test_transaction_creation() {
 
     let mut rng = OsRng;
 
+    // Create empty vp circuit without note info
     let trivial_vp_circuit = TrivialValidityPredicateCircuit::default();
     let trivail_vp_description = trivial_vp_circuit.get_vp_description();
 
@@ -315,7 +316,12 @@ fn test_transaction_creation() {
 
     // Generate note info
     let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-    let app_vp_proving_info = Box::new(TrivialValidityPredicateCircuit::dummy(&mut rng));
+    // Create vp circuit and fulfill the note info
+    let app_vp_circuit = TrivialValidityPredicateCircuit {
+        spend_notes: [spend_note_1.clone(), spend_note_2.clone()],
+        output_notes: [output_note_1.clone(), output_note_2.clone()],
+    };
+    let app_vp_proving_info = Box::new(app_vp_circuit);
     let app_logic_vp_proving_info = vec![];
     let spend_note_info_1 = SpendNoteInfo::new(
         spend_note_1,
