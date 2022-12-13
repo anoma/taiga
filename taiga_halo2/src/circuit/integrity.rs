@@ -368,8 +368,7 @@ pub fn check_output_note(
     })
 }
 
-// TODO: add hash_to_curve circuit to derivate the value base
-pub fn derivate_value_base(
+pub fn derive_value_base(
     mut layouter: impl Layouter<pallas::Base>,
     hash_to_curve_config: HashToCurveConfig,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
@@ -421,8 +420,8 @@ pub fn compute_value_commitment(
     rcv: pallas::Scalar,
 ) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
     // spend value point
-    let value_base_spend = derivate_value_base(
-        layouter.namespace(|| "derivate spend value base"),
+    let value_base_spend = derive_value_base(
+        layouter.namespace(|| "derive spend value base"),
         hash_to_curve_config.clone(),
         ecc_chip.clone(),
         is_merkle_checked_spend,
@@ -438,8 +437,8 @@ pub fn compute_value_commitment(
         value_base_spend.mul(layouter.namespace(|| "spend value point"), v_spend_scalar)?;
 
     // output value point
-    let value_base_output = derivate_value_base(
-        layouter.namespace(|| "derivate output value base"),
+    let value_base_output = derive_value_base(
+        layouter.namespace(|| "derive output value base"),
         hash_to_curve_config,
         ecc_chip.clone(),
         is_merkle_checked_output,

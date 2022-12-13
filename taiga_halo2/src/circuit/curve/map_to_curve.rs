@@ -182,19 +182,19 @@ fn test_map_to_curve_circuit() {
             )?;
             ret.0.value().map(|x| {
                 assert!(
-                    format!("{:?}", x)
+                    format!("{x:?}")
                         == "0x28c1a6a534f56c52e25295b339129a8af5f42525dea727f485ca3433519b096e"
                 );
             });
             ret.1.value().map(|y| {
                 assert!(
-                    format!("{:?}", y)
+                    format!("{y:?}")
                         == "0x3bfc658bee6653c63c7d7f0927083fd315d29c270207b7c7084fa1ee6ac5ae8d"
                 );
             });
             ret.2.value().map(|z| {
                 assert!(
-                    format!("{:?}", z)
+                    format!("{z:?}")
                         == "0x054b3ba10416dc104157b1318534a19d5d115472da7d746f8a5f250cd8cdef36"
                 );
             });

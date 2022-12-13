@@ -6,7 +6,7 @@ use ark_ec::{
 use ark_ff::{field_new, BigInteger, One, PrimeField};
 
 pub fn bits_to_fields<F: PrimeField>(bits: &[bool]) -> Vec<F> {
-    bits.chunks((F::size_in_bits() - 1) as usize)
+    bits.chunks(F::size_in_bits() - 1)
         .map(|elt| F::from_repr(<F as PrimeField>::BigInt::from_bits_le(elt)).unwrap())
         .collect()
 }

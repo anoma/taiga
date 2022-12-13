@@ -11,9 +11,9 @@ pub struct ValueCommitment(pallas::Point);
 
 impl ValueCommitment {
     pub fn new(input_note: &Note, output_note: &Note, blind_r: &pallas::Scalar) -> Self {
-        let base_input = derivate_value_base(input_note.is_merkle_checked, &input_note.application);
+        let base_input = derive_value_base(input_note.is_merkle_checked, &input_note.application);
         let base_output =
-            derivate_value_base(output_note.is_merkle_checked, &output_note.application);
+            derive_value_base(output_note.is_merkle_checked, &output_note.application);
         ValueCommitment(
             base_input * pallas::Scalar::from(input_note.value)
                 - base_output * pallas::Scalar::from(output_note.value)
@@ -38,7 +38,7 @@ impl ValueCommitment {
     }
 }
 
-pub fn derivate_value_base(is_merkle_checked: bool, application: &Application) -> pallas::Point {
+pub fn derive_value_base(is_merkle_checked: bool, application: &Application) -> pallas::Point {
     let inputs = [
         pallas::Base::from(is_merkle_checked),
         application.get_vp(),
