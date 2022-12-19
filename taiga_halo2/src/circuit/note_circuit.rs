@@ -705,7 +705,7 @@ impl NoteChip {
 fn test_halo2_note_commitment_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use crate::note::Note;
-    use crate::{application::Application, nullifier::Nullifier, user::User};
+    use crate::{nullifier::Nullifier, user::User, vp_description::ValidityPredicateDescription};
     use ff::Field;
     use group::Curve;
     use halo2_gadgets::{
@@ -726,7 +726,7 @@ fn test_halo2_note_commitment_circuit() {
     #[derive(Default)]
     struct MyCircuit {
         user: User,
-        application: Application,
+        application_vp: ValidityPredicateDescription,
         value: u64,
         rho: Nullifier,
         psi: pallas::Base,
@@ -822,7 +822,7 @@ fn test_halo2_note_commitment_circuit() {
                 NoteCommitmentFixedBases,
             >::load(note_commit_config.sinsemilla_config.clone(), &mut layouter)?;
             let note = Note::new(
-                self.application.clone(),
+                self.application_vp.clone(),
                 self.value,
                 self.rho,
                 self.psi,
@@ -852,7 +852,7 @@ fn test_halo2_note_commitment_circuit() {
             let app_vp = assign_free_advice(
                 layouter.namespace(|| "witness rho"),
                 note_commit_config.advices[0],
-                Value::known(note.application.get_vp()),
+                Value::known(note.application_vp.get_compressed()),
             )?;
 
             // Witness app_data
@@ -930,7 +930,7 @@ fn test_halo2_note_commitment_circuit() {
     {
         let circuit = MyCircuit {
             user: User::dummy(&mut rng),
-            application: Application::dummy(&mut rng),
+            application_vp: ValidityPredicateDescription::dummy(&mut rng),
             value: rng.next_u64(),
             rho: Nullifier::default(),
             psi: pallas::Base::random(&mut rng),
@@ -947,7 +947,7 @@ fn test_halo2_note_commitment_circuit() {
     {
         let circuit = MyCircuit {
             user: User::dummy(&mut rng),
-            application: Application::dummy(&mut rng),
+            application_vp: ValidityPredicateDescription::dummy(&mut rng),
             value: rng.next_u64(),
             rho: Nullifier::default(),
             psi: pallas::Base::random(&mut rng),

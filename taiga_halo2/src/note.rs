@@ -1,5 +1,4 @@
 use crate::{
-    application::Application,
     circuit::vp_circuit::ValidityPredicateInfo,
     constant::{
         BASE_BITS_NUM, NOTE_COMMIT_DOMAIN, POSEIDON_TO_CURVE_INPUT_LEN, TAIGA_COMMITMENT_TREE_DEPTH,
@@ -8,6 +7,7 @@ use crate::{
     nullifier::Nullifier,
     user::{NullifierDerivingKey, User},
     utils::{extract_p, poseidon_to_curve},
+    vp_description::ValidityPredicateDescription,
 };
 use bitvec::{array::BitArray, order::Lsb0};
 use core::iter;
@@ -39,7 +39,10 @@ impl Default for NoteCommitment {
 /// A note
 #[derive(Debug, Clone, Default)]
 pub struct Note {
-    pub application: Application,
+    /// application_vp denotes the VP description
+    pub application_vp: ValidityPredicateDescription,
+    /// vp_data is the data defined in application vp and will be used to derive value base
+    pub vp_data: pallas::Base,
     pub value: u64,
     /// old nullifier. Nonce which is a deterministically computed, unique nonce
     pub rho: Nullifier,
@@ -48,8 +51,6 @@ pub struct Note {
     pub rcm: pallas::Scalar,
     /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of the spent note will be checked in ActionProof.
     pub is_merkle_checked: bool,
-    /// vp_data is the data defined in application vp and will be used to deriate value base
-    pub vp_data: pallas::Base,
     /// user denotes the user's info including nullifier key, send vp and receive vp.
     /// TODO: user will be generalized to `vp_data_nonhashed`
     pub user: User,
@@ -74,7 +75,7 @@ pub struct OutputNoteInfo {
 impl Note {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        application: Application,
+        application_vp: ValidityPredicateDescription,
         value: u64,
         rho: Nullifier,
         psi: pallas::Base,
@@ -84,7 +85,7 @@ impl Note {
         user: User,
     ) -> Self {
         Self {
-            application,
+            application_vp,
             value,
             rho,
             psi,
@@ -101,20 +102,20 @@ impl Note {
     }
 
     pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
-        let application = Application::dummy(&mut rng);
+        let application_vp = ValidityPredicateDescription::dummy(&mut rng);
+        let vp_data = pallas::Base::random(&mut rng);
         let value: u64 = rng.gen();
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
-        let vp_data = pallas::Base::random(&mut rng);
         let user = User::dummy(&mut rng);
         Self {
-            application,
+            application_vp,
+            vp_data,
             value,
             rho,
             psi,
             rcm,
             is_merkle_checked: true,
-            vp_data,
             user,
         }
     }
@@ -122,7 +123,7 @@ impl Note {
     // cm = SinsemillaCommit^rcm(user_address || app_vp || app_data || rho || psi || is_merkle_checked || value)
     pub fn commitment(&self) -> NoteCommitment {
         let user_address = self.get_user_address();
-        let app_vp = self.application.get_vp();
+        let app_vp = self.application_vp.get_compressed();
         let ret = NOTE_COMMIT_DOMAIN
             .commit(
                 iter::empty()
@@ -191,7 +192,7 @@ impl Note {
     pub fn derivate_value_base(&self) -> pallas::Point {
         let inputs = [
             pallas::Base::from(self.is_merkle_checked),
-            self.application.get_vp(),
+            self.application_vp.get_compressed(),
             self.vp_data,
         ];
         poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&inputs)

@@ -268,7 +268,6 @@ impl NoteVPVerifyingInfoSet {
 #[test]
 fn test_transaction_creation() {
     use crate::{
-        application::Application,
         circuit::vp_examples::TrivialValidityPredicateCircuit,
         constant::TAIGA_COMMITMENT_TREE_DEPTH,
         merkle_tree::MerklePath,
@@ -291,14 +290,14 @@ fn test_transaction_creation() {
         let vp_data = pallas::Base::random(&mut rng);
         // TODO: add real user vps(application logic vps) later.
         let user = User::dummy(&mut rng);
-        let application = Application::new(trivail_vp_description.clone());
+        let application_vp = trivail_vp_description.clone();
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
         let value: u64 = rng.gen();
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let is_merkle_checked = true;
         Note::new(
-            application,
+            application_vp,
             value,
             rho,
             psi,
@@ -312,14 +311,13 @@ fn test_transaction_creation() {
         let vp_data = pallas::Base::random(&mut rng);
         // TODO: add real user vps(application logic vps) later.
         let user = User::dummy(&mut rng);
-        let application = Application::new(trivail_vp_description);
         let rho = spend_note_1.get_nf();
         let value: u64 = rng.gen();
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let is_merkle_checked = true;
         Note::new(
-            application,
+            trivail_vp_description,
             value,
             rho,
             psi,

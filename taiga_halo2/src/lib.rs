@@ -2,7 +2,6 @@
 #![allow(clippy::large_enum_variant)]
 
 pub mod action;
-pub mod application;
 pub mod circuit;
 pub mod constant;
 pub mod merkle_tree;
