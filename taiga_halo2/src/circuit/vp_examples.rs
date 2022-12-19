@@ -89,7 +89,6 @@ impl ValidityPredicateInfo for TrivialValidityPredicateCircuit {
         .unwrap();
         let proof = transcript.finalize();
         VPVerifyingInfo {
-            param_size: 12,
             vk,
             proof,
             instance,

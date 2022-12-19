@@ -60,15 +60,16 @@ lazy_static! {
     };
 }
 
-pub const CIRCUIT_PARAMS_SIZE_11: u32 = 11;
 pub const CIRCUIT_PARAMS_SIZE_12: u32 = 12;
 pub const ACTION_CIRCUIT_PARAMS_SIZE: u32 = 12;
+pub const VP_CIRCUIT_PARAMS_SIZE: u32 = 12;
 
 // Setup params map
 lazy_static! {
     pub static ref SETUP_PARAMS_MAP: HashMap<u32, Params<vesta::Affine>> = {
         let mut m = HashMap::new();
-        for circuit_size in [CIRCUIT_PARAMS_SIZE_11, CIRCUIT_PARAMS_SIZE_12] {
+        #[allow(clippy::single_element_loop)]
+        for circuit_size in [CIRCUIT_PARAMS_SIZE_12] {
             let params = Params::new(circuit_size);
             m.insert(circuit_size, params);
         }

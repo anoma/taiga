@@ -115,7 +115,6 @@ impl ValidityPredicateInfo for FieldAdditionValidityPredicateCircuit {
         .unwrap();
         let proof = transcript.finalize();
         VPVerifyingInfo {
-            param_size: 12,
             vk,
             proof,
             instance,

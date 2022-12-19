@@ -6,7 +6,7 @@ use crate::{
     },
     constant::{
         NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain, NUM_NOTE,
-        SETUP_PARAMS_MAP,
+        SETUP_PARAMS_MAP, VP_CIRCUIT_PARAMS_SIZE,
     },
     note::Note,
     vp_description::ValidityPredicateDescription,
@@ -22,7 +22,6 @@ use pasta_curves::{pallas, vesta};
 
 #[derive(Debug, Clone)]
 pub struct VPVerifyingInfo {
-    pub param_size: u32,
     pub vk: VerifyingKey<vesta::Affine>,
     pub proof: Vec<u8>,
     pub instance: Vec<pallas::Base>,
@@ -30,7 +29,7 @@ pub struct VPVerifyingInfo {
 
 impl VPVerifyingInfo {
     pub fn verify(&self) -> Result<(), Error> {
-        let params = SETUP_PARAMS_MAP.get(&self.param_size).unwrap();
+        let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
         let strategy = SingleVerifier::new(params);
         let mut transcript = Blake2bRead::init(&self.proof[..]);
         verify_proof(
