@@ -1,4 +1,5 @@
 use crate::circuit::gadgets::AddChip;
+use crate::circuit::hash_to_curve::HashToCurveConfig;
 use crate::circuit::integrity::{check_output_note, check_spend_note, compute_value_commitment};
 use crate::circuit::merkle_circuit::{
     merkle_poseidon_gadget, MerklePoseidonChip, MerklePoseidonConfig,
@@ -26,6 +27,7 @@ pub struct ActionConfig {
     note_config: NoteConfig,
     merkle_config: MerklePoseidonConfig,
     merkle_path_selector: Selector,
+    hash_to_curve_config: HashToCurveConfig,
 }
 
 /// The Action circuit.
@@ -94,12 +96,16 @@ impl Circuit<pallas::Base> for ActionCircuit {
             note_config.poseidon_config.clone(),
         );
 
+        let hash_to_curve_config =
+            HashToCurveConfig::configure(meta, advices, note_config.poseidon_config.clone());
+
         Self::Config {
             instances,
             advices,
             note_config,
             merkle_config,
             merkle_path_selector,
+            hash_to_curve_config,
         }
     }
 
@@ -180,6 +186,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
         let cv_net = compute_value_commitment(
             layouter.namespace(|| "net value commitment"),
             ecc_chip,
+            config.hash_to_curve_config.clone(),
             spend_note_vars.is_merkle_checked.clone(),
             spend_note_vars.app_vp.clone(),
             spend_note_vars.app_data.clone(),
@@ -244,13 +251,13 @@ fn test_halo2_action_circuit() {
     let (action, action_circuit) = action_info.build(&mut rng);
     let instances = vec![action.to_instance()];
     {
-        let prover = MockProver::<pallas::Base>::run(11, &action_circuit, instances).unwrap();
+        let prover = MockProver::<pallas::Base>::run(12, &action_circuit, instances).unwrap();
         assert_eq!(prover.verify(), Ok(()));
     }
 
     // Create action proof
     {
-        let params = Params::new(11);
+        let params = Params::new(12);
         let empty_circuit: ActionCircuit = Default::default();
         let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
         let pk = keygen_pk(&params, vk, &empty_circuit).expect("keygen_pk should not fail");

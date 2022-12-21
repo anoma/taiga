@@ -180,7 +180,7 @@ pub fn bits_to_variables<CP: CircuitParameters>(
         .collect();
 
     let scalar_variables = bit_variables
-        .chunks((CP::CurveScalarField::size_in_bits() - 1) as usize)
+        .chunks(CP::CurveScalarField::size_in_bits() - 1)
         .map(|elt| {
             let mut accumulator_var = composer.zero_var();
             for (power, bit) in elt.iter().enumerate() {

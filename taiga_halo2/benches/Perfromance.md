@@ -1,7 +1,7 @@
 # Action proof performance
 ```
-action-proof-prover     time:   [1.0737 s 1.0864 s 1.1003 s]
-action-proof-verifier   time:   [21.613 ms 22.317 ms 23.143 ms]
+action-proof-prover     time:   [3.6500 s 3.1445 s 3.7210 s]
+action-proof-verifier   time:   [35.858 ms 36.359 ms 36.873 ms]
 ```
 
 # VP proof performance

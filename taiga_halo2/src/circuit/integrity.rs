@@ -1,13 +1,14 @@
 use std::ops::Neg;
 
 use crate::circuit::gadgets::{assign_free_advice, AddChip, AddInstructions};
+use crate::circuit::hash_to_curve::{hash_to_curve_circuit, HashToCurveConfig};
 use crate::circuit::note_circuit::{note_commitment_gadget, NoteCommitmentChip};
 use crate::constant::{
     NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentFixedBasesFull,
-    NoteCommitmentHashDomain, NullifierK,
+    NoteCommitmentHashDomain, NullifierK, POSEIDON_TO_CURVE_INPUT_LEN,
 };
 use crate::note::Note;
-use ff::PrimeField;
+use crate::utils::poseidon_to_curve;
 use group::Curve;
 use halo2_gadgets::{
     ecc::{
@@ -367,40 +368,47 @@ pub fn check_output_note(
     })
 }
 
-// TODO: add hash_to_curve circuit to derivate the value base
-pub fn derivate_value_base(
+pub fn derive_value_base(
     mut layouter: impl Layouter<pallas::Base>,
+    hash_to_curve_config: HashToCurveConfig,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
     is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
     app_vp: AssignedCell<pallas::Base, pallas::Base>,
     app_data: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<NonIdentityPoint<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
-    let out_of_circuit_value_base = {
-        use halo2_proofs::arithmetic::CurveExt;
-        let hash = pallas::Point::hash_to_curve("taiga:test");
-        let mut bytes: Vec<u8> = vec![];
-        is_merkle_checked
-            .value()
-            .map(|v| bytes.push(v.to_repr()[0]));
-        app_vp.value().map(|x| {
-            bytes.extend_from_slice(&x.to_repr());
+    let point = hash_to_curve_circuit(
+        layouter.namespace(|| "hash to curve"),
+        hash_to_curve_config,
+        ecc_chip.clone(),
+        &[is_merkle_checked.clone(), app_vp.clone(), app_data.clone()],
+    )?;
+
+    // Assign a new `NonIdentityPoint` and constran equal to hash_to_curve point since `Point` doesn't have mul operation
+    // IndentityPoint is an invalid value base and it returns an error.
+    let non_identity_point = is_merkle_checked
+        .value()
+        .zip(app_vp.value())
+        .zip(app_data.value())
+        .map(|((&flag, &vp), &data)| {
+            poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&[flag, vp, data]).to_affine()
         });
-        app_data.value().map(|x| {
-            bytes.extend_from_slice(&x.to_repr());
-        });
-        hash(&bytes)
-    };
-    NonIdentityPoint::new(
+    let non_identity_point_var = NonIdentityPoint::new(
         ecc_chip,
-        layouter.namespace(|| "derivate value base"),
-        Value::known(out_of_circuit_value_base.to_affine()),
-    )
+        layouter.namespace(|| "non-identity value base"),
+        non_identity_point,
+    )?;
+    point.constrain_equal(
+        layouter.namespace(|| "non-identity value base"),
+        &non_identity_point_var,
+    )?;
+    Ok(non_identity_point_var)
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn compute_value_commitment(
     mut layouter: impl Layouter<pallas::Base>,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
+    hash_to_curve_config: HashToCurveConfig,
     is_merkle_checked_spend: AssignedCell<pallas::Base, pallas::Base>,
     app_address_spend: AssignedCell<pallas::Base, pallas::Base>,
     data_spend: AssignedCell<pallas::Base, pallas::Base>,
@@ -412,8 +420,9 @@ pub fn compute_value_commitment(
     rcv: pallas::Scalar,
 ) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
     // spend value point
-    let value_base_spend = derivate_value_base(
-        layouter.namespace(|| "derivate spend value base"),
+    let value_base_spend = derive_value_base(
+        layouter.namespace(|| "derive spend value base"),
+        hash_to_curve_config.clone(),
         ecc_chip.clone(),
         is_merkle_checked_spend,
         app_address_spend,
@@ -428,8 +437,9 @@ pub fn compute_value_commitment(
         value_base_spend.mul(layouter.namespace(|| "spend value point"), v_spend_scalar)?;
 
     // output value point
-    let value_base_output = derivate_value_base(
-        layouter.namespace(|| "derivate output value base"),
+    let value_base_output = derive_value_base(
+        layouter.namespace(|| "derive output value base"),
+        hash_to_curve_config,
         ecc_chip.clone(),
         is_merkle_checked_output,
         app_address_output,
