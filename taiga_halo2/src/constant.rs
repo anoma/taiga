@@ -1,3 +1,4 @@
+use crate::circuit::action_circuit::ActionCircuit;
 use crate::utils::to_field_elements;
 use group::Curve;
 use halo2_gadgets::{
@@ -10,8 +11,13 @@ use halo2_gadgets::{
     },
     sinsemilla::{primitives::CommitDomain, CommitDomains, HashDomains},
 };
+use halo2_proofs::{
+    plonk::{keygen_pk, keygen_vk, ProvingKey, VerifyingKey},
+    poly::commitment::Params,
+};
 use lazy_static::lazy_static;
-use pasta_curves::pallas;
+use pasta_curves::{pallas, vesta};
+use std::collections::HashMap;
 
 /// SWU hash-to-curve personalization for the note commitment generator
 pub const NOTE_COMMITMENT_PERSONALIZATION: &str = "Taiga-NoteCommit";
@@ -21,8 +27,8 @@ pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
 
 pub const BASE_BITS_NUM: usize = 255;
 
-/// The number of notes in a tx.
-pub const NUM_NOTE: usize = 4;
+/// The number of notes in a (partial)tx.
+pub const NUM_NOTE: usize = 2;
 
 pub const ACTION_NF_INSTANCE_ROW_IDX: usize = 0;
 pub const ACTION_ANCHOR_INSTANCE_ROW_IDX: usize = 1;
@@ -51,6 +57,35 @@ lazy_static! {
         .into_bytes();
         postfix.push((4 + CURVE_ID.len() + VALUE_BASE_DOMAIN_PREFIX.len()) as u8);
         to_field_elements(&postfix)
+    };
+}
+
+pub const CIRCUIT_PARAMS_SIZE_12: u32 = 12;
+pub const ACTION_CIRCUIT_PARAMS_SIZE: u32 = 12;
+pub const VP_CIRCUIT_PARAMS_SIZE: u32 = 12;
+
+// Setup params map
+lazy_static! {
+    pub static ref SETUP_PARAMS_MAP: HashMap<u32, Params<vesta::Affine>> = {
+        let mut m = HashMap::new();
+        #[allow(clippy::single_element_loop)]
+        for circuit_size in [CIRCUIT_PARAMS_SIZE_12] {
+            let params = Params::new(circuit_size);
+            m.insert(circuit_size, params);
+        }
+        m
+    };
+}
+
+// Action proving key and verifying key
+lazy_static! {
+    pub static ref ACTION_VERIFYING_KEY: VerifyingKey<vesta::Affine> =
+        ACTION_PROVING_KEY.get_vk().clone();
+    pub static ref ACTION_PROVING_KEY: ProvingKey<vesta::Affine> = {
+        let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
+        let empty_circuit: ActionCircuit = Default::default();
+        let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
+        keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail")
     };
 }
 

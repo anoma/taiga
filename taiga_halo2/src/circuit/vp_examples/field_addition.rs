@@ -3,17 +3,26 @@ use crate::{
         gadgets::{assign_free_advice, AddChip, AddConfig, AddInstructions},
         integrity::{OutputNoteVar, SpendNoteVar},
         note_circuit::NoteConfig,
-        vp_circuit::{ValidityPredicateCircuit, ValidityPredicateConfig},
+        vp_circuit::{
+            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
+            ValidityPredicateInfo,
+        },
     },
-    constant::NUM_NOTE,
+    constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
+    vp_description::ValidityPredicateDescription,
 };
 use ff::Field;
 use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
-    plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Instance},
+    plonk::{
+        create_proof, keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error,
+        Instance,
+    },
+    transcript::Blake2bWrite,
 };
-use pasta_curves::pallas;
+use pasta_curves::{pallas, vesta};
+use rand::rngs::OsRng;
 use rand::RngCore;
 
 // FieldAdditionValidityPredicateCircuit with a trivial constraint a + b = c.
@@ -69,28 +78,9 @@ impl FieldAdditionValidityPredicateCircuit {
             b,
         }
     }
-
-    pub fn get_instances(&self) -> Vec<pallas::Base> {
-        let mut instances = vec![];
-        self.spend_notes
-            .iter()
-            .zip(self.output_notes.iter())
-            .for_each(|(spend_note, output_note)| {
-                let nf = spend_note.get_nf().inner();
-                instances.push(nf);
-                let cm = output_note.commitment();
-                instances.push(cm.get_x());
-            });
-
-        instances.push(self.a + self.b);
-
-        instances
-    }
 }
 
-impl ValidityPredicateCircuit for FieldAdditionValidityPredicateCircuit {
-    type Config = FieldAdditionValidityPredicateConfig;
-
+impl ValidityPredicateInfo for FieldAdditionValidityPredicateCircuit {
     fn get_spend_notes(&self) -> &[Note; NUM_NOTE] {
         &self.spend_notes
     }
@@ -99,6 +89,47 @@ impl ValidityPredicateCircuit for FieldAdditionValidityPredicateCircuit {
         &self.output_notes
     }
 
+    fn get_instances(&self) -> Vec<pallas::Base> {
+        let mut instances = self.get_note_instances();
+
+        instances.push(self.a + self.b);
+
+        instances
+    }
+
+    fn get_verifying_info(&self) -> VPVerifyingInfo {
+        let mut rng = OsRng;
+        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
+        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
+        let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
+        let instance = self.get_instances();
+        let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
+        create_proof(
+            params,
+            &pk,
+            &[self.clone()],
+            &[&[&instance]],
+            &mut rng,
+            &mut transcript,
+        )
+        .unwrap();
+        let proof = transcript.finalize();
+        VPVerifyingInfo {
+            vk,
+            proof,
+            instance,
+        }
+    }
+
+    fn get_vp_description(&self) -> ValidityPredicateDescription {
+        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
+        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
+        ValidityPredicateDescription::from_vk(vk)
+    }
+}
+
+impl ValidityPredicateCircuit for FieldAdditionValidityPredicateCircuit {
+    type VPConfig = FieldAdditionValidityPredicateConfig;
     // Add custom constraints
     // Note: the trivial vp doesn't constrain on spend_note_variables and output_note_variables
     fn custom_constraints(
@@ -125,7 +156,7 @@ impl ValidityPredicateCircuit for FieldAdditionValidityPredicateCircuit {
         let c = add_chip.add(layouter.namespace(|| "a + b = c"), &a, &b)?;
 
         // Public c
-        layouter.constrain_instance(c.cell(), config.instances, 8)?;
+        layouter.constrain_instance(c.cell(), config.instances, 2 * NUM_NOTE)?;
 
         Ok(())
     }

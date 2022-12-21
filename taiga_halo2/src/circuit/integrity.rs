@@ -101,7 +101,7 @@ pub fn check_spend_note(
     // Check spend note user integrity: user_address = Com_r(Com_r(send_vp, nk), recv_vp_hash)
     let (user_address, nk) = {
         // Witness send_data
-        let send_data = spend_note.application.get_user_send_data().unwrap();
+        let send_data = spend_note.get_user_send_data().unwrap();
         let send_vp_var = assign_free_advice(
             layouter.namespace(|| "witness user send data"),
             advices[0],
@@ -109,7 +109,7 @@ pub fn check_spend_note(
         )?;
 
         // Witness nk
-        let nk = spend_note.application.get_nk().unwrap();
+        let nk = spend_note.get_nk().unwrap();
         let nk_var = assign_free_advice(
             layouter.namespace(|| "witness nk"),
             advices[0],
@@ -132,7 +132,7 @@ pub fn check_spend_note(
         let recv_data = assign_free_advice(
             layouter.namespace(|| "witness user recv data"),
             advices[0],
-            Value::known(spend_note.application.get_user_recv_data()),
+            Value::known(spend_note.get_user_recv_data()),
         )?;
 
         // user_address = Com_r(send_com, recv_vp_data)
@@ -154,14 +154,14 @@ pub fn check_spend_note(
     let app_vp = assign_free_advice(
         layouter.namespace(|| "witness app_vp"),
         advices[0],
-        Value::known(spend_note.application.get_vp()),
+        Value::known(spend_note.application_vp.get_compressed()),
     )?;
 
     // Witness app_data
     let app_data = assign_free_advice(
         layouter.namespace(|| "witness app_vp_data"),
         advices[0],
-        Value::known(spend_note.application.get_vp_data()),
+        Value::known(spend_note.vp_data),
     )?;
 
     // Witness value(u64)
@@ -277,13 +277,13 @@ pub fn check_output_note(
         let send_com = assign_free_advice(
             layouter.namespace(|| "witness output send_com"),
             advices[0],
-            Value::known(output_note.application.get_user_send_closed()),
+            Value::known(output_note.get_user_send_closed()),
         )?;
         // Witness recv data
         let recv_data = assign_free_advice(
             layouter.namespace(|| "witness user recv data"),
             advices[0],
-            Value::known(output_note.application.get_user_recv_data()),
+            Value::known(output_note.get_user_recv_data()),
         )?;
 
         let poseidon_chip = PoseidonChip::construct(poseidon_config);
@@ -300,14 +300,14 @@ pub fn check_output_note(
     let app_vp = assign_free_advice(
         layouter.namespace(|| "witness app_vp"),
         advices[0],
-        Value::known(output_note.application.get_vp()),
+        Value::known(output_note.application_vp.get_compressed()),
     )?;
 
     // Witness app_data
     let app_data = assign_free_advice(
         layouter.namespace(|| "witness app_data"),
         advices[0],
-        Value::known(output_note.application.get_vp_data()),
+        Value::known(output_note.vp_data),
     )?;
 
     // Witness value(u64)

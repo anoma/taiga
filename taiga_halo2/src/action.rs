@@ -1,9 +1,8 @@
 use crate::{
-    application::Application,
     circuit::action_circuit::ActionCircuit,
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
-    merkle_tree::{MerklePath, Node},
-    note::{Note, NoteCommitment},
+    merkle_tree::MerklePath,
+    note::{Note, NoteCommitment, OutputNoteInfo, SpendNoteInfo},
     nullifier::Nullifier,
     value_commitment::ValueCommitment,
 };
@@ -27,24 +26,10 @@ pub struct ActionInstance {
 }
 
 /// The information to build ActionInstance and ActionCircuit.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ActionInfo {
-    spend: SpendInfo,
-    output: OutputInfo,
-}
-
-#[derive(Debug, Clone)]
-pub struct SpendInfo {
-    note: Note,
-    auth_path: [(pallas::Base, bool); TAIGA_COMMITMENT_TREE_DEPTH],
-    root: pallas::Base,
-}
-
-#[derive(Debug, Clone)]
-pub struct OutputInfo {
-    application: Application,
-    value: u64,
-    is_merkle_checked: bool,
+    spend: SpendNoteInfo,
+    output: OutputNoteInfo,
 }
 
 impl ActionInstance {
@@ -60,37 +45,38 @@ impl ActionInstance {
 }
 
 impl ActionInfo {
-    pub fn new(spend: SpendInfo, output: OutputInfo) -> Self {
+    pub fn new(spend: SpendNoteInfo, output: OutputNoteInfo) -> Self {
         Self { spend, output }
     }
 
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
+        use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
         let spend_note = Note::dummy(&mut rng);
+        let output_info = OutputNoteInfo::dummy(&mut rng, spend_note.get_nf());
         let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let spend_info = SpendInfo::new(spend_note, merkle_path);
-
-        let output_info = OutputInfo::dummy(&mut rng);
+        let app_vp_proving_info = Box::new(TrivialValidityPredicateCircuit::dummy(&mut rng));
+        let app_logic_vp_proving_info = vec![];
+        let spend_info = SpendNoteInfo::new(
+            spend_note,
+            merkle_path,
+            app_vp_proving_info,
+            app_logic_vp_proving_info,
+        );
 
         ActionInfo::new(spend_info, output_info)
     }
 
     pub fn build<R: RngCore>(self, mut rng: R) -> (ActionInstance, ActionCircuit) {
         let nf = self.spend.note.get_nf();
-        let psi = pallas::Base::random(&mut rng);
-        let note_rcm = pallas::Scalar::random(&mut rng);
-        let output_note = Note::new(
-            self.output.application,
-            self.output.value,
-            nf,
-            psi,
-            note_rcm,
-            self.output.is_merkle_checked,
+        assert_eq!(
+            nf, self.output.note.rho,
+            "The nf of spend note should be equal to the rho of output note"
         );
 
-        let output_cm = output_note.commitment();
+        let output_cm = self.output.note.commitment();
         let rcv = pallas::Scalar::random(&mut rng);
 
-        let cv_net = ValueCommitment::new(&self.spend.note, &output_note, &rcv);
+        let cv_net = ValueCommitment::new(&self.spend.note, &self.output.note, &rcv);
         let action = ActionInstance {
             nf,
             cm: output_cm,
@@ -101,45 +87,10 @@ impl ActionInfo {
         let action_circuit = ActionCircuit {
             spend_note: self.spend.note,
             auth_path: self.spend.auth_path,
-            output_note,
+            output_note: self.output.note,
             rcv,
         };
 
         (action, action_circuit)
-    }
-}
-
-impl SpendInfo {
-    pub fn new(note: Note, merkle_path: MerklePath) -> Self {
-        let cm_node = Node::new(note.commitment().get_x());
-        let root = merkle_path.root(cm_node).inner();
-        let auth_path: [(pallas::Base, bool); TAIGA_COMMITMENT_TREE_DEPTH] =
-            merkle_path.get_path().as_slice().try_into().unwrap();
-        Self {
-            note,
-            auth_path,
-            root,
-        }
-    }
-}
-
-impl OutputInfo {
-    pub fn new(application: Application, value: u64, is_merkle_checked: bool) -> Self {
-        Self {
-            application,
-            value,
-            is_merkle_checked,
-        }
-    }
-
-    pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        use rand::Rng;
-        let application = Application::dummy(&mut rng);
-        let value: u64 = rng.gen();
-        Self {
-            application,
-            value,
-            is_merkle_checked: true,
-        }
     }
 }

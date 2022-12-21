@@ -705,7 +705,7 @@ impl NoteChip {
 fn test_halo2_note_commitment_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use crate::note::Note;
-    use crate::{application::Application, nullifier::Nullifier, user::User};
+    use crate::{nullifier::Nullifier, user::User, vp_description::ValidityPredicateDescription};
     use ff::Field;
     use group::Curve;
     use halo2_gadgets::{
@@ -726,12 +726,13 @@ fn test_halo2_note_commitment_circuit() {
     #[derive(Default)]
     struct MyCircuit {
         user: User,
-        application: Application,
+        application_vp: ValidityPredicateDescription,
         value: u64,
         rho: Nullifier,
         psi: pallas::Base,
         rcm: pallas::Scalar,
         is_merkle_checked: bool,
+        vp_data: pallas::Base,
     }
 
     impl Circuit<pallas::Base> for MyCircuit {
@@ -821,12 +822,14 @@ fn test_halo2_note_commitment_circuit() {
                 NoteCommitmentFixedBases,
             >::load(note_commit_config.sinsemilla_config.clone(), &mut layouter)?;
             let note = Note::new(
-                self.application.clone(),
+                self.application_vp.clone(),
                 self.value,
                 self.rho,
                 self.psi,
                 self.rcm,
                 self.is_merkle_checked,
+                self.vp_data,
+                self.user.clone(),
             );
             // Construct a Sinsemilla chip
             let sinsemilla_chip =
@@ -842,21 +845,21 @@ fn test_halo2_note_commitment_circuit() {
             let user_address = assign_free_advice(
                 layouter.namespace(|| "witness user address"),
                 note_commit_config.advices[0],
-                Value::known(note.application.get_user_address()),
+                Value::known(note.get_user_address()),
             )?;
 
             // Witness application
             let app_vp = assign_free_advice(
                 layouter.namespace(|| "witness rho"),
                 note_commit_config.advices[0],
-                Value::known(note.application.get_vp()),
+                Value::known(note.application_vp.get_compressed()),
             )?;
 
             // Witness app_data
             let app_data = assign_free_advice(
                 layouter.namespace(|| "witness application vp_data"),
                 note_commit_config.advices[0],
-                Value::known(note.application.get_vp_data()),
+                Value::known(note.vp_data),
             )?;
 
             // Witness a random non-negative u64 note value
@@ -927,12 +930,13 @@ fn test_halo2_note_commitment_circuit() {
     {
         let circuit = MyCircuit {
             user: User::dummy(&mut rng),
-            application: Application::dummy(&mut rng),
+            application_vp: ValidityPredicateDescription::dummy(&mut rng),
             value: rng.next_u64(),
             rho: Nullifier::default(),
             psi: pallas::Base::random(&mut rng),
             rcm: pallas::Scalar::random(&mut rng),
             is_merkle_checked: false,
+            vp_data: pallas::Base::random(&mut rng),
         };
 
         let prover = MockProver::<pallas::Base>::run(11, &circuit, vec![]).unwrap();
@@ -943,12 +947,13 @@ fn test_halo2_note_commitment_circuit() {
     {
         let circuit = MyCircuit {
             user: User::dummy(&mut rng),
-            application: Application::dummy(&mut rng),
+            application_vp: ValidityPredicateDescription::dummy(&mut rng),
             value: rng.next_u64(),
             rho: Nullifier::default(),
             psi: pallas::Base::random(&mut rng),
             rcm: pallas::Scalar::random(&mut rng),
             is_merkle_checked: true,
+            vp_data: pallas::Base::random(&mut rng),
         };
 
         let prover = MockProver::<pallas::Base>::run(11, &circuit, vec![]).unwrap();
