@@ -250,7 +250,7 @@ fn test_halo2_action_circuit() {
 
     let mut rng = OsRng;
     let action_info = ActionInfo::dummy(&mut rng);
-    let (action, action_circuit) = action_info.build(&mut rng);
+    let (action, action_circuit) = action_info.build();
     let instances = vec![action.to_instance()];
     {
         let prover =

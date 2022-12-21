@@ -1,23 +1,34 @@
 use crate::action::{ActionInfo, ActionInstance};
+use crate::bindnig_signature::*;
 use crate::circuit::vp_circuit::{VPVerifyingInfo, ValidityPredicateInfo};
 use crate::constant::{
     ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, NUM_NOTE,
-    SETUP_PARAMS_MAP,
+    SETUP_PARAMS_MAP, TRANSACTION_BINDING_HASH_PERSONALIZATION,
 };
 use crate::note::{NoteCommitment, OutputNoteInfo, SpendNoteInfo};
 use crate::nullifier::Nullifier;
 use crate::value_commitment::ValueCommitment;
+use blake2b_simd::Params as Blake2bParams;
+use ff::PrimeField;
+use group::Group;
 use halo2_proofs::{
     plonk::{create_proof, verify_proof, Error, SingleVerifier},
     transcript::{Blake2bRead, Blake2bWrite},
 };
 use pasta_curves::{pallas, vesta};
-use rand::RngCore;
+use rand::{CryptoRng, RngCore};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Transaction {
     partial_txs: Vec<PartialTransaction>,
-    // TODO: add binding signature to check sum balance
+    // binding signature to check sum balance
+    signature: InProgressBindingSignature,
+}
+
+#[derive(Debug, Clone)]
+pub enum InProgressBindingSignature {
+    Authorized(BindingSignature),
+    Unauthorized(BindingSigningKey),
 }
 
 #[derive(Debug, Clone)]
@@ -42,9 +53,51 @@ pub struct NoteVPVerifyingInfoSet {
 }
 
 impl Transaction {
+    pub fn build(partial_txs: Vec<PartialTransaction>, rcv_vec: Vec<pallas::Scalar>) -> Self {
+        let sk = rcv_vec
+            .iter()
+            .fold(pallas::Scalar::zero(), |acc, rcv| acc + rcv);
+        let signature = InProgressBindingSignature::Unauthorized(BindingSigningKey::from(sk));
+        Self {
+            partial_txs,
+            signature,
+        }
+    }
+
+    pub fn binding_sign<R: RngCore + CryptoRng>(&mut self, rng: R) {
+        if let InProgressBindingSignature::Unauthorized(sk) = self.signature.clone() {
+            let vk = self.get_binding_vk();
+            assert_eq!(vk, sk.get_vk());
+            let sig_hash = self.commitment();
+            let signature = sk.sign(rng, &sig_hash);
+            self.signature = InProgressBindingSignature::Authorized(signature);
+        }
+    }
+
+    fn commitment(&self) -> [u8; 32] {
+        let mut h = Blake2bParams::new()
+            .hash_length(32)
+            .personal(TRANSACTION_BINDING_HASH_PERSONALIZATION)
+            .to_state();
+        self.get_nullifiers().iter().for_each(|nf| {
+            h.update(&nf.to_bytes());
+        });
+        self.get_output_cms().iter().for_each(|cm| {
+            h.update(&cm.to_bytes());
+        });
+        self.get_value_commitments().iter().for_each(|vc| {
+            h.update(&vc.to_bytes());
+        });
+        self.get_value_anchors().iter().for_each(|anchor| {
+            h.update(&anchor.to_repr());
+        });
+        h.finalize().as_bytes().try_into().unwrap()
+    }
+
     pub fn add_partial_tx(&mut self, ptx: PartialTransaction) {
         self.partial_txs.push(ptx);
     }
+
     pub fn get_nullifiers(&self) -> Vec<Nullifier> {
         self.partial_txs
             .iter()
@@ -73,12 +126,32 @@ impl Transaction {
             .collect()
     }
 
+    pub fn get_binding_vk(&self) -> BindingVerificationKey {
+        let vk = self
+            .get_value_commitments()
+            .iter()
+            .fold(pallas::Point::identity(), |acc, cv| acc + cv.inner());
+
+        BindingVerificationKey::from(vk)
+    }
+
     //
-    pub fn verify(&self) -> Result<(), Error> {
+    pub fn verify_proofs(&self) -> Result<(), Error> {
         for partial_tx in self.partial_txs.iter() {
             partial_tx.verify()?;
         }
 
+        Ok(())
+    }
+
+    pub fn verify_binding_sig(&self) -> Result<(), Error> {
+        let binding_vk = self.get_binding_vk();
+        let sig_hash = self.commitment();
+        if let InProgressBindingSignature::Authorized(sig) = self.signature.clone() {
+            binding_vk.verify(&sig_hash, &sig).unwrap();
+        } else {
+            panic!();
+        }
         Ok(())
     }
 
@@ -87,10 +160,10 @@ impl Transaction {
         &self,
     ) -> Result<(Vec<Nullifier>, Vec<NoteCommitment>, Vec<pallas::Base>), Error> {
         // Verify proofs
-        self.verify()?;
+        self.verify_proofs()?;
 
-        // TODO: Verify binding signature
-        let _value_commitments = self.get_value_commitments();
+        // Verify binding signature
+        self.verify_binding_sig()?;
 
         // Return Nullifiers to check double-spent, NoteCommitments to store, anchors to check the root-existence
         Ok((
@@ -106,7 +179,7 @@ impl PartialTransaction {
         spend_info: [SpendNoteInfo; NUM_NOTE],
         output_info: [OutputNoteInfo; NUM_NOTE],
         mut rng: R,
-    ) -> Self {
+    ) -> (Self, pallas::Scalar) {
         let spends: Vec<NoteVPVerifyingInfoSet> = spend_info
             .iter()
             .map(|spend_note| {
@@ -125,20 +198,25 @@ impl PartialTransaction {
                 )
             })
             .collect();
+        let mut rcv_sum = pallas::Scalar::zero();
         let actions: Vec<ActionVerifyingInfo> = spend_info
             .into_iter()
             .zip(output_info.into_iter())
             .map(|(spend, output)| {
-                let action_info = ActionInfo::new(spend, output);
+                let action_info = ActionInfo::new(spend, output, &mut rng);
+                rcv_sum += action_info.get_rcv();
                 ActionVerifyingInfo::create(action_info, &mut rng).unwrap()
             })
             .collect();
 
-        Self {
-            actions: actions.try_into().unwrap(),
-            spends: spends.try_into().unwrap(),
-            outputs: outputs.try_into().unwrap(),
-        }
+        (
+            Self {
+                actions: actions.try_into().unwrap(),
+                spends: spends.try_into().unwrap(),
+                outputs: outputs.try_into().unwrap(),
+            },
+            rcv_sum,
+        )
     }
 
     pub fn verify(&self) -> Result<(), Error> {
@@ -190,7 +268,7 @@ impl PartialTransaction {
 
 impl ActionVerifyingInfo {
     pub fn create<R: RngCore>(action_info: ActionInfo, mut rng: R) -> Result<Self, Error> {
-        let (action_instance, circuit) = action_info.build(&mut rng);
+        let (action_instance, circuit) = action_info.build();
         let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
         let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
         create_proof(
@@ -277,7 +355,6 @@ fn test_transaction_creation() {
     };
     use ff::Field;
     use rand::rngs::OsRng;
-    use rand::Rng;
 
     let mut rng = OsRng;
 
@@ -287,12 +364,12 @@ fn test_transaction_creation() {
 
     // Generate notes
     let spend_note_1 = {
-        let vp_data = pallas::Base::random(&mut rng);
+        let vp_data = pallas::Base::zero();
         // TODO: add real user vps(application logic vps) later.
         let user = User::dummy(&mut rng);
         let application_vp = trivail_vp_description.clone();
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        let value: u64 = rng.gen();
+        let value = 5000u64;
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let is_merkle_checked = true;
@@ -308,11 +385,11 @@ fn test_transaction_creation() {
         )
     };
     let output_note_1 = {
-        let vp_data = pallas::Base::random(&mut rng);
+        let vp_data = pallas::Base::zero();
         // TODO: add real user vps(application logic vps) later.
         let user = User::dummy(&mut rng);
         let rho = spend_note_1.get_nf();
-        let value: u64 = rng.gen();
+        let value = 5000u64;
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let is_merkle_checked = true;
@@ -363,14 +440,14 @@ fn test_transaction_creation() {
     );
 
     // Create partial tx
-    let ptx = PartialTransaction::build(
+    let (ptx, rcv) = PartialTransaction::build(
         [spend_note_info_1, spend_note_info_2],
         [output_note_info_1, output_note_info_2],
         &mut rng,
     );
 
     // Create tx
-    let mut tx = Transaction::default();
-    tx.add_partial_tx(ptx);
+    let mut tx = Transaction::build(vec![ptx], vec![rcv]);
+    tx.binding_sign(rng);
     tx.execute().unwrap();
 }

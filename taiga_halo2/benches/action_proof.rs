@@ -15,7 +15,7 @@ use taiga_halo2::{
 fn bench_action_proof(name: &str, c: &mut Criterion) {
     let mut rng = OsRng;
     let action_info = ActionInfo::dummy(&mut rng);
-    let (action, action_circuit) = action_info.build(&mut rng);
+    let (action, action_circuit) = action_info.build();
     let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
 
     // Prover bench
