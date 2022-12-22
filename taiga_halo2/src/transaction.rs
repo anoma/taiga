@@ -9,6 +9,7 @@ use crate::note::{NoteCommitment, OutputNoteInfo, SpendNoteInfo};
 use crate::nullifier::Nullifier;
 use crate::value_commitment::ValueCommitment;
 use blake2b_simd::Params as Blake2bParams;
+use core::fmt;
 use ff::PrimeField;
 use group::Group;
 use halo2_proofs::{
@@ -17,6 +18,34 @@ use halo2_proofs::{
 };
 use pasta_curves::{pallas, vesta};
 use rand::{CryptoRng, RngCore};
+use std::fmt::Display;
+
+#[derive(Debug)]
+pub enum TransactionError {
+    /// An error occurred when creating halo2 proof.
+    Proof(Error),
+    /// Binding signature is not valid.
+    InvalidBindingSignature,
+    /// Binding signature is missing.
+    MissingBindingSignatures,
+}
+
+impl Display for TransactionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use TransactionError::*;
+        match self {
+            Proof(e) => f.write_str(&format!("Proof error: {e}")),
+            InvalidBindingSignature => f.write_str("Binding signature was invalid"),
+            MissingBindingSignatures => f.write_str("Binding signature is missing"),
+        }
+    }
+}
+
+impl From<Error> for TransactionError {
+    fn from(e: Error) -> Self {
+        TransactionError::Proof(e)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Transaction {
@@ -67,7 +96,7 @@ impl Transaction {
     pub fn binding_sign<R: RngCore + CryptoRng>(&mut self, rng: R) {
         if let InProgressBindingSignature::Unauthorized(sk) = self.signature.clone() {
             let vk = self.get_binding_vk();
-            assert_eq!(vk, sk.get_vk());
+            assert_eq!(vk, sk.get_vk(), "The notes value is unbalanced");
             let sig_hash = self.commitment();
             let signature = sk.sign(rng, &sig_hash);
             self.signature = InProgressBindingSignature::Authorized(signature);
@@ -144,21 +173,24 @@ impl Transaction {
         Ok(())
     }
 
-    pub fn verify_binding_sig(&self) -> Result<(), Error> {
+    pub fn verify_binding_sig(&self) -> Result<(), TransactionError> {
         let binding_vk = self.get_binding_vk();
         let sig_hash = self.commitment();
         if let InProgressBindingSignature::Authorized(sig) = self.signature.clone() {
-            binding_vk.verify(&sig_hash, &sig).unwrap();
+            binding_vk
+                .verify(&sig_hash, &sig)
+                .map_err(|_| TransactionError::InvalidBindingSignature)?;
         } else {
-            panic!();
+            return Err(TransactionError::MissingBindingSignatures);
         }
+
         Ok(())
     }
 
     #[allow(clippy::type_complexity)]
     pub fn execute(
         &self,
-    ) -> Result<(Vec<Nullifier>, Vec<NoteCommitment>, Vec<pallas::Base>), Error> {
+    ) -> Result<(Vec<Nullifier>, Vec<NoteCommitment>, Vec<pallas::Base>), TransactionError> {
         // Verify proofs
         self.verify_proofs()?;
 
