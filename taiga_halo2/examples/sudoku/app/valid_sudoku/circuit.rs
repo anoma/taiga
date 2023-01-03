@@ -145,23 +145,25 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
         //
 
         let sudoku = self.sudoku.concat();
-        let s1 = &sudoku[..sudoku.len() / 2];
-        let s2 = &sudoku[sudoku.len() / 2..];
+        let s1 = &sudoku[..sudoku.len() / 2]; // s1 contains 40 elements
+        let s2 = &sudoku[sudoku.len() / 2..]; // s2 contains 41 elements
         let u: Vec<u8> = s1
             .iter()
-            .zip(s2.iter())
+            .zip(s2.iter()) // zip contains 40 elements
             .map(|(b1, b2)| {
                 // Two entries of the sudoku can be seen as [b0,b1,b2,b3] and [c0,c1,c2,c3]
                 // We store [b0,b1,b2,b3,c0,c1,c2,c3] here.
                 assert!(b1 + 16 * b2 < 255);
                 b1 + 16 * b2
             })
+            .chain(s2.last().copied()) // there's 41st element in s2, so we add it here
             .collect();
 
         // fill u with zeros.
-        // The length of u is 40, or 160 bits, since we are allocating 4 bits per integer.
-        // We still need to add 96 bits (i.e. 24 integers) to reach 256 bits in total.
-        let u2 = [u, vec![0; 24]].concat();
+        // The length of u is 41 bytes, or 328 bits, since we are allocating 4 bits
+        // per the first 40 integers and let the last sudoku digit to take an entire byte.
+        // We still need to add 184 bits (i.e. 23 bytes) to reach 2*256=512 bits in total.
+        let u2 = [u, vec![0; 23]].concat();
         let u_first: [u8; 32] = u2[0..32].try_into().unwrap();
         let u_last: [u8; 32] = u2[32..].try_into().unwrap();
 
