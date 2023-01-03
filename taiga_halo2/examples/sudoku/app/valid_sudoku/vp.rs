@@ -5,7 +5,7 @@ extern crate taiga_halo2;
 use taiga_halo2::{
     circuit::{
         note_circuit::NoteConfig,
-        vp_circuit::{ValidityPredicateCircuit, ValidityPredicateConfig},
+        vp_circuit::{ValidityPredicateCircuit, ValidityPredicateConfig, ValidityPredicateInfo},
     },
     constant::NUM_NOTE,
     note::Note,
@@ -36,15 +36,29 @@ pub struct SudokuVP {
     output_notes: [Note; NUM_NOTE],
 }
 
-impl ValidityPredicateCircuit for SudokuVP {
-    type Config = SudokuVPConfig;
+// impl ValidityPredicateCircuit for SudokuVP {
+//     type VPConfig = SudokuVPConfig;
+// }
 
+impl ValidityPredicateInfo for SudokuVP {
     fn get_spend_notes(&self) -> &[Note; NUM_NOTE] {
         &self.spend_notes
     }
 
     fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
         &self.output_notes
+    }
+
+    fn get_instances(&self) -> Vec<pallas::Base> {
+        self.get_note_instances()
+    }
+
+    fn get_verifying_info(&self) -> taiga_halo2::circuit::vp_circuit::VPVerifyingInfo {
+        todo!()
+    }
+
+    fn get_vp_description(&self) -> taiga_halo2::vp_description::ValidityPredicateDescription {
+        todo!()
     }
 }
 
