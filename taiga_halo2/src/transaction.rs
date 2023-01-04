@@ -305,6 +305,7 @@ fn test_transaction_creation() {
             is_merkle_checked,
             vp_data,
             user,
+            vec![0u8; 32],
         )
     };
     let output_note_1 = {
@@ -325,6 +326,7 @@ fn test_transaction_creation() {
             is_merkle_checked,
             vp_data,
             user,
+            vec![0u8; 32],
         )
     };
     let spend_note_2 = spend_note_1.clone();

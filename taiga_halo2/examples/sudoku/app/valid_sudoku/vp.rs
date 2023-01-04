@@ -5,7 +5,7 @@ extern crate taiga_halo2;
 use taiga_halo2::{
     circuit::{
         note_circuit::NoteConfig,
-        vp_circuit::{ValidityPredicateCircuit, ValidityPredicateConfig, ValidityPredicateInfo},
+        vp_circuit::{ValidityPredicateConfig, ValidityPredicateInfo},
     },
     constant::NUM_NOTE,
     note::Note,
