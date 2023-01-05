@@ -1,7 +1,7 @@
 use halo2_proofs::{
-    circuit::{Layouter},
+    circuit::Layouter,
+    plonk::{self, create_proof, keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
     transcript::Blake2bWrite,
-    plonk::{ self, Circuit, ConstraintSystem, Error, keygen_vk, keygen_pk, create_proof}
 };
 use pasta_curves::{pallas, vesta, Fp};
 
@@ -9,15 +9,18 @@ extern crate taiga_halo2;
 use taiga_halo2::{
     circuit::{
         note_circuit::NoteConfig,
-        vp_circuit::{ValidityPredicateCircuit, ValidityPredicateConfig, ValidityPredicateInfo, VPVerifyingInfo},
+        vp_circuit::{
+            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
+            ValidityPredicateInfo,
+        },
     },
-    vp_description::ValidityPredicateDescription,
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
+    vp_description::ValidityPredicateDescription,
 };
 
-use rand::rngs::OsRng;
 use crate::app::valid_sudoku::circuit::{SudokuCircuit, SudokuConfig};
+use rand::rngs::OsRng;
 
 #[derive(Clone, Debug)]
 pub struct SudokuVPConfig {
@@ -81,7 +84,7 @@ impl ValidityPredicateInfo for SudokuVP {
         self.get_note_instances()
     }
 
-    fn get_verifying_info(&self) -> taiga_halo2::circuit::vp_circuit::VPVerifyingInfo {
+    fn get_verifying_info(&self) -> VPVerifyingInfo {
         let mut rng = OsRng;
         let params = SETUP_PARAMS_MAP.get(&12).unwrap();
         let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
@@ -102,10 +105,10 @@ impl ValidityPredicateInfo for SudokuVP {
             vk,
             proof,
             instance,
-        }    
+        }
     }
 
-    fn get_vp_description(&self) -> taiga_halo2::vp_description::ValidityPredicateDescription {
+    fn get_vp_description(&self) -> ValidityPredicateDescription {
         let params = SETUP_PARAMS_MAP.get(&12).unwrap();
         let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
         ValidityPredicateDescription::from_vk(vk)
@@ -174,7 +177,6 @@ mod tests {
 
         let mut vp = SudokuVP::new(sudoku, input_notes, output_notes);
 
-
         let vp_desc = ValidityPredicateDescription::from_vk(vk.vk);
 
         let vp_data = pallas::Base::zero(); // TODO: What else can this be?
@@ -185,6 +187,6 @@ mod tests {
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        Note::new(vp_desc, value, rho, psi, rcm, true, vp_data, user, vec!());
+        Note::new(vp_desc, value, rho, psi, rcm, true, vp_data, user, vec![]);
     }
 }
