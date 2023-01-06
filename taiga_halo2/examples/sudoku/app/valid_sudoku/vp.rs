@@ -1,5 +1,5 @@
 use halo2_proofs::{
-    circuit::Layouter,
+    circuit::{floor_planner, Layouter},
     plonk::{self, create_proof, keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
     transcript::Blake2bWrite,
 };
@@ -8,6 +8,7 @@ use pasta_curves::{pallas, vesta, Fp};
 extern crate taiga_halo2;
 use taiga_halo2::{
     circuit::{
+        integrity::{OutputNoteVar, SpendNoteVar},
         note_circuit::NoteConfig,
         vp_circuit::{
             VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
@@ -16,6 +17,7 @@ use taiga_halo2::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
+    vp_circuit_impl,
     vp_description::ValidityPredicateDescription,
 };
 
@@ -25,6 +27,7 @@ use rand::rngs::OsRng;
 #[derive(Clone, Debug)]
 pub struct SudokuVPConfig {
     note_config: NoteConfig,
+    sudoku_config: SudokuConfig,
 }
 
 impl ValidityPredicateConfig for SudokuVPConfig {
@@ -34,7 +37,11 @@ impl ValidityPredicateConfig for SudokuVPConfig {
 
     fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
         let note_config = Self::configure_note(meta);
-        Self { note_config }
+        let sudoku_config = SudokuCircuit::configure(meta);
+        Self {
+            note_config,
+            sudoku_config,
+        }
     }
 }
 
@@ -47,27 +54,15 @@ pub struct SudokuVP {
 
 impl ValidityPredicateCircuit for SudokuVP {
     type VPConfig = SudokuVPConfig;
-}
 
-impl Circuit<pallas::Base> for SudokuVP {
-    type Config = <SudokuCircuit as Circuit<pallas::Base>>::Config;
-    type FloorPlanner = <SudokuCircuit as Circuit<pallas::Base>>::FloorPlanner;
-
-    fn without_witnesses(&self) -> Self {
-        Self::default()
-    }
-
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self::Config {
-        SudokuCircuit::configure(meta)
-    }
-
-    #[allow(non_snake_case)]
-    fn synthesize(
+    fn custom_constraints(
         &self,
-        config: Self::Config,
+        config: Self::VPConfig,
         mut layouter: impl Layouter<pallas::Base>,
+        _spend_note_variables: &[SpendNoteVar],
+        _output_note_variables: &[OutputNoteVar],
     ) -> Result<(), plonk::Error> {
-        self.sudoku.synthesize(config, layouter)
+        self.sudoku.synthesize(config.sudoku_config, layouter)
     }
 }
 
@@ -128,6 +123,8 @@ impl SudokuVP {
         }
     }
 }
+
+vp_circuit_impl!(SudokuVP);
 
 #[cfg(test)]
 mod tests {
