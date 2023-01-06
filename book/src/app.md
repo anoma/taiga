@@ -1,54 +1,47 @@
 # Application
 
-`App` define the type of note (e.g. XAN, ETH, BTC). Each application is identified by an address `appAddress` (the same way as user address identifies a user) and has its own VP `AppVP`.
+Similarly to Ethereum applications that are build on smart contracts, Taiga applications have VPs that define the application rules. Every application is identified by its address and has its own note type. Sending and receiving the notes of the app type is controlled by the `appVP`.
+
+#### Example
+- a cryptocurrency application with a note type CUR (matches the token name) and `appVP` that makes sure that the balance is correct
 
 ### Application VP
-Each application has its own [validity predicate](./validity-predicates.md) `AppVP` that defines the conditions on which the application can be sent/received/etc (e.g. whitelist VP that only allows using the application a specified set of users). As with other VPs, `AppVP` checks that input and output notes of the tx satisfy certain constraints.
-It is required that the `AppVP` of the applications involved in a tx evaluated to `true`.
+Each application has its own [`appVP`](./validity-predicates.md) that defines the conditions on which the application can be used (i.e. the notes of the corresponding type can be sent or received). 
 
-In Taiga, VPs are shielded, so instead of showing that `AppVP` evaluates to `true` publicly, a ZK proof is created. To make sure that `AppVP`  evaluates to `true`, an observer can verify the proof (using the verifier key):
+Like all other VPs, `appVP` is required to evaluate to `true` in a valid transaction and shielded with the help of ZK proofs.
 
-```verify(AppVP_proof, app_VK) = True```
+#### Application Address
+Each application is identified by an address that is derived from its verifier key `app_VK` (that is itself derived from the `appVP`):
+`appAddress = Com(app_VK)`. Notes are linked to applications through the app address field of a note. 
 
-### Application Address
-Each app is identified by an address that is derived from its verifier key `app_VK`:
-`appAddress = Com(app_VK)`
+TODO: link to a VK definition
 
+### Examples
+##### Create an application
+As `appVP` basically defines the application, creating an application is done by creating its `appVP`.
 
-### Example
-##### Create a application
-In order to create a application, we need `AppVP`. Let's use the `TrivialValidityPredicate` (see [more](./validity-predicates.md)):
+Let's use the [`TrivialValidityPredicate`](./validity-predicates.md) we defined earlier. It does nothing and returns `true`:
 ```rust
+// trivial VP checks nothing and returns Ok()
 let mut app_vp = TrivialValidityPredicate::<CP> {
 	input_notes,
 	output_notes,
 };
 
-// transform the VP into a short form 
+// transform the VP into a circuit description
 let desc_vp = ValidityPredicateDescription::from_vp(&mut app_vp, &vp_setup).unwrap();
 
 let app = App::<CP>::new(desc_vp);
 
-//app address can be used to create notes of that app;
+//app address can be used to create notes of that app
 let app_address = app.address().unwrap();
 ```
-This example is reproducible with [this file](https://github.com/anoma/taiga/blob/main/src/doc_examples/app.rs) or with the command
-```
-cargo test doc_examples::app::test_app_creation
-```
+See the example code [here](https://github.com/anoma/taiga/blob/main/taiga_zk_garage/src/doc_examples/app.rs)
 
-#### Dummy app
+#### Dummy application
 
-It is also possible to create a dummy app without VP:
+It is also possible to create a dummy application without a VP (used to create dummy notes):
 
 ```rust
 let app = App::<CP>::dummy(&mut rng)
 ```
-
-Using this app, we can create a [dummy note](./notes.md) of a specific app (all other fields are random):
-
-```rust
-let note = Note::<CP>::dummy_from_app(app, rng)
-```
-
-Next: [User](./users.md)

@@ -1,6 +1,6 @@
 # Note
 
-`Note` is an immutable object that represents a unit of value of a certain application. Each note has an [owner](users.md), a [application](application.md) type, and a value:
+`Note` is an immutable object that represents a unit of value. Each note has an [owner](users.md), an [application](application.md) type, and a value:
 
 ```rust
 pub struct Note<CP: CircuitParameters> {
