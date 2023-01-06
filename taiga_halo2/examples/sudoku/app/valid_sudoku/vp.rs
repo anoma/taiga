@@ -38,7 +38,10 @@ impl ValidityPredicateConfig for SudokuVPConfig {
     fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
         let note_config = Self::configure_note(meta);
         let sudoku_config = SudokuCircuit::configure(meta);
-        Self { note_config, sudoku_config }
+        Self {
+            note_config,
+            sudoku_config,
+        }
     }
 }
 
