@@ -1,3 +1,8 @@
+
+Every [application](./app.md) in Taiga has a validity predicate that contains its rules (e.g. a token application checks the transaction balance).
+
+
+
 # Application
 
 Similarly to Ethereum applications that are build on smart contracts, Taiga applications have VPs that define the application rules. Every application is identified by its address and has its own note type. Sending and receiving the notes of the app type is controlled by the `appVP`.

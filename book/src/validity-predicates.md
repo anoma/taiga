@@ -1,6 +1,11 @@
 # Validity predicate (VP)
 
-A **validity predicate** (VP) is a piece of code that authorizes transactions. Users express their preferences (who to transact with, what actions are allowed, what tokens are accepted, etc) in VPs, and VPs check proposed state transitions to ensure that the user requirements are satisfied.
+In Taiga, there are two types of rules have to be preserved in order for a transaction to be valid. The first type is the rules of Taiga as a system that must be preserved for all transactions. The second type is validity predicates. 
+
+In Taiga, there are two types of mechanisms that check the transaction validity. There are rules enforced by Taiga itself which a
+
+A **validity predicate** (VP) is a piece of code that authorizes transactions.
+
 
 A valid (can be published on the blockchain) transaction satisfy the VPs of all involved parties (but not only that, see [Transaction](transaction.md)).
 
@@ -10,23 +15,18 @@ A valid (can be published on the blockchain) transaction satisfy the VPs of all 
 
 
 Validity predicates exist in both transparent and shielded Anoma (Taiga). Unlike transparent Anoma  VPs that are represented as WASM code and publicly visible, Taiga VPs are arithmetic circuits hidden under ZKP. 
-To make sure that the state transition is allowed by the user, Taiga VPs take the current state (expressed by the spent notes) and the next proposed state (expressed by the output notes) as input and perform various checks.
+To make sure that the state transition is allowed, VPs in Taiga take the current state (expressed by the spent notes) and the next proposed state (expressed by the output notes) as input and perform the required checks.
 
 ## VP types in Taiga
+
+Validity predicates in Taiga have a hierarchical structure. The main VP is `ApplicationVP` that must be checked if the state of the application changes in the proposed transaction. If the application requires checking other VPs (e.g. userVPs which allow the application user to express their preferences), they
+
+TODO: hierarchical structure of VPs
 
 There are two main VP types in Taiga: `applicationVP` and `userVP`. `ApplicationVP` makes sure that every proposed state transition that affects the application state doesn't violate the application rules (e.g. a currency application makes sure that there are no double-spent coins), and `userVP` makes sure that the users' preferences who are affected by the proposed state transition are satisfied.
 
 ### ApplicationVP
 Applications can define the conditions on which they can be used via `applicationVP`. Everytime notes of a certain application are created or spent in a transaction, the `applicationVP` is called to validate the transaction.
-
-### UserVP
-#### sendVP/recvVP
-Users define their long-term preferences with `sendVP` and `recvVP`. Every transaction the user is involved into has to be approved by the user's VP in order to be considered valid.
-* `SendVP` defines the conditions on which notes can be sent (e.g. signature check)
-* `RecvVP` defines the conditions on which a note can be received by the user (e.g. sender whitelist)
-
-#### intentVP
-`IntentVP` helps a user to express their ephemeral interests and make sure the interests are satisfied. Intent VP checks are enforced through **intent notes**. Learn more about intents, `intentVP`, and intent notes [here](./exec.md).
 
 ### Validity predicates as arithemtic circuits
 
