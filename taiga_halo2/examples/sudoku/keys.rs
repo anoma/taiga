@@ -1,8 +1,6 @@
-use halo2_proofs::{plonk::{self, Circuit}, transcript::Blake2bWrite};
+use halo2_proofs::plonk::{self, Circuit};
 use pasta_curves::{pallas, vesta};
-use rand::rngs::OsRng;
-use taiga_halo2::circuit::vp_examples::TrivialValidityPredicateCircuit;
-use std::{hash::{Hash, Hasher}, collections::hash_map::DefaultHasher};
+use std::hash::{Hash, Hasher};
 
 #[derive(Debug)]
 pub struct VerifyingKey {
@@ -48,9 +46,10 @@ impl ProvingKey {
 
 #[test]
 fn test_vk_hashing() {
+    use std::{io::{stdout, Write}, collections::hash_map::DefaultHasher, time::Instant};
+    use rand::rngs::OsRng;
+    use taiga_halo2::circuit::vp_examples::TrivialValidityPredicateCircuit;
     use crate::app::valid_sudoku::circuit::SudokuCircuit;
-    use std::io::{stdout, Write};
-    use std::time::Instant;
 
     let sudoku1 = [
         [7, 6, 9, 5, 3, 8, 1, 2, 4],
