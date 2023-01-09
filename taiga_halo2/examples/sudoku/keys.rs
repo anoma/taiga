@@ -1,5 +1,7 @@
 use halo2_proofs::{plonk::{self, Circuit}, transcript::Blake2bWrite};
 use pasta_curves::{pallas, vesta};
+use rand::rngs::OsRng;
+use taiga_halo2::circuit::vp_examples::TrivialValidityPredicateCircuit;
 use std::{hash::{Hash, Hasher}, collections::hash_map::DefaultHasher};
 
 #[derive(Debug)]
@@ -21,9 +23,8 @@ impl VerifyingKey {
 
 impl Hash for VerifyingKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
-        self.vk.hash_into(&mut transcript);
-        transcript.finalize().hash(state);
+        let s = format!("{:?}", self.vk.pinned());
+        s.hash(state);
     }
 }
 
@@ -75,30 +76,40 @@ fn test_vk_hashing() {
         [6, 2, 7, 4, 3, 5, 1, 9, 8],
     ];
 
-    let circuit1 = SudokuCircuit { sudoku: sudoku1 };
-    let circuit2 = SudokuCircuit { sudoku: sudoku2 };
-    const K: u32 = 13;
-
-    print!("Building proving key 1... "); stdout().flush();
-    let time = Instant::now();
-    let vk1 = VerifyingKey::build(&circuit1, K);
-    println!("Done in {} ms", time.elapsed().as_millis());
-
-    print!("Building proving key 2... "); stdout().flush();
-    let vk2 = VerifyingKey::build(&circuit1, K);
-    println!("Done in {} ms", time.elapsed().as_millis());
-
-    print!("Building proving key 3... "); stdout().flush();
-    let vk3 = VerifyingKey::build(&circuit2, K);
-    println!("Done in {} ms", time.elapsed().as_millis());
-    println!("Done building proving keys.");
-
     fn calculate_hash<T: Hash>(t: &T) -> u64 {
         let mut s = DefaultHasher::new();
         t.hash(&mut s);
         s.finish()
     }
 
+    let circuit1 = SudokuCircuit { sudoku: sudoku1 };
+    let circuit2 = SudokuCircuit { sudoku: sudoku2 };
+    let circuit3 = TrivialValidityPredicateCircuit::dummy(&mut OsRng);
+
+    const K: u32 = 13;
+
+    print!("Building proving key 1... "); stdout().flush();
+    let time = Instant::now();
+    let vk1 = VerifyingKey::build(&circuit1, K);
+    println!("Done in {} ms", time.elapsed().as_millis());
+    let vk1s = format!("{:?}", vk1.vk.pinned());
+
+    print!("Building proving key 2... "); stdout().flush();
+    let time = Instant::now();
+    let vk2 = VerifyingKey::build(&circuit2, K);
+    println!("Done in {} ms", time.elapsed().as_millis());
+    let vk2s = format!("{:?}", vk2.vk.pinned());
+
+    assert_eq!(vk1s, vk2s);
     assert_eq!(calculate_hash(&vk1), calculate_hash(&vk2));
-    assert_ne!(calculate_hash(&vk1), calculate_hash(&vk3)); // these are stil equal
+
+    print!("Building proving key 3... "); stdout().flush();
+    let time = Instant::now();
+    let vk3 = VerifyingKey::build(&circuit3, K);
+    println!("Done in {} ms", time.elapsed().as_millis());
+    println!("Done building proving keys.");
+    let vk3s = format!("{:?}", vk3.vk.pinned());
+
+    assert_ne!(vk1s, vk3s);
+    assert_ne!(calculate_hash(&vk1), calculate_hash(&vk3));
 }

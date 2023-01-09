@@ -163,8 +163,18 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
         // The length of u is 41 bytes, or 328 bits, since we are allocating 4 bits
         // per the first 40 integers and let the last sudoku digit to take an entire byte.
         // We still need to add 184 bits (i.e. 23 bytes) to reach 2*256=512 bits in total.
-        let u2 = [u, vec![0; 23]].concat();
-        let u_first: [u8; 32] = u2[0..32].try_into().unwrap();
+        let mut u2 = [0u8; 64];
+        let mut i = 0;
+        let mut j = 0;
+        while j != u.len() {
+            if (i+1) % 8 != 0 {
+                u2[i] = u[j];
+                j += 1;
+            }
+            i += 1;
+        }
+        // let u2 = [u, vec![0; 23]].concat();
+        let u_first: [u8; 32] = u2[..32].try_into().unwrap();
         let u_last: [u8; 32] = u2[32..].try_into().unwrap();
 
         let x = pallas::Base::from_repr(u_first).unwrap();
