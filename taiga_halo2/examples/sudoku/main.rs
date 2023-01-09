@@ -53,6 +53,7 @@ fn main() {
     pub_instance_vec.append(&mut vec_puzzle);
     assert_eq!(
         MockProver::run(13, &circuit, vec![pub_instance_vec.clone()])
+        // TODO:        ^^ should this '13' be 'K'?
             .unwrap()
             .verify(),
         Ok(())
