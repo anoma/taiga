@@ -29,5 +29,3 @@ To create a note, the user also needs to prove the right to do so. `AppVP` must 
 To see a more detailed description of the action circuit checks, see the [specification](./spec.md). See also the [action implementation](https://github.com/anoma/taiga/blob/main/src/action.rs) and the [action circuit implementation](https://github.com/anoma/taiga/blob/main/src/circuit/action_circuit.rs) for more details.
 
 To ensure full privacy, we use [blinding](./blinding.md) to hide the verifier keys.
-
-Next: [blinding](./blinding.md)

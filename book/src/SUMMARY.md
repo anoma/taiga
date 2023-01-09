@@ -1,6 +1,6 @@
 # Taiga
 
-- [Taiga overview](./overview.md)
+- [Introduction](intro.md)
 - [Notes](./notes.md)
 - [Validity predicates](./validity-predicates.md)
 - [Applications](app.md)

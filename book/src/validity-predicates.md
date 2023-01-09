@@ -1,32 +1,31 @@
 # Validity predicate (VP)
 
-In Taiga, there are two types of rules have to be preserved in order for a transaction to be valid. The first type is the rules of Taiga as a system that must be preserved for all transactions. The second type is validity predicates. 
-
-In Taiga, there are two types of mechanisms that check the transaction validity. There are rules enforced by Taiga itself which a
-
-A **validity predicate** (VP) is a piece of code that authorizes transactions.
+In Taiga, there are two types of mechanisms checking validity of a transaction: 
+* the first type is the Taiga rules that are the same for all transactions.
+* the second type is different for each application and is called **validity predicates**. 
 
 
-A valid (can be published on the blockchain) transaction satisfy the VPs of all involved parties (but not only that, see [Transaction](transaction.md)).
+A **validity predicate** is a piece of code defined by an application that authorizes transactions the application is involved in.  A valid (can be published on the blockchain) transaction satisfy the VPs of all involved applications.
 
-#### Examples of VPs
-- white list VP allows only specific users to send notes to the VP owner
+A single transaction that changes the state of two applications has to be:
+* checked against the Taiga rules
+* checked against the VP of the first application
+* checked against the VP of the second application
+
+Every VP is called **once** per transaction to validate the state transition (e.g. if two notes of the same app exist, the `appVP` is called only once and is checking the state transitions for both notes at once).
+#### Examples
+- white list VP allows only specific users to change the application state
 - lower bound VP restricts the smallest amount of asset that can be received
-
 
 Validity predicates exist in both transparent and shielded Anoma (Taiga). Unlike transparent Anoma  VPs that are represented as WASM code and publicly visible, Taiga VPs are arithmetic circuits hidden under ZKP. 
 To make sure that the state transition is allowed, VPs in Taiga take the current state (expressed by the spent notes) and the next proposed state (expressed by the output notes) as input and perform the required checks.
 
-## VP types in Taiga
+## Hierarchical VP structure
 
-Validity predicates in Taiga have a hierarchical structure. The main VP is `ApplicationVP` that must be checked if the state of the application changes in the proposed transaction. If the application requires checking other VPs (e.g. userVPs which allow the application user to express their preferences), they
+Validity predicates in Taiga have a hierarchical structure. For all applications involved in a transaction, their `ApplicationVP` must be checked. These VPs might require validity of some other VPs in order for a transaction to be considered valid. In that case, those other VPs must be checked too.
 
-TODO: hierarchical structure of VPs
-
-There are two main VP types in Taiga: `applicationVP` and `userVP`. `ApplicationVP` makes sure that every proposed state transition that affects the application state doesn't violate the application rules (e.g. a currency application makes sure that there are no double-spent coins), and `userVP` makes sure that the users' preferences who are affected by the proposed state transition are satisfied.
-
-### ApplicationVP
-Applications can define the conditions on which they can be used via `applicationVP`. Everytime notes of a certain application are created or spent in a transaction, the `applicationVP` is called to validate the transaction.
+#### Example of a sub VP
+Token applications might have `userVP` for each user where they can define on which conditions they want to transact with other users. In this case `applicationVP` would require the validity of userVPs of all users involved in a transaction.
 
 ### Validity predicates as arithemtic circuits
 
@@ -46,15 +45,6 @@ The VP configuration includes the following "gates" in the PLONK configuration:
   
 TODO: update the gate info
 
-### VP checks per transaction
-
-In every transaction some notes are spent and some notes are created. 
-* For every spent note, `sendVP` of its owner is called
-* For every output note, `recvVP` of the recipient is called
-* For every intent note, `intentVP` of the owner is called
-* Every note belongs to some application. For every application that has its notes involved in the transaction, its `appVP` is called.
-
-Every VP is called **once** per transaction to validate the state transition (e.g. if two notes of the same app exist, the `appVP` is called only once and is checking the state transitions for both notes at once). 
 
 ### VP interface
 
@@ -73,53 +63,3 @@ TODO: clarify
 #### Private inputs
 
 While not formally required, most validity predicates will have all spent and output notes as private input and will verify that they match public input.
-
-## Examples
-
-Let's define a trivial VP that takes spent and output notes as input, checks nothing and returns true:
-```rust
-pub struct TrivialValidityPredicate<CP: CircuitParameters> {
-    input_notes: [Note<CP>; NUM_NOTE],
-    output_notes: [Note<CP>; NUM_NOTE],
-}
-
-impl<CP: CircuitParameters> Circuit<CP::CurveScalarField, CP::InnerCurve> for TrivialValidityPredicate<CP>
-{
-    ...
-    
-    //the VP constraints are defined here
-    fn gadget(
-        &mut self,
-        _composer: &mut StandardComposer<CP::CurveScalarField, CP::InnerCurve>,
-    ) -> Result<(), Error> {
-        // do nothing and return Ok()
-        Ok(())
-    }
-   ... 
-}
-```
-Now we can compute the proof for our VP and verify it:
-```rust
-let mut vp = TrivialValidityPredicate::<CP> { input_notes, output_notes };
-
-// setup of the proof system
-let vp_setup = PC::setup(vp.padded_circuit_size(), None, &mut rng).unwrap();
-
-// compute proving and verifying keys
-let (pk, vk) = vp.compile::<PC>(&vp_setup).unwrap();
-
-// generate the proof
-let (proof, public_inputs) = vp.gen_proof::<PC>(&vp_setup, pk, b"Test").unwrap();
-
-// verify the proof to make sure the VP is satisfied
-let verifier_data = VerifierData::new(vk, public_inputs);
-verify_proof::<Fr, P, PC>(
-    &vp_setup,
-    verifier_data.key,
-    &proof,
-    &verifier_data.pi,
-    b"Test",
-).unwrap();
-```
-
-You can find the full example [here](https://github.com/anoma/taiga/blob/main/taiga_zk_garage/src/doc_examples/validity_predicate.rs).
