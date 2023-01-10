@@ -54,6 +54,8 @@ pub struct Note {
     /// user denotes the user's info including nullifier key, send vp and receive vp.
     /// TODO: user will be generalized to `vp_data_nonhashed`
     pub user: User,
+    /// note data bytes
+    pub note_data: Vec<u8>,
 }
 
 #[derive(Clone)]
@@ -83,6 +85,7 @@ impl Note {
         is_merkle_checked: bool,
         vp_data: pallas::Base,
         user: User,
+        note_data: Vec<u8>,
     ) -> Self {
         Self {
             application_vp,
@@ -93,6 +96,7 @@ impl Note {
             is_merkle_checked,
             vp_data,
             user,
+            note_data,
         }
     }
 
@@ -108,6 +112,7 @@ impl Note {
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let user = User::dummy(&mut rng);
+        let note_data = vec![0u8; 32];
         Self {
             application_vp,
             vp_data,
@@ -117,6 +122,7 @@ impl Note {
             rcm,
             is_merkle_checked: true,
             user,
+            note_data,
         }
     }
 

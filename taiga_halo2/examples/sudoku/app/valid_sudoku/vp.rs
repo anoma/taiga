@@ -1,21 +1,33 @@
-use halo2_proofs::plonk::ConstraintSystem;
-use pasta_curves::pallas;
+use halo2_proofs::{
+    circuit::{floor_planner, Layouter},
+    plonk::{self, create_proof, keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
+    transcript::Blake2bWrite,
+};
+use pasta_curves::{pallas, vesta};
 
 extern crate taiga_halo2;
 use taiga_halo2::{
     circuit::{
+        integrity::{OutputNoteVar, SpendNoteVar},
         note_circuit::NoteConfig,
-        vp_circuit::{ValidityPredicateCircuit, ValidityPredicateConfig},
+        vp_circuit::{
+            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
+            ValidityPredicateInfo,
+        },
     },
-    constant::NUM_NOTE,
+    constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
+    vp_circuit_impl,
+    vp_description::ValidityPredicateDescription,
 };
 
-use crate::app::valid_sudoku::circuit::SudokuCircuit;
+use crate::app::valid_sudoku::circuit::{SudokuCircuit, SudokuConfig};
+use rand::rngs::OsRng;
 
 #[derive(Clone, Debug)]
 pub struct SudokuVPConfig {
     note_config: NoteConfig,
+    sudoku_config: SudokuConfig,
 }
 
 impl ValidityPredicateConfig for SudokuVPConfig {
@@ -25,7 +37,11 @@ impl ValidityPredicateConfig for SudokuVPConfig {
 
     fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
         let note_config = Self::configure_note(meta);
-        Self { note_config }
+        let sudoku_config = SudokuCircuit::configure(meta);
+        Self {
+            note_config,
+            sudoku_config,
+        }
     }
 }
 
@@ -37,14 +53,60 @@ pub struct SudokuVP {
 }
 
 impl ValidityPredicateCircuit for SudokuVP {
-    type Config = SudokuVPConfig;
+    type VPConfig = SudokuVPConfig;
 
+    fn custom_constraints(
+        &self,
+        config: Self::VPConfig,
+        layouter: impl Layouter<pallas::Base>,
+        _spend_note_variables: &[SpendNoteVar],
+        _output_note_variables: &[OutputNoteVar],
+    ) -> Result<(), plonk::Error> {
+        self.sudoku.synthesize(config.sudoku_config, layouter)
+    }
+}
+
+impl ValidityPredicateInfo for SudokuVP {
     fn get_spend_notes(&self) -> &[Note; NUM_NOTE] {
         &self.spend_notes
     }
 
     fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
         &self.output_notes
+    }
+
+    fn get_instances(&self) -> Vec<pallas::Base> {
+        self.get_note_instances()
+    }
+
+    fn get_verifying_info(&self) -> VPVerifyingInfo {
+        let mut rng = OsRng;
+        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
+        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
+        let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
+        let instance = self.get_instances();
+        let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
+        create_proof(
+            params,
+            &pk,
+            &[self.clone()],
+            &[&[&instance]],
+            &mut rng,
+            &mut transcript,
+        )
+        .unwrap();
+        let proof = transcript.finalize();
+        VPVerifyingInfo {
+            vk,
+            proof,
+            instance,
+        }
+    }
+
+    fn get_vp_description(&self) -> ValidityPredicateDescription {
+        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
+        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
+        ValidityPredicateDescription::from_vk(vk)
     }
 }
 
@@ -62,12 +124,13 @@ impl SudokuVP {
     }
 }
 
+vp_circuit_impl!(SudokuVP);
+
 #[cfg(test)]
 mod tests {
     use std::time::Instant;
 
     use taiga_halo2::{
-        application::Application,
         circuit::gadgets::{
             assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
             MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
@@ -107,22 +170,20 @@ mod tests {
                 [3, 2, 5, 1, 9, 7, 8, 4, 6],
             ],
         };
-
-        let mut vp = SudokuVP::new(sudoku.clone(), input_notes, output_notes);
-
         let vk = VerifyingKey::build(&sudoku, K);
+
+        let mut vp = SudokuVP::new(sudoku, input_notes, output_notes);
 
         let vp_desc = ValidityPredicateDescription::from_vk(vk.vk);
 
         let vp_data = pallas::Base::zero(); // TODO: What else can this be?
 
         let user = User::dummy(&mut rng);
-        let application = Application::new(vp_desc, vp_data, user);
 
         let value: u64 = 1; // TODO: What is the correct value here (if any)?
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        Note::new(application, value, rho, psi, rcm, true);
+        Note::new(vp_desc, value, rho, psi, rcm, true, vp_data, user, vec![]);
     }
 }
