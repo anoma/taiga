@@ -1,6 +1,6 @@
 use halo2_proofs::plonk::{self, Circuit};
 use pasta_curves::{pallas, vesta};
-use std::hash::{Hash, Hasher};
+use std::{hash::{Hash, Hasher}, io};
 
 #[derive(Debug)]
 pub struct VerifyingKey {
@@ -23,6 +23,9 @@ impl Hash for VerifyingKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let s = format!("{:?}", self.vk.pinned());
         s.hash(state);
+        let mut v = Vec::new();
+        self.params.write(&mut v); // TODO: properly process result
+        v.hash(state);
     }
 }
 
@@ -87,28 +90,41 @@ fn test_vk_hashing() {
 
     const K: u32 = 13;
 
-    print!("Building proving key 1... "); stdout().flush();
+    println!("Building proving key 1... ");
     let time = Instant::now();
     let vk1 = VerifyingKey::build(&circuit1, K);
     println!("Done in {} ms", time.elapsed().as_millis());
     let vk1s = format!("{:?}", vk1.vk.pinned());
 
-    print!("Building proving key 2... "); stdout().flush();
+    println!("Building proving key 2... ");
     let time = Instant::now();
     let vk2 = VerifyingKey::build(&circuit2, K);
     println!("Done in {} ms", time.elapsed().as_millis());
     let vk2s = format!("{:?}", vk2.vk.pinned());
 
+    // Verif keys for Sudoku circuits should be the same even though the puzzles are different
     assert_eq!(vk1s, vk2s);
     assert_eq!(calculate_hash(&vk1), calculate_hash(&vk2));
 
-    print!("Building proving key 3... "); stdout().flush();
+    println!("Building proving key 3... ");
     let time = Instant::now();
     let vk3 = VerifyingKey::build(&circuit3, K);
     println!("Done in {} ms", time.elapsed().as_millis());
-    println!("Done building proving keys.");
     let vk3s = format!("{:?}", vk3.vk.pinned());
 
+    // Sudoku circuit and Trivial VP Circuit are different, so verif keys should be different
     assert_ne!(vk1s, vk3s);
     assert_ne!(calculate_hash(&vk1), calculate_hash(&vk3));
+
+    println!("Building proving key 4... ");
+    let time = Instant::now();
+    let vk4 = VerifyingKey::build(&circuit3, K+3);
+    println!("Done in {} ms", time.elapsed().as_millis());
+    let vk4s = format!("{:?}", vk4.vk.pinned());
+
+    // Verif keys with different K should be different
+    assert_ne!(vk4s, vk3s);
+    assert_ne!(calculate_hash(&vk4), calculate_hash(&vk3));
+
+    // TODO: Add actual hashset tests
 }

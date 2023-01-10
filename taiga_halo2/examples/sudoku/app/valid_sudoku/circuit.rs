@@ -161,8 +161,13 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
 
         // fill u with zeros.
         // The length of u is 41 bytes, or 328 bits, since we are allocating 4 bits
-        // per the first 40 integers and let the last sudoku digit to take an entire byte.
+        // per the first 40 integers and let the last sudoku digit takes an entire byte.
         // We still need to add 184 bits (i.e. 23 bytes) to reach 2*256=512 bits in total.
+        // let u2 = [u, vec![0; 23]].concat(); // this is not working with all puzzles
+        // For some reason, not _any_ byte array can be transformed into a 256-bit field element.
+        // Preliminary investigation shows that `pallas::Base::from_repr` fails on a 32 byte array
+        // if the first bit of every 8-byte (== u64) chunk is set to '1'. For now, we just add a zero
+        // byte every 7 bytes, which is not ideal but works. Further investigation is needed.
         let mut u2 = [0u8; 64];
         let mut i = 0;
         let mut j = 0;
@@ -173,7 +178,6 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
             }
             i += 1;
         }
-        // let u2 = [u, vec![0; 23]].concat();
         let u_first: [u8; 32] = u2[..32].try_into().unwrap();
         let u_last: [u8; 32] = u2[32..].try_into().unwrap();
 
