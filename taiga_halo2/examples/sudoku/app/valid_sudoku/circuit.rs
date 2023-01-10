@@ -172,7 +172,7 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
         let mut i = 0;
         let mut j = 0;
         while j != u.len() {
-            if (i+1) % 8 != 0 {
+            if (i + 1) % 8 != 0 {
                 u2[i] = u[j];
                 j += 1;
             }
