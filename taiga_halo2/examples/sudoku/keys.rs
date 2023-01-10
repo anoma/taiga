@@ -1,6 +1,6 @@
 use halo2_proofs::plonk::{self, Circuit};
 use pasta_curves::{pallas, vesta};
-use std::{hash::{Hash, Hasher}, io};
+use std::hash::{Hash, Hasher};
 
 #[derive(Debug)]
 pub struct VerifyingKey {
@@ -49,7 +49,7 @@ impl ProvingKey {
 
 #[test]
 fn test_vk_hashing() {
-    use std::{io::{stdout, Write}, collections::hash_map::DefaultHasher, time::Instant};
+    use std::{io::Write, collections::hash_map::DefaultHasher, time::Instant};
     use rand::rngs::OsRng;
     use taiga_halo2::circuit::vp_examples::TrivialValidityPredicateCircuit;
     use crate::app::valid_sudoku::circuit::SudokuCircuit;
