@@ -3,7 +3,7 @@ use halo2_proofs::{
     plonk::{self, create_proof, keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
     transcript::Blake2bWrite,
 };
-use pasta_curves::{pallas, vesta, Fp};
+use pasta_curves::{pallas, vesta};
 
 extern crate taiga_halo2;
 use taiga_halo2::{
@@ -58,7 +58,7 @@ impl ValidityPredicateCircuit for SudokuVP {
     fn custom_constraints(
         &self,
         config: Self::VPConfig,
-        mut layouter: impl Layouter<pallas::Base>,
+        layouter: impl Layouter<pallas::Base>,
         _spend_note_variables: &[SpendNoteVar],
         _output_note_variables: &[OutputNoteVar],
     ) -> Result<(), plonk::Error> {
