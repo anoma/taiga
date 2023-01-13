@@ -3,6 +3,7 @@ use ff::Field;
 use halo2_proofs::plonk::VerifyingKey;
 use pasta_curves::{arithmetic::FieldExt, pallas, vesta};
 use rand::RngCore;
+use std::hash::{Hash, Hasher};
 
 // TODO: add vp_param in future.
 #[derive(Debug, Clone)]
@@ -53,5 +54,20 @@ impl ValidityPredicateDescription {
 impl Default for ValidityPredicateDescription {
     fn default() -> ValidityPredicateDescription {
         ValidityPredicateDescription::Compressed(pallas::Base::one())
+    }
+}
+
+impl Hash for ValidityPredicateDescription {
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        match self {
+            ValidityPredicateDescription::Compressed(f) => {
+                let s = format!("{:?}", f);
+                s.hash(hasher);
+            }
+            ValidityPredicateDescription::Uncompressed(vk) => {
+                let s = format!("{:?}", vk.pinned());
+                s.hash(hasher);
+            }
+        }
     }
 }
