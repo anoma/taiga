@@ -23,9 +23,6 @@ impl Hash for VerifyingKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let s = format!("{:?}", self.vk.pinned());
         s.hash(state);
-        let mut v = Vec::new();
-        self.params.write(&mut v); // TODO: properly process result
-        v.hash(state);
     }
 }
 
