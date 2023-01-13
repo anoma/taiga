@@ -1,7 +1,6 @@
 pub mod app;
 pub mod keys;
 pub mod proof;
-pub mod vp_table;
 
 fn main() {
     use std::time::Instant;
