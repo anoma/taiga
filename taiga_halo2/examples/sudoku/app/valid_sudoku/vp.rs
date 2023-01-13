@@ -142,17 +142,17 @@ mod tests {
         vp_description::ValidityPredicateDescription,
     };
 
+    use crate::app::valid_sudoku::{circuit::SudokuCircuit, vp::SudokuVP};
+    use crate::keys::VerifyingKey;
     use ff::Field;
     use pasta_curves::pallas::{self, Point};
     use rand::{rngs::OsRng, Rng};
     use std::collections::hash_map::DefaultHasher;
-    use crate::app::valid_sudoku::{circuit::SudokuCircuit, vp::SudokuVP};
-    use crate::keys::VerifyingKey;
 
     use crate::vp_table::VPTable;
+    use pasta_curves::Fp;
     use std::collections::HashMap;
     use std::hash::{Hash, Hasher};
-    use pasta_curves::Fp;
     fn calculate_hash<T: Hash>(t: &T) -> u64 {
         let mut s = DefaultHasher::new();
         t.hash(&mut s);
@@ -164,7 +164,6 @@ mod tests {
         let mut vp = SudokuVP::default();
         let vk = VerifyingKey::build(&vp, K);
 
-
         let vp_desc = ValidityPredicateDescription::from_vk(vk.vk);
 
         let vk_hash = calculate_hash(&vp_desc);
@@ -173,7 +172,7 @@ mod tests {
         let mut rng = OsRng;
         let user = User::dummy(&mut rng);
 
-        let value: u64 = 1; 
+        let value: u64 = 1;
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let rho = Nullifier::new(pallas::Base::random(&mut rng));

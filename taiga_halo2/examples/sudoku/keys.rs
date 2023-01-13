@@ -49,10 +49,10 @@ impl ProvingKey {
 
 #[test]
 fn test_vk_hashing() {
-    use std::{io::Write, collections::hash_map::DefaultHasher, time::Instant};
-    use rand::rngs::OsRng;
-    use taiga_halo2::circuit::vp_examples::TrivialValidityPredicateCircuit;
     use crate::app::valid_sudoku::circuit::SudokuCircuit;
+    use rand::rngs::OsRng;
+    use std::{collections::hash_map::DefaultHasher, io::Write, time::Instant};
+    use taiga_halo2::circuit::vp_examples::TrivialValidityPredicateCircuit;
 
     let sudoku1 = [
         [7, 6, 9, 5, 3, 8, 1, 2, 4],
@@ -118,7 +118,7 @@ fn test_vk_hashing() {
 
     println!("Building proving key 4... ");
     let time = Instant::now();
-    let vk4 = VerifyingKey::build(&circuit3, K+3);
+    let vk4 = VerifyingKey::build(&circuit3, K + 3);
     println!("Done in {} ms", time.elapsed().as_millis());
     let vk4s = format!("{:?}", vk4.vk.pinned());
 
