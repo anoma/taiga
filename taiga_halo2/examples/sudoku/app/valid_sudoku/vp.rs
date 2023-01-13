@@ -143,44 +143,37 @@ mod tests {
     };
 
     use ff::Field;
-    use pasta_curves::pallas;
+    use pasta_curves::pallas::{self, Point};
     use rand::{rngs::OsRng, Rng};
-
+    use std::collections::hash_map::DefaultHasher;
     use crate::app::valid_sudoku::{circuit::SudokuCircuit, vp::SudokuVP};
     use crate::keys::VerifyingKey;
 
+    use crate::vp_table::VPTable;
+    use std::collections::HashMap;
+    use std::hash::{Hash, Hasher};
+    use pasta_curves::Fp;
+    fn calculate_hash<T: Hash>(t: &T) -> u64 {
+        let mut s = DefaultHasher::new();
+        t.hash(&mut s);
+        s.finish()
+    }
     #[test]
     fn test_vp() {
-        // TODO: What do notes contain in Sudoku?
-        let mut rng = OsRng;
-        let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-
         const K: u32 = 13;
-        let sudoku = SudokuCircuit {
-            sudoku: [
-                [7, 6, 9, 5, 3, 8, 1, 2, 4],
-                [2, 4, 3, 7, 1, 9, 6, 5, 8],
-                [8, 5, 1, 4, 6, 2, 9, 7, 3],
-                [4, 8, 6, 9, 7, 5, 3, 1, 2],
-                [5, 3, 7, 6, 2, 1, 4, 8, 9],
-                [1, 9, 2, 8, 4, 3, 7, 6, 5],
-                [6, 1, 8, 3, 5, 4, 2, 9, 7],
-                [9, 7, 4, 2, 8, 6, 5, 3, 1],
-                [3, 2, 5, 1, 9, 7, 8, 4, 6],
-            ],
-        };
-        let vk = VerifyingKey::build(&sudoku, K);
+        let mut vp = SudokuVP::default();
+        let vk = VerifyingKey::build(&vp, K);
 
-        let mut vp = SudokuVP::new(sudoku, input_notes, output_notes);
 
         let vp_desc = ValidityPredicateDescription::from_vk(vk.vk);
 
-        let vp_data = pallas::Base::zero(); // TODO: What else can this be?
+        let vk_hash = calculate_hash(&vp_desc);
+        let vp_data = Fp::from(vk_hash); // TODO: Hash user and value as well
 
+        let mut rng = OsRng;
         let user = User::dummy(&mut rng);
 
-        let value: u64 = 1; // TODO: What is the correct value here (if any)?
+        let value: u64 = 1; 
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
