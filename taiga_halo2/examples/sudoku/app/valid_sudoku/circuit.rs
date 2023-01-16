@@ -381,14 +381,12 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Instant;
-
     use halo2_proofs::{arithmetic::FieldExt, dev::MockProver};
     use pasta_curves::pallas;
     use rand::rngs::OsRng;
 
     use crate::{
-        app::{valid_puzzle::circuit::PuzzleCircuit, valid_sudoku::circuit::SudokuCircuit},
+        app::{valid_sudoku::circuit::SudokuCircuit},
         keys::{ProvingKey, VerifyingKey},
         proof::Proof,
     };
@@ -459,5 +457,27 @@ mod tests {
             "verification: \t\t{:?}ms",
             (Instant::now() - time).as_millis()
         );
+    }
+
+    #[test]
+    fn test_synthesize() {
+        use crate::app::valid_sudoku::circuit::SudokuCircuit;
+
+        let sudoku= [
+            [5, 8, 1, 6, 7, 2, 4, 3, 9],
+            [7, 9, 2, 8, 4, 3, 6, 5, 1],
+            [3, 6, 4, 5, 9, 1, 7, 8, 2],
+            [4, 3, 8, 9, 5, 7, 2, 1, 6],
+            [2, 5, 6, 1, 8, 4, 9, 7, 3],
+            [1, 7, 9, 3, 2, 6, 8, 4, 5],
+            [8, 4, 5, 2, 1, 9, 3, 6, 7],
+            [9, 1, 3, 7, 6, 8, 5, 2, 4],
+            [6, 2, 7, 4, 3, 5, 1, 9, 8],
+        ];
+
+        const K: u32 = 13;
+
+        let circuit = SudokuCircuit { sudoku };
+        let _vk = VerifyingKey::build(&circuit, K); // this would fail on this specific puzzle with the old implementation of synthesize
     }
 }
