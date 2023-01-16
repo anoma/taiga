@@ -58,7 +58,7 @@ impl ActionInfo {
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
         use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
         let spend_note = Note::dummy(&mut rng);
-        let output_info = OutputNoteInfo::dummy(&mut rng, spend_note.get_nf());
+        let output_info = OutputNoteInfo::dummy(&mut rng, spend_note.get_nf().unwrap());
         let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         let app_vp_proving_info = Box::new(TrivialValidityPredicateCircuit::dummy(&mut rng));
         let app_logic_vp_proving_info = vec![];
@@ -73,7 +73,7 @@ impl ActionInfo {
     }
 
     pub fn build(self) -> (ActionInstance, ActionCircuit) {
-        let nf = self.spend.note.get_nf();
+        let nf = self.spend.note.get_nf().unwrap();
         assert_eq!(
             nf, self.output.note.rho,
             "The nf of spend note should be equal to the rho of output note"

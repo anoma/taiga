@@ -1,7 +1,7 @@
 use crate::constant::NOTE_COMMITMENT_R_GENERATOR;
 use crate::{
     note::NoteCommitment,
-    user::NullifierDerivingKey,
+    nullifier_key::NullifierDerivingKey,
     utils::{extract_p, mod_r_p},
 };
 use ff::PrimeField;

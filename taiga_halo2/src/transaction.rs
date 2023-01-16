@@ -383,7 +383,7 @@ fn test_transaction_creation() {
         merkle_tree::MerklePath,
         note::{Note, OutputNoteInfo, SpendNoteInfo},
         nullifier::Nullifier,
-        user::User,
+        nullifier_key::NullifierKeyCom,
     };
     use ff::Field;
     use rand::rngs::OsRng;
@@ -397,44 +397,48 @@ fn test_transaction_creation() {
     // Generate notes
     let spend_note_1 = {
         let vp_data = pallas::Base::zero();
-        // TODO: add real user vps(application logic vps) later.
-        let user = User::dummy(&mut rng);
+        // TODO: add real application logic vps and encode them to vp_data_nonhashed later.
+        let vp_data_nonhashed = pallas::Base::zero();
         let application_vp = trivail_vp_description.clone();
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
         let value = 5000u64;
+        let nk_com = NullifierKeyCom::rand(&mut rng);
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let is_merkle_checked = true;
         Note::new(
             application_vp,
+            vp_data,
+            vp_data_nonhashed,
             value,
+            nk_com,
             rho,
             psi,
             rcm,
             is_merkle_checked,
-            vp_data,
-            user,
             vec![0u8; 32],
         )
     };
     let output_note_1 = {
         let vp_data = pallas::Base::zero();
-        // TODO: add real user vps(application logic vps) later.
-        let user = User::dummy(&mut rng);
-        let rho = spend_note_1.get_nf();
+        // TODO: add real application logic vps and encode them to vp_data_nonhashed later.
+        let vp_data_nonhashed = pallas::Base::zero();
+        let rho = spend_note_1.get_nf().unwrap();
         let value = 5000u64;
+        let nk_com = NullifierKeyCom::rand(&mut rng);
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let is_merkle_checked = true;
         Note::new(
             trivail_vp_description,
+            vp_data,
+            vp_data_nonhashed,
             value,
+            nk_com,
             rho,
             psi,
             rcm,
             is_merkle_checked,
-            vp_data,
-            user,
             vec![0u8; 32],
         )
     };

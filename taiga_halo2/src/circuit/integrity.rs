@@ -1,6 +1,6 @@
 use std::ops::Neg;
 
-use crate::circuit::gadgets::{assign_free_advice, AddChip, AddInstructions};
+use crate::circuit::gadgets::{assign_free_advice, assign_free_constant, AddChip, AddInstructions};
 use crate::circuit::hash_to_curve::{hash_to_curve_circuit, HashToCurveConfig};
 use crate::circuit::note_circuit::{note_commitment_gadget, NoteCommitmentChip};
 use crate::constant::{
@@ -70,7 +70,7 @@ pub fn nullifier_circuit(
 // Return variables in the spend note
 #[derive(Debug)]
 pub struct SpendNoteVar {
-    pub user_address: AssignedCell<pallas::Base, pallas::Base>,
+    pub address: AssignedCell<pallas::Base, pallas::Base>,
     pub app_vp: AssignedCell<pallas::Base, pallas::Base>,
     pub app_data: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
@@ -98,16 +98,8 @@ pub fn check_spend_note(
     spend_note: Note,
     nf_row_idx: usize,
 ) -> Result<SpendNoteVar, Error> {
-    // Check spend note user integrity: user_address = Com_r(Com_r(send_vp, nk), recv_vp_hash)
-    let (user_address, nk) = {
-        // Witness send_data
-        let send_data = spend_note.get_user_send_data().unwrap();
-        let send_vp_var = assign_free_advice(
-            layouter.namespace(|| "witness user send data"),
-            advices[0],
-            Value::known(send_data),
-        )?;
-
+    // Check spend note user integrity: address = Com_r(Com_r(nk, zero), vp_data_nonhashed)
+    let (address, nk) = {
         // Witness nk
         let nk = spend_note.get_nk().unwrap();
         let nk_var = assign_free_advice(
@@ -116,38 +108,44 @@ pub fn check_spend_note(
             Value::known(nk.inner()),
         )?;
 
-        // send_com = Com_r(send_data, nk)
-        let send_com = {
-            let poseidon_chip = PoseidonChip::construct(poseidon_config.clone());
-            let poseidon_hasher =
-                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
-                    poseidon_chip,
-                    layouter.namespace(|| "Poseidon init"),
-                )?;
-            let poseidon_message = [send_vp_var, nk_var.clone()];
-            poseidon_hasher.hash(layouter.namespace(|| "send_com"), poseidon_message)?
-        };
-
-        // Witness recv_data
-        let recv_data = assign_free_advice(
-            layouter.namespace(|| "witness user recv data"),
+        let zero_constant = assign_free_constant(
+            layouter.namespace(|| "constant zero"),
             advices[0],
-            Value::known(spend_note.get_user_recv_data()),
+            pallas::Base::zero(),
         )?;
 
-        // user_address = Com_r(send_com, recv_vp_data)
-        let user_address = {
+        // nk_com = Com_r(nk, zero)
+        let nk_com = {
             let poseidon_chip = PoseidonChip::construct(poseidon_config.clone());
             let poseidon_hasher =
                 PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
                     poseidon_chip,
                     layouter.namespace(|| "Poseidon init"),
                 )?;
-            let poseidon_message = [send_com, recv_data];
-            poseidon_hasher.hash(layouter.namespace(|| "user_address"), poseidon_message)?
+            let poseidon_message = [nk_var.clone(), zero_constant];
+            poseidon_hasher.hash(layouter.namespace(|| "nk_com"), poseidon_message)?
         };
 
-        (user_address, nk_var)
+        // Witness vp_data_nonhashed
+        let vp_data_nonhashed = assign_free_advice(
+            layouter.namespace(|| "witness vp_data_nonhashed"),
+            advices[0],
+            Value::known(spend_note.vp_data_nonhashed),
+        )?;
+
+        // address = Com_r(vp_data_nonhashed, nk_com)
+        let address = {
+            let poseidon_chip = PoseidonChip::construct(poseidon_config.clone());
+            let poseidon_hasher =
+                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
+                    poseidon_chip,
+                    layouter.namespace(|| "Poseidon init"),
+                )?;
+            let poseidon_message = [vp_data_nonhashed, nk_com];
+            poseidon_hasher.hash(layouter.namespace(|| "spend address"), poseidon_message)?
+        };
+
+        (address, nk_var)
     };
 
     // Witness app_vp
@@ -205,7 +203,7 @@ pub fn check_spend_note(
         sinsemilla_chip,
         ecc_chip.clone(),
         note_commit_chip,
-        user_address.clone(),
+        address.clone(),
         app_vp.clone(),
         app_data.clone(),
         rho.clone(),
@@ -232,7 +230,7 @@ pub fn check_spend_note(
     layouter.constrain_instance(nf.cell(), instances, nf_row_idx)?;
 
     Ok(SpendNoteVar {
-        user_address,
+        address,
         app_vp,
         value,
         app_data,
@@ -245,7 +243,7 @@ pub fn check_spend_note(
 // Return variables in the spend note
 #[derive(Debug)]
 pub struct OutputNoteVar {
-    pub user_address: AssignedCell<pallas::Base, pallas::Base>,
+    pub address: AssignedCell<pallas::Base, pallas::Base>,
     pub app_vp: AssignedCell<pallas::Base, pallas::Base>,
     pub app_data: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
@@ -272,18 +270,20 @@ pub fn check_output_note(
     old_nf: AssignedCell<pallas::Base, pallas::Base>,
     cm_row_idx: usize,
 ) -> Result<OutputNoteVar, Error> {
-    // Check output note user integrity: user_address = Com_r(send_com, recv_vp_hash)
-    let user_address = {
-        let send_com = assign_free_advice(
-            layouter.namespace(|| "witness output send_com"),
+    // Check output note user integrity: address = Com_r(vp_data_nonhashed, nk_com)
+    let address = {
+        // Witness nk_com
+        let nk_com = assign_free_advice(
+            layouter.namespace(|| "witness nk_com"),
             advices[0],
-            Value::known(output_note.get_user_send_closed()),
+            Value::known(output_note.nk_com.get_nk_com()),
         )?;
-        // Witness recv data
-        let recv_data = assign_free_advice(
-            layouter.namespace(|| "witness user recv data"),
+
+        // Witness vp_data_nonhashed
+        let vp_data_nonhashed = assign_free_advice(
+            layouter.namespace(|| "witness vp_data_nonhashed"),
             advices[0],
-            Value::known(output_note.get_user_recv_data()),
+            Value::known(output_note.vp_data_nonhashed),
         )?;
 
         let poseidon_chip = PoseidonChip::construct(poseidon_config);
@@ -292,8 +292,8 @@ pub fn check_output_note(
                 poseidon_chip,
                 layouter.namespace(|| "Poseidon init"),
             )?;
-        let poseidon_message = [send_com, recv_data];
-        poseidon_hasher.hash(layouter.namespace(|| "user_address"), poseidon_message)?
+        let poseidon_message = [vp_data_nonhashed, nk_com];
+        poseidon_hasher.hash(layouter.namespace(|| "output address"), poseidon_message)?
     };
 
     // Witness app_vp
@@ -344,7 +344,7 @@ pub fn check_output_note(
         sinsemilla_chip,
         ecc_chip,
         note_commit_chip,
-        user_address.clone(),
+        address.clone(),
         app_vp.clone(),
         app_data.clone(),
         old_nf,
@@ -359,7 +359,7 @@ pub fn check_output_note(
     layouter.constrain_instance(cm_x.cell(), instances, cm_row_idx)?;
 
     Ok(OutputNoteVar {
-        user_address,
+        address,
         app_vp,
         app_data,
         value,
@@ -504,7 +504,7 @@ fn test_halo2_nullifier_circuit() {
     };
     use crate::note::NoteCommitment;
     use crate::nullifier::Nullifier;
-    use crate::user::NullifierDerivingKey;
+    use crate::nullifier_key::NullifierDerivingKey;
     use ff::Field;
     use group::Curve;
     use halo2_gadgets::{

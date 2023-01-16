@@ -477,7 +477,7 @@ pub fn note_commitment_gadget(
     chip: SinsemillaChip<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
     note_commit_chip: NoteCommitmentChip,
-    user_address: AssignedCell<pallas::Base, pallas::Base>,
+    address: AssignedCell<pallas::Base, pallas::Base>,
     app_vp: AssignedCell<pallas::Base, pallas::Base>,
     app_data: AssignedCell<pallas::Base, pallas::Base>,
     rho: AssignedCell<pallas::Base, pallas::Base>,
@@ -488,11 +488,11 @@ pub fn note_commitment_gadget(
 ) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
     let lookup_config = chip.config().lookup_config();
 
-    // `user_0_249` = bits 0..=249 of `user_address`
+    // `user_0_249` = bits 0..=249 of `address`
     let user_0_249 = MessagePiece::from_subpieces(
         chip.clone(),
         layouter.namespace(|| "user_0_249"),
-        [RangeConstrained::bitrange_of(user_address.value(), 0..250)],
+        [RangeConstrained::bitrange_of(address.value(), 0..250)],
     )?;
 
     // `a` = (bits 250..=255 of user) || (bits 0..=4 of application)
@@ -500,7 +500,7 @@ pub fn note_commitment_gadget(
         &lookup_config,
         chip.clone(),
         &mut layouter,
-        &user_address,
+        &address,
         &app_vp,
     )?;
 
@@ -546,7 +546,7 @@ pub fn note_commitment_gadget(
         &value,
     )?;
 
-    // cm = NoteCommit^rcm(user_address || app_vp || app_data || rho || psi || is_merkle_checked || value)
+    // cm = NoteCommit^rcm(address || app_vp || app_data || rho || psi || is_merkle_checked || value)
     let (cm, _zs) = {
         let message = Message::from_pieces(
             chip.clone(),
@@ -595,7 +595,7 @@ pub fn note_commitment_gadget(
     )?;
 
     cfg.base_canonicity_250_5
-        .assign(&mut layouter, user_address, user_0_249, user_tail_bit5)?;
+        .assign(&mut layouter, address, user_0_249, user_tail_bit5)?;
     cfg.base_canonicity_5
         .assign(&mut layouter, app_vp, app_5_254, app_pre_bit5)?;
     cfg.base_canonicity_250_5
@@ -705,7 +705,10 @@ impl NoteChip {
 fn test_halo2_note_commitment_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use crate::note::Note;
-    use crate::{nullifier::Nullifier, user::User, vp_description::ValidityPredicateDescription};
+    use crate::{
+        nullifier::Nullifier, nullifier_key::NullifierKeyCom,
+        vp_description::ValidityPredicateDescription,
+    };
     use ff::Field;
     use group::Curve;
     use halo2_gadgets::{
@@ -725,14 +728,15 @@ fn test_halo2_note_commitment_circuit() {
 
     #[derive(Default)]
     struct MyCircuit {
-        user: User,
         application_vp: ValidityPredicateDescription,
+        vp_data: pallas::Base,
+        vp_data_nonhashed: pallas::Base,
         value: u64,
+        nk_com: NullifierKeyCom,
         rho: Nullifier,
         psi: pallas::Base,
         rcm: pallas::Scalar,
         is_merkle_checked: bool,
-        vp_data: pallas::Base,
     }
 
     impl Circuit<pallas::Base> for MyCircuit {
@@ -823,13 +827,14 @@ fn test_halo2_note_commitment_circuit() {
             >::load(note_commit_config.sinsemilla_config.clone(), &mut layouter)?;
             let note = Note::new(
                 self.application_vp.clone(),
+                self.vp_data,
+                self.vp_data_nonhashed,
                 self.value,
+                self.nk_com,
                 self.rho,
                 self.psi,
                 self.rcm,
                 self.is_merkle_checked,
-                self.vp_data,
-                self.user.clone(),
                 vec![0u8; 32],
             );
             // Construct a Sinsemilla chip
@@ -843,10 +848,10 @@ fn test_halo2_note_commitment_circuit() {
             let note_commit_chip = NoteCommitmentChip::construct(note_commit_config.clone());
 
             // Witness user
-            let user_address = assign_free_advice(
-                layouter.namespace(|| "witness user address"),
+            let address = assign_free_advice(
+                layouter.namespace(|| "witness address"),
                 note_commit_config.advices[0],
-                Value::known(note.get_user_address()),
+                Value::known(note.get_address()),
             )?;
 
             // Witness application
@@ -904,7 +909,7 @@ fn test_halo2_note_commitment_circuit() {
                 sinsemilla_chip,
                 ecc_chip.clone(),
                 note_commit_chip,
-                user_address,
+                address,
                 app_vp,
                 app_data,
                 rho,
@@ -930,14 +935,15 @@ fn test_halo2_note_commitment_circuit() {
     // Test note with flase is_merkle_checked flag
     {
         let circuit = MyCircuit {
-            user: User::dummy(&mut rng),
             application_vp: ValidityPredicateDescription::dummy(&mut rng),
+            vp_data: pallas::Base::random(&mut rng),
+            vp_data_nonhashed: pallas::Base::random(&mut rng),
             value: rng.next_u64(),
+            nk_com: NullifierKeyCom::rand(&mut rng),
             rho: Nullifier::default(),
             psi: pallas::Base::random(&mut rng),
             rcm: pallas::Scalar::random(&mut rng),
             is_merkle_checked: false,
-            vp_data: pallas::Base::random(&mut rng),
         };
 
         let prover = MockProver::<pallas::Base>::run(11, &circuit, vec![]).unwrap();
@@ -947,14 +953,15 @@ fn test_halo2_note_commitment_circuit() {
     // Test note with true is_merkle_checked flag
     {
         let circuit = MyCircuit {
-            user: User::dummy(&mut rng),
             application_vp: ValidityPredicateDescription::dummy(&mut rng),
+            vp_data: pallas::Base::random(&mut rng),
+            vp_data_nonhashed: pallas::Base::random(&mut rng),
             value: rng.next_u64(),
+            nk_com: NullifierKeyCom::rand(&mut rng),
             rho: Nullifier::default(),
             psi: pallas::Base::random(&mut rng),
             rcm: pallas::Scalar::random(&mut rng),
             is_merkle_checked: true,
-            vp_data: pallas::Base::random(&mut rng),
         };
 
         let prover = MockProver::<pallas::Base>::run(11, &circuit, vec![]).unwrap();
