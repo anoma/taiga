@@ -386,7 +386,7 @@ mod tests {
     use rand::rngs::OsRng;
 
     use crate::{
-        app::{valid_sudoku::circuit::SudokuCircuit},
+        app::valid_sudoku::circuit::SudokuCircuit,
         keys::{ProvingKey, VerifyingKey},
         proof::Proof,
     };
@@ -463,7 +463,7 @@ mod tests {
     fn test_synthesize() {
         use crate::app::valid_sudoku::circuit::SudokuCircuit;
 
-        let sudoku= [
+        let sudoku = [
             [5, 8, 1, 6, 7, 2, 4, 3, 9],
             [7, 9, 2, 8, 4, 3, 6, 5, 1],
             [3, 6, 4, 5, 9, 1, 7, 8, 2],

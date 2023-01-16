@@ -144,7 +144,7 @@ mod tests {
 
     use ff::Field;
     use pasta_curves::pallas;
-    use rand::{rngs::OsRng};
+    use rand::rngs::OsRng;
 
     use crate::app::valid_sudoku::{circuit::SudokuCircuit, vp::SudokuVP};
     use crate::keys::VerifyingKey;
