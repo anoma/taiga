@@ -52,7 +52,7 @@ fn main() {
     let mut pub_instance_vec = zeros.to_vec();
     pub_instance_vec.append(&mut vec_puzzle);
     assert_eq!(
-        MockProver::run(13, &circuit, vec![pub_instance_vec.clone()])
+        MockProver::run(K, &circuit, vec![pub_instance_vec.clone()])
             .unwrap()
             .verify(),
         Ok(())

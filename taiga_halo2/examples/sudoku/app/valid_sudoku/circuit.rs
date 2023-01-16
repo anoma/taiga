@@ -161,9 +161,23 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
 
         // fill u with zeros.
         // The length of u is 41 bytes, or 328 bits, since we are allocating 4 bits
-        // per the first 40 integers and let the last sudoku digit to take an entire byte.
+        // per the first 40 integers and let the last sudoku digit takes an entire byte.
         // We still need to add 184 bits (i.e. 23 bytes) to reach 2*256=512 bits in total.
-        let u2 = [u, vec![0; 23]].concat();
+        // let u2 = [u, vec![0; 23]].concat(); // this is not working with all puzzles
+        // For some reason, not _any_ byte array can be transformed into a 256-bit field element.
+        // Preliminary investigation shows that `pallas::Base::from_repr` fails on a 32 byte array
+        // if the first bit of every 8-byte (== u64) chunk is set to '1'. For now, we just add a zero
+        // byte every 7 bytes, which is not ideal but works. Further investigation is needed.
+        let mut u2 = [0u8; 64];
+        let mut i = 0;
+        let mut j = 0;
+        while j != u.len() {
+            if (i + 1) % 8 != 0 {
+                u2[i] = u[j];
+                j += 1;
+            }
+            i += 1;
+        }
         let u_first: [u8; 32] = u2[0..32].try_into().unwrap();
         let u_last: [u8; 32] = u2[32..].try_into().unwrap();
 
@@ -367,14 +381,12 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Instant;
-
     use halo2_proofs::{arithmetic::FieldExt, dev::MockProver};
     use pasta_curves::pallas;
     use rand::rngs::OsRng;
 
     use crate::{
-        app::{valid_puzzle::circuit::PuzzleCircuit, valid_sudoku::circuit::SudokuCircuit},
+        app::valid_sudoku::circuit::SudokuCircuit,
         keys::{ProvingKey, VerifyingKey},
         proof::Proof,
     };
@@ -445,5 +457,27 @@ mod tests {
             "verification: \t\t{:?}ms",
             (Instant::now() - time).as_millis()
         );
+    }
+
+    #[test]
+    fn test_synthesize() {
+        use crate::app::valid_sudoku::circuit::SudokuCircuit;
+
+        let sudoku = [
+            [5, 8, 1, 6, 7, 2, 4, 3, 9],
+            [7, 9, 2, 8, 4, 3, 6, 5, 1],
+            [3, 6, 4, 5, 9, 1, 7, 8, 2],
+            [4, 3, 8, 9, 5, 7, 2, 1, 6],
+            [2, 5, 6, 1, 8, 4, 9, 7, 3],
+            [1, 7, 9, 3, 2, 6, 8, 4, 5],
+            [8, 4, 5, 2, 1, 9, 3, 6, 7],
+            [9, 1, 3, 7, 6, 8, 5, 2, 4],
+            [6, 2, 7, 4, 3, 5, 1, 9, 8],
+        ];
+
+        const K: u32 = 13;
+
+        let circuit = SudokuCircuit { sudoku };
+        let _vk = VerifyingKey::build(&circuit, K); // this would fail on this specific puzzle with the old implementation of synthesize
     }
 }
