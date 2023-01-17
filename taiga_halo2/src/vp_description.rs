@@ -1,9 +1,9 @@
-use std::hash::Hash;
 use blake2b_simd::Params as Blake2bParams;
 use ff::{Field, PrimeField};
 use halo2_proofs::plonk::VerifyingKey;
 use pasta_curves::{arithmetic::FieldExt, pallas, vesta};
 use rand::RngCore;
+use std::hash::Hash;
 
 // TODO: add vp_param in future.
 #[derive(Debug, Clone)]
