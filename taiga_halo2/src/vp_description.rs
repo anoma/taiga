@@ -64,6 +64,12 @@ impl Hash for ValidityPredicateDescription {
     }
 }
 
+impl PartialEq for ValidityPredicateDescription {
+    fn eq(&self, other: &Self) -> bool {
+        self.get_compressed() == other.get_compressed()
+    }
+}
+
 #[test]
 fn test_vpd_hashing() {
     use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
@@ -91,16 +97,18 @@ fn test_vpd_hashing() {
     let vpd2 = ValidityPredicateDescription::from_vk(vk2.clone());
     let vk2s = format!("{:?}", vk2.pinned());
 
-    // Verif keys for Sudoku circuits should be the same even though the puzzles are different
-    assert_eq!(vk1s, vk2s);
-    assert_eq!(calculate_hash(&vpd1), calculate_hash(&vpd2));
+    // Same circuit, same param => same key
+    assert_eq!(vk1s, vk2s); // check that the keys are actually the same
+    assert_eq!(calculate_hash(&vpd1), calculate_hash(&vpd2)); // check that the hashes are the same
+    assert_eq!(vpd1, vpd2); // check that the vpd's are equal
 
     let params3 = halo2_proofs::poly::commitment::Params::new(13); // different param => different key
     let vk3 = plonk::keygen_vk(&params3, &circuit3).unwrap();
     let vpd3 = ValidityPredicateDescription::from_vk(vk3.clone());
     let vk3s = format!("{:?}", vk3.pinned());
 
-    // Sudoku circuit and Trivial VP Circuit are different, so verif keys should be different
-    assert_ne!(vk1s, vk3s);
-    assert_ne!(calculate_hash(&vpd1), calculate_hash(&vpd3));
+    // Same circuit, different param => different key
+    assert_ne!(vk1s, vk3s); // check that the keys are actually different
+    assert_ne!(calculate_hash(&vpd1), calculate_hash(&vpd3)); // check that the hashes are different
+    assert_ne!(vpd1, vpd3); // check that the vpd's are not equal
 }
