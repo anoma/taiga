@@ -8,7 +8,6 @@ pub mod constant;
 pub mod merkle_tree;
 pub mod note;
 pub mod nullifier;
-pub mod nullifier_key;
 pub mod transaction;
 pub mod utils;
 pub mod value_commitment;

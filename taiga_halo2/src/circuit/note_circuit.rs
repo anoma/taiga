@@ -706,7 +706,7 @@ fn test_halo2_note_commitment_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use crate::note::Note;
     use crate::{
-        nullifier::Nullifier, nullifier_key::NullifierKeyCom,
+        nullifier::{Nullifier, NullifierKeyCom},
         vp_description::ValidityPredicateDescription,
     };
     use ff::Field;

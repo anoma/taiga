@@ -503,8 +503,7 @@ fn test_halo2_nullifier_circuit() {
         NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain,
     };
     use crate::note::NoteCommitment;
-    use crate::nullifier::Nullifier;
-    use crate::nullifier_key::NullifierDerivingKey;
+    use crate::nullifier::{Nullifier, NullifierDerivingKey};
     use ff::Field;
     use group::Curve;
     use halo2_gadgets::{

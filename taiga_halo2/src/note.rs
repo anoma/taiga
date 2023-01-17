@@ -4,8 +4,7 @@ use crate::{
         BASE_BITS_NUM, NOTE_COMMIT_DOMAIN, POSEIDON_TO_CURVE_INPUT_LEN, TAIGA_COMMITMENT_TREE_DEPTH,
     },
     merkle_tree::{MerklePath, Node},
-    nullifier::Nullifier,
-    nullifier_key::{NullifierDerivingKey, NullifierKeyCom},
+    nullifier::{Nullifier, NullifierDerivingKey, NullifierKeyCom},
     utils::{extract_p, poseidon_hash, poseidon_to_curve},
     vp_description::ValidityPredicateDescription,
 };
@@ -48,7 +47,7 @@ pub struct Note {
     /// vp_data is the data defined in application vp and will be used to derive value base
     pub vp_data: pallas::Base,
     /// vp_data_nonhashed is the data defined in application vp and will NOT be used to derive value base
-    /// vp_data_nonhashed denotes the encoded user-specific data and vps
+    /// vp_data_nonhashed denotes the encoded user-specific data and sub-vps
     pub vp_data_nonhashed: pallas::Base,
     /// value denotes the amount of the note.
     pub value: u64,

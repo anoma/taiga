@@ -382,8 +382,7 @@ fn test_transaction_creation() {
         constant::TAIGA_COMMITMENT_TREE_DEPTH,
         merkle_tree::MerklePath,
         note::{Note, OutputNoteInfo, SpendNoteInfo},
-        nullifier::Nullifier,
-        nullifier_key::NullifierKeyCom,
+        nullifier::{Nullifier, NullifierKeyCom},
     };
     use ff::Field;
     use rand::rngs::OsRng;
