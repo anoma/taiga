@@ -70,6 +70,8 @@ impl PartialEq for ValidityPredicateDescription {
     }
 }
 
+impl Eq for ValidityPredicateDescription {}
+
 #[test]
 fn test_vpd_hashing() {
     use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
@@ -111,4 +113,11 @@ fn test_vpd_hashing() {
     assert_ne!(vk1s, vk3s); // check that the keys are actually different
     assert_ne!(calculate_hash(&vpd1), calculate_hash(&vpd3)); // check that the hashes are different
     assert_ne!(vpd1, vpd3); // check that the vpd's are not equal
+
+    // test with actual hashset
+    use std::collections::HashSet;
+    let mut set = HashSet::new();
+    assert!(set.insert(vpd1));
+    assert!(!set.insert(vpd2));
+    assert!(set.insert(vpd3));
 }
