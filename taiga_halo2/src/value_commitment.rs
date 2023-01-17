@@ -1,6 +1,6 @@
 use crate::constant::NOTE_COMMITMENT_R_GENERATOR;
 use crate::note::Note;
-use group::{cofactor::CofactorCurveAffine, Curve, Group};
+use group::{cofactor::CofactorCurveAffine, Curve, Group, GroupEncoding};
 use halo2_proofs::arithmetic::CurveAffine;
 use pasta_curves::pallas;
 
@@ -32,5 +32,13 @@ impl ValueCommitment {
         } else {
             *self.0.to_affine().coordinates().unwrap().y()
         }
+    }
+
+    pub fn inner(&self) -> pallas::Point {
+        self.0
+    }
+
+    pub fn to_bytes(&self) -> [u8; 32] {
+        self.0.to_bytes()
     }
 }

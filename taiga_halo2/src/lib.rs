@@ -2,6 +2,7 @@
 #![allow(clippy::large_enum_variant)]
 
 pub mod action;
+pub mod bindnig_signature;
 pub mod circuit;
 pub mod constant;
 pub mod merkle_tree;

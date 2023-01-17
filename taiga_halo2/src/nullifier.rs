@@ -4,6 +4,7 @@ use crate::{
     user::NullifierDerivingKey,
     utils::{extract_p, mod_r_p},
 };
+use ff::PrimeField;
 use group::cofactor::CofactorCurveAffine;
 use pasta_curves::pallas;
 
@@ -35,6 +36,10 @@ impl Nullifier {
 
     pub fn inner(&self) -> pallas::Base {
         self.0
+    }
+
+    pub fn to_bytes(&self) -> [u8; 32] {
+        self.0.to_repr()
     }
 }
 

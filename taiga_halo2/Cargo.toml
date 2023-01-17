@@ -15,6 +15,7 @@ halo2_proofs = "0.2"
 bitvec = "1"
 subtle = { version = "2.3", default-features = false }
 dyn-clone = "1.0"
+reddsa = "0.3"
 
 [dev-dependencies]
 criterion = "0.3"

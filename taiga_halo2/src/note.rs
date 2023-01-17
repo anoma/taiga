@@ -12,7 +12,7 @@ use crate::{
 use bitvec::{array::BitArray, order::Lsb0};
 use core::iter;
 use ff::{Field, PrimeFieldBits};
-use group::Group;
+use group::{Group, GroupEncoding};
 use pasta_curves::pallas;
 use rand::{Rng, RngCore};
 
@@ -27,6 +27,10 @@ impl NoteCommitment {
 
     pub fn get_x(&self) -> pallas::Base {
         extract_p(&self.0)
+    }
+
+    pub fn to_bytes(&self) -> [u8; 32] {
+        self.0.to_bytes()
     }
 }
 

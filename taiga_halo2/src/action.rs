@@ -30,6 +30,7 @@ pub struct ActionInstance {
 pub struct ActionInfo {
     spend: SpendNoteInfo,
     output: OutputNoteInfo,
+    rcv: pallas::Scalar,
 }
 
 impl ActionInstance {
@@ -45,8 +46,13 @@ impl ActionInstance {
 }
 
 impl ActionInfo {
-    pub fn new(spend: SpendNoteInfo, output: OutputNoteInfo) -> Self {
-        Self { spend, output }
+    pub fn new<R: RngCore>(spend: SpendNoteInfo, output: OutputNoteInfo, mut rng: R) -> Self {
+        let rcv = pallas::Scalar::random(&mut rng);
+        Self { spend, output, rcv }
+    }
+
+    pub fn get_rcv(&self) -> pallas::Scalar {
+        self.rcv
     }
 
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
@@ -63,10 +69,10 @@ impl ActionInfo {
             app_logic_vp_proving_info,
         );
 
-        ActionInfo::new(spend_info, output_info)
+        ActionInfo::new(spend_info, output_info, &mut rng)
     }
 
-    pub fn build<R: RngCore>(self, mut rng: R) -> (ActionInstance, ActionCircuit) {
+    pub fn build(self) -> (ActionInstance, ActionCircuit) {
         let nf = self.spend.note.get_nf();
         assert_eq!(
             nf, self.output.note.rho,
@@ -74,9 +80,8 @@ impl ActionInfo {
         );
 
         let output_cm = self.output.note.commitment();
-        let rcv = pallas::Scalar::random(&mut rng);
 
-        let cv_net = ValueCommitment::new(&self.spend.note, &self.output.note, &rcv);
+        let cv_net = ValueCommitment::new(&self.spend.note, &self.output.note, &self.rcv);
         let action = ActionInstance {
             nf,
             cm: output_cm,
@@ -88,7 +93,7 @@ impl ActionInfo {
             spend_note: self.spend.note,
             auth_path: self.spend.auth_path,
             output_note: self.output.note,
-            rcv,
+            rcv: self.rcv,
         };
 
         (action, action_circuit)
