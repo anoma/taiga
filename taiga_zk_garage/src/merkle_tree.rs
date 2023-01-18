@@ -92,7 +92,7 @@ impl<F: PrimeField, BH: FieldHasher<F>> MerklePath<F, BH> {
         }
     }
 
-    pub fn build_merkle_path(leaf_hashes: &Vec<F>, position: usize) -> Self {
+    pub fn build_merkle_path(leaf_hashes: &[F], position: usize) -> Self {
         let mut auth_path = vec![];
         let completed_leaf_hashes = add_remaining_addresses(leaf_hashes);
         Self::build_auth_path(completed_leaf_hashes, position, &mut auth_path);
@@ -161,13 +161,13 @@ impl<F: PrimeField, BH: FieldHasher<F>> Node<F, BH> {
     }
 }
 
-fn add_remaining_addresses<F: PrimeField>(addresses: &Vec<F>) -> Vec<F> {
+fn add_remaining_addresses<F: PrimeField>(addresses: &[F]) -> Vec<F> {
     let number_of_elems = addresses.len();
     let next_power_of_two = number_of_elems.next_power_of_two();
     let remaining = next_power_of_two - number_of_elems;
     let slice = &addresses[..remaining];
     let mut added = slice.to_vec();
-    let mut new_addresses = addresses.clone();
+    let mut new_addresses = addresses.to_owned();
     new_addresses.append(&mut added);
     new_addresses
 }

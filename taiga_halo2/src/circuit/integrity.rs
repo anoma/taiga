@@ -530,6 +530,7 @@ fn test_halo2_nullifier_circuit() {
     }
 
     impl Circuit<pallas::Base> for MyCircuit {
+        #[allow(clippy::type_complexity)]
         type Config = (
             [Column<Advice>; 10],
             PoseidonConfig<pallas::Base, 3, 2>,
