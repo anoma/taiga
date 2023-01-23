@@ -1,9 +1,12 @@
 # Transaction
 
-## Overview
 The structure `Transaction` defines all the information needed to be executed on the blockchain.
-Once a transaction is executed successfully (i.e. verified), the ledger status will be transfered.
-A transaction includes the proofs corresponding to the spending of input notes and the creation of output notes.
+Informally, transactions take a private subset of unspent notes from the Taiga note set, publicly reveal their nullifiers, and reveal a new set of note commitments to add to the Taiga note set. The Action circuit verifies consistency of this state transition, but does not check directly its validity. Instead, the validity predicate circuits must check the validity of the state transition. The following VPs are called:
+
+* The app VP for every spent and created note
+* The sub VP for every spent and created note
+
+Each VP is called *once* per transaction, even if it is checking multiple *notes*. In addition, VPs are given all notes in the transaction as input, whether or not that note is associated with that *app type* or *user address*.
 
 In our current implementation version, there are four input notes and four output notes in each transaction. A transaction is split into *action transfers*.
 

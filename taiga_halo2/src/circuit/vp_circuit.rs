@@ -43,6 +43,7 @@ impl VPVerifyingInfo {
 }
 
 pub trait ValidityPredicateConfig {
+    /// `configure_note` behaves like as `configure` but it's particular to configuring a note chip. A default implementation is provided since it's likely to work in the same way for all types of applications.
     fn configure_note(meta: &mut ConstraintSystem<pallas::Base>) -> NoteConfig {
         let instances = meta.instance_column();
         meta.enable_equality(instances);
@@ -67,6 +68,9 @@ pub trait ValidityPredicateConfig {
         NoteChip::configure(meta, instances, advices)
     }
     fn get_note_config(&self) -> NoteConfig;
+
+    /// `configure` calls `ConstraintSystem`, that is, the description of the information of a circuit, to set values for `Column` and `Gate` and thus describe the exact gate arrangement, column arrangement, etc. 
+    /// Calling the `configure` function of a circuit will sequentially utilize the `configure` information of the corresponding `Chip`. This method is left without a default implementation, since it's completely dependent of the application at hand.
     fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self;
 }
 

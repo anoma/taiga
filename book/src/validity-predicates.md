@@ -1,47 +1,95 @@
 # Validity predicates
 
-A **validity predicate** (VP) is a piece of code that authorizes transactions by checking its input and output notes. In order to be authorized, a transaction must satisfy all of the constraints of VPs of parties involved.
+A validity predicate (VP) is a circuit living inside a note that has access to the contents of all the notes involved in a transaction. A transaction is valid if and only if all the VPs of the notes it contains are satisfied and the note `values` are balanced (see notes).
 
-Examples of such constraints would be a white list VP that allows only specific users to send notes to the VP owner, or a lower bound VP that restricts the smallest amount of asset that can be received.
 
-Taiga validity predicates are intended to be the private version of Anoma's transparent validity predicates. Similarly, Taiga VPs take as input stored state prior and posterior to a transaction execution and either authorize the state change or reject it. Unlike transparent VPs, which execute as WASM, Taiga VPs execute in a zero-knowledge proof/arithmetic circuit model of computation. Because of vastly different nature of the execution model, there are some differences between transparent and Taiga VPs, even if they have similar goals.
+<!-- TODO: Code these examples and add a link to them here -->
+Examples of VPs are:
+- Whitelist sending addresses
+- Whitelist asset types
+- Content-based multi-signature check
+- Subscription
+- Conditional spend/joint funding of public good
+- Check transaction is balanced
+- Shield/Unshield tokens
 
-### Validity predicates in Taiga
 
-Taiga uses a PLONK-based zero knowledge proof system, and validity predicates are given as [PLONK arithmetizations](https://zcash.github.io/halo2/concepts/arithmetization.html), which is a table of cells with polynomial constraints. For privacy of which validity predicate is used inside of a transaction, all Taiga validity predicates must share the same PLONK configuration (which can be thought of as the set of "gates" available). Different validity predicates are created by specifying the *selectors*.
+## The anatomy of a VP
 
-#### State model in Taiga
+The VP follows closely the Halo2 API, plus adding the note-related methods that characterise a VP.
 
-Unlike transparent Anoma, which operates on an account model, Taiga uses a note based model. In an account model, each account has associated state which is stored in a database, and updated according to that account's validity predicate. In the note model, however, state is sharded into an append-only set of *note commitments* and revealed *nullifiers*. Each note has exactly one associated nullifier, and the current state of the Taiga is the subset of notes whose nullifiers are not yet revealed, called unspent notes. The Action/Execute circuit, together with the transaction verifier, ensure that the Taiga state is consistent.
+#### ValidityPredicateConfig
 
-### PLONK circuit configuration for validity predicates in Taiga
+```rust
+pub trait ValidityPredicateConfig {
+    fn configure_note(meta: &mut ConstraintSystem<pallas::Base>) -> NoteConfig;
+    fn get_note_config(&self) -> NoteConfig;
+    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self;
+}
+```
 
-The validity predicate configuration includes the following "gates" in the PLONK configuration:
+- `configure` calls `ConstraintSystem`, that is, the description of the information of a circuit, to set values for `Column` and `Gate` and thus describe the exact gate arrangement, column arrangement, etc. Calling the `configure` function of a circuit will sequentially utilize the `configure` information of the corresponding `Chip`. This method is left without a default implementation, since it's completely dependent of the application at hand.
+- `configure_note` behaves like as `configure` but it's particular to configuring a note chip. A default implementation is provided since it's likely to work in the same way for all types of applications.
+- `get_note_config` is a simple getter, since the application config that implements `ValidityPredicateConfig` will have a field of type `NoteConfig`.
 
-* Field addition/multiplication
-* Elliptic curve addition and scalar multiplication
-* Poseidon hash
+#### ValidityPredicateConfig
 
-#### Addresses
+```rust
+pub trait ValidityPredicateInfo: DynClone {
+    fn get_spend_notes(&self) -> &[Note; NUM_NOTE];
+    fn get_output_notes(&self) -> &[Note; NUM_NOTE];
+    fn get_note_instances(&self) -> Vec<pallas::Base>;
+    fn get_instances(&self) -> Vec<pallas::Base>;
+    fn get_verifying_info(&self) -> VPVerifyingInfo;
+    fn get_vp_description(&self) -> ValidityPredicateDescription;
+}
+```
 
-Even though Taiga does not have *accounts*, it does have *addresses*. Each note is associated with one *user address* and one *app address*. Intuitively, a note belongs to the user address and is of a type given by the app address.
+- `get_spend_notes` and `get_output_notes` are simple getters.
+- `get_note_instances`
+- `get_verifying_info` constructs the necessary information to verify a validity predicate, that is, the proof of the circuit, its verifying key and its instances.
+- `get_vp_description` constructs the verifying key of the VP.
 
-Currently, every [user](./users.md) in Taiga has two VPs: one that authorizes spending notes (`SendVP`), and one that authorizes receiving notes (`RecvVP`). [Apps](./app.md) in Taiga also have validity predicates, and spending or receiving a note of a particular app requires satisfying the `AppVP`.
+```rust
+pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateInfo {
+    type VPConfig: ValidityPredicateConfig + Clone;
+    // Default implementation, constrains the notes integrity.
+    // TODO: how to enforce the constraints in vp circuit?
+    fn basic_constraints(
+        &self,
+        config: Self::VPConfig,
+        mut layouter: impl Layouter<pallas::Base>,
+    ) -> Result<(Vec<SpendNoteVar>, Vec<OutputNoteVar>), Error>;
+
+    fn custom_constraints(
+        &self,
+        _config: Self::VPConfig,
+        mut _layouter: impl Layouter<pallas::Base>,
+        _spend_note_variables: &[SpendNoteVar],
+        _output_note_variables: &[OutputNoteVar],
+    ) -> Result<(), Error>;
+}
+```
+
+- `basic_contraints` constrains the notes integrity. A default implementation is provided
+- `custom_constraints` provides the application specific constraints. Informally, it corresponds to the `synthesise` method in Halo2 from the user's perspective.
+
+### Application VPs and Sub VPs
+
+There are two types of validity predicates inside a note:
+- An Application VP
+- A Sub VP
+
+### Example of an application VP: Sudoku intent
+The constraints in this application VP are:
+- Check that `vp_data` is encoded correctly - `vp_data` encodes the Sudoku puzzle to make the note value base unique
+- If one of the notes (there are four notes in a VP) is an output note of Sudoku (created by the dealer), check the validity of the puzzle
+- If one of the 4 output notes is a spent note of Sudoku (spent by the player/solver), check the correctness of the solution
 
 ### Shielded VPs
 For each transaction, it must be proven that all of the VPs of parties and apps involved are satisfied. To preserve privacy, ZK proofs are used. The transaction is authorized only if all of the produced proofs are verified successfully.
 
 ![img.png](img/vp_img.png)
-
-### Transactions
-
-Informally, transactions take a private subset of unspent notes from the Taiga note set, publicly reveal their nullifiers, and reveal a new set of note commitments to add to the Taiga note set. The Action/Execute circuit verifies consistency of this state transition, but does not check directly its validity. Instead, the validity predicate circuits must check the validity of the state transition. The following VPs are called:
-
-* The spending VP for every spent note
-* The app VP for every spent and created note
-* The receiving VP for every created note
-
-Each VP is called *once* per transaction, even if it is checking multiple *notes*. In addition, VPs are given all notes in the transaction as input, whether or not that note is associated with that *app type* or *user address*.
 
 ### VP interface
 
