@@ -9,7 +9,6 @@
         - [Users](./users.md)
 
 - [Action](./action.md)
-    - [Blinding](./blinding.md)
 - [Transaction](./transaction.md)
 - [Execution model](./exec.md)
 - [Performance & conclusion](./conclusion.md)
