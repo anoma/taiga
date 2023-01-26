@@ -44,15 +44,6 @@ impl Distribution<LR> for Standard {
     }
 }
 
-impl<L> Into<Result<LR, L>> for LR {
-    fn into(self) -> Result<LR, L> {
-        match self {
-            L => Ok(L),
-            R => Ok(R),
-        }
-    }
-}
-
 impl Default for LR {
     fn default() -> Self {
         L
