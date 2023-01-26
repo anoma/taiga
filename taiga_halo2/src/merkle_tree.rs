@@ -6,52 +6,52 @@ use ff::Field;
 use pasta_curves::pallas;
 use rand::{Rng, RngCore};
 
-use crate::merkle_tree::Parity::{Odd, Even};
+use crate::merkle_tree::LR::{L, R};
 use rand::distributions::{Distribution, Standard};
 
 #[derive(Clone, Debug, PartialEq, Eq, Copy)]
-pub enum Parity {
-    Even,
-    Odd
+pub enum LR {
+    R,
+    L
 }
 
-pub fn is_even(p: Parity) -> bool {
+pub fn is_even(p: LR) -> bool {
     match p {
-        Even => true,
-        Odd => false
+        R => true,
+        L => false
     }
 }
 
-pub fn is_odd(p: Parity) -> bool {
+pub fn is_odd(p: LR) -> bool {
     match p {
-        Even => false,
-        Odd => true
+        R => false,
+        L => true
     }
 }
 
-pub fn parity(i: usize) -> Parity {
-    if i % 2 == 0 { Even } else { Odd }
+pub fn lr(i: usize) -> LR {
+    if i % 2 == 0 { R } else { L }
 }
 
-impl Distribution<Parity> for Standard {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Parity {
+impl Distribution<LR> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> LR {
         let u: usize = rng.gen();
-        parity(u)
+        lr(u)
     }
 }
 
-impl<L> Into<Result<Parity, L>> for Parity {
-    fn into(self) -> Result<Parity, L> {
+impl<L> Into<Result<LR, L>> for LR {
+    fn into(self) -> Result<LR, L> {
         match self {
-            Odd => Ok(Odd),
-            Even => Ok(Even),
+            L => Ok(L),
+            R => Ok(R),
         }
     }
 }
 
-impl Default for Parity {
+impl Default for LR {
     fn default() -> Self {
-        Odd
+        L
     }
 }
 
@@ -90,7 +90,7 @@ impl MerkleTreeLeafs {
 /// In Orchard merkle tree, they are using MerkleCRH(layer, left, right), where MerkleCRH is a sinsemilla. We are using poseidon_hash(left, right).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MerklePath {
-    auth_path: Vec<(Node, Parity)>,
+    auth_path: Vec<(Node, LR)>,
 }
 
 impl MerklePath {
@@ -101,7 +101,7 @@ impl MerklePath {
     }
 
     /// Constructs a Merkle path directly from a path.
-    pub fn from_path(auth_path: Vec<(Node, Parity)>) -> Self {
+    pub fn from_path(auth_path: Vec<(Node, LR)>) -> Self {
         MerklePath { auth_path }
     }
 
@@ -114,11 +114,11 @@ impl MerklePath {
         (pos, leaf_hashes[pos])
     }
 
-    fn build_auth_path(leaf_hashes: Vec<Node>, position: usize, path: &mut Vec<(Node, Parity)>) {
+    fn build_auth_path(leaf_hashes: Vec<Node>, position: usize, path: &mut Vec<(Node, LR)>) {
         let mut new_leaves = vec![];
         if leaf_hashes.len() > 1 {
             let (sibling_pos, sibling) = Self::find_sibling(&leaf_hashes, position);
-            path.push((sibling, parity(sibling_pos)));
+            path.push((sibling, lr(sibling_pos)));
 
             for pair in leaf_hashes.chunks(2) {
                 let hash_pair = Node::combine(&pair[0], &pair[1]);
@@ -142,15 +142,15 @@ impl MerklePath {
         let mut root = leaf;
         for val in self.auth_path.iter() {
             root = match val.1 {
-                Even => Node::combine(&root, &val.0),
-                Odd => Node::combine(&val.0, &root),
+                R => Node::combine(&root, &val.0),
+                L => Node::combine(&val.0, &root),
             }
         }
         root
     }
 
     /// Returns the input parameters for merkle tree gadget.
-    pub fn get_path(&self) -> Vec<(pallas::Base, Parity)> {
+    pub fn get_path(&self) -> Vec<(pallas::Base, LR)> {
         self.auth_path
             .iter()
             .map(|(node, b)| (node.inner(), *b))
@@ -194,7 +194,7 @@ impl Node {
 impl Default for MerklePath {
     fn default() -> MerklePath {
         let auth_path = (0..TAIGA_COMMITMENT_TREE_DEPTH)
-            .map(|_| (Node::new(pallas::Base::one()), Odd))
+            .map(|_| (Node::new(pallas::Base::one()), L))
             .collect();
         Self::from_path(auth_path)
     }

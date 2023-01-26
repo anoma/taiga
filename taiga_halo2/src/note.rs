@@ -3,7 +3,7 @@ use crate::{
     constant::{
         BASE_BITS_NUM, NOTE_COMMIT_DOMAIN, POSEIDON_TO_CURVE_INPUT_LEN, TAIGA_COMMITMENT_TREE_DEPTH,
     },
-    merkle_tree::{MerklePath, Node, Parity},
+    merkle_tree::{MerklePath, Node, LR},
     nullifier::Nullifier,
     user::{NullifierDerivingKey, User},
     utils::{extract_p, poseidon_to_curve},
@@ -65,7 +65,7 @@ pub struct Note {
 #[derive(Clone)]
 pub struct SpendNoteInfo {
     pub note: Note,
-    pub auth_path: [(pallas::Base, Parity); TAIGA_COMMITMENT_TREE_DEPTH],
+    pub auth_path: [(pallas::Base, LR); TAIGA_COMMITMENT_TREE_DEPTH],
     pub root: pallas::Base,
     app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
     app_logic_vp_proving_info: Vec<Box<dyn ValidityPredicateInfo>>,
@@ -218,7 +218,7 @@ impl SpendNoteInfo {
     ) -> Self {
         let cm_node = Node::new(note.commitment().get_x());
         let root = merkle_path.root(cm_node).inner();
-        let auth_path: [(pallas::Base, Parity); TAIGA_COMMITMENT_TREE_DEPTH] =
+        let auth_path: [(pallas::Base, LR); TAIGA_COMMITMENT_TREE_DEPTH] =
             merkle_path.get_path().try_into().unwrap();
         Self {
             note,

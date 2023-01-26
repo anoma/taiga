@@ -18,7 +18,7 @@ use halo2_proofs::{
     plonk::{Advice, Circuit, Column, ConstraintSystem, Constraints, Error, Instance, Selector},
     poly::Rotation,
 };
-use crate::merkle_tree::Parity;
+use crate::merkle_tree::LR;
 use pasta_curves::pallas;
 
 #[derive(Clone, Debug)]
@@ -37,7 +37,7 @@ pub struct ActionCircuit {
     /// Spent note
     pub spend_note: Note,
     /// The authorization path of spend note
-    pub auth_path: [(pallas::Base, Parity); TAIGA_COMMITMENT_TREE_DEPTH],
+    pub auth_path: [(pallas::Base, LR); TAIGA_COMMITMENT_TREE_DEPTH],
     /// Output note
     pub output_note: Note,
     /// random scalar for net value commitment

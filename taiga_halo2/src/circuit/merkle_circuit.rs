@@ -10,7 +10,7 @@ use halo2_proofs::{
     plonk::{Advice, Column, ConstraintSystem, Error},
 };
 use pasta_curves::pallas;
-use crate::merkle_tree::{Parity, is_odd};
+use crate::merkle_tree::{LR, is_odd};
 
 /// MerkleTreeChip based on poseidon hash.
 #[derive(Clone, Debug)]
@@ -63,7 +63,7 @@ pub fn merkle_poseidon_gadget(
     mut layouter: impl Layouter<pallas::Base>,
     chip: MerklePoseidonChip,
     note_x: AssignedCell<pallas::Base, pallas::Base>,
-    merkle_path: &[(pallas::Base, Parity)],
+    merkle_path: &[(pallas::Base, LR)],
 ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
     fn swap(
         merkle_chip: &MerklePoseidonChip,
