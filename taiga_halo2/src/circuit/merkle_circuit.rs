@@ -1,3 +1,4 @@
+use crate::merkle_tree::{is_left, LR};
 use halo2_gadgets::{
     poseidon::{
         primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
@@ -10,7 +11,6 @@ use halo2_proofs::{
     plonk::{Advice, Column, ConstraintSystem, Error},
 };
 use pasta_curves::pallas;
-use crate::merkle_tree::{LR, is_left};
 
 /// MerkleTreeChip based on poseidon hash.
 #[derive(Clone, Debug)]

@@ -11,6 +11,7 @@ use crate::constant::{
     ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX, ACTION_NF_INSTANCE_ROW_IDX,
     ACTION_OUTPUT_CM_INSTANCE_ROW_IDX, TAIGA_COMMITMENT_TREE_DEPTH,
 };
+use crate::merkle_tree::LR;
 use crate::note::Note;
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
@@ -18,7 +19,6 @@ use halo2_proofs::{
     plonk::{Advice, Circuit, Column, ConstraintSystem, Constraints, Error, Instance, Selector},
     poly::Rotation,
 };
-use crate::merkle_tree::LR;
 use pasta_curves::pallas;
 
 #[derive(Clone, Debug)]
