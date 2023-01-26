@@ -10,7 +10,7 @@ use halo2_proofs::{
     plonk::{Advice, Column, ConstraintSystem, Error},
 };
 use pasta_curves::pallas;
-use crate::merkle_tree::{LR, is_odd};
+use crate::merkle_tree::{LR, is_left};
 
 /// MerkleTreeChip based on poseidon hash.
 #[derive(Clone, Debug)]
@@ -93,7 +93,7 @@ pub fn merkle_poseidon_gadget(
                 &chip,
                 layouter.namespace(|| "merkle swap"),
                 pair,
-                Value::known(is_odd(e.1)),
+                Value::known(is_left(e.1)),
             )?
         };
         let poseidon_message = [pair.0, pair.1];

@@ -15,14 +15,14 @@ pub enum LR {
     L
 }
 
-pub fn is_even(p: LR) -> bool {
+pub fn is_right(p: LR) -> bool {
     match p {
         R => true,
         L => false
     }
 }
 
-pub fn is_odd(p: LR) -> bool {
+pub fn is_left(p: LR) -> bool {
     match p {
         R => false,
         L => true
@@ -30,7 +30,7 @@ pub fn is_odd(p: LR) -> bool {
 }
 
 pub fn lr(i: usize) -> LR {
-    if i % 2 == 0 { R } else { L }
+    if i % 2 == 0 { L } else { R }
 }
 
 impl Distribution<LR> for Standard {
@@ -198,4 +198,46 @@ impl Default for MerklePath {
             .collect();
         Self::from_path(auth_path)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::merkle_tree::Node;
+    use halo2_gadgets::poseidon::primitives as poseidon;
+    use pasta_curves::{Fp};
+
+    #[test]
+    // Test a Merkle tree with 4 leaves
+    fn test_auth_path_4() {
+        let mut rng = rand::thread_rng();
+
+        let hashes: Vec<Node> = (0..4).map(
+            |_| {
+                let poseidon =
+                poseidon::Hash::<_, poseidon::P128Pow5T3, poseidon::ConstantLength<4>, 3, 2>::init();
+                let inputs: Vec<Fp> = (0..4).map(|_| Fp::from(rng.gen::<u64>())).collect();
+                let f = poseidon.hash(inputs.try_into().expect("slice with incorrect length"));
+                Node::new(f)
+            }
+        ).collect();
+
+
+        let position = 1;
+
+        let hash_2_3 = poseidon_hash(hashes[2].inner(), hashes[3].inner());
+
+        let auth_path = &[
+            (Node::new(hashes[0].inner()), L),
+            (Node::new(hash_2_3), R),
+        ];
+
+        let merkle_path = MerklePath::from_path(auth_path.to_vec());
+
+        let merkle_path_2: MerklePath =
+            MerklePath::build_merkle_path(&hashes, position);
+
+        assert_eq!(merkle_path, merkle_path_2);
+    }
+
 }
