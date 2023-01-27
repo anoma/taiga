@@ -83,7 +83,9 @@ impl MerkleTreeLeafs {
     pub fn insert(&mut self, value: pallas::Base) -> Self {
         let leafs = &mut self.leafs;
         leafs.push(Node::new(value));
-        Self { leafs: leafs.to_vec() }
+        Self {
+            leafs: leafs.to_vec(),
+        }
     }
 }
 
