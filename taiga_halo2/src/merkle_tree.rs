@@ -79,6 +79,12 @@ impl MerkleTreeLeafs {
         }
         list[0]
     }
+
+    pub fn insert(&mut self, value: pallas::Base) -> Self {
+        let leafs = &mut self.leafs;
+        leafs.push(Node::new(value));
+        Self { leafs: leafs.to_vec() }
+    }
 }
 
 /// A path from a position in a particular commitment tree to the root of that tree.
