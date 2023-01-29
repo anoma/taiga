@@ -382,8 +382,8 @@ fn test_transaction_creation() {
         constant::TAIGA_COMMITMENT_TREE_DEPTH,
         merkle_tree::MerklePath,
         note::{Note, OutputNoteInfo, SpendNoteInfo},
-        nullifier::Nullifier,
-        user::User,
+        nullifier::{Nullifier, NullifierKeyCom},
+        utils::poseidon_hash,
     };
     use ff::Field;
     use rand::rngs::OsRng;
@@ -397,44 +397,59 @@ fn test_transaction_creation() {
     // Generate notes
     let spend_note_1 = {
         let vp_data = pallas::Base::zero();
-        // TODO: add real user vps(application logic vps) later.
-        let user = User::dummy(&mut rng);
+        // TODO: add real application logic vps and encode them to vp_data_nonhashed later.
+        let app_logic_vps_description = vec![
+            trivail_vp_description.clone(),
+            trivail_vp_description.clone(),
+        ];
+        // Encode the app_logic_vps_description into vp_data_nonhashed
+        // The encoding method is flexible and defined in the application vp.
+        // Use poseidon hash to encode the two logic vps here
+        let vp_data_nonhashed = poseidon_hash(
+            app_logic_vps_description[0].get_compressed(),
+            app_logic_vps_description[1].get_compressed(),
+        );
         let application_vp = trivail_vp_description.clone();
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
         let value = 5000u64;
+        let nk_com = NullifierKeyCom::rand(&mut rng);
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let is_merkle_checked = true;
         Note::new(
             application_vp,
+            vp_data,
+            vp_data_nonhashed,
             value,
+            nk_com,
             rho,
             psi,
             rcm,
             is_merkle_checked,
-            vp_data,
-            user,
             vec![0u8; 32],
         )
     };
     let output_note_1 = {
         let vp_data = pallas::Base::zero();
-        // TODO: add real user vps(application logic vps) later.
-        let user = User::dummy(&mut rng);
-        let rho = spend_note_1.get_nf();
+        // TODO: add real application logic vps and encode them to vp_data_nonhashed later.
+        // If the logic vp is not used, set vp_data_nonhashed pallas::Base::zero() by defualt.
+        let vp_data_nonhashed = pallas::Base::zero();
+        let rho = spend_note_1.get_nf().unwrap();
         let value = 5000u64;
+        let nk_com = NullifierKeyCom::rand(&mut rng);
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let is_merkle_checked = true;
         Note::new(
             trivail_vp_description,
+            vp_data,
+            vp_data_nonhashed,
             value,
+            nk_com,
             rho,
             psi,
             rcm,
             is_merkle_checked,
-            vp_data,
-            user,
             vec![0u8; 32],
         )
     };
@@ -444,18 +459,22 @@ fn test_transaction_creation() {
     // Generate note info
     let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
     // Create vp circuit and fulfill the note info
-    let app_vp_circuit = TrivialValidityPredicateCircuit {
+    let trivial_vp_circuit = TrivialValidityPredicateCircuit {
         spend_notes: [spend_note_1.clone(), spend_note_2.clone()],
         output_notes: [output_note_1.clone(), output_note_2.clone()],
     };
-    let app_vp_proving_info = Box::new(app_vp_circuit);
-    let app_logic_vp_proving_info = vec![];
+    let app_vp_proving_info = Box::new(trivial_vp_circuit.clone());
+    let trivial_app_logic_1: Box<dyn ValidityPredicateInfo> = Box::new(trivial_vp_circuit.clone());
+    let trivial_app_logic_2 = Box::new(trivial_vp_circuit);
+    let trivial_app_logic_vp_proving_info = vec![trivial_app_logic_1, trivial_app_logic_2];
     let spend_note_info_1 = SpendNoteInfo::new(
         spend_note_1,
         merkle_path.clone(),
         app_vp_proving_info.clone(),
-        app_logic_vp_proving_info.clone(),
+        trivial_app_logic_vp_proving_info.clone(),
     );
+    // The following notes use empty logic vps and use vp_data_nonhashed with pallas::Base::zero() by default.
+    let app_logic_vp_proving_info = vec![];
     let spend_note_info_2 = SpendNoteInfo::new(
         spend_note_2,
         merkle_path,

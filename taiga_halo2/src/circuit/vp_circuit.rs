@@ -79,7 +79,7 @@ pub trait ValidityPredicateInfo: DynClone {
             .iter()
             .zip(self.get_output_notes().iter())
             .for_each(|(spend_note, output_note)| {
-                let nf = spend_note.get_nf().inner();
+                let nf = spend_note.get_nf().unwrap().inner();
                 instances.push(nf);
                 let cm = output_note.commitment();
                 instances.push(cm.get_x());
