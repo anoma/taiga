@@ -35,6 +35,20 @@ pub fn assign_free_instance<F: Field>(
     )
 }
 
+pub fn assign_free_constant<F: Field, V: Copy>(
+    mut layouter: impl Layouter<F>,
+    column: Column<Advice>,
+    value: V,
+) -> Result<AssignedCell<V, F>, Error>
+where
+    for<'v> Assigned<F>: From<&'v V>,
+{
+    layouter.assign_region(
+        || "load constant",
+        |mut region| region.assign_advice_from_constant(|| "load constant", column, 0, value),
+    )
+}
+
 // AddChip copy from halo2 example two-chip
 #[derive(Clone, Debug)]
 pub struct AddChip<F: FieldExt> {

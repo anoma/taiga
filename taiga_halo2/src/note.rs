@@ -4,9 +4,8 @@ use crate::{
         BASE_BITS_NUM, NOTE_COMMIT_DOMAIN, POSEIDON_TO_CURVE_INPUT_LEN, TAIGA_COMMITMENT_TREE_DEPTH,
     },
     merkle_tree::{MerklePath, Node, LR},
-    nullifier::Nullifier,
-    user::{NullifierDerivingKey, User},
-    utils::{extract_p, poseidon_to_curve},
+    nullifier::{Nullifier, NullifierDerivingKey, NullifierKeyCom},
+    utils::{extract_p, poseidon_hash, poseidon_to_curve},
     vp_description::ValidityPredicateDescription,
 };
 use bitvec::{array::BitArray, order::Lsb0};
@@ -47,7 +46,13 @@ pub struct Note {
     pub application_vp: ValidityPredicateDescription,
     /// vp_data is the data defined in application vp and will be used to derive value base
     pub vp_data: pallas::Base,
+    /// vp_data_nonhashed is the data defined in application vp and will NOT be used to derive value base
+    /// vp_data_nonhashed denotes the encoded user-specific data and sub-vps
+    pub vp_data_nonhashed: pallas::Base,
+    /// value denotes the amount of the note.
     pub value: u64,
+    /// the wrapped nullifier key.
+    pub nk_com: NullifierKeyCom,
     /// old nullifier. Nonce which is a deterministically computed, unique nonce
     pub rho: Nullifier,
     /// computed from spent_note_nf and rcm by using a PRF
@@ -55,9 +60,6 @@ pub struct Note {
     pub rcm: pallas::Scalar,
     /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of the spent note will be checked in ActionProof.
     pub is_merkle_checked: bool,
-    /// user denotes the user's info including nullifier key, send vp and receive vp.
-    /// TODO: user will be generalized to `vp_data_nonhashed`
-    pub user: User,
     /// note data bytes
     pub note_data: Vec<u8>,
 }
@@ -82,24 +84,26 @@ impl Note {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         application_vp: ValidityPredicateDescription,
+        vp_data: pallas::Base,
+        vp_data_nonhashed: pallas::Base,
         value: u64,
+        nk_com: NullifierKeyCom,
         rho: Nullifier,
         psi: pallas::Base,
         rcm: pallas::Scalar,
         is_merkle_checked: bool,
-        vp_data: pallas::Base,
-        user: User,
         note_data: Vec<u8>,
     ) -> Self {
         Self {
             application_vp,
+            vp_data,
+            vp_data_nonhashed,
             value,
+            nk_com,
             rho,
             psi,
             rcm,
             is_merkle_checked,
-            vp_data,
-            user,
             note_data,
         }
     }
@@ -112,38 +116,34 @@ impl Note {
     pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
         let application_vp = ValidityPredicateDescription::dummy(&mut rng);
         let vp_data = pallas::Base::random(&mut rng);
+        let vp_data_nonhashed = pallas::Base::zero();
         let value: u64 = rng.gen();
+        let nk_com = NullifierKeyCom::rand(&mut rng);
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
-        let user = User::dummy(&mut rng);
         let note_data = vec![0u8; 32];
         Self {
             application_vp,
             vp_data,
+            vp_data_nonhashed,
             value,
+            nk_com,
             rho,
             psi,
             rcm,
             is_merkle_checked: true,
-            user,
             note_data,
         }
     }
 
-    // cm = SinsemillaCommit^rcm(user_address || app_vp || app_data || rho || psi || is_merkle_checked || value)
+    // cm = SinsemillaCommit^rcm(address || app_vp || app_data || rho || psi || is_merkle_checked || value)
     pub fn commitment(&self) -> NoteCommitment {
-        let user_address = self.get_user_address();
+        let address = self.get_address();
         let app_vp = self.application_vp.get_compressed();
         let ret = NOTE_COMMIT_DOMAIN
             .commit(
                 iter::empty()
-                    .chain(
-                        user_address
-                            .to_le_bits()
-                            .iter()
-                            .by_vals()
-                            .take(BASE_BITS_NUM),
-                    )
+                    .chain(address.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
                     .chain(app_vp.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
                     .chain(
                         self.vp_data
@@ -173,30 +173,27 @@ impl Note {
         NoteCommitment(ret)
     }
 
-    pub fn get_nf(&self) -> Nullifier {
-        let nk = self.get_nk().unwrap();
-        let cm = self.commitment();
-        Nullifier::derive_native(&nk, &self.rho.inner(), &self.psi, &cm)
+    pub fn get_nf(&self) -> Option<Nullifier> {
+        match self.get_nk() {
+            Some(nk) => {
+                let cm = self.commitment();
+                Some(Nullifier::derive_native(
+                    &nk,
+                    &self.rho.inner(),
+                    &self.psi,
+                    &cm,
+                ))
+            }
+            None => None,
+        }
     }
 
-    pub fn get_user_send_closed(&self) -> pallas::Base {
-        self.user.get_send_closed()
-    }
-
-    pub fn get_user_send_data(&self) -> Option<pallas::Base> {
-        self.user.get_send_data()
-    }
-
-    pub fn get_user_recv_data(&self) -> pallas::Base {
-        self.user.get_recv_data()
-    }
-
-    pub fn get_user_address(&self) -> pallas::Base {
-        self.user.address()
+    pub fn get_address(&self) -> pallas::Base {
+        poseidon_hash(self.vp_data_nonhashed, self.nk_com.get_nk_com())
     }
 
     pub fn get_nk(&self) -> Option<NullifierDerivingKey> {
-        self.user.get_nk()
+        self.nk_com.get_nk()
     }
 
     pub fn derivate_value_base(&self) -> pallas::Point {

@@ -133,7 +133,7 @@ impl MerklePath {
         }
     }
 
-    pub fn build_merkle_path(leaf_hashes: &Vec<Node>, position: usize) -> Self {
+    pub fn build_merkle_path(leaf_hashes: &[Node], position: usize) -> Self {
         let mut auth_path = vec![];
         let completed_leaf_hashes = add_remaining_addresses(leaf_hashes);
         Self::build_auth_path(completed_leaf_hashes, position, &mut auth_path);
@@ -161,13 +161,13 @@ impl MerklePath {
     }
 }
 
-fn add_remaining_addresses(addresses: &Vec<Node>) -> Vec<Node> {
+fn add_remaining_addresses(addresses: &[Node]) -> Vec<Node> {
     let number_of_elems = addresses.len();
     let next_power_of_two = number_of_elems.next_power_of_two();
     let remaining = next_power_of_two - number_of_elems;
     let slice = &addresses[..remaining];
     let mut added = slice.to_vec();
-    let mut new_addresses = addresses.clone();
+    let mut new_addresses = addresses.to_owned();
     new_addresses.append(&mut added);
     new_addresses
 }
