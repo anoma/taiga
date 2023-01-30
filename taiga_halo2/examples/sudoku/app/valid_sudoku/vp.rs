@@ -176,7 +176,7 @@ mod tests {
 
         let vp_desc = ValidityPredicateDescription::from_vk(vk.vk);
 
-        let vp_data = pallas::Base::zero(); // TODO: What else can this be?
+        let app_data = pallas::Base::zero(); // TODO: What else can this be?
 
         let user = User::dummy(&mut rng);
 
@@ -184,6 +184,6 @@ mod tests {
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        Note::new(vp_desc, value, rho, psi, rcm, true, vp_data, user, vec![]);
+        Note::new(vp_desc, value, rho, psi, rcm, true, app_data, user, vec![]);
     }
 }

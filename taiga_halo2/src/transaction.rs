@@ -396,7 +396,7 @@ fn test_transaction_creation() {
 
     // Generate notes
     let spend_note_1 = {
-        let vp_data = pallas::Base::zero();
+        let app_data = pallas::Base::zero();
         // TODO: add real application logic vps and encode them to vp_data_nonhashed later.
         let app_logic_vps_description = vec![
             trivail_vp_description.clone(),
@@ -418,7 +418,7 @@ fn test_transaction_creation() {
         let is_merkle_checked = true;
         Note::new(
             application_vp,
-            vp_data,
+            app_data,
             vp_data_nonhashed,
             value,
             nk_com,
@@ -430,7 +430,7 @@ fn test_transaction_creation() {
         )
     };
     let output_note_1 = {
-        let vp_data = pallas::Base::zero();
+        let app_data = pallas::Base::zero();
         // TODO: add real application logic vps and encode them to vp_data_nonhashed later.
         // If the logic vp is not used, set vp_data_nonhashed pallas::Base::zero() by defualt.
         let vp_data_nonhashed = pallas::Base::zero();
@@ -442,7 +442,7 @@ fn test_transaction_creation() {
         let is_merkle_checked = true;
         Note::new(
             trivail_vp_description,
-            vp_data,
+            app_data,
             vp_data_nonhashed,
             value,
             nk_com,

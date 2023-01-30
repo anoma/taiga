@@ -44,8 +44,9 @@ impl Default for NoteCommitment {
 pub struct Note {
     /// application_vp denotes the VP description
     pub application_vp: ValidityPredicateDescription,
-    /// vp_data is the data defined in application vp and will be used to derive value base
-    pub vp_data: pallas::Base,
+    /// app_data is the encoded data that is defined in application vp
+    /// app_data is used to derive the note value base
+    pub app_data: pallas::Base,
     /// vp_data_nonhashed is the data defined in application vp and will NOT be used to derive value base
     /// vp_data_nonhashed denotes the encoded user-specific data and sub-vps
     pub vp_data_nonhashed: pallas::Base,
@@ -84,7 +85,7 @@ impl Note {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         application_vp: ValidityPredicateDescription,
-        vp_data: pallas::Base,
+        app_data: pallas::Base,
         vp_data_nonhashed: pallas::Base,
         value: u64,
         nk_com: NullifierKeyCom,
@@ -96,7 +97,7 @@ impl Note {
     ) -> Self {
         Self {
             application_vp,
-            vp_data,
+            app_data,
             vp_data_nonhashed,
             value,
             nk_com,
@@ -115,7 +116,7 @@ impl Note {
 
     pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
         let application_vp = ValidityPredicateDescription::dummy(&mut rng);
-        let vp_data = pallas::Base::random(&mut rng);
+        let app_data = pallas::Base::random(&mut rng);
         let vp_data_nonhashed = pallas::Base::zero();
         let value: u64 = rng.gen();
         let nk_com = NullifierKeyCom::rand(&mut rng);
@@ -124,7 +125,7 @@ impl Note {
         let note_data = vec![0u8; 32];
         Self {
             application_vp,
-            vp_data,
+            app_data,
             vp_data_nonhashed,
             value,
             nk_com,
@@ -146,7 +147,7 @@ impl Note {
                     .chain(address.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
                     .chain(app_vp.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
                     .chain(
-                        self.vp_data
+                        self.app_data
                             .to_le_bits()
                             .iter()
                             .by_vals()
@@ -200,7 +201,7 @@ impl Note {
         let inputs = [
             pallas::Base::from(self.is_merkle_checked),
             self.application_vp.get_compressed(),
-            self.vp_data,
+            self.app_data,
         ];
         poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&inputs)
     }

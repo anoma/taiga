@@ -729,7 +729,7 @@ fn test_halo2_note_commitment_circuit() {
     #[derive(Default)]
     struct MyCircuit {
         application_vp: ValidityPredicateDescription,
-        vp_data: pallas::Base,
+        app_data: pallas::Base,
         vp_data_nonhashed: pallas::Base,
         value: u64,
         nk_com: NullifierKeyCom,
@@ -827,7 +827,7 @@ fn test_halo2_note_commitment_circuit() {
             >::load(note_commit_config.sinsemilla_config.clone(), &mut layouter)?;
             let note = Note::new(
                 self.application_vp.clone(),
-                self.vp_data,
+                self.app_data,
                 self.vp_data_nonhashed,
                 self.value,
                 self.nk_com,
@@ -863,9 +863,9 @@ fn test_halo2_note_commitment_circuit() {
 
             // Witness app_data
             let app_data = assign_free_advice(
-                layouter.namespace(|| "witness application vp_data"),
+                layouter.namespace(|| "witness application app_data"),
                 note_commit_config.advices[0],
-                Value::known(note.vp_data),
+                Value::known(note.app_data),
             )?;
 
             // Witness a random non-negative u64 note value
@@ -936,7 +936,7 @@ fn test_halo2_note_commitment_circuit() {
     {
         let circuit = MyCircuit {
             application_vp: ValidityPredicateDescription::dummy(&mut rng),
-            vp_data: pallas::Base::random(&mut rng),
+            app_data: pallas::Base::random(&mut rng),
             vp_data_nonhashed: pallas::Base::random(&mut rng),
             value: rng.next_u64(),
             nk_com: NullifierKeyCom::rand(&mut rng),
@@ -954,7 +954,7 @@ fn test_halo2_note_commitment_circuit() {
     {
         let circuit = MyCircuit {
             application_vp: ValidityPredicateDescription::dummy(&mut rng),
-            vp_data: pallas::Base::random(&mut rng),
+            app_data: pallas::Base::random(&mut rng),
             vp_data_nonhashed: pallas::Base::random(&mut rng),
             value: rng.next_u64(),
             nk_com: NullifierKeyCom::rand(&mut rng),
