@@ -2,14 +2,31 @@
 
 `Note` is an immutable object that represents a unit of value. Each note has an [owner](users.md), an [application](application.md) type, and a value:
 
-```rust
-pub struct Note<CP: CircuitParameters> {
-	pub owner: User<CP>,
-	pub app: App<CP>,
-	pub value: u64,
-...
+``` rust
+pub struct Note {
+/// application_vp denotes the VP description
+pub application_vp: ValidityPredicateDescription,
+/// vp_data is the data defined in application vp and will be used to derive value base
+pub vp_data: pallas::Base,
+/// vp_data_nonhashed is the data defined in application vp and will NOT be used to derive value base
+/// vp_data_nonhashed denotes the encoded user-specific data and sub-vps
+pub vp_data_nonhashed: pallas::Base,
+/// value denotes the amount of the note.
+pub value: u64,
+/// the wrapped nullifier key.
+pub nk_com: NullifierKeyCom,
+/// old nullifier. Nonce which is a deterministically computed, unique nonce
+pub rho: Nullifier,
+/// computed from spent_note_nf and rcm by using a PRF
+pub psi: pallas::Base,
+pub rcm: pallas::Scalar,
+/// If the is_merkle_checked flag is true, the merkle path authorization(membership) of the spent note will be checked in ActionProof.
+pub is_merkle_checked: bool,
+/// note data bytes
+pub note_data: Vec<u8>,
 }
 ```
+
 
 #### Sending notes
 
