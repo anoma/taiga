@@ -152,7 +152,7 @@ pub fn check_spend_note(
     let app_vp = assign_free_advice(
         layouter.namespace(|| "witness app_vp"),
         advices[0],
-        Value::known(spend_note.application_vp.get_compressed()),
+        Value::known(spend_note.app_vk.get_compressed()),
     )?;
 
     // Witness app_data
@@ -300,7 +300,7 @@ pub fn check_output_note(
     let app_vp = assign_free_advice(
         layouter.namespace(|| "witness app_vp"),
         advices[0],
-        Value::known(output_note.application_vp.get_compressed()),
+        Value::known(output_note.app_vk.get_compressed()),
     )?;
 
     // Witness app_data

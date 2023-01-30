@@ -728,7 +728,7 @@ fn test_halo2_note_commitment_circuit() {
 
     #[derive(Default)]
     struct MyCircuit {
-        application_vp: ValidityPredicateDescription,
+        app_vk: ValidityPredicateDescription,
         app_data: pallas::Base,
         vp_data_nonhashed: pallas::Base,
         value: u64,
@@ -826,7 +826,7 @@ fn test_halo2_note_commitment_circuit() {
                 NoteCommitmentFixedBases,
             >::load(note_commit_config.sinsemilla_config.clone(), &mut layouter)?;
             let note = Note::new(
-                self.application_vp.clone(),
+                self.app_vk.clone(),
                 self.app_data,
                 self.vp_data_nonhashed,
                 self.value,
@@ -858,7 +858,7 @@ fn test_halo2_note_commitment_circuit() {
             let app_vp = assign_free_advice(
                 layouter.namespace(|| "witness rho"),
                 note_commit_config.advices[0],
-                Value::known(note.application_vp.get_compressed()),
+                Value::known(note.app_vk.get_compressed()),
             )?;
 
             // Witness app_data
@@ -935,7 +935,7 @@ fn test_halo2_note_commitment_circuit() {
     // Test note with flase is_merkle_checked flag
     {
         let circuit = MyCircuit {
-            application_vp: ValidityPredicateDescription::dummy(&mut rng),
+            app_vk: ValidityPredicateDescription::dummy(&mut rng),
             app_data: pallas::Base::random(&mut rng),
             vp_data_nonhashed: pallas::Base::random(&mut rng),
             value: rng.next_u64(),
@@ -953,7 +953,7 @@ fn test_halo2_note_commitment_circuit() {
     // Test note with true is_merkle_checked flag
     {
         let circuit = MyCircuit {
-            application_vp: ValidityPredicateDescription::dummy(&mut rng),
+            app_vk: ValidityPredicateDescription::dummy(&mut rng),
             app_data: pallas::Base::random(&mut rng),
             vp_data_nonhashed: pallas::Base::random(&mut rng),
             value: rng.next_u64(),

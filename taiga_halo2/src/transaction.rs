@@ -409,7 +409,7 @@ fn test_transaction_creation() {
             app_logic_vps_description[0].get_compressed(),
             app_logic_vps_description[1].get_compressed(),
         );
-        let application_vp = trivail_vp_description.clone();
+        let app_vk = trivail_vp_description.clone();
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
         let value = 5000u64;
         let nk_com = NullifierKeyCom::rand(&mut rng);
@@ -417,7 +417,7 @@ fn test_transaction_creation() {
         let psi = pallas::Base::random(&mut rng);
         let is_merkle_checked = true;
         Note::new(
-            application_vp,
+            app_vk,
             app_data,
             vp_data_nonhashed,
             value,

@@ -42,8 +42,8 @@ impl Default for NoteCommitment {
 /// A note
 #[derive(Debug, Clone, Default)]
 pub struct Note {
-    /// application_vp denotes the VP description
-    pub application_vp: ValidityPredicateDescription,
+    /// app_vk is the verifying key of VP
+    pub app_vk: ValidityPredicateDescription,
     /// app_data is the encoded data that is defined in application vp
     /// app_data is used to derive the note value base
     pub app_data: pallas::Base,
@@ -84,7 +84,7 @@ pub struct OutputNoteInfo {
 impl Note {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        application_vp: ValidityPredicateDescription,
+        app_vk: ValidityPredicateDescription,
         app_data: pallas::Base,
         vp_data_nonhashed: pallas::Base,
         value: u64,
@@ -96,7 +96,7 @@ impl Note {
         note_data: Vec<u8>,
     ) -> Self {
         Self {
-            application_vp,
+            app_vk,
             app_data,
             vp_data_nonhashed,
             value,
@@ -115,7 +115,7 @@ impl Note {
     }
 
     pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
-        let application_vp = ValidityPredicateDescription::dummy(&mut rng);
+        let app_vk = ValidityPredicateDescription::dummy(&mut rng);
         let app_data = pallas::Base::random(&mut rng);
         let vp_data_nonhashed = pallas::Base::zero();
         let value: u64 = rng.gen();
@@ -124,7 +124,7 @@ impl Note {
         let psi = pallas::Base::random(&mut rng);
         let note_data = vec![0u8; 32];
         Self {
-            application_vp,
+            app_vk,
             app_data,
             vp_data_nonhashed,
             value,
@@ -140,7 +140,7 @@ impl Note {
     // cm = SinsemillaCommit^rcm(address || app_vp || app_data || rho || psi || is_merkle_checked || value)
     pub fn commitment(&self) -> NoteCommitment {
         let address = self.get_address();
-        let app_vp = self.application_vp.get_compressed();
+        let app_vp = self.app_vk.get_compressed();
         let ret = NOTE_COMMIT_DOMAIN
             .commit(
                 iter::empty()
@@ -200,7 +200,7 @@ impl Note {
     pub fn derivate_value_base(&self) -> pallas::Point {
         let inputs = [
             pallas::Base::from(self.is_merkle_checked),
-            self.application_vp.get_compressed(),
+            self.app_vk.get_compressed(),
             self.app_data,
         ];
         poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&inputs)
