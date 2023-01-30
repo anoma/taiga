@@ -10,7 +10,7 @@ use crate::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
-    vp_description::ValidityPredicateDescription,
+    vp_vk::ValidityPredicateVerifyingKey,
 };
 use ff::Field;
 use halo2_proofs::{
@@ -121,10 +121,10 @@ impl ValidityPredicateInfo for FieldAdditionValidityPredicateCircuit {
         }
     }
 
-    fn get_vp_description(&self) -> ValidityPredicateDescription {
+    fn get_vp_description(&self) -> ValidityPredicateVerifyingKey {
         let params = SETUP_PARAMS_MAP.get(&12).unwrap();
         let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
-        ValidityPredicateDescription::from_vk(vk)
+        ValidityPredicateVerifyingKey::from_vk(vk)
     }
 }
 

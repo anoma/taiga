@@ -18,7 +18,7 @@ use taiga_halo2::{
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
     vp_circuit_impl,
-    vp_description::ValidityPredicateDescription,
+    vp_vk::ValidityPredicateVerifyingKey,
 };
 
 use crate::app::valid_sudoku::circuit::{SudokuCircuit, SudokuConfig};
@@ -103,10 +103,10 @@ impl ValidityPredicateInfo for SudokuVP {
         }
     }
 
-    fn get_vp_description(&self) -> ValidityPredicateDescription {
+    fn get_vp_description(&self) -> ValidityPredicateVerifyingKey {
         let params = SETUP_PARAMS_MAP.get(&12).unwrap();
         let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
-        ValidityPredicateDescription::from_vk(vk)
+        ValidityPredicateVerifyingKey::from_vk(vk)
     }
 }
 
@@ -139,7 +139,7 @@ mod tests {
         note::Note,
         nullifier::Nullifier,
         user::User,
-        vp_description::ValidityPredicateDescription,
+        vp_vk::ValidityPredicateVerifyingKey,
     };
 
     use ff::Field;
@@ -174,7 +174,7 @@ mod tests {
 
         let mut vp = SudokuVP::new(sudoku, input_notes, output_notes);
 
-        let vp_desc = ValidityPredicateDescription::from_vk(vk.vk);
+        let vp_desc = ValidityPredicateVerifyingKey::from_vk(vk.vk);
 
         let app_data = pallas::Base::zero(); // TODO: What else can this be?
 

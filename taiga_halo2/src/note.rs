@@ -6,7 +6,7 @@ use crate::{
     merkle_tree::{MerklePath, Node},
     nullifier::{Nullifier, NullifierDerivingKey, NullifierKeyCom},
     utils::{extract_p, poseidon_hash, poseidon_to_curve},
-    vp_description::ValidityPredicateDescription,
+    vp_vk::ValidityPredicateVerifyingKey,
 };
 use bitvec::{array::BitArray, order::Lsb0};
 use core::iter;
@@ -43,7 +43,7 @@ impl Default for NoteCommitment {
 #[derive(Debug, Clone, Default)]
 pub struct Note {
     /// app_vk is the verifying key of VP
-    pub app_vk: ValidityPredicateDescription,
+    pub app_vk: ValidityPredicateVerifyingKey,
     /// app_data is the encoded data that is defined in application vp
     /// app_data is used to derive the note value base
     pub app_data: pallas::Base,
@@ -84,7 +84,7 @@ pub struct OutputNoteInfo {
 impl Note {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        app_vk: ValidityPredicateDescription,
+        app_vk: ValidityPredicateVerifyingKey,
         app_data: pallas::Base,
         vp_data_nonhashed: pallas::Base,
         value: u64,
@@ -115,7 +115,7 @@ impl Note {
     }
 
     pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
-        let app_vk = ValidityPredicateDescription::dummy(&mut rng);
+        let app_vk = ValidityPredicateVerifyingKey::dummy(&mut rng);
         let app_data = pallas::Base::random(&mut rng);
         let vp_data_nonhashed = pallas::Base::zero();
         let value: u64 = rng.gen();

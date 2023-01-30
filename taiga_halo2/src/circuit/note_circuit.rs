@@ -707,7 +707,7 @@ fn test_halo2_note_commitment_circuit() {
     use crate::note::Note;
     use crate::{
         nullifier::{Nullifier, NullifierKeyCom},
-        vp_description::ValidityPredicateDescription,
+        vp_vk::ValidityPredicateVerifyingKey,
     };
     use ff::Field;
     use group::Curve;
@@ -728,7 +728,7 @@ fn test_halo2_note_commitment_circuit() {
 
     #[derive(Default)]
     struct MyCircuit {
-        app_vk: ValidityPredicateDescription,
+        app_vk: ValidityPredicateVerifyingKey,
         app_data: pallas::Base,
         vp_data_nonhashed: pallas::Base,
         value: u64,
@@ -935,7 +935,7 @@ fn test_halo2_note_commitment_circuit() {
     // Test note with flase is_merkle_checked flag
     {
         let circuit = MyCircuit {
-            app_vk: ValidityPredicateDescription::dummy(&mut rng),
+            app_vk: ValidityPredicateVerifyingKey::dummy(&mut rng),
             app_data: pallas::Base::random(&mut rng),
             vp_data_nonhashed: pallas::Base::random(&mut rng),
             value: rng.next_u64(),
@@ -953,7 +953,7 @@ fn test_halo2_note_commitment_circuit() {
     // Test note with true is_merkle_checked flag
     {
         let circuit = MyCircuit {
-            app_vk: ValidityPredicateDescription::dummy(&mut rng),
+            app_vk: ValidityPredicateVerifyingKey::dummy(&mut rng),
             app_data: pallas::Base::random(&mut rng),
             vp_data_nonhashed: pallas::Base::random(&mut rng),
             value: rng.next_u64(),

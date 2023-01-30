@@ -11,4 +11,4 @@ pub mod nullifier;
 pub mod transaction;
 pub mod utils;
 pub mod value_commitment;
-pub mod vp_description;
+pub mod vp_vk;
