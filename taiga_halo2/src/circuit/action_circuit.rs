@@ -11,6 +11,7 @@ use crate::constant::{
     ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX, ACTION_NF_INSTANCE_ROW_IDX,
     ACTION_OUTPUT_CM_INSTANCE_ROW_IDX, TAIGA_COMMITMENT_TREE_DEPTH,
 };
+use crate::merkle_tree::LR;
 use crate::note::Note;
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
@@ -36,7 +37,7 @@ pub struct ActionCircuit {
     /// Spent note
     pub spend_note: Note,
     /// The authorization path of spend note
-    pub auth_path: [(pallas::Base, bool); TAIGA_COMMITMENT_TREE_DEPTH],
+    pub auth_path: [(pallas::Base, LR); TAIGA_COMMITMENT_TREE_DEPTH],
     /// Output note
     pub output_note: Note,
     /// random scalar for net value commitment

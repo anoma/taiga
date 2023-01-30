@@ -1,3 +1,4 @@
+use crate::merkle_tree::{is_left, LR};
 use halo2_gadgets::{
     poseidon::{
         primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
@@ -62,7 +63,7 @@ pub fn merkle_poseidon_gadget(
     mut layouter: impl Layouter<pallas::Base>,
     chip: MerklePoseidonChip,
     note_x: AssignedCell<pallas::Base, pallas::Base>,
-    merkle_path: &[(pallas::Base, bool)],
+    merkle_path: &[(pallas::Base, LR)],
 ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
     fn swap(
         merkle_chip: &MerklePoseidonChip,
@@ -92,7 +93,7 @@ pub fn merkle_poseidon_gadget(
                 &chip,
                 layouter.namespace(|| "merkle swap"),
                 pair,
-                Value::known(e.1),
+                Value::known(is_left(e.1)),
             )?
         };
         let poseidon_message = [pair.0, pair.1];

@@ -6,6 +6,50 @@ use ff::Field;
 use pasta_curves::pallas;
 use rand::{Rng, RngCore};
 
+use crate::merkle_tree::LR::{L, R};
+use rand::distributions::{Distribution, Standard};
+
+#[derive(Clone, Debug, PartialEq, Eq, Copy)]
+pub enum LR {
+    R,
+    L,
+}
+
+pub fn is_right(p: LR) -> bool {
+    match p {
+        R => true,
+        L => false,
+    }
+}
+
+pub fn is_left(p: LR) -> bool {
+    match p {
+        R => false,
+        L => true,
+    }
+}
+
+pub fn lr(i: usize) -> LR {
+    if i % 2 == 0 {
+        L
+    } else {
+        R
+    }
+}
+
+impl Distribution<LR> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> LR {
+        let u: usize = rng.gen();
+        lr(u)
+    }
+}
+
+impl Default for LR {
+    fn default() -> Self {
+        L
+    }
+}
+
 #[derive(Clone)]
 pub struct MerkleTreeLeafs {
     leafs: Vec<Node>,
@@ -35,13 +79,21 @@ impl MerkleTreeLeafs {
         }
         list[0]
     }
+
+    pub fn insert(&mut self, value: pallas::Base) -> Self {
+        let leafs = &mut self.leafs;
+        leafs.push(Node::new(value));
+        Self {
+            leafs: leafs.to_vec(),
+        }
+    }
 }
 
 /// A path from a position in a particular commitment tree to the root of that tree.
 /// In Orchard merkle tree, they are using MerkleCRH(layer, left, right), where MerkleCRH is a sinsemilla. We are using poseidon_hash(left, right).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MerklePath {
-    auth_path: Vec<(Node, bool)>,
+    auth_path: Vec<(Node, LR)>,
 }
 
 impl MerklePath {
@@ -52,7 +104,7 @@ impl MerklePath {
     }
 
     /// Constructs a Merkle path directly from a path.
-    pub fn from_path(auth_path: Vec<(Node, bool)>) -> Self {
+    pub fn from_path(auth_path: Vec<(Node, LR)>) -> Self {
         MerklePath { auth_path }
     }
 
@@ -65,11 +117,11 @@ impl MerklePath {
         (pos, leaf_hashes[pos])
     }
 
-    fn build_auth_path(leaf_hashes: Vec<Node>, position: usize, path: &mut Vec<(Node, bool)>) {
+    fn build_auth_path(leaf_hashes: Vec<Node>, position: usize, path: &mut Vec<(Node, LR)>) {
         let mut new_leaves = vec![];
         if leaf_hashes.len() > 1 {
             let (sibling_pos, sibling) = Self::find_sibling(&leaf_hashes, position);
-            path.push((sibling, sibling_pos % 2 == 0));
+            path.push((sibling, lr(sibling_pos)));
 
             for pair in leaf_hashes.chunks(2) {
                 let hash_pair = Node::combine(&pair[0], &pair[1]);
@@ -93,15 +145,15 @@ impl MerklePath {
         let mut root = leaf;
         for val in self.auth_path.iter() {
             root = match val.1 {
-                false => Node::combine(&root, &val.0),
-                true => Node::combine(&val.0, &root),
+                R => Node::combine(&root, &val.0),
+                L => Node::combine(&val.0, &root),
             }
         }
         root
     }
 
     /// Returns the input parameters for merkle tree gadget.
-    pub fn get_path(&self) -> Vec<(pallas::Base, bool)> {
+    pub fn get_path(&self) -> Vec<(pallas::Base, LR)> {
         self.auth_path
             .iter()
             .map(|(node, b)| (node.inner(), *b))
@@ -145,8 +197,49 @@ impl Node {
 impl Default for MerklePath {
     fn default() -> MerklePath {
         let auth_path = (0..TAIGA_COMMITMENT_TREE_DEPTH)
-            .map(|_| (Node::new(pallas::Base::one()), true))
+            .map(|_| (Node::new(pallas::Base::one()), L))
             .collect();
         Self::from_path(auth_path)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::merkle_tree::Node;
+    use halo2_gadgets::poseidon::primitives as poseidon;
+    use pasta_curves::Fp;
+
+    #[test]
+    // Test a Merkle tree with 4 leaves
+    fn test_auth_path_4() {
+        let mut rng = rand::thread_rng();
+
+        let hashes: Vec<Node> = (0..4)
+            .map(|_| {
+                let poseidon = poseidon::Hash::<
+                    _,
+                    poseidon::P128Pow5T3,
+                    poseidon::ConstantLength<4>,
+                    3,
+                    2,
+                >::init();
+                let inputs: Vec<Fp> = (0..4).map(|_| Fp::from(rng.gen::<u64>())).collect();
+                let f = poseidon.hash(inputs.try_into().expect("slice with incorrect length"));
+                Node::new(f)
+            })
+            .collect();
+
+        let position = 1;
+
+        let hash_2_3 = poseidon_hash(hashes[2].inner(), hashes[3].inner());
+
+        let auth_path = &[(Node::new(hashes[0].inner()), L), (Node::new(hash_2_3), R)];
+
+        let merkle_path = MerklePath::from_path(auth_path.to_vec());
+
+        let merkle_path_2: MerklePath = MerklePath::build_merkle_path(&hashes, position);
+
+        assert_eq!(merkle_path, merkle_path_2);
     }
 }
