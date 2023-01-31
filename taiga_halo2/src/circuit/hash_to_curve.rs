@@ -331,7 +331,7 @@ fn test_hash_to_curve_circuit() {
             let (advices, hash_to_curve_config, ecc_config) = config;
             let ecc_chip = EccChip::construct(ecc_config);
 
-            let messages = [pallas::Base::zero(); 3];
+            let messages = [pallas::Base::zero(); POSEIDON_TO_CURVE_INPUT_LEN - 2];
             let messages_vars = messages
                 .into_iter()
                 .map(|v| {

@@ -71,7 +71,7 @@ pub fn nullifier_circuit(
 #[derive(Debug)]
 pub struct SpendNoteVar {
     pub address: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_vp: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_vk: AssignedCell<pallas::Base, pallas::Base>,
     pub app_data: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub nf: AssignedCell<pallas::Base, pallas::Base>,
@@ -149,7 +149,7 @@ pub fn check_spend_note(
     };
 
     // Witness app_vk
-    let app_vp = assign_free_advice(
+    let app_vk = assign_free_advice(
         layouter.namespace(|| "witness app_vk"),
         advices[0],
         Value::known(spend_note.get_compressed_app_vk()),
@@ -204,7 +204,7 @@ pub fn check_spend_note(
         ecc_chip.clone(),
         note_commit_chip,
         address.clone(),
-        app_vp.clone(),
+        app_vk.clone(),
         app_data.clone(),
         rho.clone(),
         psi.clone(),
@@ -231,7 +231,7 @@ pub fn check_spend_note(
 
     Ok(SpendNoteVar {
         address,
-        app_vp,
+        app_vk,
         value,
         app_data,
         nf,
@@ -244,7 +244,7 @@ pub fn check_spend_note(
 #[derive(Debug)]
 pub struct OutputNoteVar {
     pub address: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_vp: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_vk: AssignedCell<pallas::Base, pallas::Base>,
     pub app_data: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
@@ -297,7 +297,7 @@ pub fn check_output_note(
     };
 
     // Witness app_vk
-    let app_vp = assign_free_advice(
+    let app_vk = assign_free_advice(
         layouter.namespace(|| "witness app_vk"),
         advices[0],
         Value::known(output_note.get_compressed_app_vk()),
@@ -345,7 +345,7 @@ pub fn check_output_note(
         ecc_chip,
         note_commit_chip,
         address.clone(),
-        app_vp.clone(),
+        app_vk.clone(),
         app_data.clone(),
         old_nf,
         psi,
@@ -360,7 +360,7 @@ pub fn check_output_note(
 
     Ok(OutputNoteVar {
         address,
-        app_vp,
+        app_vk,
         app_data,
         value,
         cm,
@@ -372,26 +372,21 @@ pub fn derive_value_base(
     mut layouter: impl Layouter<pallas::Base>,
     hash_to_curve_config: HashToCurveConfig,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
-    is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
-    app_vp: AssignedCell<pallas::Base, pallas::Base>,
+    app_vk: AssignedCell<pallas::Base, pallas::Base>,
     app_data: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<NonIdentityPoint<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
     let point = hash_to_curve_circuit(
         layouter.namespace(|| "hash to curve"),
         hash_to_curve_config,
         ecc_chip.clone(),
-        &[is_merkle_checked.clone(), app_vp.clone(), app_data.clone()],
+        &[app_vk.clone(), app_data.clone()],
     )?;
 
     // Assign a new `NonIdentityPoint` and constran equal to hash_to_curve point since `Point` doesn't have mul operation
     // IndentityPoint is an invalid value base and it returns an error.
-    let non_identity_point = is_merkle_checked
-        .value()
-        .zip(app_vp.value())
-        .zip(app_data.value())
-        .map(|((&flag, &vp), &data)| {
-            poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&[flag, vp, data]).to_affine()
-        });
+    let non_identity_point = app_vk.value().zip(app_data.value()).map(|(&vk, &data)| {
+        poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&[vk, data]).to_affine()
+    });
     let non_identity_point_var = NonIdentityPoint::new(
         ecc_chip,
         layouter.namespace(|| "non-identity value base"),
@@ -409,11 +404,9 @@ pub fn compute_value_commitment(
     mut layouter: impl Layouter<pallas::Base>,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
     hash_to_curve_config: HashToCurveConfig,
-    is_merkle_checked_spend: AssignedCell<pallas::Base, pallas::Base>,
     app_address_spend: AssignedCell<pallas::Base, pallas::Base>,
     data_spend: AssignedCell<pallas::Base, pallas::Base>,
     v_spend: AssignedCell<pallas::Base, pallas::Base>,
-    is_merkle_checked_output: AssignedCell<pallas::Base, pallas::Base>,
     app_address_output: AssignedCell<pallas::Base, pallas::Base>,
     data_output: AssignedCell<pallas::Base, pallas::Base>,
     v_output: AssignedCell<pallas::Base, pallas::Base>,
@@ -424,7 +417,6 @@ pub fn compute_value_commitment(
         layouter.namespace(|| "derive spend value base"),
         hash_to_curve_config.clone(),
         ecc_chip.clone(),
-        is_merkle_checked_spend,
         app_address_spend,
         data_spend,
     )?;
@@ -441,7 +433,6 @@ pub fn compute_value_commitment(
         layouter.namespace(|| "derive output value base"),
         hash_to_curve_config,
         ecc_chip.clone(),
-        is_merkle_checked_output,
         app_address_output,
         data_output,
     )?;

@@ -207,13 +207,8 @@ impl Note {
         self.nk_com.get_nk()
     }
 
-    pub fn derivate_value_base(&self) -> pallas::Point {
-        let inputs = [
-            pallas::Base::from(self.is_merkle_checked),
-            self.get_compressed_app_vk(),
-            self.get_value_base_app_data(),
-        ];
-        poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&inputs)
+    pub fn get_value_base(&self) -> pallas::Point {
+        self.value_base.derive_value_base()
     }
 
     pub fn get_compressed_app_vk(&self) -> pallas::Base {
@@ -231,6 +226,11 @@ impl NoteValueBase {
             app_vk: vk,
             app_data: data,
         }
+    }
+
+    pub fn derive_value_base(&self) -> pallas::Point {
+        let inputs = [self.app_vk.get_compressed(), self.app_data];
+        poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&inputs)
     }
 }
 
