@@ -5,6 +5,7 @@ pub mod action;
 pub mod bindnig_signature;
 pub mod circuit;
 pub mod constant;
+pub mod keys;
 pub mod merkle_tree;
 pub mod note;
 pub mod nullifier;
