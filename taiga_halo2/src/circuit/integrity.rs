@@ -98,7 +98,7 @@ pub fn check_spend_note(
     spend_note: Note,
     nf_row_idx: usize,
 ) -> Result<SpendNoteVar, Error> {
-    // Check spend note user integrity: address = Com_r(Com_r(nk, zero), vp_data_nonhashed)
+    // Check spend note user integrity: address = Com_r(Com_r(nk, zero), app_data_nonhashed)
     let (address, nk) = {
         // Witness nk
         let nk = spend_note.get_nk().unwrap();
@@ -126,14 +126,14 @@ pub fn check_spend_note(
             poseidon_hasher.hash(layouter.namespace(|| "nk_com"), poseidon_message)?
         };
 
-        // Witness vp_data_nonhashed
-        let vp_data_nonhashed = assign_free_advice(
-            layouter.namespace(|| "witness vp_data_nonhashed"),
+        // Witness app_data_nonhashed
+        let app_data_nonhashed = assign_free_advice(
+            layouter.namespace(|| "witness app_data_nonhashed"),
             advices[0],
-            Value::known(spend_note.vp_data_nonhashed),
+            Value::known(spend_note.app_data_nonhashed),
         )?;
 
-        // address = Com_r(vp_data_nonhashed, nk_com)
+        // address = Com_r(app_data_nonhashed, nk_com)
         let address = {
             let poseidon_chip = PoseidonChip::construct(poseidon_config.clone());
             let poseidon_hasher =
@@ -141,7 +141,7 @@ pub fn check_spend_note(
                     poseidon_chip,
                     layouter.namespace(|| "Poseidon init"),
                 )?;
-            let poseidon_message = [vp_data_nonhashed, nk_com];
+            let poseidon_message = [app_data_nonhashed, nk_com];
             poseidon_hasher.hash(layouter.namespace(|| "spend address"), poseidon_message)?
         };
 
@@ -270,7 +270,7 @@ pub fn check_output_note(
     old_nf: AssignedCell<pallas::Base, pallas::Base>,
     cm_row_idx: usize,
 ) -> Result<OutputNoteVar, Error> {
-    // Check output note user integrity: address = Com_r(vp_data_nonhashed, nk_com)
+    // Check output note user integrity: address = Com_r(app_data_nonhashed, nk_com)
     let address = {
         // Witness nk_com
         let nk_com = assign_free_advice(
@@ -279,11 +279,11 @@ pub fn check_output_note(
             Value::known(output_note.nk_com.get_nk_com()),
         )?;
 
-        // Witness vp_data_nonhashed
-        let vp_data_nonhashed = assign_free_advice(
-            layouter.namespace(|| "witness vp_data_nonhashed"),
+        // Witness app_data_nonhashed
+        let app_data_nonhashed = assign_free_advice(
+            layouter.namespace(|| "witness app_data_nonhashed"),
             advices[0],
-            Value::known(output_note.vp_data_nonhashed),
+            Value::known(output_note.app_data_nonhashed),
         )?;
 
         let poseidon_chip = PoseidonChip::construct(poseidon_config);
@@ -292,7 +292,7 @@ pub fn check_output_note(
                 poseidon_chip,
                 layouter.namespace(|| "Poseidon init"),
             )?;
-        let poseidon_message = [vp_data_nonhashed, nk_com];
+        let poseidon_message = [app_data_nonhashed, nk_com];
         poseidon_hasher.hash(layouter.namespace(|| "output address"), poseidon_message)?
     };
 

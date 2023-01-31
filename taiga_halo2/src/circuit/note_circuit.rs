@@ -730,7 +730,7 @@ fn test_halo2_note_commitment_circuit() {
     struct MyCircuit {
         app_vk: ValidityPredicateVerifyingKey,
         app_data: pallas::Base,
-        vp_data_nonhashed: pallas::Base,
+        app_data_nonhashed: pallas::Base,
         value: u64,
         nk_com: NullifierKeyCom,
         rho: Nullifier,
@@ -828,7 +828,7 @@ fn test_halo2_note_commitment_circuit() {
             let note = Note::new(
                 self.app_vk.clone(),
                 self.app_data,
-                self.vp_data_nonhashed,
+                self.app_data_nonhashed,
                 self.value,
                 self.nk_com,
                 self.rho,
@@ -937,7 +937,7 @@ fn test_halo2_note_commitment_circuit() {
         let circuit = MyCircuit {
             app_vk: ValidityPredicateVerifyingKey::dummy(&mut rng),
             app_data: pallas::Base::random(&mut rng),
-            vp_data_nonhashed: pallas::Base::random(&mut rng),
+            app_data_nonhashed: pallas::Base::random(&mut rng),
             value: rng.next_u64(),
             nk_com: NullifierKeyCom::rand(&mut rng),
             rho: Nullifier::default(),
@@ -955,7 +955,7 @@ fn test_halo2_note_commitment_circuit() {
         let circuit = MyCircuit {
             app_vk: ValidityPredicateVerifyingKey::dummy(&mut rng),
             app_data: pallas::Base::random(&mut rng),
-            vp_data_nonhashed: pallas::Base::random(&mut rng),
+            app_data_nonhashed: pallas::Base::random(&mut rng),
             value: rng.next_u64(),
             nk_com: NullifierKeyCom::rand(&mut rng),
             rho: Nullifier::default(),
