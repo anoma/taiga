@@ -42,11 +42,7 @@ impl Default for NoteCommitment {
 /// A note
 #[derive(Debug, Clone, Default)]
 pub struct Note {
-    /// app_vk is the verifying key of VP
-    pub app_vk: ValidityPredicateVerifyingKey,
-    /// app_data is the encoded data that is defined in application vp
-    /// app_data is used to derive the note value base
-    pub app_data: pallas::Base,
+    pub value_base: NoteValueBase,
     /// vp_data_nonhashed is the data defined in application vp and will NOT be used to derive value base
     /// vp_data_nonhashed denotes the encoded user-specific data and sub-vps
     pub vp_data_nonhashed: pallas::Base,
@@ -63,6 +59,15 @@ pub struct Note {
     pub is_merkle_checked: bool,
     /// note data bytes
     pub note_data: Vec<u8>,
+}
+
+/// The parameters in the NoteValueBase are used to derive note value base.
+#[derive(Debug, Clone, Default)]
+pub struct NoteValueBase {
+    /// app_vk is the verifying key of VP
+    app_vk: ValidityPredicateVerifyingKey,
+    /// app_data is the encoded data that is defined in application vp
+    app_data: pallas::Base,
 }
 
 #[derive(Clone)]
@@ -95,9 +100,9 @@ impl Note {
         is_merkle_checked: bool,
         note_data: Vec<u8>,
     ) -> Self {
+        let value_base = NoteValueBase::new(app_vk, app_data);
         Self {
-            app_vk,
-            app_data,
+            value_base,
             vp_data_nonhashed,
             value,
             nk_com,
@@ -117,6 +122,7 @@ impl Note {
     pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
         let app_vk = ValidityPredicateVerifyingKey::dummy(&mut rng);
         let app_data = pallas::Base::random(&mut rng);
+        let value_base = NoteValueBase::new(app_vk, app_data);
         let vp_data_nonhashed = pallas::Base::zero();
         let value: u64 = rng.gen();
         let nk_com = NullifierKeyCom::rand(&mut rng);
@@ -124,8 +130,7 @@ impl Note {
         let psi = pallas::Base::random(&mut rng);
         let note_data = vec![0u8; 32];
         Self {
-            app_vk,
-            app_data,
+            value_base,
             vp_data_nonhashed,
             value,
             nk_com,
@@ -137,17 +142,22 @@ impl Note {
         }
     }
 
-    // cm = SinsemillaCommit^rcm(address || app_vp || app_data || rho || psi || is_merkle_checked || value)
+    // cm = SinsemillaCommit^rcm(address || app_vk || app_data || rho || psi || is_merkle_checked || value)
     pub fn commitment(&self) -> NoteCommitment {
         let address = self.get_address();
-        let app_vp = self.app_vk.get_compressed();
         let ret = NOTE_COMMIT_DOMAIN
             .commit(
                 iter::empty()
                     .chain(address.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
-                    .chain(app_vp.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
                     .chain(
-                        self.app_data
+                        self.get_compressed_app_vk()
+                            .to_le_bits()
+                            .iter()
+                            .by_vals()
+                            .take(BASE_BITS_NUM),
+                    )
+                    .chain(
+                        self.get_value_base_app_data()
                             .to_le_bits()
                             .iter()
                             .by_vals()
@@ -200,10 +210,27 @@ impl Note {
     pub fn derivate_value_base(&self) -> pallas::Point {
         let inputs = [
             pallas::Base::from(self.is_merkle_checked),
-            self.app_vk.get_compressed(),
-            self.app_data,
+            self.get_compressed_app_vk(),
+            self.get_value_base_app_data(),
         ];
         poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&inputs)
+    }
+
+    pub fn get_compressed_app_vk(&self) -> pallas::Base {
+        self.value_base.app_vk.get_compressed()
+    }
+
+    pub fn get_value_base_app_data(&self) -> pallas::Base {
+        self.value_base.app_data
+    }
+}
+
+impl NoteValueBase {
+    pub fn new(vk: ValidityPredicateVerifyingKey, data: pallas::Base) -> Self {
+        Self {
+            app_vk: vk,
+            app_data: data,
+        }
     }
 }
 

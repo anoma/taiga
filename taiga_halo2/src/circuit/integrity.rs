@@ -148,18 +148,18 @@ pub fn check_spend_note(
         (address, nk_var)
     };
 
-    // Witness app_vp
+    // Witness app_vk
     let app_vp = assign_free_advice(
-        layouter.namespace(|| "witness app_vp"),
+        layouter.namespace(|| "witness app_vk"),
         advices[0],
-        Value::known(spend_note.app_vk.get_compressed()),
+        Value::known(spend_note.get_compressed_app_vk()),
     )?;
 
-    // Witness app_data
+    // Witness value_base_app_data
     let app_data = assign_free_advice(
-        layouter.namespace(|| "witness app_vp_data"),
+        layouter.namespace(|| "witness value_base_app_data"),
         advices[0],
-        Value::known(spend_note.app_data),
+        Value::known(spend_note.get_value_base_app_data()),
     )?;
 
     // Witness value(u64)
@@ -296,18 +296,18 @@ pub fn check_output_note(
         poseidon_hasher.hash(layouter.namespace(|| "output address"), poseidon_message)?
     };
 
-    // Witness app_vp
+    // Witness app_vk
     let app_vp = assign_free_advice(
-        layouter.namespace(|| "witness app_vp"),
+        layouter.namespace(|| "witness app_vk"),
         advices[0],
-        Value::known(output_note.app_vk.get_compressed()),
+        Value::known(output_note.get_compressed_app_vk()),
     )?;
 
-    // Witness app_data
+    // Witness value_base_app_data
     let app_data = assign_free_advice(
-        layouter.namespace(|| "witness app_data"),
+        layouter.namespace(|| "witness value_base_app_data"),
         advices[0],
-        Value::known(output_note.app_data),
+        Value::known(output_note.get_value_base_app_data()),
     )?;
 
     // Witness value(u64)

@@ -854,18 +854,18 @@ fn test_halo2_note_commitment_circuit() {
                 Value::known(note.get_address()),
             )?;
 
-            // Witness application
+            // Witness app_vk
             let app_vp = assign_free_advice(
-                layouter.namespace(|| "witness rho"),
+                layouter.namespace(|| "witness app_vk"),
                 note_commit_config.advices[0],
-                Value::known(note.app_vk.get_compressed()),
+                Value::known(note.get_compressed_app_vk()),
             )?;
 
-            // Witness app_data
+            // Witness value_base_app_data
             let app_data = assign_free_advice(
-                layouter.namespace(|| "witness application app_data"),
+                layouter.namespace(|| "witness value_base_app_data"),
                 note_commit_config.advices[0],
-                Value::known(note.app_data),
+                Value::known(note.get_value_base_app_data()),
             )?;
 
             // Witness a random non-negative u64 note value
