@@ -6,7 +6,7 @@ use halo2_proofs::{
 use pasta_curves::{pallas, vesta};
 use rand::RngCore;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Proof(Vec<u8>);
 
 impl Proof {
@@ -46,4 +46,9 @@ impl Proof {
     pub fn new(bytes: Vec<u8>) -> Self {
         Proof(bytes)
     }
+
+    pub fn inner(&self) -> Vec<u8> {
+        self.0.clone()
+    }
+
 }

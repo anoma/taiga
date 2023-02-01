@@ -8,6 +8,7 @@ use crate::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
+    proof::Proof,
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use halo2_proofs::{
@@ -77,17 +78,9 @@ impl ValidityPredicateInfo for TrivialValidityPredicateCircuit {
         let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
         let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
         let instance = self.get_instances();
-        let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
-        create_proof(
-            params,
-            &pk,
-            &[self.clone()],
-            &[&[&instance]],
-            &mut rng,
-            &mut transcript,
-        )
-        .unwrap();
-        let proof = transcript.finalize();
+        let proof = Proof::create(&pk, &params, self.clone(),
+        &[&instance],
+            &mut rng).unwrap();
         VPVerifyingInfo {
             vk,
             proof,

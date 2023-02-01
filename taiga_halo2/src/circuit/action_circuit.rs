@@ -261,17 +261,9 @@ fn test_halo2_action_circuit() {
     // Create action proof
     {
         let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
-        let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
-        create_proof(
-            params,
-            &ACTION_PROVING_KEY,
-            &[action_circuit],
-            &[&[&action.to_instance()]],
-            &mut rng,
-            &mut transcript,
-        )
-        .unwrap();
-        let proof = transcript.finalize();
+        let proof = Proof::create(&ACTION_PROVING_KEY, &params, action_circuit,
+            &[&action_instance.to_instance()],
+                &mut rng).unwrap();
 
         let strategy = SingleVerifier::new(params);
         let mut transcript = Blake2bRead::init(&proof[..]);

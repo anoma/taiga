@@ -85,17 +85,9 @@ impl ValidityPredicateInfo for SudokuVP {
         let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
         let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
         let instance = self.get_instances();
-        let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
-        create_proof(
-            params,
-            &pk,
-            &[self.clone()],
-            &[&[&instance]],
-            &mut rng,
-            &mut transcript,
-        )
-        .unwrap();
-        let proof = transcript.finalize();
+        let proof = Proof::create(&pk, &params, self.clone(),
+        &[&instance],
+            &mut rng);
         VPVerifyingInfo {
             vk,
             proof,
@@ -177,7 +169,7 @@ mod tests {
 
         let vk = plonk::keygen_vk(&params, &sudoku).unwrap();
 
-        let mut vp = SudokuVP::new(sudoku, input_notes, output_notes);
+        let mut _vp = SudokuVP::new(sudoku, input_notes, output_notes);
 
         let vp_desc = ValidityPredicateVerifyingKey::from_vk(vk);
 
