@@ -394,7 +394,8 @@ mod tests {
     use pasta_curves::pallas;
     use rand::rngs::OsRng;
 
-    use crate::{app::valid_puzzle::circuit::PuzzleCircuit, proof::Proof};
+    use taiga_halo2::{proof::Proof};
+    use crate::{app::valid_puzzle::circuit::PuzzleCircuit};
 
     #[test]
     fn test_puzzle() {
@@ -429,7 +430,7 @@ mod tests {
         let params = Params::new(K);
 
         let vk = plonk::keygen_vk(&params, &circuit).unwrap();
-        let pk = plonk::keygen_pk(&params, vk, &circuit).unwrap();
+        let pk = plonk::keygen_pk(&params, vk.clone(), &circuit).unwrap();
         println!(
             "key generation: \t{:?}ms",
             (Instant::now() - time).as_millis()

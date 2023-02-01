@@ -382,16 +382,17 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
 #[cfg(test)]
 mod tests {
     use halo2_proofs::{arithmetic::FieldExt, dev::MockProver};
-    use pasta_curves::pallas;
     use rand::rngs::OsRng;
 
-    use crate::{app::valid_sudoku::circuit::SudokuCircuit, proof::Proof};
+    use crate::{app::valid_sudoku::circuit::SudokuCircuit};
 
     use halo2_proofs::{
         plonk::{self, ProvingKey, VerifyingKey},
         poly::commitment::Params,
     };
-
+    use pasta_curves::{pallas, vesta};
+    use std::time::Instant;
+    use taiga_halo2::{proof::Proof};
     #[test]
     fn test_sudoku() {
         let sudoku = [
@@ -443,7 +444,7 @@ mod tests {
         let params = Params::new(K);
 
         let vk = plonk::keygen_vk(&params, &circuit).unwrap();
-        let pk = plonk::keygen_pk(&params, vk, &circuit).unwrap();
+        let pk = plonk::keygen_pk(&params, vk.clone(), &circuit).unwrap();
         println!(
             "key generation: \t{:?}ms",
             (Instant::now() - time).as_millis()
@@ -481,6 +482,8 @@ mod tests {
         const K: u32 = 13;
 
         let circuit = SudokuCircuit { sudoku };
-        let _vk = VerifyingKey::build(&circuit, K); // this would fail on this specific puzzle with the old implementation of synthesize
+        let params : Params<vesta::Affine> = Params::new(K);
+
+        let vk = plonk::keygen_vk(&params, &circuit).unwrap(); // this would fail on this specific puzzle with the old implementation of synthesize
     }
 }

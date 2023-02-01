@@ -137,8 +137,7 @@ mod tests {
         },
         constant::NUM_NOTE,
         note::Note,
-        nullifier::Nullifier,
-        user::User,
+        nullifier::{Nullifier, NullifierKeyCom},
         vp_vk::ValidityPredicateVerifyingKey,
     };
 
@@ -182,14 +181,14 @@ mod tests {
 
         let vp_desc = ValidityPredicateVerifyingKey::from_vk(vk);
 
-        let app_data = pallas::Base::zero(); // TODO: What else can this be?
+        let app_data = pallas::Base::zero(); 
+        let app_data_dynamic = pallas::Base::zero(); 
 
-        let user = User::dummy(&mut rng);
-
-        let value: u64 = 1; // TODO: What is the correct value here (if any)?
+        let value: u64 = 0; 
+        let nk_com = NullifierKeyCom::default();
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        Note::new(vp_desc, value, rho, psi, rcm, true, app_data, user, vec![]);
+        Note::new(vp_desc, app_data, app_data_dynamic, value, nk_com, rho, psi, rcm, true, vec![]);
     }
 }
