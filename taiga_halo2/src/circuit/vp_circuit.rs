@@ -30,7 +30,7 @@ pub struct VPVerifyingInfo {
 impl VPVerifyingInfo {
     pub fn verify(&self) -> Result<(), Error> {
         let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
-        self.proof.verify(&self.vk, &params, &[&self.instance])
+        self.proof.verify(&self.vk, params, &[&self.instance])
     }
 }
 

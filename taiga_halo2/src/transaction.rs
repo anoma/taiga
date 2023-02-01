@@ -302,7 +302,7 @@ impl ActionVerifyingInfo {
         let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
         let action_proof = Proof::create(
             &ACTION_PROVING_KEY,
-            &params,
+            params,
             circuit,
             &[&action_instance.to_instance()],
             &mut rng,
@@ -318,7 +318,7 @@ impl ActionVerifyingInfo {
         let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
         self.action_proof.verify(
             &ACTION_VERIFYING_KEY,
-            &params,
+            params,
             &[&self.action_instance.to_instance()],
         )
     }
