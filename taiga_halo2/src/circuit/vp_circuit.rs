@@ -9,36 +9,28 @@ use crate::{
         SETUP_PARAMS_MAP, VP_CIRCUIT_PARAMS_SIZE,
     },
     note::Note,
+    proof::Proof,
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use dyn_clone::{clone_trait_object, DynClone};
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
     circuit::{Layouter, Value},
-    plonk::{verify_proof, Circuit, ConstraintSystem, Error, SingleVerifier, VerifyingKey},
-    transcript::Blake2bRead,
+    plonk::{Circuit, ConstraintSystem, Error, VerifyingKey},
 };
 use pasta_curves::{pallas, vesta};
 
 #[derive(Debug, Clone)]
 pub struct VPVerifyingInfo {
     pub vk: VerifyingKey<vesta::Affine>,
-    pub proof: Vec<u8>,
+    pub proof: Proof,
     pub instance: Vec<pallas::Base>,
 }
 
 impl VPVerifyingInfo {
     pub fn verify(&self) -> Result<(), Error> {
         let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
-        let strategy = SingleVerifier::new(params);
-        let mut transcript = Blake2bRead::init(&self.proof[..]);
-        verify_proof(
-            params,
-            &self.vk,
-            strategy,
-            &[&[&self.instance]],
-            &mut transcript,
-        )
+        self.proof.verify(&self.vk, params, &[&self.instance])
     }
 }
 

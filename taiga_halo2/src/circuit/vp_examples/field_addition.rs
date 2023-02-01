@@ -10,18 +10,15 @@ use crate::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
+    proof::Proof,
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use ff::Field;
 use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
-    plonk::{
-        create_proof, keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error,
-        Instance,
-    },
-    transcript::Blake2bWrite,
+    plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
 };
-use pasta_curves::{pallas, vesta};
+use pasta_curves::pallas;
 use rand::rngs::OsRng;
 use rand::RngCore;
 
@@ -103,17 +100,7 @@ impl ValidityPredicateInfo for FieldAdditionValidityPredicateCircuit {
         let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
         let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
         let instance = self.get_instances();
-        let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
-        create_proof(
-            params,
-            &pk,
-            &[self.clone()],
-            &[&[&instance]],
-            &mut rng,
-            &mut transcript,
-        )
-        .unwrap();
-        let proof = transcript.finalize();
+        let proof = Proof::create(&pk, params, self.clone(), &[&instance], &mut rng).unwrap();
         VPVerifyingInfo {
             vk,
             proof,

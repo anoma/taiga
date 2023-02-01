@@ -1,9 +1,8 @@
 use halo2_proofs::{
     circuit::{floor_planner, Layouter},
-    plonk::{self, create_proof, keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
-    transcript::Blake2bWrite,
+    plonk::{self, keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
-use pasta_curves::{pallas, vesta};
+use pasta_curves::pallas;
 
 extern crate taiga_halo2;
 use taiga_halo2::{
@@ -17,6 +16,7 @@ use taiga_halo2::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
+    proof::Proof,
     vp_circuit_impl,
     vp_vk::ValidityPredicateVerifyingKey,
 };
@@ -85,17 +85,7 @@ impl ValidityPredicateInfo for SudokuVP {
         let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
         let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
         let instance = self.get_instances();
-        let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
-        create_proof(
-            params,
-            &pk,
-            &[self.clone()],
-            &[&[&instance]],
-            &mut rng,
-            &mut transcript,
-        )
-        .unwrap();
-        let proof = transcript.finalize();
+        let proof = Proof::create(&pk, params, self.clone(), &[&instance], &mut rng).unwrap();
         VPVerifyingInfo {
             vk,
             proof,
@@ -137,8 +127,7 @@ mod tests {
         },
         constant::NUM_NOTE,
         note::Note,
-        nullifier::Nullifier,
-        user::User,
+        nullifier::{Nullifier, NullifierKeyCom},
         vp_vk::ValidityPredicateVerifyingKey,
     };
 
@@ -146,8 +135,12 @@ mod tests {
     use pasta_curves::pallas;
     use rand::rngs::OsRng;
 
+    use halo2_proofs::{
+        plonk::{self, ProvingKey, VerifyingKey},
+        poly::commitment::Params,
+    };
+
     use crate::app::valid_sudoku::{circuit::SudokuCircuit, vp::SudokuVP};
-    use crate::keys::VerifyingKey;
 
     #[test]
     fn test_vp() {
@@ -170,20 +163,33 @@ mod tests {
                 [3, 2, 5, 1, 9, 7, 8, 4, 6],
             ],
         };
-        let vk = VerifyingKey::build(&sudoku, K);
+        let params = Params::new(K);
 
-        let mut vp = SudokuVP::new(sudoku, input_notes, output_notes);
+        let vk = plonk::keygen_vk(&params, &sudoku).unwrap();
 
-        let vp_desc = ValidityPredicateVerifyingKey::from_vk(vk.vk);
+        let mut _vp = SudokuVP::new(sudoku, input_notes, output_notes);
 
-        let app_data = pallas::Base::zero(); // TODO: What else can this be?
+        let vp_desc = ValidityPredicateVerifyingKey::from_vk(vk);
 
-        let user = User::dummy(&mut rng);
+        let app_data = pallas::Base::zero();
+        let app_data_dynamic = pallas::Base::zero();
 
-        let value: u64 = 1; // TODO: What is the correct value here (if any)?
+        let value: u64 = 0;
+        let nk_com = NullifierKeyCom::default();
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        Note::new(vp_desc, value, rho, psi, rcm, true, app_data, user, vec![]);
+        Note::new(
+            vp_desc,
+            app_data,
+            app_data_dynamic,
+            value,
+            nk_com,
+            rho,
+            psi,
+            rcm,
+            true,
+            vec![],
+        );
     }
 }

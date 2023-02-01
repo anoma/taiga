@@ -387,14 +387,15 @@ mod tests {
     use std::time::Instant;
 
     use halo2_proofs::dev::MockProver;
+    use halo2_proofs::{
+        plonk::{self, ProvingKey, VerifyingKey},
+        poly::commitment::Params,
+    };
     use pasta_curves::pallas;
     use rand::rngs::OsRng;
 
-    use crate::{
-        app::valid_puzzle::circuit::PuzzleCircuit,
-        keys::{ProvingKey, VerifyingKey},
-        proof::Proof,
-    };
+    use crate::app::valid_puzzle::circuit::PuzzleCircuit;
+    use taiga_halo2::proof::Proof;
 
     #[test]
     fn test_puzzle() {
@@ -426,8 +427,10 @@ mod tests {
         println!("Success!");
 
         let time = Instant::now();
-        let vk = VerifyingKey::build(&circuit, K);
-        let pk = ProvingKey::build(&circuit, K);
+        let params = Params::new(K);
+
+        let vk = plonk::keygen_vk(&params, &circuit).unwrap();
+        let pk = plonk::keygen_pk(&params, vk.clone(), &circuit).unwrap();
         println!(
             "key generation: \t{:?}ms",
             (Instant::now() - time).as_millis()
@@ -436,11 +439,11 @@ mod tests {
         let mut rng = OsRng;
         let time = Instant::now();
 
-        let proof = Proof::create(&pk, circuit, &[&public_inputs], &mut rng).unwrap();
+        let proof = Proof::create(&pk, &params, circuit, &[&public_inputs], &mut rng).unwrap();
         println!("proof: \t\t\t{:?}ms", (Instant::now() - time).as_millis());
 
         let time = Instant::now();
-        assert!(proof.verify(&vk, &[&public_inputs]).is_ok());
+        assert!(proof.verify(&vk, &params, &[&public_inputs]).is_ok());
         println!(
             "verification: \t\t{:?}ms",
             (Instant::now() - time).as_millis()

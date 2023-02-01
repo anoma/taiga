@@ -1,13 +1,11 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use halo2_proofs::{
-    plonk::{create_proof, keygen_pk, keygen_vk, verify_proof, SingleVerifier},
-    transcript::{Blake2bRead, Blake2bWrite},
-};
-use pasta_curves::vesta;
+use halo2_proofs::plonk::{keygen_pk, keygen_vk};
+
 use rand::rngs::OsRng;
 use taiga_halo2::circuit::vp_circuit::ValidityPredicateInfo;
 use taiga_halo2::circuit::vp_examples::TrivialValidityPredicateCircuit;
 use taiga_halo2::constant::SETUP_PARAMS_MAP;
+use taiga_halo2::proof::Proof;
 
 fn bench_vp_proof(name: &str, c: &mut Criterion) {
     let mut rng = OsRng;
@@ -23,49 +21,18 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
     let prover_name = name.to_string() + "-prover";
     c.bench_function(&prover_name, |b| {
         b.iter(|| {
-            let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
-            create_proof(
-                params,
-                &pk,
-                &[vp_circuit.clone()],
-                &[&[&instances]],
-                &mut rng,
-                &mut transcript,
-            )
-            .unwrap();
-            let _proof = transcript.finalize();
+            Proof::create(&pk, &params, vp_circuit.clone(), &[&instances], &mut rng);
         })
     });
 
     // Verifier bench
     // Create a proof for verifier
-    let proof = {
-        let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
-        create_proof(
-            params,
-            &pk,
-            &[vp_circuit.clone()],
-            &[&[&instances]],
-            &mut rng,
-            &mut transcript,
-        )
-        .unwrap();
-        transcript.finalize()
-    };
+    let proof = Proof::create(&pk, &params, vp_circuit.clone(), &[&instances], &mut rng).unwrap();
 
     let verifier_name = name.to_string() + "-verifier";
     c.bench_function(&verifier_name, |b| {
         b.iter(|| {
-            let strategy = SingleVerifier::new(params);
-            let mut transcript = Blake2bRead::init(&proof[..]);
-            assert!(verify_proof(
-                params,
-                pk.get_vk(),
-                strategy,
-                &[&[&instances]],
-                &mut transcript
-            )
-            .is_ok());
+            proof.verify(pk.get_vk(), &params, &[&instances]).is_ok();
         })
     });
 }

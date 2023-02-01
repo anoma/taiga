@@ -7,16 +7,14 @@ use crate::constant::{
 };
 use crate::note::{NoteCommitment, OutputNoteInfo, SpendNoteInfo};
 use crate::nullifier::Nullifier;
+use crate::proof::Proof;
 use crate::value_commitment::ValueCommitment;
 use blake2b_simd::Params as Blake2bParams;
 use core::fmt;
 use ff::PrimeField;
 use group::Group;
-use halo2_proofs::{
-    plonk::{create_proof, verify_proof, Error, SingleVerifier},
-    transcript::{Blake2bRead, Blake2bWrite},
-};
-use pasta_curves::{pallas, vesta};
+use halo2_proofs::plonk::Error;
+use pasta_curves::pallas;
 use rand::{CryptoRng, RngCore};
 use std::fmt::Display;
 
@@ -69,7 +67,7 @@ pub struct PartialTransaction {
 
 #[derive(Debug, Clone)]
 pub struct ActionVerifyingInfo {
-    action_proof: Vec<u8>,
+    action_proof: Proof,
     action_instance: ActionInstance,
 }
 
@@ -302,16 +300,14 @@ impl ActionVerifyingInfo {
     pub fn create<R: RngCore>(action_info: ActionInfo, mut rng: R) -> Result<Self, Error> {
         let (action_instance, circuit) = action_info.build();
         let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
-        let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
-        create_proof(
-            params,
+        let action_proof = Proof::create(
             &ACTION_PROVING_KEY,
-            &[circuit],
-            &[&[&action_instance.to_instance()]],
+            params,
+            circuit,
+            &[&action_instance.to_instance()],
             &mut rng,
-            &mut transcript,
-        )?;
-        let action_proof = transcript.finalize();
+        )
+        .unwrap();
         Ok(Self {
             action_proof,
             action_instance,
@@ -320,14 +316,10 @@ impl ActionVerifyingInfo {
 
     pub fn verify(&self) -> Result<(), Error> {
         let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
-        let strategy = SingleVerifier::new(params);
-        let mut transcript = Blake2bRead::init(&self.action_proof[..]);
-        verify_proof(
-            params,
+        self.action_proof.verify(
             &ACTION_VERIFYING_KEY,
-            strategy,
-            &[&[&self.action_instance.to_instance()]],
-            &mut transcript,
+            params,
+            &[&self.action_instance.to_instance()],
         )
     }
 }

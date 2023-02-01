@@ -29,5 +29,5 @@ harness = false
 name = "vp_proof"
 harness = false
 
-[[examples]]
+[[example]]
 name = "sudoku"

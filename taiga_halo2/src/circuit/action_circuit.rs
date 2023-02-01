@@ -13,6 +13,7 @@ use crate::constant::{
 };
 use crate::merkle_tree::LR;
 use crate::note::Note;
+
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
     circuit::{floor_planner, Layouter},
@@ -239,49 +240,32 @@ fn test_halo2_action_circuit() {
     use crate::constant::{
         ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, SETUP_PARAMS_MAP,
     };
-    use halo2_proofs::{
-        dev::MockProver,
-        plonk::{create_proof, verify_proof, SingleVerifier},
-        transcript::{Blake2bRead, Blake2bWrite},
-    };
-    use pasta_curves::vesta;
+    use crate::proof::Proof;
+    use halo2_proofs::dev::MockProver;
+
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     let action_info = ActionInfo::dummy(&mut rng);
     let (action, action_circuit) = action_info.build();
     let instances = vec![action.to_instance()];
-    {
-        let prover =
-            MockProver::<pallas::Base>::run(ACTION_CIRCUIT_PARAMS_SIZE, &action_circuit, instances)
-                .unwrap();
-        assert_eq!(prover.verify(), Ok(()));
-    }
+    let prover =
+        MockProver::<pallas::Base>::run(ACTION_CIRCUIT_PARAMS_SIZE, &action_circuit, instances)
+            .unwrap();
+    assert_eq!(prover.verify(), Ok(()));
 
     // Create action proof
-    {
-        let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
-        let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
-        create_proof(
-            params,
-            &ACTION_PROVING_KEY,
-            &[action_circuit],
-            &[&[&action.to_instance()]],
-            &mut rng,
-            &mut transcript,
-        )
-        .unwrap();
-        let proof = transcript.finalize();
+    let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
+    let proof = Proof::create(
+        &ACTION_PROVING_KEY,
+        params,
+        action_circuit,
+        &[&action.to_instance()],
+        &mut rng,
+    )
+    .unwrap();
 
-        let strategy = SingleVerifier::new(params);
-        let mut transcript = Blake2bRead::init(&proof[..]);
-        assert!(verify_proof(
-            params,
-            &ACTION_VERIFYING_KEY,
-            strategy,
-            &[&[&action.to_instance()]],
-            &mut transcript
-        )
+    assert!(proof
+        .verify(&ACTION_VERIFYING_KEY, params, &[&action.to_instance()])
         .is_ok());
-    }
 }

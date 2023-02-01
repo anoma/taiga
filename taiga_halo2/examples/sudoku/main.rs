@@ -1,19 +1,15 @@
 pub mod app;
-pub mod keys;
-pub mod proof;
 
 fn main() {
     use std::time::Instant;
 
-    use halo2_proofs::dev::MockProver;
+    use halo2_proofs::{dev::MockProver, plonk, poly::commitment::Params};
     use pasta_curves::{arithmetic::FieldExt, pallas};
     use rand::rngs::OsRng;
 
-    use crate::{
-        app::valid_sudoku::circuit::SudokuCircuit,
-        keys::{ProvingKey, VerifyingKey},
-        proof::Proof,
-    };
+    use crate::app::valid_sudoku::circuit::SudokuCircuit;
+
+    use taiga_halo2::proof::Proof;
 
     let sudoku = [
         [7, 6, 9, 5, 3, 8, 1, 2, 4],
@@ -61,8 +57,11 @@ fn main() {
 
     println!("Success!");
     let time = Instant::now();
-    let vk = VerifyingKey::build(&circuit, K);
-    let pk = ProvingKey::build(&circuit, K);
+    let params = Params::new(K);
+
+    let vk = plonk::keygen_vk(&params, &circuit).unwrap();
+    let pk = plonk::keygen_pk(&params, vk.clone(), &circuit).unwrap();
+
     println!(
         "key generation: \t{:?}ms",
         (Instant::now() - time).as_millis()
@@ -70,11 +69,11 @@ fn main() {
 
     let mut rng = OsRng;
     let time = Instant::now();
-    let proof = Proof::create(&pk, circuit, &[&pub_instance], &mut rng).unwrap();
+    let proof = Proof::create(&pk, &params, circuit, &[&pub_instance], &mut rng).unwrap();
     println!("proof: \t\t\t{:?}ms", (Instant::now() - time).as_millis());
 
     let time = Instant::now();
-    assert!(proof.verify(&vk, &[&pub_instance]).is_ok());
+    assert!(proof.verify(&vk, &params, &[&pub_instance]).is_ok());
     println!(
         "verification: \t\t{:?}ms",
         (Instant::now() - time).as_millis()
