@@ -258,7 +258,7 @@ fn test_halo2_action_circuit() {
     let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
     let proof = Proof::create(
         &ACTION_PROVING_KEY,
-        &params,
+        params,
         action_circuit,
         &[&action.to_instance()],
         &mut rng,
@@ -266,6 +266,6 @@ fn test_halo2_action_circuit() {
     .unwrap();
 
     assert!(proof
-        .verify(&ACTION_VERIFYING_KEY, &params, &[&action.to_instance()])
+        .verify(&ACTION_VERIFYING_KEY, params, &[&action.to_instance()])
         .is_ok());
 }
