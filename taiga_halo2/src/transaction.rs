@@ -397,15 +397,15 @@ fn test_transaction_creation() {
     // Generate notes
     let spend_note_1 = {
         let app_data = pallas::Base::zero();
-        // TODO: add real application logic vps and encode them to app_data_nonhashed later.
+        // TODO: add real application logic vps and encode them to app_data_dynamic later.
         let app_logic_vps_description = vec![
             trivail_vp_description.clone(),
             trivail_vp_description.clone(),
         ];
-        // Encode the app_logic_vps_description into app_data_nonhashed
+        // Encode the app_logic_vps_description into app_data_dynamic
         // The encoding method is flexible and defined in the application vp.
         // Use poseidon hash to encode the two logic vps here
-        let app_data_nonhashed = poseidon_hash(
+        let app_data_dynamic = poseidon_hash(
             app_logic_vps_description[0].get_compressed(),
             app_logic_vps_description[1].get_compressed(),
         );
@@ -419,7 +419,7 @@ fn test_transaction_creation() {
         Note::new(
             app_vk,
             app_data,
-            app_data_nonhashed,
+            app_data_dynamic,
             value,
             nk_com,
             rho,
@@ -431,9 +431,9 @@ fn test_transaction_creation() {
     };
     let output_note_1 = {
         let app_data = pallas::Base::zero();
-        // TODO: add real application logic vps and encode them to app_data_nonhashed later.
-        // If the logic vp is not used, set app_data_nonhashed pallas::Base::zero() by defualt.
-        let app_data_nonhashed = pallas::Base::zero();
+        // TODO: add real application logic vps and encode them to app_data_dynamic later.
+        // If the logic vp is not used, set app_data_dynamic pallas::Base::zero() by defualt.
+        let app_data_dynamic = pallas::Base::zero();
         let rho = spend_note_1.get_nf().unwrap();
         let value = 5000u64;
         let nk_com = NullifierKeyCom::rand(&mut rng);
@@ -443,7 +443,7 @@ fn test_transaction_creation() {
         Note::new(
             trivail_vp_description,
             app_data,
-            app_data_nonhashed,
+            app_data_dynamic,
             value,
             nk_com,
             rho,
@@ -473,7 +473,7 @@ fn test_transaction_creation() {
         app_vp_proving_info.clone(),
         trivial_app_logic_vp_proving_info.clone(),
     );
-    // The following notes use empty logic vps and use app_data_nonhashed with pallas::Base::zero() by default.
+    // The following notes use empty logic vps and use app_data_dynamic with pallas::Base::zero() by default.
     let app_logic_vp_proving_info = vec![];
     let spend_note_info_2 = SpendNoteInfo::new(
         spend_note_2,

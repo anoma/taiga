@@ -43,9 +43,9 @@ impl Default for NoteCommitment {
 #[derive(Debug, Clone, Default)]
 pub struct Note {
     pub value_base: NoteType,
-    /// app_data_nonhashed is the data defined in application vp and will NOT be used to derive value base
-    /// app_data_nonhashed denotes the encoded user-specific data and sub-vps
-    pub app_data_nonhashed: pallas::Base,
+    /// app_data_dynamic is the data defined in application vp and will NOT be used to derive value base
+    /// sub-vps and any other data can be encoded to the app_data_dynamic
+    pub app_data_dynamic: pallas::Base,
     /// value denotes the amount of the note.
     pub value: u64,
     /// the wrapped nullifier key.
@@ -91,7 +91,7 @@ impl Note {
     pub fn new(
         app_vk: ValidityPredicateVerifyingKey,
         app_data: pallas::Base,
-        app_data_nonhashed: pallas::Base,
+        app_data_dynamic: pallas::Base,
         value: u64,
         nk_com: NullifierKeyCom,
         rho: Nullifier,
@@ -103,7 +103,7 @@ impl Note {
         let value_base = NoteType::new(app_vk, app_data);
         Self {
             value_base,
-            app_data_nonhashed,
+            app_data_dynamic,
             value,
             nk_com,
             rho,
@@ -123,7 +123,7 @@ impl Note {
         let app_vk = ValidityPredicateVerifyingKey::dummy(&mut rng);
         let app_data = pallas::Base::random(&mut rng);
         let value_base = NoteType::new(app_vk, app_data);
-        let app_data_nonhashed = pallas::Base::zero();
+        let app_data_dynamic = pallas::Base::zero();
         let value: u64 = rng.gen();
         let nk_com = NullifierKeyCom::rand(&mut rng);
         let rcm = pallas::Scalar::random(&mut rng);
@@ -131,7 +131,7 @@ impl Note {
         let note_data = vec![0u8; 32];
         Self {
             value_base,
-            app_data_nonhashed,
+            app_data_dynamic,
             value,
             nk_com,
             rho,
@@ -200,7 +200,7 @@ impl Note {
     }
 
     pub fn get_address(&self) -> pallas::Base {
-        poseidon_hash(self.app_data_nonhashed, self.nk_com.get_nk_com())
+        poseidon_hash(self.app_data_dynamic, self.nk_com.get_nk_com())
     }
 
     pub fn get_nk(&self) -> Option<NullifierDerivingKey> {
