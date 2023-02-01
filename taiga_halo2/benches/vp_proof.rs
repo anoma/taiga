@@ -1,7 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use halo2_proofs::{
-    plonk::{keygen_pk, keygen_vk},
-};
+use halo2_proofs::plonk::{keygen_pk, keygen_vk};
 
 use rand::rngs::OsRng;
 use taiga_halo2::circuit::vp_circuit::ValidityPredicateInfo;

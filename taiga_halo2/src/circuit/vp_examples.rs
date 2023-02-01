@@ -11,14 +11,12 @@ use crate::{
     proof::Proof,
     vp_vk::ValidityPredicateVerifyingKey,
 };
+use halo2_proofs::plonk::{keygen_pk, keygen_vk};
 use halo2_proofs::{
     circuit::{floor_planner, Layouter},
     plonk::{Circuit, ConstraintSystem, Error},
 };
-use halo2_proofs::{
-    plonk::{keygen_pk, keygen_vk},
-};
-use pasta_curves::{pallas};
+use pasta_curves::pallas;
 use rand::rngs::OsRng;
 use rand::RngCore;
 

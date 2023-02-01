@@ -16,12 +16,9 @@ use crate::{
 use ff::Field;
 use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
-    plonk::{
-        keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error,
-        Instance,
-    },
+    plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
 };
-use pasta_curves::{pallas};
+use pasta_curves::pallas;
 use rand::rngs::OsRng;
 use rand::RngCore;
 

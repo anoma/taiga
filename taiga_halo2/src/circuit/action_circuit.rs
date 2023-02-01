@@ -269,5 +269,7 @@ fn test_halo2_action_circuit() {
     )
     .unwrap();
 
-    assert!(proof.verify(&ACTION_VERIFYING_KEY, &params, &[&action.to_instance()]).is_ok());
+    assert!(proof
+        .verify(&ACTION_VERIFYING_KEY, &params, &[&action.to_instance()])
+        .is_ok());
 }

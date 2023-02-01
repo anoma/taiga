@@ -2,7 +2,7 @@ use halo2_proofs::{
     circuit::{floor_planner, Layouter},
     plonk::{self, keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
-use pasta_curves::{pallas};
+use pasta_curves::pallas;
 
 extern crate taiga_halo2;
 use taiga_halo2::{

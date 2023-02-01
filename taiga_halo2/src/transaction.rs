@@ -13,10 +13,8 @@ use blake2b_simd::Params as Blake2bParams;
 use core::fmt;
 use ff::PrimeField;
 use group::Group;
-use halo2_proofs::{
-    plonk::{Error},
-};
-use pasta_curves::{pallas};
+use halo2_proofs::plonk::Error;
+use pasta_curves::pallas;
 use rand::{CryptoRng, RngCore};
 use std::fmt::Display;
 
