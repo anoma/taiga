@@ -146,8 +146,12 @@ mod tests {
     use pasta_curves::pallas;
     use rand::rngs::OsRng;
 
+    use halo2_proofs::{
+        plonk::{self, ProvingKey, VerifyingKey},
+        poly::commitment::Params
+    };
+
     use crate::app::valid_sudoku::{circuit::SudokuCircuit, vp::SudokuVP};
-    use crate::keys::VerifyingKey;
 
     #[test]
     fn test_vp() {
@@ -170,11 +174,13 @@ mod tests {
                 [3, 2, 5, 1, 9, 7, 8, 4, 6],
             ],
         };
-        let vk = VerifyingKey::build(&sudoku, K);
+        let params = Params::new(K);
+
+        let vk = plonk::keygen_vk(&params, &sudoku).unwrap();
 
         let mut vp = SudokuVP::new(sudoku, input_notes, output_notes);
 
-        let vp_desc = ValidityPredicateVerifyingKey::from_vk(vk.vk);
+        let vp_desc = ValidityPredicateVerifyingKey::from_vk(vk);
 
         let app_data = pallas::Base::zero(); // TODO: What else can this be?
 
