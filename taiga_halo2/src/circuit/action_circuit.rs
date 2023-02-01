@@ -243,10 +243,8 @@ fn test_halo2_action_circuit() {
     use crate::proof::Proof;
     use halo2_proofs::{
         dev::MockProver,
-        plonk::{create_proof, verify_proof, SingleVerifier},
-        transcript::{Blake2bRead, Blake2bWrite},
     };
-    use pasta_curves::vesta;
+    
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
