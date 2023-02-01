@@ -71,7 +71,7 @@ pub fn nullifier_circuit(
 #[derive(Debug)]
 pub struct SpendNoteVar {
     pub address: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_vp: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_vk: AssignedCell<pallas::Base, pallas::Base>,
     pub app_data: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub nf: AssignedCell<pallas::Base, pallas::Base>,
@@ -98,7 +98,7 @@ pub fn check_spend_note(
     spend_note: Note,
     nf_row_idx: usize,
 ) -> Result<SpendNoteVar, Error> {
-    // Check spend note user integrity: address = Com_r(Com_r(nk, zero), vp_data_nonhashed)
+    // Check spend note user integrity: address = Com_r(Com_r(nk, zero), app_data_dynamic)
     let (address, nk) = {
         // Witness nk
         let nk = spend_note.get_nk().unwrap();
@@ -126,14 +126,14 @@ pub fn check_spend_note(
             poseidon_hasher.hash(layouter.namespace(|| "nk_com"), poseidon_message)?
         };
 
-        // Witness vp_data_nonhashed
-        let vp_data_nonhashed = assign_free_advice(
-            layouter.namespace(|| "witness vp_data_nonhashed"),
+        // Witness app_data_dynamic
+        let app_data_dynamic = assign_free_advice(
+            layouter.namespace(|| "witness app_data_dynamic"),
             advices[0],
-            Value::known(spend_note.vp_data_nonhashed),
+            Value::known(spend_note.app_data_dynamic),
         )?;
 
-        // address = Com_r(vp_data_nonhashed, nk_com)
+        // address = Com_r(app_data_dynamic, nk_com)
         let address = {
             let poseidon_chip = PoseidonChip::construct(poseidon_config.clone());
             let poseidon_hasher =
@@ -141,25 +141,25 @@ pub fn check_spend_note(
                     poseidon_chip,
                     layouter.namespace(|| "Poseidon init"),
                 )?;
-            let poseidon_message = [vp_data_nonhashed, nk_com];
+            let poseidon_message = [app_data_dynamic, nk_com];
             poseidon_hasher.hash(layouter.namespace(|| "spend address"), poseidon_message)?
         };
 
         (address, nk_var)
     };
 
-    // Witness app_vp
-    let app_vp = assign_free_advice(
-        layouter.namespace(|| "witness app_vp"),
+    // Witness app_vk
+    let app_vk = assign_free_advice(
+        layouter.namespace(|| "witness app_vk"),
         advices[0],
-        Value::known(spend_note.application_vp.get_compressed()),
+        Value::known(spend_note.get_compressed_app_vk()),
     )?;
 
-    // Witness app_data
+    // Witness value_base_app_data
     let app_data = assign_free_advice(
-        layouter.namespace(|| "witness app_vp_data"),
+        layouter.namespace(|| "witness value_base_app_data"),
         advices[0],
-        Value::known(spend_note.vp_data),
+        Value::known(spend_note.get_value_base_app_data()),
     )?;
 
     // Witness value(u64)
@@ -204,7 +204,7 @@ pub fn check_spend_note(
         ecc_chip.clone(),
         note_commit_chip,
         address.clone(),
-        app_vp.clone(),
+        app_vk.clone(),
         app_data.clone(),
         rho.clone(),
         psi.clone(),
@@ -231,7 +231,7 @@ pub fn check_spend_note(
 
     Ok(SpendNoteVar {
         address,
-        app_vp,
+        app_vk,
         value,
         app_data,
         nf,
@@ -244,7 +244,7 @@ pub fn check_spend_note(
 #[derive(Debug)]
 pub struct OutputNoteVar {
     pub address: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_vp: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_vk: AssignedCell<pallas::Base, pallas::Base>,
     pub app_data: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
@@ -270,7 +270,7 @@ pub fn check_output_note(
     old_nf: AssignedCell<pallas::Base, pallas::Base>,
     cm_row_idx: usize,
 ) -> Result<OutputNoteVar, Error> {
-    // Check output note user integrity: address = Com_r(vp_data_nonhashed, nk_com)
+    // Check output note user integrity: address = Com_r(app_data_dynamic, nk_com)
     let address = {
         // Witness nk_com
         let nk_com = assign_free_advice(
@@ -279,11 +279,11 @@ pub fn check_output_note(
             Value::known(output_note.nk_com.get_nk_com()),
         )?;
 
-        // Witness vp_data_nonhashed
-        let vp_data_nonhashed = assign_free_advice(
-            layouter.namespace(|| "witness vp_data_nonhashed"),
+        // Witness app_data_dynamic
+        let app_data_dynamic = assign_free_advice(
+            layouter.namespace(|| "witness app_data_dynamic"),
             advices[0],
-            Value::known(output_note.vp_data_nonhashed),
+            Value::known(output_note.app_data_dynamic),
         )?;
 
         let poseidon_chip = PoseidonChip::construct(poseidon_config);
@@ -292,22 +292,22 @@ pub fn check_output_note(
                 poseidon_chip,
                 layouter.namespace(|| "Poseidon init"),
             )?;
-        let poseidon_message = [vp_data_nonhashed, nk_com];
+        let poseidon_message = [app_data_dynamic, nk_com];
         poseidon_hasher.hash(layouter.namespace(|| "output address"), poseidon_message)?
     };
 
-    // Witness app_vp
-    let app_vp = assign_free_advice(
-        layouter.namespace(|| "witness app_vp"),
+    // Witness app_vk
+    let app_vk = assign_free_advice(
+        layouter.namespace(|| "witness app_vk"),
         advices[0],
-        Value::known(output_note.application_vp.get_compressed()),
+        Value::known(output_note.get_compressed_app_vk()),
     )?;
 
-    // Witness app_data
+    // Witness value_base_app_data
     let app_data = assign_free_advice(
-        layouter.namespace(|| "witness app_data"),
+        layouter.namespace(|| "witness value_base_app_data"),
         advices[0],
-        Value::known(output_note.vp_data),
+        Value::known(output_note.get_value_base_app_data()),
     )?;
 
     // Witness value(u64)
@@ -345,7 +345,7 @@ pub fn check_output_note(
         ecc_chip,
         note_commit_chip,
         address.clone(),
-        app_vp.clone(),
+        app_vk.clone(),
         app_data.clone(),
         old_nf,
         psi,
@@ -360,7 +360,7 @@ pub fn check_output_note(
 
     Ok(OutputNoteVar {
         address,
-        app_vp,
+        app_vk,
         app_data,
         value,
         cm,
@@ -372,26 +372,21 @@ pub fn derive_value_base(
     mut layouter: impl Layouter<pallas::Base>,
     hash_to_curve_config: HashToCurveConfig,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
-    is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
-    app_vp: AssignedCell<pallas::Base, pallas::Base>,
+    app_vk: AssignedCell<pallas::Base, pallas::Base>,
     app_data: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<NonIdentityPoint<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
     let point = hash_to_curve_circuit(
         layouter.namespace(|| "hash to curve"),
         hash_to_curve_config,
         ecc_chip.clone(),
-        &[is_merkle_checked.clone(), app_vp.clone(), app_data.clone()],
+        &[app_vk.clone(), app_data.clone()],
     )?;
 
     // Assign a new `NonIdentityPoint` and constran equal to hash_to_curve point since `Point` doesn't have mul operation
     // IndentityPoint is an invalid value base and it returns an error.
-    let non_identity_point = is_merkle_checked
-        .value()
-        .zip(app_vp.value())
-        .zip(app_data.value())
-        .map(|((&flag, &vp), &data)| {
-            poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&[flag, vp, data]).to_affine()
-        });
+    let non_identity_point = app_vk.value().zip(app_data.value()).map(|(&vk, &data)| {
+        poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&[vk, data]).to_affine()
+    });
     let non_identity_point_var = NonIdentityPoint::new(
         ecc_chip,
         layouter.namespace(|| "non-identity value base"),
@@ -409,11 +404,9 @@ pub fn compute_value_commitment(
     mut layouter: impl Layouter<pallas::Base>,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
     hash_to_curve_config: HashToCurveConfig,
-    is_merkle_checked_spend: AssignedCell<pallas::Base, pallas::Base>,
     app_address_spend: AssignedCell<pallas::Base, pallas::Base>,
     data_spend: AssignedCell<pallas::Base, pallas::Base>,
     v_spend: AssignedCell<pallas::Base, pallas::Base>,
-    is_merkle_checked_output: AssignedCell<pallas::Base, pallas::Base>,
     app_address_output: AssignedCell<pallas::Base, pallas::Base>,
     data_output: AssignedCell<pallas::Base, pallas::Base>,
     v_output: AssignedCell<pallas::Base, pallas::Base>,
@@ -424,7 +417,6 @@ pub fn compute_value_commitment(
         layouter.namespace(|| "derive spend value base"),
         hash_to_curve_config.clone(),
         ecc_chip.clone(),
-        is_merkle_checked_spend,
         app_address_spend,
         data_spend,
     )?;
@@ -441,7 +433,6 @@ pub fn compute_value_commitment(
         layouter.namespace(|| "derive output value base"),
         hash_to_curve_config,
         ecc_chip.clone(),
-        is_merkle_checked_output,
         app_address_output,
         data_output,
     )?;

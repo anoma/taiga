@@ -9,8 +9,8 @@ pub struct ValueCommitment(pallas::Point);
 
 impl ValueCommitment {
     pub fn new(input_note: &Note, output_note: &Note, blind_r: &pallas::Scalar) -> Self {
-        let base_input = input_note.derivate_value_base();
-        let base_output = output_note.derivate_value_base();
+        let base_input = input_note.get_value_base();
+        let base_output = output_note.get_value_base();
         ValueCommitment(
             base_input * pallas::Scalar::from(input_note.value)
                 - base_output * pallas::Scalar::from(output_note.value)

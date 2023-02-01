@@ -5,30 +5,29 @@ use pasta_curves::{arithmetic::FieldExt, pallas, vesta};
 use rand::RngCore;
 use std::hash::Hash;
 
-// TODO: add vp_param in future.
 #[derive(Debug, Clone)]
-pub enum ValidityPredicateDescription {
+pub enum ValidityPredicateVerifyingKey {
     // VK.
     Uncompressed(VerifyingKey<vesta::Affine>),
     // Compress vk into one element.
     Compressed(pallas::Base),
 }
 
-impl ValidityPredicateDescription {
+impl ValidityPredicateVerifyingKey {
     pub fn from_vk(vk: VerifyingKey<vesta::Affine>) -> Self {
         Self::Uncompressed(vk)
     }
 
     pub fn get_vk(&self) -> Option<VerifyingKey<vesta::Affine>> {
         match self {
-            ValidityPredicateDescription::Uncompressed(vk) => Some(vk.clone()),
-            ValidityPredicateDescription::Compressed(_) => None,
+            ValidityPredicateVerifyingKey::Uncompressed(vk) => Some(vk.clone()),
+            ValidityPredicateVerifyingKey::Compressed(_) => None,
         }
     }
 
     pub fn get_compressed(&self) -> pallas::Base {
         match self {
-            ValidityPredicateDescription::Uncompressed(vk) => {
+            ValidityPredicateVerifyingKey::Uncompressed(vk) => {
                 let mut hasher = Blake2bParams::new()
                     .hash_length(64)
                     .personal(b"Halo2-Verify-Key")
@@ -42,7 +41,7 @@ impl ValidityPredicateDescription {
                 // Hash in final Blake2bState
                 pallas::Base::from_bytes_wide(hasher.finalize().as_array())
             }
-            ValidityPredicateDescription::Compressed(v) => *v,
+            ValidityPredicateVerifyingKey::Compressed(v) => *v,
         }
     }
 
@@ -51,26 +50,26 @@ impl ValidityPredicateDescription {
     }
 }
 
-impl Default for ValidityPredicateDescription {
-    fn default() -> ValidityPredicateDescription {
-        ValidityPredicateDescription::Compressed(pallas::Base::one())
+impl Default for ValidityPredicateVerifyingKey {
+    fn default() -> ValidityPredicateVerifyingKey {
+        ValidityPredicateVerifyingKey::Compressed(pallas::Base::one())
     }
 }
 
-impl Hash for ValidityPredicateDescription {
+impl Hash for ValidityPredicateVerifyingKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         let compressed = self.get_compressed();
         compressed.to_repr().as_ref().hash(state);
     }
 }
 
-impl PartialEq for ValidityPredicateDescription {
+impl PartialEq for ValidityPredicateVerifyingKey {
     fn eq(&self, other: &Self) -> bool {
         self.get_compressed() == other.get_compressed()
     }
 }
 
-impl Eq for ValidityPredicateDescription {}
+impl Eq for ValidityPredicateVerifyingKey {}
 
 #[test]
 fn test_vpd_hashing() {
@@ -91,12 +90,12 @@ fn test_vpd_hashing() {
 
     let params1 = halo2_proofs::poly::commitment::Params::new(12);
     let vk1 = plonk::keygen_vk(&params1, &circuit1).unwrap();
-    let vpd1 = ValidityPredicateDescription::from_vk(vk1.clone());
+    let vpd1 = ValidityPredicateVerifyingKey::from_vk(vk1.clone());
     let vk1s = format!("{:?}", vk1.pinned());
 
     let params2 = halo2_proofs::poly::commitment::Params::new(12);
     let vk2 = plonk::keygen_vk(&params2, &circuit2).unwrap();
-    let vpd2 = ValidityPredicateDescription::from_vk(vk2.clone());
+    let vpd2 = ValidityPredicateVerifyingKey::from_vk(vk2.clone());
     let vk2s = format!("{:?}", vk2.pinned());
 
     // Same circuit, same param => same key
@@ -106,7 +105,7 @@ fn test_vpd_hashing() {
 
     let params3 = halo2_proofs::poly::commitment::Params::new(13); // different param => different key
     let vk3 = plonk::keygen_vk(&params3, &circuit3).unwrap();
-    let vpd3 = ValidityPredicateDescription::from_vk(vk3.clone());
+    let vpd3 = ValidityPredicateVerifyingKey::from_vk(vk3.clone());
     let vk3s = format!("{:?}", vk3.pinned());
 
     // Same circuit, different param => different key

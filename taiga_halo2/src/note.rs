@@ -6,7 +6,7 @@ use crate::{
     merkle_tree::{MerklePath, Node, LR},
     nullifier::{Nullifier, NullifierDerivingKey, NullifierKeyCom},
     utils::{extract_p, poseidon_hash, poseidon_to_curve},
-    vp_description::ValidityPredicateDescription,
+    vp_vk::ValidityPredicateVerifyingKey,
 };
 use bitvec::{array::BitArray, order::Lsb0};
 use core::iter;
@@ -42,13 +42,10 @@ impl Default for NoteCommitment {
 /// A note
 #[derive(Debug, Clone, Default)]
 pub struct Note {
-    /// application_vp denotes the VP description
-    pub application_vp: ValidityPredicateDescription,
-    /// vp_data is the data defined in application vp and will be used to derive value base
-    pub vp_data: pallas::Base,
-    /// vp_data_nonhashed is the data defined in application vp and will NOT be used to derive value base
-    /// vp_data_nonhashed denotes the encoded user-specific data and sub-vps
-    pub vp_data_nonhashed: pallas::Base,
+    pub value_base: NoteType,
+    /// app_data_dynamic is the data defined in application vp and will NOT be used to derive value base
+    /// sub-vps and any other data can be encoded to the app_data_dynamic
+    pub app_data_dynamic: pallas::Base,
     /// value denotes the amount of the note.
     pub value: u64,
     /// the wrapped nullifier key.
@@ -62,6 +59,15 @@ pub struct Note {
     pub is_merkle_checked: bool,
     /// note data bytes
     pub note_data: Vec<u8>,
+}
+
+/// The parameters in the NoteType are used to derive note value base.
+#[derive(Debug, Clone, Default)]
+pub struct NoteType {
+    /// app_vk is the verifying key of VP
+    app_vk: ValidityPredicateVerifyingKey,
+    /// app_data is the encoded data that is defined in application vp
+    app_data: pallas::Base,
 }
 
 #[derive(Clone)]
@@ -83,9 +89,9 @@ pub struct OutputNoteInfo {
 impl Note {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        application_vp: ValidityPredicateDescription,
-        vp_data: pallas::Base,
-        vp_data_nonhashed: pallas::Base,
+        app_vk: ValidityPredicateVerifyingKey,
+        app_data: pallas::Base,
+        app_data_dynamic: pallas::Base,
         value: u64,
         nk_com: NullifierKeyCom,
         rho: Nullifier,
@@ -94,10 +100,10 @@ impl Note {
         is_merkle_checked: bool,
         note_data: Vec<u8>,
     ) -> Self {
+        let value_base = NoteType::new(app_vk, app_data);
         Self {
-            application_vp,
-            vp_data,
-            vp_data_nonhashed,
+            value_base,
+            app_data_dynamic,
             value,
             nk_com,
             rho,
@@ -114,18 +120,18 @@ impl Note {
     }
 
     pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
-        let application_vp = ValidityPredicateDescription::dummy(&mut rng);
-        let vp_data = pallas::Base::random(&mut rng);
-        let vp_data_nonhashed = pallas::Base::zero();
+        let app_vk = ValidityPredicateVerifyingKey::dummy(&mut rng);
+        let app_data = pallas::Base::random(&mut rng);
+        let value_base = NoteType::new(app_vk, app_data);
+        let app_data_dynamic = pallas::Base::zero();
         let value: u64 = rng.gen();
         let nk_com = NullifierKeyCom::rand(&mut rng);
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
         let note_data = vec![0u8; 32];
         Self {
-            application_vp,
-            vp_data,
-            vp_data_nonhashed,
+            value_base,
+            app_data_dynamic,
             value,
             nk_com,
             rho,
@@ -136,17 +142,22 @@ impl Note {
         }
     }
 
-    // cm = SinsemillaCommit^rcm(address || app_vp || app_data || rho || psi || is_merkle_checked || value)
+    // cm = SinsemillaCommit^rcm(address || app_vk || app_data || rho || psi || is_merkle_checked || value)
     pub fn commitment(&self) -> NoteCommitment {
         let address = self.get_address();
-        let app_vp = self.application_vp.get_compressed();
         let ret = NOTE_COMMIT_DOMAIN
             .commit(
                 iter::empty()
                     .chain(address.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
-                    .chain(app_vp.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
                     .chain(
-                        self.vp_data
+                        self.get_compressed_app_vk()
+                            .to_le_bits()
+                            .iter()
+                            .by_vals()
+                            .take(BASE_BITS_NUM),
+                    )
+                    .chain(
+                        self.get_value_base_app_data()
                             .to_le_bits()
                             .iter()
                             .by_vals()
@@ -189,19 +200,36 @@ impl Note {
     }
 
     pub fn get_address(&self) -> pallas::Base {
-        poseidon_hash(self.vp_data_nonhashed, self.nk_com.get_nk_com())
+        poseidon_hash(self.app_data_dynamic, self.nk_com.get_nk_com())
     }
 
     pub fn get_nk(&self) -> Option<NullifierDerivingKey> {
         self.nk_com.get_nk()
     }
 
-    pub fn derivate_value_base(&self) -> pallas::Point {
-        let inputs = [
-            pallas::Base::from(self.is_merkle_checked),
-            self.application_vp.get_compressed(),
-            self.vp_data,
-        ];
+    pub fn get_value_base(&self) -> pallas::Point {
+        self.value_base.derive_value_base()
+    }
+
+    pub fn get_compressed_app_vk(&self) -> pallas::Base {
+        self.value_base.app_vk.get_compressed()
+    }
+
+    pub fn get_value_base_app_data(&self) -> pallas::Base {
+        self.value_base.app_data
+    }
+}
+
+impl NoteType {
+    pub fn new(vk: ValidityPredicateVerifyingKey, data: pallas::Base) -> Self {
+        Self {
+            app_vk: vk,
+            app_data: data,
+        }
+    }
+
+    pub fn derive_value_base(&self) -> pallas::Point {
+        let inputs = [self.app_vk.get_compressed(), self.app_data];
         poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&inputs)
     }
 }

@@ -707,7 +707,7 @@ fn test_halo2_note_commitment_circuit() {
     use crate::note::Note;
     use crate::{
         nullifier::{Nullifier, NullifierKeyCom},
-        vp_description::ValidityPredicateDescription,
+        vp_vk::ValidityPredicateVerifyingKey,
     };
     use ff::Field;
     use group::Curve;
@@ -728,9 +728,9 @@ fn test_halo2_note_commitment_circuit() {
 
     #[derive(Default)]
     struct MyCircuit {
-        application_vp: ValidityPredicateDescription,
-        vp_data: pallas::Base,
-        vp_data_nonhashed: pallas::Base,
+        app_vk: ValidityPredicateVerifyingKey,
+        app_data: pallas::Base,
+        app_data_dynamic: pallas::Base,
         value: u64,
         nk_com: NullifierKeyCom,
         rho: Nullifier,
@@ -826,9 +826,9 @@ fn test_halo2_note_commitment_circuit() {
                 NoteCommitmentFixedBases,
             >::load(note_commit_config.sinsemilla_config.clone(), &mut layouter)?;
             let note = Note::new(
-                self.application_vp.clone(),
-                self.vp_data,
-                self.vp_data_nonhashed,
+                self.app_vk.clone(),
+                self.app_data,
+                self.app_data_dynamic,
                 self.value,
                 self.nk_com,
                 self.rho,
@@ -854,18 +854,18 @@ fn test_halo2_note_commitment_circuit() {
                 Value::known(note.get_address()),
             )?;
 
-            // Witness application
+            // Witness app_vk
             let app_vp = assign_free_advice(
-                layouter.namespace(|| "witness rho"),
+                layouter.namespace(|| "witness app_vk"),
                 note_commit_config.advices[0],
-                Value::known(note.application_vp.get_compressed()),
+                Value::known(note.get_compressed_app_vk()),
             )?;
 
-            // Witness app_data
+            // Witness value_base_app_data
             let app_data = assign_free_advice(
-                layouter.namespace(|| "witness application vp_data"),
+                layouter.namespace(|| "witness value_base_app_data"),
                 note_commit_config.advices[0],
-                Value::known(note.vp_data),
+                Value::known(note.get_value_base_app_data()),
             )?;
 
             // Witness a random non-negative u64 note value
@@ -935,9 +935,9 @@ fn test_halo2_note_commitment_circuit() {
     // Test note with flase is_merkle_checked flag
     {
         let circuit = MyCircuit {
-            application_vp: ValidityPredicateDescription::dummy(&mut rng),
-            vp_data: pallas::Base::random(&mut rng),
-            vp_data_nonhashed: pallas::Base::random(&mut rng),
+            app_vk: ValidityPredicateVerifyingKey::dummy(&mut rng),
+            app_data: pallas::Base::random(&mut rng),
+            app_data_dynamic: pallas::Base::random(&mut rng),
             value: rng.next_u64(),
             nk_com: NullifierKeyCom::rand(&mut rng),
             rho: Nullifier::default(),
@@ -953,9 +953,9 @@ fn test_halo2_note_commitment_circuit() {
     // Test note with true is_merkle_checked flag
     {
         let circuit = MyCircuit {
-            application_vp: ValidityPredicateDescription::dummy(&mut rng),
-            vp_data: pallas::Base::random(&mut rng),
-            vp_data_nonhashed: pallas::Base::random(&mut rng),
+            app_vk: ValidityPredicateVerifyingKey::dummy(&mut rng),
+            app_data: pallas::Base::random(&mut rng),
+            app_data_dynamic: pallas::Base::random(&mut rng),
             value: rng.next_u64(),
             nk_com: NullifierKeyCom::rand(&mut rng),
             rho: Nullifier::default(),
