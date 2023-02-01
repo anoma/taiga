@@ -16,8 +16,7 @@ use dyn_clone::{clone_trait_object, DynClone};
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
     circuit::{Layouter, Value},
-    plonk::{verify_proof, Circuit, ConstraintSystem, Error, SingleVerifier, VerifyingKey},
-    transcript::Blake2bRead,
+    plonk::{Circuit, ConstraintSystem, Error, VerifyingKey},
 };
 use pasta_curves::{pallas, vesta};
 

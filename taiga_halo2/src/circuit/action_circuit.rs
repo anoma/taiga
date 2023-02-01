@@ -13,6 +13,7 @@ use crate::constant::{
 };
 use crate::merkle_tree::LR;
 use crate::note::Note;
+
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
     circuit::{floor_planner, Layouter},
@@ -259,7 +260,6 @@ fn test_halo2_action_circuit() {
     }
 
     // Create action proof
-    {
         let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
         let proof = Proof::create(
             &ACTION_PROVING_KEY,
@@ -280,5 +280,4 @@ fn test_halo2_action_circuit() {
             &mut transcript
         )
         .is_ok());
-    }
 }

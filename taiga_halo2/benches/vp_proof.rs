@@ -1,9 +1,8 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use halo2_proofs::{
-    plonk::{create_proof, keygen_pk, keygen_vk, verify_proof, SingleVerifier},
-    transcript::{Blake2bRead, Blake2bWrite},
+    plonk::{keygen_pk, keygen_vk},
 };
-use pasta_curves::vesta;
+
 use rand::rngs::OsRng;
 use taiga_halo2::circuit::vp_circuit::ValidityPredicateInfo;
 use taiga_halo2::circuit::vp_examples::TrivialValidityPredicateCircuit;

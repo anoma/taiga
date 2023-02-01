@@ -14,10 +14,9 @@ use core::fmt;
 use ff::PrimeField;
 use group::Group;
 use halo2_proofs::{
-    plonk::{create_proof, verify_proof, Error, SingleVerifier},
-    transcript::{Blake2bRead, Blake2bWrite},
+    plonk::{Error},
 };
-use pasta_curves::{pallas, vesta};
+use pasta_curves::{pallas};
 use rand::{CryptoRng, RngCore};
 use std::fmt::Display;
 

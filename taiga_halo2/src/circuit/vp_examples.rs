@@ -16,10 +16,9 @@ use halo2_proofs::{
     plonk::{Circuit, ConstraintSystem, Error},
 };
 use halo2_proofs::{
-    plonk::{create_proof, keygen_pk, keygen_vk},
-    transcript::Blake2bWrite,
+    plonk::{keygen_pk, keygen_vk},
 };
-use pasta_curves::{pallas, vesta};
+use pasta_curves::{pallas};
 use rand::rngs::OsRng;
 use rand::RngCore;
 

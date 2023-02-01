@@ -1,9 +1,8 @@
 use halo2_proofs::{
     circuit::{floor_planner, Layouter},
-    plonk::{self, create_proof, keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
-    transcript::Blake2bWrite,
+    plonk::{self, keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
-use pasta_curves::{pallas, vesta};
+use pasta_curves::{pallas};
 
 extern crate taiga_halo2;
 use taiga_halo2::{

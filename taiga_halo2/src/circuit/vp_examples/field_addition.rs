@@ -17,12 +17,11 @@ use ff::Field;
 use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
     plonk::{
-        create_proof, keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error,
+        keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error,
         Instance,
     },
-    transcript::Blake2bWrite,
 };
-use pasta_curves::{pallas, vesta};
+use pasta_curves::{pallas};
 use rand::rngs::OsRng;
 use rand::RngCore;
 
