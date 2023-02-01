@@ -17,6 +17,7 @@ use taiga_halo2::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
+    proof::Proof,
     vp_circuit_impl,
     vp_vk::ValidityPredicateVerifyingKey,
 };
@@ -85,7 +86,7 @@ impl ValidityPredicateInfo for SudokuVP {
         let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
         let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
         let instance = self.get_instances();
-        let proof = Proof::create(&pk, &params, self.clone(), &[&instance], &mut rng);
+        let proof = Proof::create(&pk, &params, self.clone(), &[&instance], &mut rng).unwrap();
         VPVerifyingInfo {
             vk,
             proof,
