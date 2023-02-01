@@ -50,5 +50,4 @@ impl Proof {
     pub fn inner(&self) -> Vec<u8> {
         self.0.clone()
     }
-
 }

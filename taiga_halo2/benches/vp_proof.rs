@@ -24,23 +24,18 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
     let prover_name = name.to_string() + "-prover";
     c.bench_function(&prover_name, |b| {
         b.iter(|| {
-            Proof::create(&pk, &params, vp_circuit.clone(),
-            &[&instances],
-            &mut rng);
+            Proof::create(&pk, &params, vp_circuit.clone(), &[&instances], &mut rng);
         })
     });
 
     // Verifier bench
     // Create a proof for verifier
-    let proof = Proof::create(&pk, &params, vp_circuit.clone(),
-    &[&instances],
-    &mut rng).unwrap();
+    let proof = Proof::create(&pk, &params, vp_circuit.clone(), &[&instances], &mut rng).unwrap();
 
     let verifier_name = name.to_string() + "-verifier";
     c.bench_function(&verifier_name, |b| {
         b.iter(|| {
             proof.verify(pk.get_vk(), &params, &[&instances]).is_ok();
-           
         })
     });
 }

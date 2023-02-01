@@ -85,9 +85,7 @@ impl ValidityPredicateInfo for SudokuVP {
         let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
         let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
         let instance = self.get_instances();
-        let proof = Proof::create(&pk, &params, self.clone(),
-        &[&instance],
-            &mut rng);
+        let proof = Proof::create(&pk, &params, self.clone(), &[&instance], &mut rng);
         VPVerifyingInfo {
             vk,
             proof,

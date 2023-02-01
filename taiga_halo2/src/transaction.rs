@@ -7,8 +7,8 @@ use crate::constant::{
 };
 use crate::note::{NoteCommitment, OutputNoteInfo, SpendNoteInfo};
 use crate::nullifier::Nullifier;
-use crate::value_commitment::ValueCommitment;
 use crate::proof::Proof;
+use crate::value_commitment::ValueCommitment;
 use blake2b_simd::Params as Blake2bParams;
 use core::fmt;
 use ff::PrimeField;
@@ -303,9 +303,14 @@ impl ActionVerifyingInfo {
     pub fn create<R: RngCore>(action_info: ActionInfo, mut rng: R) -> Result<Self, Error> {
         let (action_instance, circuit) = action_info.build();
         let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
-        let action_proof = Proof::create(&ACTION_PROVING_KEY, &params, circuit,
-        &[&action_instance.to_instance()],
-            &mut rng).unwrap();
+        let action_proof = Proof::create(
+            &ACTION_PROVING_KEY,
+            &params,
+            circuit,
+            &[&action_instance.to_instance()],
+            &mut rng,
+        )
+        .unwrap();
         Ok(Self {
             action_proof,
             action_instance,
@@ -314,7 +319,11 @@ impl ActionVerifyingInfo {
 
     pub fn verify(&self) -> Result<(), Error> {
         let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
-        self.action_proof.verify(&ACTION_VERIFYING_KEY, &params, &[&self.action_instance.to_instance()])
+        self.action_proof.verify(
+            &ACTION_VERIFYING_KEY,
+            &params,
+            &[&self.action_instance.to_instance()],
+        )
     }
 }
 

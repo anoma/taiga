@@ -261,9 +261,14 @@ fn test_halo2_action_circuit() {
     // Create action proof
     {
         let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
-        let proof = Proof::create(&ACTION_PROVING_KEY, &params, action_circuit,
+        let proof = Proof::create(
+            &ACTION_PROVING_KEY,
+            &params,
+            action_circuit,
             &[&action_instance.to_instance()],
-                &mut rng).unwrap();
+            &mut rng,
+        )
+        .unwrap();
 
         let strategy = SingleVerifier::new(params);
         let mut transcript = Blake2bRead::init(&proof[..]);
