@@ -42,7 +42,7 @@ impl Default for NoteCommitment {
 /// A note
 #[derive(Debug, Clone, Default)]
 pub struct Note {
-    pub value_base: NoteValueBase,
+    pub value_base: NoteType,
     /// app_data_nonhashed is the data defined in application vp and will NOT be used to derive value base
     /// app_data_nonhashed denotes the encoded user-specific data and sub-vps
     pub app_data_nonhashed: pallas::Base,
@@ -61,9 +61,9 @@ pub struct Note {
     pub note_data: Vec<u8>,
 }
 
-/// The parameters in the NoteValueBase are used to derive note value base.
+/// The parameters in the NoteType are used to derive note value base.
 #[derive(Debug, Clone, Default)]
-pub struct NoteValueBase {
+pub struct NoteType {
     /// app_vk is the verifying key of VP
     app_vk: ValidityPredicateVerifyingKey,
     /// app_data is the encoded data that is defined in application vp
@@ -100,7 +100,7 @@ impl Note {
         is_merkle_checked: bool,
         note_data: Vec<u8>,
     ) -> Self {
-        let value_base = NoteValueBase::new(app_vk, app_data);
+        let value_base = NoteType::new(app_vk, app_data);
         Self {
             value_base,
             app_data_nonhashed,
@@ -122,7 +122,7 @@ impl Note {
     pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
         let app_vk = ValidityPredicateVerifyingKey::dummy(&mut rng);
         let app_data = pallas::Base::random(&mut rng);
-        let value_base = NoteValueBase::new(app_vk, app_data);
+        let value_base = NoteType::new(app_vk, app_data);
         let app_data_nonhashed = pallas::Base::zero();
         let value: u64 = rng.gen();
         let nk_com = NullifierKeyCom::rand(&mut rng);
@@ -220,7 +220,7 @@ impl Note {
     }
 }
 
-impl NoteValueBase {
+impl NoteType {
     pub fn new(vk: ValidityPredicateVerifyingKey, data: pallas::Base) -> Self {
         Self {
             app_vk: vk,
