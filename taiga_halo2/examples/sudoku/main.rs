@@ -3,17 +3,11 @@ pub mod app;
 fn main() {
     use std::time::Instant;
 
-    use halo2_proofs::{
-        dev::MockProver,
-        plonk,
-        poly::commitment::Params
-    };
+    use halo2_proofs::{dev::MockProver, plonk, poly::commitment::Params};
     use pasta_curves::{arithmetic::FieldExt, pallas};
     use rand::rngs::OsRng;
 
-    use crate::{
-        app::valid_sudoku::circuit::SudokuCircuit,
-    };
+    use crate::app::valid_sudoku::circuit::SudokuCircuit;
 
     use taiga_halo2::proof::Proof;
 

@@ -1,11 +1,10 @@
 use halo2_proofs::{
-    plonk::{self, Circuit, SingleVerifier, ProvingKey, VerifyingKey},
-    transcript::{Blake2bRead, Blake2bWrite},
+    plonk::{self, Circuit, ProvingKey, SingleVerifier, VerifyingKey},
     poly::commitment::Params,
+    transcript::{Blake2bRead, Blake2bWrite},
 };
 use pasta_curves::{pallas, vesta};
 use rand::RngCore;
-
 
 #[derive(Clone)]
 pub struct Proof(Vec<u8>);
@@ -14,7 +13,7 @@ impl Proof {
     /// Creates a proof for the given circuits and instances.
     pub fn create<C: Circuit<pallas::Base>>(
         pk: &ProvingKey<vesta::Affine>,
-        params: &Params<vesta::Affine>, 
+        params: &Params<vesta::Affine>,
         circuit: C,
         instance: &[&[pallas::Base]],
         mut rng: impl RngCore,

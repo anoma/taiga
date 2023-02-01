@@ -148,7 +148,7 @@ mod tests {
 
     use halo2_proofs::{
         plonk::{self, ProvingKey, VerifyingKey},
-        poly::commitment::Params
+        poly::commitment::Params,
     };
 
     use crate::app::valid_sudoku::{circuit::SudokuCircuit, vp::SudokuVP};

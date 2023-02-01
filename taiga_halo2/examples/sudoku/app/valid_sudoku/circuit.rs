@@ -385,14 +385,11 @@ mod tests {
     use pasta_curves::pallas;
     use rand::rngs::OsRng;
 
-    use crate::{
-        app::valid_sudoku::circuit::SudokuCircuit,
-        proof::Proof,
-    };
+    use crate::{app::valid_sudoku::circuit::SudokuCircuit, proof::Proof};
 
     use halo2_proofs::{
         plonk::{self, ProvingKey, VerifyingKey},
-        poly::commitment::Params
+        poly::commitment::Params,
     };
 
     #[test]

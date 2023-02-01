@@ -387,17 +387,14 @@ mod tests {
     use std::time::Instant;
 
     use halo2_proofs::dev::MockProver;
-    use pasta_curves::pallas;
-    use rand::rngs::OsRng;
     use halo2_proofs::{
         plonk::{self, ProvingKey, VerifyingKey},
-        poly::commitment::Params
+        poly::commitment::Params,
     };
+    use pasta_curves::pallas;
+    use rand::rngs::OsRng;
 
-    use crate::{
-        app::valid_puzzle::circuit::PuzzleCircuit,
-        proof::Proof,
-    };
+    use crate::{app::valid_puzzle::circuit::PuzzleCircuit, proof::Proof};
 
     #[test]
     fn test_puzzle() {
