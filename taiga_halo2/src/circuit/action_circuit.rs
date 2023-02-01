@@ -241,10 +241,8 @@ fn test_halo2_action_circuit() {
         ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, SETUP_PARAMS_MAP,
     };
     use crate::proof::Proof;
-    use halo2_proofs::{
-        dev::MockProver,
-    };
-    
+    use halo2_proofs::dev::MockProver;
+
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
