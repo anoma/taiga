@@ -21,8 +21,8 @@ impl Proof {
     ) -> Result<Self, plonk::Error> {
         let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
         plonk::create_proof(
-            &params,
-            &pk,
+            params,
+            pk,
             &[circuit],
             &[instance],
             &mut rng,
@@ -38,9 +38,9 @@ impl Proof {
         params: &Params<vesta::Affine>,
         instance: &[&[pallas::Base]],
     ) -> Result<(), plonk::Error> {
-        let strategy = SingleVerifier::new(&params);
+        let strategy = SingleVerifier::new(params);
         let mut transcript = Blake2bRead::init(&self.0[..]);
-        plonk::verify_proof(&params, &vk, strategy, &[instance], &mut transcript)
+        plonk::verify_proof(params, vk, strategy, &[instance], &mut transcript)
     }
 
     /// Constructs a new Proof value.
