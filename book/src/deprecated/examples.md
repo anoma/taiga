@@ -230,7 +230,7 @@ This example is reproducible with [this file](../../src/doc_examples/user.rs) or
 ##### Create an application
 As `appVP` basically defines the application, creating an application is done by creating its `appVP`.
 
-Let's use the [`TrivialValidityPredicate`](./validity-predicates.md) we defined earlier. It does nothing and returns `true`:
+Let's use the [`TrivialValidityPredicate`](../validity-predicates.md) we defined earlier. It does nothing and returns `true`:
 ```rust
 // trivial VP checks nothing and returns Ok()
 let mut app_vp = TrivialValidityPredicate::<CP> {

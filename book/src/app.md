@@ -31,3 +31,5 @@ TBD
 TBD
 
 Some applications might have users. In that case the application is responsible for making the users' interests satisfied, e.g. by allowing `userVP` and enforce the check in the `appVP`
+
+The application defines what functionality the users have access to, in particular, the application might allow users have `userVP` so that they could express their preferences. 
