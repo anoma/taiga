@@ -394,8 +394,8 @@ mod tests {
     use pasta_curves::pallas;
     use rand::rngs::OsRng;
 
-    use taiga_halo2::{proof::Proof};
-    use crate::{app::valid_puzzle::circuit::PuzzleCircuit};
+    use crate::app::valid_puzzle::circuit::PuzzleCircuit;
+    use taiga_halo2::proof::Proof;
 
     #[test]
     fn test_puzzle() {

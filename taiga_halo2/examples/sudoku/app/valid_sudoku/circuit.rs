@@ -384,7 +384,7 @@ mod tests {
     use halo2_proofs::{arithmetic::FieldExt, dev::MockProver};
     use rand::rngs::OsRng;
 
-    use crate::{app::valid_sudoku::circuit::SudokuCircuit};
+    use crate::app::valid_sudoku::circuit::SudokuCircuit;
 
     use halo2_proofs::{
         plonk::{self, ProvingKey, VerifyingKey},
@@ -392,7 +392,7 @@ mod tests {
     };
     use pasta_curves::{pallas, vesta};
     use std::time::Instant;
-    use taiga_halo2::{proof::Proof};
+    use taiga_halo2::proof::Proof;
     #[test]
     fn test_sudoku() {
         let sudoku = [
@@ -482,7 +482,7 @@ mod tests {
         const K: u32 = 13;
 
         let circuit = SudokuCircuit { sudoku };
-        let params : Params<vesta::Affine> = Params::new(K);
+        let params: Params<vesta::Affine> = Params::new(K);
 
         let vk = plonk::keygen_vk(&params, &circuit).unwrap(); // this would fail on this specific puzzle with the old implementation of synthesize
     }
