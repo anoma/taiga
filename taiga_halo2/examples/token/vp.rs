@@ -179,10 +179,10 @@ mod tests {
         let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
 
-        const K: u32 = 13;
-        let params = Params::new(K);
         let vp = TokenVP::new(input_notes, output_notes);
 
+        const K: u32 = 13;
+        let params = Params::new(K);
         let vk = plonk::keygen_vk(&params, &vp).unwrap();
 
 
@@ -210,4 +210,161 @@ mod tests {
             vec![],
         );
     }
+
+
+
+    fn create_token_notes() -> (Note, Note) {
+        let mut rng = OsRng;
+
+        let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+    
+        let token_vp = TokenVP::new(input_notes, output_notes);
+        let token_vp_description = token_vp.get_vp_description();
+    
+        const K: u32 = 13;
+        let params = Params::new(K);
+        let vk = plonk::keygen_vk(&params, &token_vp).unwrap();
+        let app_vk = ValidityPredicateVerifyingKey::from_vk(vk);
+        let currency = "XAN";
+        let app_data = calculate_hash(currency);
+        let value = 5000u64;
+        let is_merkle_checked = true;
+        let spend_note_token_1 = {
+            let app_data_dynamic = pallas::Base::zero();
+            let rho = Nullifier::new(pallas::Base::random(&mut rng));
+            let nk_com = NullifierKeyCom::rand(&mut rng);
+            let rcm = pallas::Scalar::random(&mut rng);
+            let psi = pallas::Base::random(&mut rng);
+            Note::new(
+                app_vk.clone(),
+                app_data,
+                app_data_dynamic,
+                value,
+                nk_com,
+                rho,
+                psi,
+                rcm,
+                is_merkle_checked,
+                vec![0u8; 32],
+            )
+        };
+        let output_note_token_1 = {
+            let app_data_dynamic = pallas::Base::zero();
+            let rho = Nullifier::new(pallas::Base::random(&mut rng));
+            let nk_com = NullifierKeyCom::rand(&mut rng);
+            let rcm = pallas::Scalar::random(&mut rng);
+            let psi = pallas::Base::random(&mut rng);
+            Note::new(
+                app_vk,
+                app_data,
+                app_data_dynamic,
+                value,
+                nk_com,
+                rho,
+                psi,
+                rcm,
+                is_merkle_checked,
+                vec![0u8; 32],
+            )
+        }; 
+
+        (spend_note_token_1, output_note_token_1)
+    }
+
+#[test]
+fn test_transaction_creation() {
+    use taiga_halo2::{
+        circuit::vp_examples::TrivialValidityPredicateCircuit,
+        constant::TAIGA_COMMITMENT_TREE_DEPTH,
+        merkle_tree::MerklePath,
+        note::{Note, OutputNoteInfo, SpendNoteInfo},
+        nullifier::{Nullifier, NullifierKeyCom},
+        transaction::{Transaction, PartialTransaction},
+    };
+
+    let mut rng = OsRng;
+
+    let trivial_vp_circuit = TrivialValidityPredicateCircuit::default();
+    let trivial_vp_description = trivial_vp_circuit.get_vp_description();
+
+    let note_dummy = {
+        let app_data = pallas::Base::zero();
+        let app_data_dynamic = pallas::Base::zero();
+        let rho = Nullifier::new(pallas::Base::random(&mut rng));
+        let value = 5000u64;
+        let nk_com = NullifierKeyCom::rand(&mut rng);
+        let rcm = pallas::Scalar::random(&mut rng);
+        let psi = pallas::Base::random(&mut rng);
+        let is_merkle_checked = true;
+        Note::new(
+            trivial_vp_description,
+            app_data,
+            app_data_dynamic,
+            value,
+            nk_com,
+            rho,
+            psi,
+            rcm,
+            is_merkle_checked,
+            vec![0u8; 32],
+        )
+    };
+    let (spend_note_1, output_note_1) = create_token_notes();
+    let spend_note_2 = note_dummy.clone();
+    let output_note_2 = note_dummy.clone();
+
+    let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+    let token_vp_circuit = TokenVP {
+        spend_notes: [spend_note_1.clone(), spend_note_2.clone()],
+        output_notes: [output_note_1.clone(), output_note_2.clone()],
+    };
+
+    let trivial_vp_circuit = TrivialValidityPredicateCircuit {
+        spend_notes: [spend_note_1.clone(), spend_note_2.clone()],
+        output_notes: [output_note_1.clone(), output_note_2.clone()],
+    };
+    let trivial_app_vp_proving_info = Box::new(trivial_vp_circuit.clone());
+    let token_app_vp_proving_info = Box::new(token_vp_circuit.clone());
+    let trivial_app_logic: Box<dyn ValidityPredicateInfo> = Box::new(trivial_vp_circuit);
+    let token_app_logic : Box<dyn ValidityPredicateInfo> = Box::new(token_vp_circuit);
+    let trivial_app_logic_vp_proving_info = vec![trivial_app_logic];
+    let token_app_logic_vp_proving_info = vec![token_app_logic];
+    let spend_note_info_1 = SpendNoteInfo::new(
+        spend_note_1,
+        merkle_path.clone(),
+        token_app_vp_proving_info.clone(),
+        token_app_logic_vp_proving_info.clone(),
+    );
+    // The following notes use empty logic vps and use app_data_dynamic with pallas::Base::zero() by default.
+    let app_logic_vp_proving_info : Vec<Box<dyn ValidityPredicateInfo>> = vec![];
+    let spend_note_info_2 = SpendNoteInfo::new(
+        spend_note_2,
+        merkle_path,
+        trivial_app_vp_proving_info.clone(),
+        trivial_app_logic_vp_proving_info.clone(),
+    );
+    let output_note_info_1 = OutputNoteInfo::new(
+        output_note_1,
+        token_app_vp_proving_info.clone(),
+        token_app_logic_vp_proving_info.clone(),
+    );
+    let output_note_info_2 = OutputNoteInfo::new(
+        output_note_2,
+        trivial_app_vp_proving_info,
+        trivial_app_logic_vp_proving_info,
+    );
+
+    // Create partial tx
+    let (ptx, rcv) = PartialTransaction::build(
+        [spend_note_info_1, spend_note_info_2],
+        [output_note_info_1, output_note_info_2],
+        &mut rng,
+    );
+
+    // Create tx
+    let mut tx = Transaction::build(vec![ptx], vec![rcv]);
+    tx.binding_sign(rng);
+    tx.execute().unwrap();
+}
 }
