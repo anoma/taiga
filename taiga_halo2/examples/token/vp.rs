@@ -140,7 +140,7 @@ vp_circuit_impl!(TokenVP);
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use halo2_gadgets::poseidon::primitives as poseidon;
     use taiga_halo2::{
         circuit::gadgets::{
             assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
@@ -160,6 +160,17 @@ mod tests {
         plonk::{self, ProvingKey, VerifyingKey},
         poly::commitment::Params,
     };
+    use std::{
+        hash::{Hash, Hasher},
+        collections::hash_map::DefaultHasher};
+
+    fn calculate_hash<T: Hash + ?Sized>(t: &T) -> pallas::Base {
+        let mut s = DefaultHasher::new();
+        t.hash(&mut s);
+        let i = s.finish();
+        poseidon::Hash::<_, poseidon::P128Pow5T3, poseidon::ConstantLength<1>, 3, 2>::init()
+        .hash([pallas::Base::from(i)])
+    }
 
     #[test]
     fn test_vp() {
@@ -177,7 +188,8 @@ mod tests {
 
         let vp_desc = ValidityPredicateVerifyingKey::from_vk(vk);
 
-        let app_data = pallas::Base::zero();
+        let currency = "XAN";
+        let app_data = calculate_hash(currency);
         let app_data_dynamic = pallas::Base::zero();
 
         let value: u64 = 0;
