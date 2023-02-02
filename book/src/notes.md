@@ -1,16 +1,14 @@
 # Note
 
-`Note` is an immutable object that represents a unit of value. Each note has an [owner](users.md), an [application](application.md) type, and a value:
+A **note** is an immutable object that represents a unit of value. Each note belongs to a certain application (which defines the note's type), and can store some data:
 
-``` rust
+```
+#[derive(Debug, Clone, Default)]
 pub struct Note {
-/// application_vp denotes the VP description
-pub application_vp: ValidityPredicateDescription,
-/// vp_data is the data defined in application vp and will be used to derive value base
-pub vp_data: pallas::Base,
-/// vp_data_nonhashed is the data defined in application vp and will NOT be used to derive value base
-/// vp_data_nonhashed denotes the encoded user-specific data and sub-vps
-pub vp_data_nonhashed: pallas::Base,
+pub value_base: NoteType,
+/// app_data_dynamic is the data defined in application vp and will NOT be used to derive value base
+/// sub-vps and any other data can be encoded to the app_data_dynamic
+pub app_data_dynamic: pallas::Base,
 /// value denotes the amount of the note.
 pub value: u64,
 /// the wrapped nullifier key.
@@ -25,8 +23,16 @@ pub is_merkle_checked: bool,
 /// note data bytes
 pub note_data: Vec<u8>,
 }
-```
 
+/// The parameters in the NoteType are used to derive note value base.
+#[derive(Debug, Clone, Default)]
+pub struct NoteType {
+/// app_vk is the verifying key of VP
+app_vk: ValidityPredicateVerifyingKey,
+/// app_data is the encoded data that is defined in application vp
+app_data: pallas::Base,
+}
+```
 
 #### Sending notes
 
