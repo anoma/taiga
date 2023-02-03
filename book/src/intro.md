@@ -1,11 +1,11 @@
 # Introduction
 
-Taiga is a schielded state transition protocol that allows applications built on top of it to enjoy the advantages of fully shielded multi-party state transitions (hiding the application type, the data associated with it, involved parties, etc) without giving up the application complexity.
+Taiga is a **shielded** state transition protocol that allows applications built on top of it to enjoy the advantages of fully shielded multi-party state transitions (hiding the application type, the data associated with it, involved parties, etc) without giving up the application complexity.
 
 **Validity predicates** are a key component of Taiga - applications built on top of Taiga use them to express the application rules, and Taiga makes sure that the rules are being followed.
-Validity of a transaction is defined by validity predicates of all applications and parties involved in the transaction.
+Validity of a transaction is defined by validity predicates of all parties involved in the transaction.
 
-![img.png](img/intro_img.png)
+![img.png](img/Intro_Taiga_Apps.png)
 
 #### ZKP privacy
 
@@ -13,7 +13,9 @@ Taiga uses ZKPs to hide the sensitive information about the state transitions (a
 
 #### UTXO model
 
-Taiga is based on the UTXO model, the application states are stored in notes - immutable objects that can be spent and created.
+Taiga is based on the UTXO model - the application states are stored in immutable objects called **notes**. To update the state, an application (or anyone with sufficient rights) would spend the notes containing the old state and create notes containing a new state.
+
+![img_2.png](img/Intro_UTXO.png)
 
 #### Some of the nice Taiga features
 

@@ -7,7 +7,7 @@ The action is a mechanism that allows a user to spend or create [notes](notes.md
 To spend a note, the users need to prove that they are allowed to do so, namely:
 - To make sure that the correct `AppVP` is checked, prove the relationship between `app_VK` and the application field in the spent note.
   ![img_3.png](img/action_img_3.png)
-- To make sure the correct `SendVP`(read more about `SendVP` [here](./users.md)) is checked, prove the relationship between `send_VK` and the owner field in the spent note.
+- To make sure the correct `SendVP`(read more about `SendVP` [here](deprecated/users.md)) is checked, prove the relationship between `send_VK` and the owner field in the spent note.
 - Compute the nullifier of the spent note (using the nullifier key `nk`) so that it cannot be double-spent. To make sure that the nullifier is computed correctly, prove the relationship between `nk` and the owner field in the spent note.
 
 ![img_1.png](img/action_img_1.png)
@@ -19,7 +19,7 @@ To create a note, the user also needs to prove the right to do so. `AppVP` must 
 - To make sure that the correct `AppVP` is checked, prove the relationship between `app_VK` and the application field in the note to be created.
   ![img_4.png](img/action_img_4.png)
 
-- To make sure the correct `RecvVP` is checked (read more about `RecvVP` [here](./users.md)), prove the relationship between `recv_VK` and the owner field of the note to be created.
+- To make sure the correct `RecvVP` is checked (read more about `RecvVP` [here](deprecated/users.md)), prove the relationship between `recv_VK` and the owner field of the note to be created.
   ![img.png](img/action_img.png)
   
 - To make sure that the [note](./notes.md) commitment `cm` is derived correctly, prove the relationship between `cm`, the note, and the receiver of the note

@@ -4,7 +4,7 @@ TODO: extract, merge, deprecate
 
 Users:
 - keys
-  nullifier key `nk` is used to compute [note nullifiers](./notes.md) that are necessary to spend notes.
+  nullifier key `nk` is used to compute [note nullifiers](../notes.md) that are necessary to spend notes.
 - VPs (userVP, send/recv VP, intent userVP, etc)
 - Address
 

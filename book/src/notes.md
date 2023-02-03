@@ -2,35 +2,16 @@
 
 A **note** is an immutable object that represents a unit of value. Each note belongs to a certain application (which defines the note's type), and can store some data:
 
-```
-#[derive(Debug, Clone, Default)]
+``` rust
 pub struct Note {
 pub value_base: NoteType,
-/// app_data_dynamic is the data defined in application vp and will NOT be used to derive value base
-/// sub-vps and any other data can be encoded to the app_data_dynamic
 pub app_data_dynamic: pallas::Base,
 /// value denotes the amount of the note.
 pub value: u64,
-/// the wrapped nullifier key.
+/// the nullifier key commitment Whoever has nk, can spend the note (more or less).
 pub nk_com: NullifierKeyCom,
-/// old nullifier. Nonce which is a deterministically computed, unique nonce
-pub rho: Nullifier,
-/// computed from spent_note_nf and rcm by using a PRF
-pub psi: pallas::Base,
-pub rcm: pallas::Scalar,
-/// If the is_merkle_checked flag is true, the merkle path authorization(membership) of the spent note will be checked in ActionProof.
 pub is_merkle_checked: bool,
-/// note data bytes
-pub note_data: Vec<u8>,
-}
-
-/// The parameters in the NoteType are used to derive note value base.
-#[derive(Debug, Clone, Default)]
-pub struct NoteType {
-/// app_vk is the verifying key of VP
-app_vk: ValidityPredicateVerifyingKey,
-/// app_data is the encoded data that is defined in application vp
-app_data: pallas::Base,
+...
 }
 ```
 

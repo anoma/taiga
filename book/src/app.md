@@ -1,35 +1,33 @@
 # Application
 
-Every application in Taiga has a validity predicate called `appVP` that contains the application logic. The application state is stored in the notes, spending or creating application notes alters the application state and requires the approval from `appVP`.
+In Taiga, applications express their logic in validity predicates (often referred as `appVP`) that are checked each time the application's state is about to be changed. So, if a suggested state transition breaks the application rules, the `appVP` of that application won't approve the transaction. 
 
-#### Example
 
-- a cryptocurrency application CUR (matches the token name) and `appVP` that makes sure that the transaction is balanced
+As Taiga works in the UTXO model, application states are stored in notes, and changing the application state is done by spending old application state notes and creating new application state notes.
+
+Applications in Taiga are shielded, which means that the `appVP` of each application is hidden, the notes containing application states are encrypted, and the produced transactions don't reveal any information about the applications they change the state of. 
+
+![img.png](img/app_intro.png)
 
 #### Is it like Ethereum?
 
 In some sense, Taiga applications are similar to Ethereum applications, but there are two key distinctions that come to mind:
-* Ethereum uses smart contracts (imperative) when Taiga uses validity predicates (declarative) to express the application logic
-* Taiga applications are shielded by default, but can be defined over the transparent pool as well
+* Ethereum uses smart contracts (imperative) when Taiga uses validity predicates (declarative) to express the application logic (you can learn more about the difference in the Anoma whitepaper)
+* Taiga applications are shielded by default, but can be defined separately over the transparent pool as well. The shielded and transparent parts of the application can interact with each other, but whatever happens in Taiga is always shielded
 
 
 ### Application VP
-Each application has an [`appVP`](./validity-predicates.md) that defines the conditions on which the application can be used (i.e. the application notes can be sent or received). Every time a note that belongs to the application is spent or created, `appVP` is called to authorize the transaction.`AppVP` might also require validity of other VPs, enforcing a VP hierarchy.
+Each application has an [`appVP`](./validity-predicates.md) that defines the conditions on which the application can be used (i.e. the application notes can be sent or received). Every time a note that belongs to the application is spent or created, `appVP` is called to authorize the transaction.
 
-#### Application Address
-Every application is identified by an address that is derived from its `AppVP` circuit verifying key `app_vk`:
-`appAddress = Com(app_vk)`. 
+`AppVP` might also require validity of other VPs, enforcing a VP hierarchy with an `appVP` being the main VP checked. This might be userful, for example, when an application has users and allows them to express their interests by supporting user-defined validity predicates. In that case, the application is responsible for making sure the users' interests are satisfied - Taiga is agnostic of sub-VPs.
 
 #### Application notes
+The application a note belongs to is indicated by the note's type. The note type is derived from the application VP, but might be further specified so that an application can have notes of multiple types which all belong to the same application. Notes of distinct types are independent of each other, unless explicitly designed.
 
-Notes that belong to different applications have distinct types, but notes within the same application can have distinct types as well (to express the difference in usage). The note type is encoded in the notes value base (see more here). Notes of different types are independent of each other (unless explicitly designed).
+![img_1.png](img/app_with_multiple_note_types.png)
 
-### Applications interaction
-TBD
+#### Example
+- a cryptocurrency application CUR (matches the token name) and `appVP` that makes sure that the transaction is balanced
 
-### Application users
-TBD
-
-Some applications might have users. In that case the application is responsible for making the users' interests satisfied, e.g. by allowing `userVP` and enforce the check in the `appVP`
-
-The application defines what functionality the users have access to, in particular, the application might allow users have `userVP` so that they could express their preferences. 
+#### Apps address
+Applications are identified by addresses that are derived from their `appVP`s. 

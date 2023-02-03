@@ -2,7 +2,7 @@
 language = "en"
 multilingual = false
 src = "src"
-title = "Taiga documentation"
+title = "Taiga Design Specification"
 
 [output.html]
 
