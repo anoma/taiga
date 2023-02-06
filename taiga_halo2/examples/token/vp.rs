@@ -1,23 +1,3 @@
-// Token VP:
-
-// - [X] Check tx is balanced
-//      This is already done in basic constraints
-// - [] Shield/unshield tokens
-// - [] Token-type swap; mint/burn new/old token
-
-// Define the token type
-// How to encode the data to value base?
-// Make the type of the value base unique
-// How to spend the note and how to create the note?
-// In previous versions, we have sendvp and receivevp and encode those into the `sub_app_data`
-// The spendvp is more important. For now, everyone can receive the notes
-// The sendvp needs to check signature check
-
-// Define note application
-// Use empty send vp
-// Apply signature check
-
-
 use halo2_proofs::{
     circuit::{floor_planner, Layouter},
     plonk::{self, keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
@@ -43,7 +23,7 @@ use taiga_halo2::{
 
 use rand::rngs::OsRng;
 
-// For example, assuming we have a general token application VP, different tokens can use the same token application VP but different vp_data to distinguish the type of token. We can encode “ETH”, “BTC” or other property of the token into vp_data to make the token value-base unique.
+// Different tokens can use the same token application VP but different `app_data` to distinguish the type of token. We can encode “ETH”, “BTC” or other property of the token into `app_data` to make the application type unique.
 
 #[derive(Clone, Debug, Default)]
 pub struct TokenVP {
