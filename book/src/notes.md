@@ -1,19 +1,6 @@
 # Note
 
-A **note** is an immutable object that represents a unit of value. Each note belongs to a certain application (which defines the note's type), and can store some data:
-
-``` rust
-pub struct Note {
-pub value_base: NoteType,
-pub app_data_dynamic: pallas::Base,
-/// value denotes the amount of the note.
-pub value: u64,
-/// the nullifier key commitment Whoever has nk, can spend the note (more or less).
-pub nk_com: NullifierKeyCom,
-pub is_merkle_checked: bool,
-...
-}
-```
+A **note** is an immutable object that represents a unit of value. Each note belongs to a certain application (which defines the note's type), and can store some data.
 
 #### Sending notes
 
@@ -30,25 +17,36 @@ All of the notes are kept shielded and created notes are sent to users in an enc
 
 Each created note exists in a public merkle tree `CMtree` of notes. To keep the notes shielded, the tree contains note commitments `cm` instead of the notes themselves. This tree is called a note commitment tree.
 
-#### Note structure
-The full description of the note structure is
+### Note structure fields
+
+To understand the notes better, let's look at some fields in the note strucutre:
 
 ```rust
-pub struct Note<CP: CircuitParameters> {
-	pub owner: User<CP>,
-	pub app: App<CP>,
-	pub value: u64,
-	pub data: CP::CurveScalarField,
-	pub rho: Nullifier<CP>,
-	pub psi: CP::CurveScalarField,
-	pub rcm: CP::CurveScalarField,
+pub struct Note {
+pub value_base: NoteType,
+pub app_data_dynamic: pallas::Base,
+pub value: u64,
+pub nk_com: NullifierKeyCom,
+pub is_merkle_checked: bool,
+...
 }
 ```
+#### The application data
+Note's `value_base` encodes the type of the note. The value base is derived from the application-specific data such as application VP, and some note-type-related details (e.g. for NFTs it would be the NFT description). As value base is the same for all notes of the same type, it should only include fairly long-term data, and the ephemeral data goes into `app_data_dynamic`. That field can contain input parameters for VP circuits, sub-VPs, and other data provided by the app.
 
-, where:
-- `data` is additional information that might be useful to describe notes of a certain type (e.g. NFTs)
-- `rho`  and `psi` are the values used to compute the note's nullifier
-- `rcm` is randomness used to compute the commitment `cm`
+#### Note values & dummy notes
+For traditional applications like cryptocurrencies value field carries the traditional meaning e.g. USDC note of value 5 is equivalent to 5 dollars, but for more abstract applications the value field might change its meaning or loose it whatsoever. 
+However, no matter that meaning the application gives to the value, value field is still used to check the transaction balance (learn more in the exec model desc)
 
-#### Dummy notes
-Dummy notes might be useful to keep the amount of notes constant and hide the actual amount of notes in a tx.
+Dummy notes are a sort of placeholders that don't a
+ctually contain meaningful for the ledger data but look like real notes.
+In some systems such as Zcash, dummy notes are identified by their values - zero value note is considered dummy. However, this isn't true for Taiga. As Taiga generalizes the idea of a note, zero-value notes can still be important, so in Taiga we mark dummy notes by not checking the merkle path for them. `is_merkle_checked` flag marks if the note is dummy or not.
+
+#### Who spends the notes?
+
+Each note contains a field `nk_com` encoding the nullifier key (nk) of the note's owner. Notes don't have explicit owners, but are rather linked to the owner via the nullifier key. Whoever knows the nullifier key, can compute the note's nullifier and spend the note. The note doesn't contain the nullifier key itself, but only a commitment to it, which hides the key value (so it isn't enough to look at the note's content to be able to spend it).
+
+
+
+
+

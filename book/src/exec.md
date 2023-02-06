@@ -1,7 +1,8 @@
 # Taiga execution model
 
 ## On a high level
-**Intents** are a mechanism that allows users to enact a multiparty state transition. Users express their interests with intents, and Taiga makes sure that the intents are satisfied atomically.
+
+Taiga's execution model is based on the idea of intents. **Intents** are a mechanism that allows users to enact a multiparty state transition. Users express their interests with intents, and Taiga makes sure that the intents are satisfied atomically.
 
 Here is the high level description of the process, starting from creating intents and ending up publishing a blockchain transaction representing the desired state transition:
 1. **Create**: A user creates an intent, publishing the information of what they have and what they want
@@ -14,7 +15,7 @@ Here is the high level description of the process, starting from creating intent
 ## Step 1: Create an intent
 
 Intents specify ephemeral interests of users. The step of intent creation consists of two parts:
-1. **Specify an intent**. `IntentVP` encodes the user interests in the [VP](./validity-predicates.md) form. As in a valid transaction all VPs must evaluate to `True`, the intent is guaranteed to be satisfied.
+1. **Specify an intent**. `Intent userVP` encodes the user interests in the VP form. As in a valid transaction all VPs must evaluate to `True`, the intent is guaranteed to be satisfied.
 2. **Create the initial *partial transaction***.
 
 ### Partial transaction

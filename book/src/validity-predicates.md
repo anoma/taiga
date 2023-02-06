@@ -1,8 +1,8 @@
 # Validity predicate (VP)
 
-In Taiga, there are two types of mechanisms checking the validity of a transaction: 
+In Taiga, there are two types of mechanisms enforcing the validity of a transaction: 
 * the first type is the Taiga rules that are the same for all transactions (e.g. the note must exist before being spent).
-* the second type is called **validity predicates**. The choice of VPs to be checked depends on the applications involved in the transaction.
+* the second type is called **validity predicates**. The choice of VPs to be checked to validate a transaction depends on the applications involved in the transaction.
 
 A **validity predicate** is a piece of code defined by an application that authorizes transactions the application is involved in.  A valid (can be published on the blockchain) transaction satisfy the VPs of all involved applications.
 
@@ -26,18 +26,18 @@ Token applications might have `userVP` for each user where they can define on wh
 TODO: add a diagram
 
 ### Transparent vs schielded VPs
-Validity predicates in principle can be both transparent and shielded. Transparent VPs are represented as WASM code and publicly visible, Taiga VPs are arithmetic circuits hidden under ZKPs.
-Each transaction in Taiga has VP proofs attached to it, and whoever has the verifier key (VK), can verify the proofs.
+Validity predicates can be both transparent and shielded. Transparent VPs are represented as WASM code and publicly visible, shielded VPs are represented as arithmetic circuits hidden under ZKPs.
+Each transaction in Taiga has VP proofs attached to it, and whoever has the verifying key (VK), can verify the proofs.
 
 ![img.png](img/vp_img.png)
 
-Taiga uses the Halo2 proving system and validity predicates are represented as [PLONKish circuits](https://zcash.github.io/halo2/concepts/arithmetization.html). For privacy reasons, all Taiga VPs share the same PLONK configuration (the set of building blocks available for the circuits), and different VPs are created by specifying the *selectors*.
+Taiga uses the Halo2 proving system and validity predicates are represented as [PLONKish circuits](https://zcash.github.io/halo2/concepts/arithmetization.html). For privacy reasons, all Taiga VPs share the same PLONK configuration (the set of building blocks available for the circuits), and distinct VPs are created by specifying the *selectors* (which blocks to use).
 
 TODO: add selector quick explanation 
 
 ### VP interface
 
-For privacy and efficiency, all VPs share the same *public input interface*, but can have different *private* inputs (for customizability).
+All validity predicates share the same *public input interface*, but can have different *private* inputs.
 
 #### Public Inputs
 
@@ -47,11 +47,9 @@ For privacy and efficiency, all VPs share the same *public input interface*, but
 
 #### Private inputs
 
-While not formally required, most validity predicates will have all spent and output notes as private input and will verify that they match public input.
+While not formally required, most validity predicates are expected to have all spent notes (representing the current state) and output notes (representing the next proposed state) as private input to verify that the state transition is allowed.
 
 ##### ----------
-To make sure that the state transition is allowed, VPs in Taiga take the current state (expressed by the spent notes) and the next proposed state (expressed by the output notes) as input and perform the required checks.
-
 
 The VP configuration includes the following "gates" in the PLONK configuration:
 * Field addition/multiplication
