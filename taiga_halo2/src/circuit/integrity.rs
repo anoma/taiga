@@ -97,6 +97,7 @@ pub fn check_spend_note(
     add_chip: AddChip<pallas::Base>,
     spend_note: Note,
     nf_row_idx: usize,
+    key_dynamic: pallas::Base
 ) -> Result<SpendNoteVar, Error> {
     // Check spend note user integrity: address = Com_r(Com_r(nk, zero), app_data_dynamic)
     let (address, nk) = {
@@ -108,10 +109,10 @@ pub fn check_spend_note(
             Value::known(nk.inner()),
         )?;
 
-        let zero_constant = assign_free_constant(
+        let key_dynamic_var = assign_free_constant(
             layouter.namespace(|| "constant zero"),
             advices[0],
-            pallas::Base::zero(),
+            key_dynamic,
         )?;
 
         // nk_com = Com_r(nk, zero)
@@ -122,7 +123,7 @@ pub fn check_spend_note(
                     poseidon_chip,
                     layouter.namespace(|| "Poseidon init"),
                 )?;
-            let poseidon_message = [nk_var.clone(), zero_constant];
+            let poseidon_message = [nk_var.clone(), key_dynamic_var];
             poseidon_hasher.hash(layouter.namespace(|| "nk_com"), poseidon_message)?
         };
 

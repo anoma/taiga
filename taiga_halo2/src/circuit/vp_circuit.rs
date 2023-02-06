@@ -82,6 +82,9 @@ pub trait ValidityPredicateInfo: DynClone {
     fn get_instances(&self) -> Vec<pallas::Base>;
     fn get_verifying_info(&self) -> VPVerifyingInfo;
     fn get_vp_description(&self) -> ValidityPredicateVerifyingKey;
+    fn get_key_dynamic(&self) -> pallas::Base {
+        pallas::Base::zero()
+    }
 }
 
 clone_trait_object!(ValidityPredicateInfo);
@@ -132,6 +135,7 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateInf
                 add_chip.clone(),
                 spend_notes[i].clone(),
                 i * 2,
+                self.get_key_dynamic()
             )?;
 
             // The old_nf may not be from above spend note
