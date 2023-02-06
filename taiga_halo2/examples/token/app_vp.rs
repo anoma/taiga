@@ -61,8 +61,8 @@ impl ValidityPredicateCircuit for TokenVP {
 
     fn custom_constraints(
         &self,
-        config: Self::VPConfig,
-        layouter: impl Layouter<pallas::Base>,
+        _config: Self::VPConfig,
+        _layouter: impl Layouter<pallas::Base>,
         _spend_note_variables: &[SpendNoteVar],
         _output_note_variables: &[OutputNoteVar],
     ) -> Result<(), plonk::Error> {
