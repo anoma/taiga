@@ -1,5 +1,3 @@
 pub mod vp;
 
-pub fn main() {
-    
-}
+pub fn main() {}

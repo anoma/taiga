@@ -76,11 +76,9 @@ impl ActionInfo {
         let nf = self.spend.note.get_nf().unwrap();
         assert_eq!(
             nf, self.output.note.rho,
-            "The nf of spend note should be equal to the rho of output note"
-
-            // We follow the Orchard approach to nullifiers
-            // "ρ includes the nullifiers of any Orchard notes being spent in the same action. Given that an action consists of a single spend and a single output, we set ρ to be the nullifier of the spent note"
-            // See https://zcash.github.io/orchard/design/nullifiers.html
+            "The nf of spend note should be equal to the rho of output note" // We follow the Orchard approach to nullifiers
+                                                                             // "ρ includes the nullifiers of any Orchard notes being spent in the same action. Given that an action consists of a single spend and a single output, we set ρ to be the nullifier of the spent note"
+                                                                             // See https://zcash.github.io/orchard/design/nullifiers.html
         );
 
         let output_cm = self.output.note.commitment();
