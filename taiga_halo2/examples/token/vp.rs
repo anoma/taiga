@@ -122,10 +122,13 @@ mod tests {
     use super::*;
     use halo2_gadgets::poseidon::primitives as poseidon;
     use taiga_halo2::{
-        circuit::gadgets::{
+        circuit::{
+            gadgets::{
             assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
             MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
         },
+        vp_examples::TrivialValidityPredicateCircuit
+    },
         constant::NUM_NOTE,
         note::Note,
         nullifier::{Nullifier, NullifierKeyCom},
@@ -154,7 +157,6 @@ mod tests {
 
     #[test]
     fn test_vp() {
-        
         let mut rng = OsRng;
         let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
@@ -200,7 +202,6 @@ mod tests {
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
     
         let token_vp = TokenVP::new(input_notes, output_notes);
-        let token_vp_description = token_vp.get_vp_description();
     
         const K: u32 = 13;
         let params = Params::new(K);
@@ -210,7 +211,7 @@ mod tests {
         let app_data = calculate_hash(currency);
         let value = 5000u64;
         let is_merkle_checked = true;
-        let spend_note_token_1 = {
+        let spend_note = {
             let app_data_dynamic = pallas::Base::zero();
             let rho = Nullifier::new(pallas::Base::random(&mut rng));
             let nk_com = NullifierKeyCom::rand(&mut rng);
@@ -229,12 +230,12 @@ mod tests {
                 vec![0u8; 32],
             )
         };
-        let output_note_token_1 = {
+        let output_note = {
             let app_data_dynamic = pallas::Base::zero();
-            let rho = Nullifier::new(pallas::Base::random(&mut rng));
             let nk_com = NullifierKeyCom::rand(&mut rng);
             let rcm = pallas::Scalar::random(&mut rng);
             let psi = pallas::Base::random(&mut rng);
+            let rho = spend_note.get_nf().unwrap();
             Note::new(
                 app_vk,
                 app_data,
@@ -249,9 +250,60 @@ mod tests {
             )
         }; 
 
-        (spend_note_token_1, output_note_token_1)
+        (spend_note, output_note)
     }
 
+fn create_dummy_notes() -> (Note, Note) {
+    let mut rng = OsRng;
+    let trivial_vp_circuit = TrivialValidityPredicateCircuit::default();
+    let app_vk = trivial_vp_circuit.get_vp_description();
+
+
+    let app_data = pallas::Base::zero();
+    let value = 5000u64;
+    let is_merkle_checked = true;
+
+    let spend_note = {
+        let app_data_dynamic = pallas::Base::zero();
+        let rho = Nullifier::new(pallas::Base::random(&mut rng));
+        let nk_com = NullifierKeyCom::rand(&mut rng);
+        let rcm = pallas::Scalar::random(&mut rng);
+        let psi = pallas::Base::random(&mut rng);
+        Note::new(
+            app_vk.clone(),
+            app_data,
+            app_data_dynamic,
+            value,
+            nk_com,
+            rho,
+            psi,
+            rcm,
+            is_merkle_checked,
+            vec![0u8; 32],
+        )
+    };
+
+    let output_note = {
+        let app_data_dynamic = pallas::Base::zero();
+        let nk_com = NullifierKeyCom::rand(&mut rng);
+        let rcm = pallas::Scalar::random(&mut rng);
+        let psi = pallas::Base::random(&mut rng);
+        let rho = spend_note.get_nf().unwrap();
+        Note::new(
+            app_vk,
+            app_data,
+            app_data_dynamic,
+            value,
+            nk_com,
+            rho,
+            psi,
+            rcm,
+            is_merkle_checked,
+            vec![0u8; 32],
+        )
+    }; 
+    (spend_note, output_note)
+}
 #[test]
 fn test_transaction_creation() {
     use taiga_halo2::{
@@ -265,34 +317,9 @@ fn test_transaction_creation() {
 
     let mut rng = OsRng;
 
-    let trivial_vp_circuit = TrivialValidityPredicateCircuit::default();
-    let trivial_vp_description = trivial_vp_circuit.get_vp_description();
 
-    let note_dummy = {
-        let app_data = pallas::Base::zero();
-        let app_data_dynamic = pallas::Base::zero();
-        let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        let value = 5000u64;
-        let nk_com = NullifierKeyCom::rand(&mut rng);
-        let rcm = pallas::Scalar::random(&mut rng);
-        let psi = pallas::Base::random(&mut rng);
-        let is_merkle_checked = true;
-        Note::new(
-            trivial_vp_description,
-            app_data,
-            app_data_dynamic,
-            value,
-            nk_com,
-            rho,
-            psi,
-            rcm,
-            is_merkle_checked,
-            vec![0u8; 32],
-        )
-    };
     let (spend_note_1, output_note_1) = create_token_notes();
-    let spend_note_2 = note_dummy.clone();
-    let output_note_2 = note_dummy.clone();
+    let (spend_note_2, output_note_2) = create_dummy_notes();
 
     let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
     let token_vp_circuit = TokenVP {
