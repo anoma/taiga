@@ -153,7 +153,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             add_chip,
             self.spend_note.clone(),
             ACTION_NF_INSTANCE_ROW_IDX,
-            pallas::Base::zero()
+            pallas::Base::zero(),
         )?;
 
         // Check the merkle tree path validity and public the root

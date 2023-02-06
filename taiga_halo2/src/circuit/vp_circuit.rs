@@ -135,7 +135,7 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateInf
                 add_chip.clone(),
                 spend_notes[i].clone(),
                 i * 2,
-                self.get_key_dynamic()
+                self.get_key_dynamic(),
             )?;
 
             // The old_nf may not be from above spend note

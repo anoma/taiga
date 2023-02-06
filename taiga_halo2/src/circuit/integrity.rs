@@ -97,7 +97,7 @@ pub fn check_spend_note(
     add_chip: AddChip<pallas::Base>,
     spend_note: Note,
     nf_row_idx: usize,
-    key_dynamic: pallas::Base
+    key_dynamic: pallas::Base,
 ) -> Result<SpendNoteVar, Error> {
     // Check spend note user integrity: address = Com_r(Com_r(nk, zero), app_data_dynamic)
     let (address, nk) = {
