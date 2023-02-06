@@ -1,5 +1,5 @@
 use crate::action::{ActionInfo, ActionInstance};
-use crate::bindnig_signature::*;
+use crate::binding_signature::*;
 use crate::circuit::vp_circuit::{VPVerifyingInfo, ValidityPredicateInfo};
 use crate::constant::{
     ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, NUM_NOTE,
