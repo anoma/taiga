@@ -1,5 +1,5 @@
 use crate::action::{ActionInfo, ActionInstance};
-use crate::bindnig_signature::*;
+use crate::binding_signature::*;
 use crate::circuit::vp_circuit::{VPVerifyingInfo, ValidityPredicateInfo};
 use crate::constant::{
     ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, NUM_NOTE,
@@ -215,7 +215,7 @@ impl PartialTransaction {
             .map(|spend_note| {
                 NoteVPVerifyingInfoSet::build(
                     spend_note.get_app_vp_proving_info(),
-                    spend_note.get_app_logic_vp_proving_info(),
+                    spend_note.get_app_vp_proving_info_dynamic(),
                 )
             })
             .collect();
@@ -224,7 +224,7 @@ impl PartialTransaction {
             .map(|output_note| {
                 NoteVPVerifyingInfoSet::build(
                     output_note.get_app_vp_proving_info(),
-                    output_note.get_app_logic_vp_proving_info(),
+                    output_note.get_app_vp_proving_info_dynamic(),
                 )
             })
             .collect();
@@ -337,11 +337,11 @@ impl NoteVPVerifyingInfoSet {
 
     pub fn build(
         app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
-        app_logic_vp_proving_info: Vec<Box<dyn ValidityPredicateInfo>>,
+        app_vp_proving_info_dynamic: Vec<Box<dyn ValidityPredicateInfo>>,
     ) -> Self {
         let app_vp_verifying_info = app_vp_proving_info.get_verifying_info();
 
-        let app_logic_vp_verifying_info = app_logic_vp_proving_info
+        let app_logic_vp_verifying_info = app_vp_proving_info_dynamic
             .into_iter()
             .map(|proving_info| proving_info.get_verifying_info())
             .collect();
@@ -458,30 +458,30 @@ fn test_transaction_creation() {
     let app_vp_proving_info = Box::new(trivial_vp_circuit.clone());
     let trivial_app_logic_1: Box<dyn ValidityPredicateInfo> = Box::new(trivial_vp_circuit.clone());
     let trivial_app_logic_2 = Box::new(trivial_vp_circuit);
-    let trivial_app_logic_vp_proving_info = vec![trivial_app_logic_1, trivial_app_logic_2];
+    let trivial_app_vp_proving_info_dynamic = vec![trivial_app_logic_1, trivial_app_logic_2];
     let spend_note_info_1 = SpendNoteInfo::new(
         spend_note_1,
         merkle_path.clone(),
         app_vp_proving_info.clone(),
-        trivial_app_logic_vp_proving_info.clone(),
+        trivial_app_vp_proving_info_dynamic.clone(),
     );
     // The following notes use empty logic vps and use app_data_dynamic with pallas::Base::zero() by default.
-    let app_logic_vp_proving_info = vec![];
+    let app_vp_proving_info_dynamic = vec![];
     let spend_note_info_2 = SpendNoteInfo::new(
         spend_note_2,
         merkle_path,
         app_vp_proving_info.clone(),
-        app_logic_vp_proving_info.clone(),
+        app_vp_proving_info_dynamic.clone(),
     );
     let output_note_info_1 = OutputNoteInfo::new(
         output_note_1,
         app_vp_proving_info.clone(),
-        app_logic_vp_proving_info.clone(),
+        app_vp_proving_info_dynamic.clone(),
     );
     let output_note_info_2 = OutputNoteInfo::new(
         output_note_2,
         app_vp_proving_info,
-        app_logic_vp_proving_info,
+        app_vp_proving_info_dynamic,
     );
 
     // Create partial tx

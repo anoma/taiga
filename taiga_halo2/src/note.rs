@@ -76,14 +76,14 @@ pub struct SpendNoteInfo {
     pub auth_path: [(pallas::Base, LR); TAIGA_COMMITMENT_TREE_DEPTH],
     pub root: pallas::Base,
     app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
-    app_logic_vp_proving_info: Vec<Box<dyn ValidityPredicateInfo>>,
+    app_vp_proving_info_dynamic: Vec<Box<dyn ValidityPredicateInfo>>,
 }
 
 #[derive(Clone)]
 pub struct OutputNoteInfo {
     pub note: Note,
     app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
-    app_logic_vp_proving_info: Vec<Box<dyn ValidityPredicateInfo>>,
+    app_vp_proving_info_dynamic: Vec<Box<dyn ValidityPredicateInfo>>,
 }
 
 impl Note {
@@ -239,7 +239,7 @@ impl SpendNoteInfo {
         note: Note,
         merkle_path: MerklePath,
         app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
-        app_logic_vp_proving_info: Vec<Box<dyn ValidityPredicateInfo>>,
+        app_vp_proving_info_dynamic: Vec<Box<dyn ValidityPredicateInfo>>,
     ) -> Self {
         let cm_node = Node::new(note.commitment().get_x());
         let root = merkle_path.root(cm_node).inner();
@@ -250,7 +250,7 @@ impl SpendNoteInfo {
             auth_path,
             root,
             app_vp_proving_info,
-            app_logic_vp_proving_info,
+            app_vp_proving_info_dynamic,
         }
     }
 
@@ -258,8 +258,8 @@ impl SpendNoteInfo {
         self.app_vp_proving_info.clone()
     }
 
-    pub fn get_app_logic_vp_proving_info(&self) -> Vec<Box<dyn ValidityPredicateInfo>> {
-        self.app_logic_vp_proving_info.clone()
+    pub fn get_app_vp_proving_info_dynamic(&self) -> Vec<Box<dyn ValidityPredicateInfo>> {
+        self.app_vp_proving_info_dynamic.clone()
     }
 }
 
@@ -267,12 +267,12 @@ impl OutputNoteInfo {
     pub fn new(
         note: Note,
         app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
-        app_logic_vp_proving_info: Vec<Box<dyn ValidityPredicateInfo>>,
+        app_vp_proving_info_dynamic: Vec<Box<dyn ValidityPredicateInfo>>,
     ) -> Self {
         Self {
             note,
             app_vp_proving_info,
-            app_logic_vp_proving_info,
+            app_vp_proving_info_dynamic,
         }
     }
 
@@ -280,11 +280,11 @@ impl OutputNoteInfo {
         use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
         let note = Note::dummy_from_rho(&mut rng, nf);
         let app_vp_proving_info = Box::new(TrivialValidityPredicateCircuit::dummy(&mut rng));
-        let app_logic_vp_proving_info = vec![];
+        let app_vp_proving_info_dynamic = vec![];
         Self {
             note,
             app_vp_proving_info,
-            app_logic_vp_proving_info,
+            app_vp_proving_info_dynamic,
         }
     }
 
@@ -292,7 +292,7 @@ impl OutputNoteInfo {
         self.app_vp_proving_info.clone()
     }
 
-    pub fn get_app_logic_vp_proving_info(&self) -> Vec<Box<dyn ValidityPredicateInfo>> {
-        self.app_logic_vp_proving_info.clone()
+    pub fn get_app_vp_proving_info_dynamic(&self) -> Vec<Box<dyn ValidityPredicateInfo>> {
+        self.app_vp_proving_info_dynamic.clone()
     }
 }
