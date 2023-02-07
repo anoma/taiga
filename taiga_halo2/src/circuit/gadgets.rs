@@ -452,8 +452,8 @@ impl GetTargetNoteVariableConfig {
             .map(
                 |((&is_spend_note, &spend_note_variable), &output_note_variable)| {
                     pallas::Base::conditional_select(
-                        &output_note_variable,
                         &spend_note_variable,
+                        &output_note_variable,
                         is_spend_note.is_zero(),
                     )
                 },

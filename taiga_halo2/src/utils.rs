@@ -35,7 +35,7 @@ pub(crate) fn prf_nf(nk: pallas::Base, rho: pallas::Base) -> pallas::Base {
     poseidon_hash(nk, rho)
 }
 
-pub(crate) fn poseidon_hash(left: pallas::Base, right: pallas::Base) -> pallas::Base {
+pub fn poseidon_hash(left: pallas::Base, right: pallas::Base) -> pallas::Base {
     poseidon::Hash::<_, poseidon::P128Pow5T3, poseidon::ConstantLength<2>, 3, 2>::init()
         .hash([left, right])
 }

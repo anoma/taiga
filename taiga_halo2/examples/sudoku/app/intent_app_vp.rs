@@ -51,7 +51,9 @@ impl ValidityPredicateConfig for IntentAppValidityPredicateConfig {
 
         let advices = note_conifg.advices;
         let instances = note_conifg.instances;
-        let get_target_variable_config = GetTargetNoteVariableConfig::configure(meta, advices[0], advices[1], advices[2], advices[3]);
+        let get_target_variable_config = GetTargetNoteVariableConfig::configure(
+            meta, advices[0], advices[1], advices[2], advices[3],
+        );
 
         Self {
             note_conifg,
@@ -142,9 +144,13 @@ impl ValidityPredicateCircuit for IntentAppValidityPredicateCircuit {
         let _dealer_intent_vp = layouter.assign_region(
             || "get target dealer intent vp",
             |mut region| {
-                config
-                    .get_target_variable_config
-                    .assign_region(&is_spend_note, &spend_note_variables[0].app_data_dynamic, &output_note_variables[0].app_data_dynamic, 0, &mut region)
+                config.get_target_variable_config.assign_region(
+                    &is_spend_note,
+                    &spend_note_variables[0].app_data_dynamic,
+                    &output_note_variables[0].app_data_dynamic,
+                    0,
+                    &mut region,
+                )
             },
         )?;
 
