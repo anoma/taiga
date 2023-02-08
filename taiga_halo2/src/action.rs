@@ -61,12 +61,12 @@ impl ActionInfo {
         let output_info = OutputNoteInfo::dummy(&mut rng, spend_note.get_nf().unwrap());
         let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         let app_vp_proving_info = Box::new(TrivialValidityPredicateCircuit::dummy(&mut rng));
-        let app_logic_vp_proving_info = vec![];
+        let app_vp_proving_info_dynamic = vec![];
         let spend_info = SpendNoteInfo::new(
             spend_note,
             merkle_path,
             app_vp_proving_info,
-            app_logic_vp_proving_info,
+            app_vp_proving_info_dynamic,
         );
 
         ActionInfo::new(spend_info, output_info, &mut rng)
