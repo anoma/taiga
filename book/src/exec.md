@@ -94,7 +94,7 @@ After the solver matches the notes, two cases are possible:
 
 **Note**: in the current implementation we assume a simpler model with no partial solving.
 
-**Note**: solvers don't need to be identified as all actions are authorized by user/app VPs. 
+**Note**: solvers don't need to be identified as all actions are authorized by VPs. 
 However, if they want to receive fees, they need to have an address on the chain.
 
 ## Step 4: Finalize
@@ -102,12 +102,11 @@ However, if they want to receive fees, they need to have an address on the chain
 When all involved parties are satisfied the transaction can be published on the blockchain. 
 The local CMTree and all of the proofs created are published on the blockchain as well.
 
-# How to express your preferences
+# How to express the preferences
 
-A user can express their preferences in two ways. When a user knows what they want, they can create the notes that they want for themselves. 
-The counterparty then will have to spend the notes that the user has created, balancing the transaction. 
+A user can express their preferences in two ways. When a user knows what they want, they can directly create the notes that they want for themselves, 
+and the counterparty will have to spend the notes that the user has created, balancing the transaction. 
 Such approach works well when a party knows exactly what they want, 
 but if a user can be satisfied with multiple possible state transitions, such approach wouldn't work well.
-In that case, they can use the help of the [intent application](./intent.md).
+In that case, they can use the help of the [intent application](./intent.md). To learn more about the differences between two ways, check [here](./https://hackmd.io/HQM3s-i_TH-VYCQgdk8SXw?both).
 
-Elaborate on the intent application

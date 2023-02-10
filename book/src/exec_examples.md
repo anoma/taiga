@@ -1,15 +1,44 @@
 ## Exectuion model examples
 
-Let's see how different use cases can be handled with this execution model.
+Let's see how different use cases can be handled with the Taiga execution model.
 
 **Note**: For simplicity in the examples below we assume that the balancing value `v` is equal to zero.
 
-### 1. Three-party barter
+### 1. Two-party exchange with an intent userVP
+
+Let's consider the situation where one of the parties uses the intent application, and the other party doesn't.
+Here Alice has two notes [1]A and [2]B and wants to get a blue dolphin NFT in exchange for one of them and get the other one back. 
+Alice uses intent application to express her preferences. Bob has a blue dolphin NFT and wants [1] of token A in exchange for it. 
+As Bob knows what he wants, no intent userVP needed.
+
+![img_1.png](img/exec_complex_intent_plus_no_intent.png)
+
+**Step 1-2**: Alice creates her intent userVP, both Alice and Bob create their initial partial transactions. 
+Alice spends both of her notes she could give away, expecting to receive one of them back (the other one will go to the counterparty).
+
+**Step 3**: A solver sees Alice's and Bob's partial transactions and matches them together. 
+Alice receives the blue dolphin NFT and one of her notes ([2]B) back,
+her intent userVP is satisfied and Alice's intent note is spent. Bob has already sent himself the note he wanted, so the solver doesn't create notes for Bob.
+All total (accumulated over ptxs) per-token balances are equal to 0, and the final transaction can be created.
+
+**Step 4**: The final transaction is created using the spent and output notes from the partial transactions.
+
+#### Ptxs detailed description
+
+||spent notes|created notes|VP proofs|total balance (accumulated)|
+|-|-|-|-|-|
+|ptx #1 (Alice)|[1]A, [2]B|[Alice intent note]|Alice intentVP, intent App VP, Alice A userVP, A appVP, Alice B userVP, B appVP (6)|-[1]A-[2]B + [Alice intent note]|
+|ptx #2 (Bob)|[blue dolphin NFT]|[1]A|Bob A userVP, A appVP, Bob NFT userVP, NFT appVP (4)|-2[B] - [blue dolphin NFT] + [Alice intent note]
+|ptx #3 (Solver)|[Alice intent note]|[blue dolphin NFT], [2]B|Alice NFT userVP, NFT appVP, Alice intent userVP, intent AppVP, Alice B user VP, B appVP (6)|0|
+
+
+
+### 2. Three-party barter
 
 Three parties, Alice, Bob, and Charlie, are looking for some assets in exchange for something else.
 Their intents can be matched into a three-party bartering cycle. Let's see step by step how this happens.
 
-**Note**: parties don't require three-party bartering explicitly.
+**Note**: parties don't ask for a three-party bartering explicitly.
 
 ![img.png](img/exec_3_party.png)
 
@@ -49,22 +78,10 @@ Total per-token balances:
 **Step 5**:
 The final transaction containing the spent and output notes from partial transactions is created with all proofs attached.
 
-### 2. Complex intent userVP
+### 2. Three-party barter without intents
+![img.png](img/exec_3_party_no_intents.png)
 
-Let's consider the situation where one of the parties has a complex VP (compared to the VPs above).
-Here Alice has two notes: [1] of token A and [2] of token B and wants to get a blue dolphin NFT in  exchange for one of them and get the other one back.
-Bob has a simple intent userVP as in the example above.
 
-![img.png](img/exec_complex_vp.png)
-
-**Step 1-2**: Alice and Bob create their intent userVPs and initial partial transactions. Alice spends both of the notes she is ready to give away,
-expecting to receive one of them back (the other one will go to the counterparty).
-
-**Step 3**: A solver sees Alice's and Bob's partial transactions and matches them together. Alice receives the blue dolphin NFT and one of her notes ([1] of A) back,
-her intent userVP is satisfied and Alice's intent note is spent. Bob get's [2]B note from Alice, his intent userVP is satisfied,
-his intent note is spent. All total per-token balances are equal to 0, and the final transaction can be created.
-
-**Step 4**: The final transaction is created using the spent and output notes from the partial transactions.
 
 ### 3. One way to represent arbitrary states
 
@@ -73,7 +90,7 @@ it (i.e. any party that has the authority) can spend the old state and produce a
 If the state change is possible within one partial transaction, such a note has a value 0 and doesn't affect the total balance.
 ![img.png](img/exec_arbitrary_state_update.png)
 
-If the state change happens across partial transactions (meaning that the state gets consumed in one partial transaction and a new state is output in another),
+If the state change happens across partial transactions (meaning that the state gets consumed in one partial transaction, and a new state is output in another),
 the process is a bit different.
 
 #### State transition across partial transactions
