@@ -6,8 +6,6 @@ Like all other applications, intent application has an application VP that defin
 **Intent appVP** hierarchically enforces the check of **intent userVP**s that express the interests of the users involved, 
 and **intent application notes** are used to keep the transaction unbalanced (to make sure it doesn't get published), until the interests of all users are satisfied.
 
-The design of the intent application is easiest to understand by seeing how it helps to empower the execution model.
-
 ### Intent notes mechanism
 
 Users express their preferences in their intent userVPs. For each intent userVP there is a corresponding note type derived from that userVP.
@@ -23,19 +21,24 @@ and balancing the intent notes requires satisfying the intent userVPs.
 
 ### ----- To sort -----
 
+### Intents
+
+**Intents** are a mechanism that makes sure that the partial transaction is *unbalanced* until the corresponding intent is satisfied, making it impossible to publish the transaction. intents are also a way to enforce the `intent userVP` check.
+
 Intent app notes are **dummy** notes - meaning that unlike "normal" notes, the merkle path isn't checked for them (but they can have arbitrary value and stored in the CMtree, just like "normal").
 
-##### Step 3: Solve
-Solvers receive intents from the intent gossip network and match them together in order to create transactions.
+**Note**: being a dummy note and having zero value are two independent concepts in Taiga. Zero value notes aren't necessarily dummy, dummy notes can have non-zero value.
 
-That implies that users need to give some information to the solvers that is sufficient to create partial transactions and transactions (to create proofs). In order to match two intents, the solver needs to know:
-- intent userVPs of both matching parties
+How intent notes are used:
+1. Spending notes in the initial partial transaction, the user additionally outputs intent note of value [1].
+   This note will only be spent if the user's intent userVP is satisfied.
+2. Once all the parties involved in a state transition spent their intent app notes (meaning that the interests of all of them are satisfied), the transaction is balanced and can be finalized.
 
-We are considering the model where a solver makes one step at a time and sends the step result back to the gossip network, where the partial solution meets the next solver in the chain.
-In practice, the solver can continue solving instead of sending the result back to the gossip network if they can make the next step.
+![img.png](img/exec_intent_notes.png)
 
-##### Partial vs final match
-
-After the solver matches the notes, two cases are possible:
-1. At least one of the total per-token balances computed by summing up the per-token balances of partial transactions doesn't equal the balancing value. In this case, the solver sends the data to the gossip network.
-2. All total per-token balances are equal to the balancing values. A valid transaction can be created and published.
+### Intent userVP
+To validate a transaction, it is required that ` intent userVP` of each involved user was satisfied.
+The part of the intent userVP that is responsible for validating the future transaction (satisfying the user's intent) is exposed in the `intent userVP`, along with the description of the intent (so that the solver knows what it takes to satisfy the user interests).
+Later `intent userVP` is checked in the circuit, validating the state transition.
+The `intent userVP` check is enforced by the use of intent application.
+Spending an intent note is only allowed if the `intent userVP` tied to the note is satisfied.
