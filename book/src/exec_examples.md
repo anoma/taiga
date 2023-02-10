@@ -25,13 +25,11 @@ All total (accumulated over ptxs) per-token balances are equal to 0, and the fin
 
 #### Ptxs detailed description
 
-||spent notes|created notes|VP proofs|total balance (accumulated)|
-|-|-|-|-|-|
-|ptx #1 (Alice)|[1]A, [2]B|[Alice intent note]|Alice intentVP, intent App VP, Alice A userVP, A appVP, Alice B userVP, B appVP (6)|-[1]A-[2]B + [Alice intent note]|
-|ptx #2 (Bob)|[blue dolphin NFT]|[1]A|Bob A userVP, A appVP, Bob NFT userVP, NFT appVP (4)|-2[B] - [blue dolphin NFT] + [Alice intent note]
-|ptx #3 (Solver)|[Alice intent note]|[blue dolphin NFT], [2]B|Alice NFT userVP, NFT appVP, Alice intent userVP, intent AppVP, Alice B user VP, B appVP (6)|0|
-
-
+||spent notes|created notes|Apps|VP proofs|total balance (accumulated)|
+|-|-|-|-|-|-|
+|ptx #1 (Alice)|[1]A, [2]B|[Alice intent note]|intent app, A token, B token|Alice intentVP, intent App VP, Alice A userVP, A appVP, Alice B userVP, B appVP (6)|-[1]A-[2]B + [Alice intent note]|
+|ptx #2 (Bob)|[blue dolphin NFT]|[1]A|blue dolphin NFT app, A token|Bob A userVP, A appVP, Bob NFT userVP, NFT appVP (4)|-2[B] - [blue dolphin NFT] + [Alice intent note]
+|ptx #3 (Solver)|[Alice intent note]|[blue dolphin NFT], [2]B|intent app, blue dolphin NFT app, B token|Alice NFT userVP, NFT appVP, Alice intent userVP, intent AppVP, Alice B user VP, B appVP (6)|0|
 
 ### 2. Three-party barter
 
