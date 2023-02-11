@@ -18,12 +18,15 @@ Every VP is called **once** per transaction to validate the state transition (e.
 - lower bound VP restricts the smallest amount of asset that can be received
 
 ### Hierarchical VP structure
-Validity predicates in Taiga have a hierarchical structure. For all applications involved in a transaction, their `ApplicationVP` must be checked. These VPs might require validity of some other VPs in order for a transaction to be considered valid. In that case, those other VPs must be checked too.
+Validity predicates in Taiga have a hierarchical structure. For all applications involved in a transaction, their `ApplicationVP` must be checked. 
+These VPs might require validity of some other VPs in order for a transaction to be considered valid. 
+In that case, those other VPs must be checked too.
 
-#### Example of a sub VP
-Token applications might have `userVP` for each user where they can define on which conditions they want to transact with other users. In this case `applicationVP` would require the validity of userVPs of all users involved in a transaction.
+Hierarchical structure of VPs might come in handy in the situations where the application wants to enforce different checks depending on the use case. 
+One example of it could be applications that have users and allow them to have `userVP`s. 
+The application VP will enforce checking the userVP of each user involved in the transaction.
 
-TODO: add a diagram
+![img.png](img/vp_hierarchy.png)
 
 ### Transparent vs schielded VPs
 Validity predicates can be both transparent and shielded. Transparent VPs are represented as WASM code and publicly visible, shielded VPs are represented as arithmetic circuits hidden under ZKPs.
@@ -49,11 +52,5 @@ All validity predicates share the same *public input interface*, but can have di
 
 While not formally required, most validity predicates are expected to have all spent notes (representing the current state) and output notes (representing the next proposed state) as private input to verify that the state transition is allowed.
 
-##### ----------
-
-The VP configuration includes the following "gates" in the PLONK configuration:
-* Field addition/multiplication
-* Elliptic curve addition and scalar multiplication
-* Poseidon hash
 
 

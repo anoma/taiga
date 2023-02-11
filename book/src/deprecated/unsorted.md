@@ -15,3 +15,10 @@ VPs take the current and next proposed state as input and check if the state tra
 ##-
 
 Informally, transactions take a private subset of unspent notes from the Taiga note set, publicly reveal their nullifiers, and reveal a new set of note commitments to add to the Taiga note set. The Action/Execute circuit verifies consistency of this state transition, but does not check directly its validity. Instead, the validity predicate circuits must check the validity of the state transition. The following VPs are called:
+
+##### ----------
+
+The VP configuration includes the following "gates" in the PLONK configuration:
+* Field addition/multiplication
+* Elliptic curve addition and scalar multiplication
+* Poseidon hash
