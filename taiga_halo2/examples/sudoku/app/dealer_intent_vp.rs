@@ -1,8 +1,15 @@
-use ff::PrimeField;
+use ff::Field;
+use halo2_gadgets::poseidon::{
+    primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
+    Pow5Chip as PoseidonChip,
+};
 use halo2_proofs::{
-    arithmetic::FieldExt,
-    circuit::{floor_planner, AssignedCell, Layouter, Value},
-    plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
+    circuit::{floor_planner, AssignedCell, Layouter, Region, Value},
+    plonk::{
+        keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Constraints, Error,
+        Instance, Selector,
+    },
+    poly::Rotation,
 };
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
@@ -26,65 +33,16 @@ use taiga_halo2::{
 };
 
 #[derive(Clone, Debug, Default)]
-pub struct SudokuState {
-    pub state: [[u8; 9]; 9],
-}
-
-impl SudokuState {
-    pub fn encode_to_app_data(&self) -> pallas::Base {
-        // TODO: add the rho of note to make the app_data unique.
-
-        let sudoku = self.state.concat();
-        let s1 = &sudoku[..sudoku.len() / 2]; // s1 contains 40 elements
-        let s2 = &sudoku[sudoku.len() / 2..]; // s2 contains 41 elements
-        let u: Vec<u8> = s1
-            .iter()
-            .zip(s2.iter()) // zip contains 40 elements
-            .map(|(b1, b2)| {
-                // Two entries of the sudoku can be seen as [b0,b1,b2,b3] and [c0,c1,c2,c3]
-                // We store [b0,b1,b2,b3,c0,c1,c2,c3] here.
-                assert!(b1 + 16 * b2 < 255);
-                b1 + 16 * b2
-            })
-            .chain(s2.last().copied()) // there's 41st element in s2, so we add it here
-            .collect();
-
-        // fill u with zeros.
-        // The length of u is 41 bytes, or 328 bits, since we are allocating 4 bits
-        // per the first 40 integers and let the last sudoku digit takes an entire byte.
-        // We still need to add 184 bits (i.e. 23 bytes) to reach 2*256=512 bits in total.
-        // let u2 = [u, vec![0; 23]].concat(); // this is not working with all puzzles
-        // For some reason, not _any_ byte array can be transformed into a 256-bit field element.
-        // Preliminary investigation shows that `pallas::Base::from_repr` fails on a 32 byte array
-        // if the first bit of every 8-byte (== u64) chunk is set to '1'. For now, we just add a zero
-        // byte every 7 bytes, which is not ideal but works. Further investigation is needed.
-        let mut u2 = [0u8; 64];
-        let mut i = 0;
-        let mut j = 0;
-        while j != u.len() {
-            if (i + 1) % 8 != 0 {
-                u2[i] = u[j];
-                j += 1;
-            }
-            i += 1;
-        }
-        let u_first: [u8; 32] = u2[0..32].try_into().unwrap();
-        let u_last: [u8; 32] = u2[32..].try_into().unwrap();
-
-        let x = pallas::Base::from_repr(u_first).unwrap();
-        let y = pallas::Base::from_repr(u_last).unwrap();
-        poseidon_hash(x, y)
-    }
-}
-
-#[derive(Clone, Debug, Default)]
 struct DealerIntentValidityPredicateCircuit {
     spend_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
     // The note that vp owned is set at spend_notes[0] or output_notes[0] by default. Make it mandatory later.
     // is_spend_note helps locate the target note in spend_notes and output_notes.
     is_spend_note: pallas::Base,
-    sudoku_state: SudokuState,
+    encoded_puzzle: pallas::Base,
+    sudoku_app_vk: pallas::Base,
+    // When it's an output note, we don't need a valid solution.
+    encoded_solution: pallas::Base,
 }
 
 #[derive(Clone, Debug)]
@@ -93,6 +51,7 @@ struct IntentAppValidityPredicateConfig {
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
     get_target_variable_config: GetTargetNoteVariableConfig,
+    dealer_intent_check_config: DealerIntentCheckConfig,
 }
 
 impl ValidityPredicateConfig for IntentAppValidityPredicateConfig {
@@ -108,12 +67,16 @@ impl ValidityPredicateConfig for IntentAppValidityPredicateConfig {
         let get_target_variable_config = GetTargetNoteVariableConfig::configure(
             meta, advices[0], advices[1], advices[2], advices[3],
         );
+        let dealer_intent_check_config = DealerIntentCheckConfig::configure(
+            meta, advices[0], advices[1], advices[2], advices[3], advices[4], advices[5],
+        );
 
         Self {
             note_conifg,
             advices,
             instances,
             get_target_variable_config,
+            dealer_intent_check_config,
         }
     }
 }
@@ -121,30 +84,76 @@ impl ValidityPredicateConfig for IntentAppValidityPredicateConfig {
 impl DealerIntentValidityPredicateCircuit {
     #![allow(dead_code)]
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        let mut spend_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let spend_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let is_spend_note = pallas::Base::zero();
-        let sudoku_state = SudokuState {
-            state: [
-                [7, 0, 9, 5, 3, 8, 1, 2, 4],
-                [2, 0, 3, 7, 1, 9, 6, 5, 8],
-                [8, 0, 1, 4, 6, 2, 9, 7, 3],
-                [4, 0, 6, 9, 7, 5, 3, 1, 2],
-                [5, 0, 7, 6, 2, 1, 4, 8, 9],
-                [1, 0, 2, 8, 4, 3, 7, 6, 5],
-                [6, 0, 8, 3, 5, 4, 2, 9, 7],
-                [9, 0, 4, 2, 8, 6, 5, 3, 1],
-                [3, 0, 5, 1, 9, 7, 8, 4, 6],
-            ],
-        };
-        output_notes[0].value_base.app_data = sudoku_state.encode_to_app_data();
-        // spend_notes[0].value_base.app_data = sudoku_state.encode_to_app_data();
+        let encoded_puzzle = pallas::Base::random(&mut rng);
+        let sudoku_app_vk = ValidityPredicateVerifyingKey::dummy(&mut rng).get_compressed();
+        output_notes[0].value_base.app_data = Self::compute_app_data(encoded_puzzle, sudoku_app_vk);
+        let encoded_solution = pallas::Base::random(&mut rng);
         Self {
             spend_notes,
             output_notes,
             is_spend_note,
-            sudoku_state,
+            encoded_puzzle,
+            sudoku_app_vk,
+            encoded_solution,
         }
+    }
+
+    pub fn compute_app_data(
+        encoded_puzzle: pallas::Base,
+        sudoku_app_vk: pallas::Base,
+    ) -> pallas::Base {
+        poseidon_hash(encoded_puzzle, sudoku_app_vk)
+    }
+
+    fn dealer_intent_check(
+        &self,
+        config: &IntentAppValidityPredicateConfig,
+        mut layouter: impl Layouter<pallas::Base>,
+        is_spend_note: &AssignedCell<pallas::Base, pallas::Base>,
+        encoded_puzzle: &AssignedCell<pallas::Base, pallas::Base>,
+        sudoku_app_vk_in_dealer_intent_note: &AssignedCell<pallas::Base, pallas::Base>,
+        puzzle_note: &OutputNoteVar,
+    ) -> Result<(), Error> {
+        // puzzle_note_app_data = poseidon_hash(encoded_puzzle || encoded_solution)
+        let encoded_solution = assign_free_advice(
+            layouter.namespace(|| "witness encoded_solution"),
+            config.advices[0],
+            Value::known(self.encoded_solution),
+        )?;
+        let encoded_puzzle_note_app_data = {
+            let poseidon_config = config.get_note_config().poseidon_config;
+            let poseidon_chip = PoseidonChip::construct(poseidon_config);
+            let poseidon_hasher =
+                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
+                    poseidon_chip,
+                    layouter.namespace(|| "Poseidon init"),
+                )?;
+            let poseidon_message = [encoded_puzzle.clone(), encoded_solution];
+            poseidon_hasher.hash(
+                layouter.namespace(|| "check app_data encoding"),
+                poseidon_message,
+            )?
+        };
+
+        layouter.assign_region(
+            || "dealer intent check",
+            |mut region| {
+                config.dealer_intent_check_config.assign_region(
+                    is_spend_note,
+                    &puzzle_note.value,
+                    &puzzle_note.app_vk,
+                    sudoku_app_vk_in_dealer_intent_note,
+                    &puzzle_note.app_data,
+                    &encoded_puzzle_note_app_data,
+                    0,
+                    &mut region,
+                )
+            },
+        )?;
+        Ok(())
     }
 }
 
@@ -221,50 +230,173 @@ impl ValidityPredicateCircuit for DealerIntentValidityPredicateCircuit {
             },
         )?;
 
-        // witness the sudoku puzzle
-        let sudoku_cells: Vec<AssignedCell<_, _>> = self
-            .sudoku_state
-            .state
-            .concat()
-            .iter()
-            .map(|x| {
-                assign_free_advice(
-                    layouter.namespace(|| "sudoku_cell"),
-                    config.advices[0],
-                    Value::known(pallas::Base::from_u128(*x as u128)),
-                )
-                .unwrap()
-            })
-            .collect();
-
-        // TODO: add app_data decoding constraints instead of the witness
-        let app_data_encode = assign_free_advice(
-            layouter.namespace(|| "app data encoding"),
+        // app_data = poseidon_hash(encoded_puzzle || sudoku_app_vk)
+        let encoded_puzzle = assign_free_advice(
+            layouter.namespace(|| "witness encoded_puzzle"),
             config.advices[0],
-            Value::known(self.sudoku_state.encode_to_app_data()),
+            Value::known(self.encoded_puzzle),
         )?;
+        let sudoku_app_vk = assign_free_advice(
+            layouter.namespace(|| "witness sudoku_app_vk"),
+            config.advices[0],
+            Value::known(self.sudoku_app_vk),
+        )?;
+        let app_data_encode = {
+            let poseidon_config = config.get_note_config().poseidon_config;
+            let poseidon_chip = PoseidonChip::construct(poseidon_config);
+            let poseidon_hasher =
+                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
+                    poseidon_chip,
+                    layouter.namespace(|| "Poseidon init"),
+                )?;
+            let poseidon_message = [encoded_puzzle.clone(), sudoku_app_vk.clone()];
+            poseidon_hasher.hash(
+                layouter.namespace(|| "check app_data encoding"),
+                poseidon_message,
+            )?
+        };
 
         layouter.assign_region(
-            || "check app_data decoding",
+            || "check app_data encoding",
             |mut region| region.constrain_equal(app_data_encode.cell(), app_data.cell()),
         )?;
 
-        // if it is a spend note, decode and check the puzzle solution
-        // if it is a output note, do nothing
-        check_solution()?;
-
-        Ok(())
+        // if it is an output note, do nothing
+        // if it is a spend note, 1. check the zero value of puzzle_note; 2. check the puzzle equality.
+        self.dealer_intent_check(
+            &config,
+            layouter.namespace(|| ""),
+            &is_spend_note,
+            &encoded_puzzle,
+            &sudoku_app_vk,
+            &output_note_variables[0],
+        )
     }
 }
 
 vp_circuit_impl!(DealerIntentValidityPredicateCircuit);
 
-// TODO:
-fn check_solution(// _is_spend_note:
-    // _puzzle_state:
-    // solution_note:
-) -> Result<(), Error> {
-    Ok(())
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DealerIntentCheckConfig {
+    q_dealer_intent_check: Selector,
+    is_spend_note: Column<Advice>,
+    puzzle_note_value: Column<Advice>,
+    sudoku_app_vk: Column<Advice>,
+    sudoku_app_vk_in_dealer_intent_note: Column<Advice>,
+    puzzle_note_app_data: Column<Advice>,
+    encoded_puzzle_note_app_data: Column<Advice>,
+}
+
+impl DealerIntentCheckConfig {
+    #[allow(clippy::too_many_arguments)]
+    pub fn configure(
+        meta: &mut ConstraintSystem<pallas::Base>,
+        is_spend_note: Column<Advice>,
+        puzzle_note_value: Column<Advice>,
+        sudoku_app_vk: Column<Advice>,
+        sudoku_app_vk_in_dealer_intent_note: Column<Advice>,
+        puzzle_note_app_data: Column<Advice>,
+        encoded_puzzle_note_app_data: Column<Advice>,
+    ) -> Self {
+        meta.enable_equality(is_spend_note);
+        meta.enable_equality(puzzle_note_value);
+        meta.enable_equality(sudoku_app_vk);
+        meta.enable_equality(sudoku_app_vk_in_dealer_intent_note);
+        meta.enable_equality(puzzle_note_app_data);
+        meta.enable_equality(encoded_puzzle_note_app_data);
+
+        let config = Self {
+            q_dealer_intent_check: meta.selector(),
+            is_spend_note,
+            puzzle_note_value,
+            sudoku_app_vk,
+            sudoku_app_vk_in_dealer_intent_note,
+            puzzle_note_app_data,
+            encoded_puzzle_note_app_data,
+        };
+
+        config.create_gate(meta);
+
+        config
+    }
+
+    fn create_gate(&self, meta: &mut ConstraintSystem<pallas::Base>) {
+        meta.create_gate("check dealer intent", |meta| {
+            let q_dealer_intent_check = meta.query_selector(self.q_dealer_intent_check);
+            let is_spend_note = meta.query_advice(self.is_spend_note, Rotation::cur());
+            let puzzle_note_value = meta.query_advice(self.puzzle_note_value, Rotation::cur());
+            let sudoku_app_vk = meta.query_advice(self.sudoku_app_vk, Rotation::cur());
+            let sudoku_app_vk_in_dealer_intent_note =
+                meta.query_advice(self.sudoku_app_vk_in_dealer_intent_note, Rotation::cur());
+            let puzzle_note_app_data =
+                meta.query_advice(self.puzzle_note_app_data, Rotation::cur());
+            let encoded_puzzle_note_app_data =
+                meta.query_advice(self.encoded_puzzle_note_app_data, Rotation::cur());
+
+            Constraints::with_selector(
+                q_dealer_intent_check,
+                [
+                    (
+                        "check zero value of puzzle note",
+                        is_spend_note.clone() * puzzle_note_value,
+                    ),
+                    (
+                        "check sudoku_app_vk",
+                        is_spend_note.clone()
+                            * (sudoku_app_vk - sudoku_app_vk_in_dealer_intent_note),
+                    ),
+                    (
+                        "check puzzle note app_data encoding",
+                        is_spend_note * (puzzle_note_app_data - encoded_puzzle_note_app_data),
+                    ),
+                ],
+            )
+        });
+    }
+
+    pub fn assign_region(
+        &self,
+        is_spend_note: &AssignedCell<pallas::Base, pallas::Base>,
+        puzzle_note_value: &AssignedCell<pallas::Base, pallas::Base>,
+        sudoku_app_vk: &AssignedCell<pallas::Base, pallas::Base>,
+        sudoku_app_vk_in_dealer_intent_note: &AssignedCell<pallas::Base, pallas::Base>,
+        puzzle_note_app_data: &AssignedCell<pallas::Base, pallas::Base>,
+        encoded_puzzle_note_app_data: &AssignedCell<pallas::Base, pallas::Base>,
+        offset: usize,
+        region: &mut Region<'_, pallas::Base>,
+    ) -> Result<(), Error> {
+        // Enable `q_dealer_intent_check` selector
+        self.q_dealer_intent_check.enable(region, offset)?;
+
+        is_spend_note.copy_advice(|| "is_spend_notex", region, self.is_spend_note, offset)?;
+        puzzle_note_value.copy_advice(
+            || "puzzle_note_value",
+            region,
+            self.puzzle_note_value,
+            offset,
+        )?;
+        sudoku_app_vk.copy_advice(|| "sudoku_app_vk", region, self.sudoku_app_vk, offset)?;
+        sudoku_app_vk_in_dealer_intent_note.copy_advice(
+            || "sudoku_app_vk_in_dealer_intent_note",
+            region,
+            self.sudoku_app_vk_in_dealer_intent_note,
+            offset,
+        )?;
+        puzzle_note_app_data.copy_advice(
+            || "puzzle_note_app_data",
+            region,
+            self.puzzle_note_app_data,
+            offset,
+        )?;
+        encoded_puzzle_note_app_data.copy_advice(
+            || "encoded_puzzle_note_app_data",
+            region,
+            self.encoded_puzzle_note_app_data,
+            offset,
+        )?;
+
+        Ok(())
+    }
 }
 
 #[test]
