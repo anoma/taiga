@@ -49,7 +49,7 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
     let (proof, public_input) = balance_vp.gen_proof::<PC>(pp, pk, b"Test").unwrap();
 
     // Verifier bench
-    let verifier_name = name.to_string() + "-verifier";
+    let verifier_name = name.to_string() + "-verifier-zk-garage";
     c.bench_function(&verifier_name, |b| {
         b.iter(|| {
             let verifier_data = VerifierData::new(vk.clone(), public_input.clone());

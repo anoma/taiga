@@ -19,7 +19,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
     let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
 
     // Prover bench
-    let prover_name = name.to_string() + "-prover";
+    let prover_name = name.to_string() + "-prover-halo2";
     c.bench_function(&prover_name, |b| {
         b.iter(|| {
             let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
@@ -52,7 +52,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
         transcript.finalize()
     };
 
-    let verifier_name = name.to_string() + "-verifier";
+    let verifier_name = name.to_string() + "-verifier-halo2";
     c.bench_function(&verifier_name, |b| {
         b.iter(|| {
             let strategy = SingleVerifier::new(params);
