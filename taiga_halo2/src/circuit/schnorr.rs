@@ -1,6 +1,6 @@
 use ff::PrimeField;
 use halo2_proofs::{
-    arithmetic::FieldExt,
+    arithmetic::{FieldExt, CurveExt},
     circuit::{floor_planner, AssignedCell, Layouter, Value},
     plonk::{self, Advice, Column, Instance as InstanceColumn},
 };
@@ -8,15 +8,15 @@ use pasta_curves::{pallas, Fp};
 
 use halo2_gadgets::{
     poseidon::{
-    primitives::{self as poseidon, P128Pow5T3},
-    Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
+    primitives::{self as poseidon, P128Pow5T3, ConstantLength},
+    Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig, Hash as PoseidonHash
     },
-    ecc::{chip::{EccConfig, EccChip}, FixedPoints, FixedPoint}, utilities::lookup_range_check::LookupRangeCheckConfig
+    ecc::{chip::{EccConfig, EccChip}, FixedPoints, FixedPoint, FixedPointBaseField, ScalarFixed}, utilities::lookup_range_check::LookupRangeCheckConfig
 };
 use crate::{circuit::gadgets::{
     assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
     MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
-}, constant::NoteCommitmentFixedBases};
+}, constant::{NoteCommitmentFixedBases, NullifierK, NoteCommitmentFixedBasesFull}};
 
 #[derive(Clone, Debug)]
 pub struct SchnorrConfig {
@@ -55,7 +55,7 @@ impl SchnorrConfig {
 #[derive(Clone, Debug, Default)]
 pub struct SchnorrCircuit {
     // message
-    m: pallas::Scalar,
+    m: pallas::Base,
     // public key
     vk: pallas::Point,
     // signature (r,s)
@@ -173,6 +173,64 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
     ) -> Result<(), plonk::Error> {
         // We implement the verification algorithm first
         // and assume that the signature is given
+        // Obtain the signature: (r,s)
+        // Obtain public key : P
+        // Obtain message: m
+        // TODO: Obtain signature, public key and message from witness
+        // Calculate the random point R from r
+        // Verify: s*G = R + Hash(r||P||m)*P
+        // Construct an ECC chip
+        let ecc_chip = EccChip::construct(config.ecc_config);
+        let m_cell = assign_free_advice(
+            layouter.namespace(|| "message"),
+            config.advices[0],
+            Value::known(self.m),
+        )?;
+        let r_cell = assign_free_advice(
+            layouter.namespace(|| "message"),
+            config.advices[0],
+            Value::known(self.r),
+        )?;
+        let p_cell = {
+            let (p, _, _) = self.vk.jacobian_coordinates();
+            assign_free_advice(
+                layouter.namespace(|| "message"),
+                config.advices[0],
+                Value::known(p),
+            )?
+        };
+    
+        let s_scalar = ScalarFixed::new(
+            ecc_chip.clone(),
+            layouter.namespace(|| "s"),
+            Value::known(self.s),
+        )?;
+
+        let generator = FixedPoint::from_inner(ecc_chip, NoteCommitmentFixedBasesFull);
+        let (sG, _) = generator.mul(
+            layouter.namespace(|| "s_scalar * generator"),
+            &s_scalar,
+        )?;
+
+        let poseidon_chip = PoseidonChip::construct(config.poseidon_config.clone());
+        let poseidon_message = [r_cell, p_cell, m_cell];
+        let poseidon_hasher =
+            PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<3>, 3, 2>::init(
+                poseidon_chip,
+                layouter.namespace(|| "Poseidon init"),
+            )?;
+        let h = poseidon_hasher.hash(
+            layouter.namespace(|| "Poseidon_hash(r, P, m)"),
+            poseidon_message,
+        )?;
+    
+        // let _ = add_chip.add(
+        //     layouter.namespace(|| ""),
+        //     &hash_nk_rho,
+        //     &psi,
+        // )?;
+
+
         Ok(())
     }
 }
@@ -208,7 +266,7 @@ mod tests {
 
         let mut rng = OsRng;
         let G = pallas::Point::generator();
-        let m = pallas::Scalar::from(calculate_hash("Every day you play with the light of the universe"));
+        let m = pallas::Base::from(calculate_hash("Every day you play with the light of the universe"));
         let sk = pallas::Scalar::from(rng.next_u64());
         let vk = G * sk;
 
