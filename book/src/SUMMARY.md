@@ -3,7 +3,7 @@
 - [Introduction](intro.md)
 - [Applications](app.md)
     - [Users](deprecated/users.md)
-    - [Token Application](./token.md)
+    - [Token Application](deprecated/token.md)
 - [Notes](./notes.md)
 - [Validity predicates](./validity-predicates.md)
 - [Action](./action.md)

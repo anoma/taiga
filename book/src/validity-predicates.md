@@ -1,13 +1,13 @@
 # Validity predicate (VP)
 
 In Taiga, there are two types of mechanisms enforcing the validity of a transaction: 
-* the first type is the Taiga rules that are the same for all transactions (e.g. the note must exist before being spent).
+* the first type is the Taiga rules that are the same for all transactions (e.g. the note must exist before being spent) and are checked by the [Action circuit](./action.md).
 * the second type is called **validity predicates**. The choice of VPs to be checked to validate a transaction depends on the applications involved in the transaction.
 
 A **validity predicate** is a piece of code defined by an application that authorizes transactions the application is involved in.  A valid (can be published on the blockchain) transaction satisfy the VPs of all involved applications.
 
 A single transaction that changes the state of two applications has to be:
-* checked against the Taiga rules
+* checked against the Taiga rules (the Action circuit)
 * checked against the VP of the first application
 * checked against the VP of the second application
 
@@ -28,9 +28,10 @@ The application VP will enforce checking the userVP of each user involved in the
 
 ![img.png](img/vp_hierarchy.png)
 
-### Transparent vs schielded VPs
-Validity predicates can be both transparent and shielded. Transparent VPs are represented as WASM code and publicly visible, shielded VPs are represented as arithmetic circuits hidden under ZKPs.
-Each transaction in Taiga has VP proofs attached to it, and whoever has the verifying key (VK), can verify the proofs.
+### Transparent vs shielded VPs
+Validity predicates can be both transparent and shielded. Transparent VPs are represented as WASM code and publicly visible, 
+shielded VPs are represented as arithmetic circuits hidden under ZKPs. Each transaction in Taiga has VP proofs attached to it, 
+and whoever has the verifying key (VK), can verify the proofs.
 
 ![img.png](img/vp_img.png)
 

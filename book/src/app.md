@@ -16,7 +16,6 @@ In some sense, Taiga applications are similar to Ethereum applications, but ther
 * Ethereum uses smart contracts (imperative) when Taiga uses validity predicates (declarative) to express the application logic (learn more about the difference in the [Anoma whitepaper](https://github.com/anoma/whitepaper/blob/main/whitepaper.pdf), check page 3)
 * Taiga applications are shielded by default, but can be defined separately over the transparent pool as well. The shielded and transparent parts of the application can interact with each other, but whatever happens in Taiga is always shielded
 
-
 ### Application VP
 Each application has an [`appVP`](./validity-predicates.md) that defines the conditions on which the application can be used (i.e. the application notes can be sent or received). Every time a note that belongs to the application is spent or created, `appVP` is called to authorize the transaction.
 
@@ -29,6 +28,6 @@ Notes of distinct types are independent of each other, unless explicitly designe
 
 ![img_1.png](img/app_with_multiple_note_types.png)
 
-#### Example
-- a cryptocurrency application CUR (matches the token name) and `appVP` that makes sure that the transaction is balanced
+#-- example
 
+The simplest application could be a cryptoasset application CRY with the `appVP` that makes sure that the transaction is balanced.

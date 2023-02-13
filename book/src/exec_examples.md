@@ -23,13 +23,15 @@ All total (accumulated over ptxs) per-token balances are equal to 0, and the fin
 
 **Step 4**: The final transaction is created using the spent and output notes from the partial transactions.
 
-#### Ptxs detailed description
+#### Partial transactions' details
 
 ||spent notes|created notes|Apps|VP proofs|total balance (accumulated)|
 |-|-|-|-|-|-|
 |ptx #1 (Alice)|[1]A, [2]B|[Alice intent note]|intent app, A token, B token|Alice intentVP, intent App VP, Alice A userVP, A appVP, Alice B userVP, B appVP (6)|-[1]A-[2]B + [Alice intent note]|
 |ptx #2 (Bob)|[blue dolphin NFT]|[1]A|blue dolphin NFT app, A token|Bob A userVP, A appVP, Bob NFT userVP, NFT appVP (4)|-2[B] - [blue dolphin NFT] + [Alice intent note]
 |ptx #3 (Solver)|[Alice intent note]|[blue dolphin NFT], [2]B|intent app, blue dolphin NFT app, B token|Alice NFT userVP, NFT appVP, Alice intent userVP, intent AppVP, Alice B user VP, B appVP (6)|0|
+
+We assume here that all applications support userVPs and that both Alice and Bob have a userVP in each application.
 
 ### 2. Three-party barter
 
@@ -38,16 +40,20 @@ Their intents can be matched into a three-party bartering cycle. Let's see step 
 
 **Note**: parties don't ask for a three-party bartering explicitly.
 
+**Note**: in the example below each party uses the intent app to describe simple requests that can be satisfied without the intent app. 
+It helps to show how the intent app can be used without making the diagram and the example overcomplicated.
+
 ![img.png](img/exec_3_party.png)
 
-**Step 1-2**: The users define their intents and create intent userVPs.
-It doesn't have to happen at the same time for all users, but for simplicity we describe it as one step.
-The intent userVPs of all three users have the same structure: users are willing to spend their asset (Alice - a star, Bob - a dolphin, Charlie - a tree) in exchange for some other asset.
-Once the user receives the desired asset, the intent note is spent.
-In addition to that, all three users also create their initial partial transactions spending the asset they are ready to give away (Alice ptx, Bob ptx, and Charlie ptx).
+**Step 1-2**: The users create their intent userVPs. It doesn't have to happen at the same time for all users, 
+but for simplicity we describe it as one step. The intent userVPs of all three users have the same structure: 
+users are willing to spend their asset (Alice - a star, Bob - a dolphin, Charlie - a tree) in exchange for some other asset, 
+and once the user receives the desired asset, the user's intent is satisfied.
+Users create their initial partial transactions spending the asset they want to give away (Alice ptx, Bob ptx, and Charlie ptx).
 
-**Step 3**: A solver sees Alice's ptx and Bob's ptx, matches them together, and creates a new partial transaction.
-Alice's intent userVP is satisfied, and her intent note is spent.
+**Step 3**: A solver sees Alice's ptx and Bob's ptx, matches them together, and creates a new partial transaction 
+(expecting to find a third ptx to create the cycle). Alice's intent userVP is satisfied, and her intent note can be spent.
+The solver adds the required VP proofs to the freshly created partial transactions.
 
 Total per-token balances:
 
@@ -76,16 +82,11 @@ Total per-token balances:
 **Step 5**:
 The final transaction containing the spent and output notes from partial transactions is created with all proofs attached.
 
-### 2. Three-party barter without intents
-![img.png](img/exec_3_party_no_intents.png)
-
-
-
 ### 3. One way to represent arbitrary states
 
 For an arbitrary application, notes store the state of the application. When the application needs to change its state,
 it (i.e. any party that has the authority) can spend the old state and produce a new state.
-If the state change is possible within one partial transaction, such a note has a value 0 and doesn't affect the total balance.
+If the state change is possible within one partial transaction, such a note can have value 0 and doesn't affect the total balance.
 ![img.png](img/exec_arbitrary_state_update.png)
 
 If the state change happens across partial transactions (meaning that the state gets consumed in one partial transaction, and a new state is output in another),
