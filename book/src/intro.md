@@ -1,12 +1,12 @@
 # Introduction
 
-Taiga is a **shielded** state transition protocol that allows applications built on top of it to enjoy the advantages of fully shielded multi-party state transitions 
+Taiga is a shielded state transition protocol that allows applications built on top of it to enjoy the advantages of fully shielded multi-party state transitions 
 (hiding the application type, the data associated with it, involved parties, etc) without giving up the application complexity.
 
 ![img.png](images/Intro_Taiga_Apps.png)
 
 [**Validity predicates**](./validity-predicates.md) are a key component of Taiga - applications built on top of Taiga use them to express the application rules, 
-and Taiga makes sure that the rules are being followed. The [Action circuit](./action.md) is responsible for checking that the Taiga rules are preserved.
+and Taiga makes sure that the rules are being followed with the help of the [Action circuit](./action.md).
 
 The state transition is considered to be valid if validity predicates of all involved parties are satisfied, and the Action circuit check passed successfully.
 

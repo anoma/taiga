@@ -1,15 +1,14 @@
-# Taiga
+# Taiga Specification
 
-- [Introduction](intro.md)
-- [Applications](app.md)
+- [Introduction](./intro.md)
+- [Applications](./app.md)
 - [Notes](./notes.md)
 - [Validity predicates](./validity-predicates.md)
 - [The Action circuit](./action.md)
 - [Execution model](./exec.md)
   - [Intent Application](./intent.md)
   - [Examples](./exec_examples.md)
-- [Performance](performance.md)
+- [Performance](./performance.md)
 - [Technical specification draft](./spec.md)
-
   
 

@@ -1,11 +1,12 @@
 # The Action circuit
 
-Every time a user wants to create or spend a note, 
-the Action circuit check is required to make sure that the user doesn't violate Taiga rules. 
-The conditions checked in the Action circuit are the same for all transactions, 
-unlike validity predicate checks that depend on the applications involved in the transaction.
+The Action circuit is a mechanism that ensures that the proposed state transitions follow the Taiga rules. 
+Unlike validity predicates, the Action circuit checks don't depend on the applications involved and are the same for all transactions.
 
-### Spent note checks
+As an application state is contained in notes, and a state transition is represented as spending the old notes and creating new ones,
+the Action circuit checks the correctness of the old state by checking properties of the old notes and the correctness of the new state by checking the properties of the new notes.
+
+### Check the old state (the spent notes)
 
 For spent notes, the Action circuit checks that:
 * the note existed before (can you spend a note that doesn't exist?),
@@ -13,7 +14,7 @@ For spent notes, the Action circuit checks that:
 * the user has a right to spend it (do you own the note?),
 * and that the application the note belongs to approves the action (sure there is some application approves the check, but is it the one the note belongs to?).
 
-### Created note checks
+### Check the new state (the created notes)
 
 For the notes being created, the Action circuit checks that:
 * the correct application approves it (same check as for spent notes)
