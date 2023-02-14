@@ -6,13 +6,13 @@ This repository contains the implementation of Taiga in Rust.
 ⚠️ It is a WIP project and cannot be used in production yet ⚠️
 
 
-### Taiga specification
+### Taiga overview & specification
 
-* To see the Taiga specification, run
+* To see the Taiga overview, run
 ```
 cd book
 mdbook serve --open
 ```
 
-* You can find the *cryptographic* specification of Taiga [here](./book/src/spec.md).
+* You can find the specification of Taiga [here](./book/src/spec.md).
 

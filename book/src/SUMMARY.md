@@ -1,4 +1,4 @@
-# Taiga Specification
+# Taiga Overview
 
 - [Introduction](./intro.md)
 - [Applications](./app.md)
