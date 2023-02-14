@@ -18,7 +18,7 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
     let instances = vp_circuit.get_instances();
 
     // Prover bench
-    let prover_name = name.to_string() + "-prover-halo2";
+    let prover_name = name.to_string() + "-prover";
     c.bench_function(&prover_name, |b| {
         b.iter(|| {
             Proof::create(&pk, &params, vp_circuit.clone(), &[&instances], &mut rng);
@@ -29,7 +29,7 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
     // Create a proof for verifier
     let proof = Proof::create(&pk, &params, vp_circuit.clone(), &[&instances], &mut rng).unwrap();
 
-    let verifier_name = name.to_string() + "-verifier-halo2";
+    let verifier_name = name.to_string() + "-verifier";
     c.bench_function(&verifier_name, |b| {
         b.iter(|| {
             proof.verify(pk.get_vk(), &params, &[&instances]).is_ok();
@@ -37,7 +37,7 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
     });
 }
 fn criterion_benchmark(c: &mut Criterion) {
-    bench_vp_proof("vp-proof", c);
+    bench_vp_proof("halo2-vp-proof", c);
 }
 
 criterion_group!(benches, criterion_benchmark);

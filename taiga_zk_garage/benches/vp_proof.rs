@@ -49,7 +49,7 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
     let (proof, public_input) = balance_vp.gen_proof::<PC>(pp, pk, b"Test").unwrap();
 
     // Verifier bench
-    let verifier_name = name.to_string() + "-verifier-zk-garage";
+    let verifier_name = name.to_string() + "-verifier";
     c.bench_function(&verifier_name, |b| {
         b.iter(|| {
             let verifier_data = VerifierData::new(vk.clone(), public_input.clone());
@@ -71,7 +71,7 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    bench_vp_proof("vp-proof", c);
+    bench_vp_proof("zk-garage-vp-proof", c);
 }
 
 criterion_group!(benches, criterion_benchmark);

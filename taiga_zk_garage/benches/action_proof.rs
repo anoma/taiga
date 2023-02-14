@@ -26,7 +26,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
     let vk = CP::get_action_vk();
 
     // Prover bench
-    let prover_name = name.to_string() + "-prover-zk-garage";
+    let prover_name = name.to_string() + "-prover";
     c.bench_function(&prover_name, |b| {
         b.iter(|| {
             action_circuit
@@ -39,7 +39,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
         .unwrap();
 
     // Verifier bench
-    let verifier_name = name.to_string() + "-verifier-zk-garage";
+    let verifier_name = name.to_string() + "-verifier";
     c.bench_function(&verifier_name, |b| {
         b.iter(|| {
             let mut expect_public_input = PublicInputs::new();
@@ -67,7 +67,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
     verify_proof::<Fr, P, PC>(pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
 }
 fn criterion_benchmark(c: &mut Criterion) {
-    bench_action_proof("action-proof", c);
+    bench_action_proof("zk-garage-action-proof", c);
 }
 
 criterion_group!(benches, criterion_benchmark);
