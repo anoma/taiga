@@ -22,7 +22,6 @@ use taiga_halo2::{
     vp_vk::ValidityPredicateVerifyingKey,
 };
 
-// IntentAppValidityPredicateCircuit with a trivial constraint a + b = c.
 #[derive(Clone, Debug, Default)]
 struct IntentAppValidityPredicateCircuit {
     spend_notes: [Note; NUM_NOTE],

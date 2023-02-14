@@ -1,7 +1,10 @@
 use ff::Field;
-use halo2_gadgets::poseidon::{
-    primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
-    Pow5Chip as PoseidonChip,
+use halo2_gadgets::{
+    poseidon::{
+        primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
+        Pow5Chip as PoseidonChip,
+    },
+    utilities::bool_check,
 };
 use halo2_proofs::{
     circuit::{floor_planner, AssignedCell, Layouter, Region, Value},
@@ -168,10 +171,7 @@ impl ValidityPredicateInfo for DealerIntentValidityPredicateCircuit {
 
     fn get_instances(&self) -> Vec<pallas::Base> {
         let mut instances = self.get_note_instances();
-
         instances.push(self.is_spend_note);
-
-        // TODO: add dealer intent vp commitment
 
         instances
     }
@@ -265,7 +265,7 @@ impl ValidityPredicateCircuit for DealerIntentValidityPredicateCircuit {
         // if it is a spend note, 1. check the zero value of puzzle_note; 2. check the puzzle equality.
         self.dealer_intent_check(
             &config,
-            layouter.namespace(|| ""),
+            layouter.namespace(|| "dealer intent check"),
             &is_spend_note,
             &encoded_puzzle,
             &sudoku_app_vk,
@@ -333,9 +333,12 @@ impl DealerIntentCheckConfig {
             let encoded_puzzle_note_app_data =
                 meta.query_advice(self.encoded_puzzle_note_app_data, Rotation::cur());
 
+            let bool_check_is_spend = bool_check(is_spend_note.clone());
+
             Constraints::with_selector(
                 q_dealer_intent_check,
                 [
+                    ("bool_check_is_spend", bool_check_is_spend),
                     (
                         "check zero value of puzzle note",
                         is_spend_note.clone() * puzzle_note_value,
@@ -354,6 +357,7 @@ impl DealerIntentCheckConfig {
         });
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn assign_region(
         &self,
         is_spend_note: &AssignedCell<pallas::Base, pallas::Base>,
