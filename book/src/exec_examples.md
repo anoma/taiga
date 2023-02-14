@@ -1,4 +1,4 @@
-## Exectuion model examples
+# Exectuion model examples
 
 Let's see how different use cases can be handled with the Taiga execution model.
 
@@ -11,7 +11,7 @@ Here Alice has two notes [1]A and [2]B and wants to get a blue dolphin NFT in ex
 Alice uses intent application to express her preferences. Bob has a blue dolphin NFT and wants [1] of token A in exchange for it. 
 As Bob knows what he wants, no intent userVP needed.
 
-![img_1.png](img/exec_complex_intent_plus_no_intent.png)
+![img_1.png](images/exec_complex_intent_plus_no_intent.png)
 
 **Step 1-2**: Alice creates her intent userVP, both Alice and Bob create their initial partial transactions. 
 Alice spends both of her notes she could give away, expecting to receive one of them back (the other one will go to the counterparty).
@@ -43,7 +43,7 @@ Their intents can be matched into a three-party bartering cycle. Let's see step 
 **Note**: in the example below each party uses the intent app to describe simple requests that can be satisfied without the intent app. 
 It helps to show how the intent app can be used without making the diagram and the example overcomplicated.
 
-![img.png](img/exec_3_party.png)
+![img.png](images/exec_3_party.png)
 
 **Step 1-2**: The users create their intent userVPs. It doesn't have to happen at the same time for all users, 
 but for simplicity we describe it as one step. The intent userVPs of all three users have the same structure: 
@@ -87,14 +87,14 @@ The final transaction containing the spent and output notes from partial transac
 For an arbitrary application, notes store the state of the application. When the application needs to change its state,
 it (i.e. any party that has the authority) can spend the old state and produce a new state.
 If the state change is possible within one partial transaction, such a note can have value 0 and doesn't affect the total balance.
-![img.png](img/exec_arbitrary_state_update.png)
+![img.png](images/exec_arbitrary_state_update.png)
 
 If the state change happens across partial transactions (meaning that the state gets consumed in one partial transaction, and a new state is output in another),
 the process is a bit different.
 
 #### State transition across partial transactions
 
-![img_1.png](img/exec_update.png)
+![img_1.png](images/exec_update.png)
 
 For simplicity, let's assume that the old state note has a 0 value.
 A zero-value note doesn't affect the total balance which is necessary for across-ptx communication.

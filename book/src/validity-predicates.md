@@ -13,9 +13,9 @@ A single transaction that changes the state of two applications has to be:
 
 Every VP is called **once** per transaction to validate the state transition (e.g. if the state of the same app changes twice within one transaction, the `appVP` is called only once and is checking the total state transition).
 
-#### Examples
+Some simple VP examples:
 - white list VP allows only specific users to change the application state
-- lower bound VP restricts the smallest amount of asset that can be received
+- lower bound VP restricts the smallest amount of asset that can be received by a user
 
 ### Hierarchical VP structure
 Validity predicates in Taiga have a hierarchical structure. For all applications involved in a transaction, their `ApplicationVP` must be checked. 
@@ -23,21 +23,24 @@ These VPs might require validity of some other VPs in order for a transaction to
 In that case, those other VPs must be checked too.
 
 Hierarchical structure of VPs might come in handy in the situations where the application wants to enforce different checks depending on the use case. 
-One example of it could be applications that have users and allow them to have `userVP`s. 
-The application VP will enforce checking the userVP of each user involved in the transaction.
+One example of it could be applications that have users and allow them to have a `userVP`. 
+The application VP will enforce checking the `userVP` of each user involved in the transaction.
 
-![img.png](img/vp_hierarchy.png)
+![img.png](images/vp_hierarchy.png)
 
 ### Transparent vs shielded VPs
-Validity predicates can be both transparent and shielded. Transparent VPs are represented as WASM code and publicly visible, 
+Validity predicates in principle can be both transparent and shielded. Transparent VPs are represented as WASM code and publicly visible, 
 shielded VPs are represented as arithmetic circuits hidden under ZKPs. Each transaction in Taiga has VP proofs attached to it, 
 and whoever has the verifying key (VK), can verify the proofs.
 
-![img.png](img/vp_img.png)
+![img.png](images/vp_img.png)
 
-Taiga uses the Halo2 proving system and validity predicates are represented as [PLONKish circuits](https://zcash.github.io/halo2/concepts/arithmetization.html). For privacy reasons, all Taiga VPs share the same PLONK configuration (the set of building blocks available for the circuits), and distinct VPs are created by specifying the *selectors* (which blocks to use).
+Taiga uses the Halo2 proving system and validity predicates are represented as [PLONKish circuits](https://zcash.github.io/halo2/concepts/arithmetization.html). 
+For privacy reasons, all Taiga VPs share the same configuration (the set of building blocks available for the circuits), 
+and distinct VPs are created by specifying the *selectors* (that select which blocks to use).
 
-TODO: add selector quick explanation 
+Zero-knowledge proofs hide the details of the transaction, but hiding the validity predicates themselves to provide functional privacy, it isn't enough.
+The halo2 proving system is designed to handle this issue naturally, accumulating the proofs together.
 
 ### VP interface
 

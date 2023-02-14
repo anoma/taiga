@@ -1,4 +1,4 @@
-# Note
+# Notes
 
 A **note** is an immutable object that represents a unit of value. Each note belongs to a certain application (which defines the note's type), and can store some data.
 

@@ -8,7 +8,7 @@ As Taiga works in the UTXO model, application states are stored in notes, and ch
 Applications in Taiga are shielded, which means that the `appVP` of each application is hidden, the notes containing application states are encrypted, 
 and the produced transactions don't reveal any information about the applications they change the state of. 
 
-![img.png](img/app_intro.png)
+![img.png](images/app_intro.png)
 
 #### Is it like Ethereum?
 
@@ -26,7 +26,7 @@ The application a note belongs to is indicated by the note's type. The note type
 The note type might be further specified so that an application can have notes of multiple types all of which belong to the same application. 
 Notes of distinct types are independent of each other, unless explicitly designed.
 
-![img_1.png](img/app_with_multiple_note_types.png)
+![img_1.png](images/app_with_multiple_note_types.png)
 
 #-- example
 

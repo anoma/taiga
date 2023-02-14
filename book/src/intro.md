@@ -3,7 +3,7 @@
 Taiga is a **shielded** state transition protocol that allows applications built on top of it to enjoy the advantages of fully shielded multi-party state transitions 
 (hiding the application type, the data associated with it, involved parties, etc) without giving up the application complexity.
 
-![img.png](img/Intro_Taiga_Apps.png)
+![img.png](images/Intro_Taiga_Apps.png)
 
 [**Validity predicates**](./validity-predicates.md) are a key component of Taiga - applications built on top of Taiga use them to express the application rules, 
 and Taiga makes sure that the rules are being followed. The [Action circuit](./action.md) is responsible for checking that the Taiga rules are preserved.
@@ -21,7 +21,7 @@ Transactions of different applications are indistinguishable from one another an
 Taiga is based on the UTXO model - the application states are stored in immutable objects called **notes**. 
 To update the state, an application (or anyone with sufficient rights) would spend the notes containing the old state and create notes containing a new state.
 
-![img_2.png](img/Intro_UTXO.png)
+![img_2.png](images/Intro_UTXO.png)
 
 #### Some of the nice Taiga features
 

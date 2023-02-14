@@ -16,7 +16,7 @@ Here is the high level description of the process, starting from expressing the 
 3. **Solve**: Solvers find matching partial transactions and add new partial transactions until the interests of all parties are fully satisfied
 4. **Finalize**: When all parties are satisfied, a transaction is created and published on the blockchain
 
-![img.png](img/exec_high_new.png)
+![img.png](images/exec_high_new.png)
 
 ## Step 1: Specify interests
 
@@ -34,7 +34,7 @@ We call a **partial transaction** a state transition where the first requirement
 Such a state transition isn't a valid transaction and cannot be published on the blockchain, 
 but can be combined with other partial transactions in order to build a valid transaction. 
 
-![img.png](img/exec_partial_tx.png)
+![img.png](images/exec_partial_tx.png)
 
 Partial transactions are immutable objects, and once they are created, they cannot be changed. 
 In principle, any party can create a partial transaction, 
@@ -100,6 +100,13 @@ However, if they want to receive fees, they need to have an address on the chain
 ## Step 4: Finalize
 
 When all involved parties are satisfied the transaction can be published on the blockchain. 
+A created transaction contains information about the proposed state transition to be stored on the blockchain:
+- spent notes' nullifiers
+- output notes' commitments
+- VP proofs required by each involved application
+- Action circuit proofs
+- and some additional data
+  
 The local CMTree and all of the proofs created are published on the blockchain as well.
 
 # How to express the preferences

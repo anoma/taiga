@@ -36,6 +36,6 @@ Intent app notes are **dummy** notes - meaning that unlike "normal" notes, the m
    This note will only be spent if the user's intent userVP is satisfied.
 2. Once all the parties involved in a state transition spent their intent app notes (meaning that the interests of all of them are satisfied), the transaction is balanced and can be finalized.
   
-![img.png](img/exec_intent_notes.png) 
+![img.png](images/exec_intent_notes.png) 
 
 **Note**: The solvers need to know the content of the intent userVPs to know how to satisfy them.
