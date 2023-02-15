@@ -7,16 +7,16 @@ Let's see how different use cases can be handled with the Taiga execution model.
 ### 1. Two-party exchange with an intent userVP
 
 Let's consider the situation where one of the parties uses the intent application, and the other party doesn't.
-Here Alice has two notes [1]A and [2]B and wants to get a blue dolphin NFT in exchange for one of them and get the other one back. 
-Alice uses intent application to express her preferences. Bob has a blue dolphin NFT and wants [1] of token A in exchange for it. 
+Here Alice has two notes [1]A and [2]B and wants to get a blue dolphin NFT in exchange for one of them and get the other one back.
+Alice uses intent application to express her preferences. Bob has a blue dolphin NFT and wants [1]A in exchange for it.
 As Bob knows what he wants, no intent userVP needed.
 
-![img_1.png](images/exec_complex_intent_plus_no_intent.png)
+![img.png](images/exec_examples_intent_and_no_intent.png)
 
-**Step 1-2**: Alice creates her intent userVP, both Alice and Bob create their initial partial transactions. 
-Alice spends both of her notes she could give away, expecting to receive one of them back (the other one will go to the counterparty).
+**Step 1-2**: Alice creates her intent userVP, both Alice and Bob create their initial partial transactions.
+Alice spends both of her notes she could give away, expecting to receive one of them back (the other one will go to Bob).
 
-**Step 3**: A solver sees Alice's and Bob's partial transactions and matches them together. 
+**Step 3**: A solver sees Alice's and Bob's partial transactions and matches them together.
 Alice receives the blue dolphin NFT and one of her notes ([2]B) back,
 her intent userVP is satisfied and Alice's intent note is spent. Bob has already sent himself the note he wanted, so the solver doesn't create notes for Bob.
 All total (accumulated over ptxs) per-token balances are equal to 0, and the final transaction can be created.
@@ -35,23 +35,23 @@ We assume here that all applications support userVPs and that both Alice and Bob
 
 ### 2. Three-party barter
 
-Three parties, Alice, Bob, and Charlie, are looking for some assets in exchange for something else.
+Alice, Bob, and Charlie, are looking for some NFTs in exchange for other NFTs.
 Their intents can be matched into a three-party bartering cycle. Let's see step by step how this happens.
 
 **Note**: parties don't ask for a three-party bartering explicitly.
 
-**Note**: in the example below each party uses the intent app to describe simple requests that can be satisfied without the intent app. 
-It helps to show how the intent app can be used without making the diagram and the example overcomplicated.
+**Note**: in the example below each party uses the intent app to describe simple requests that can be satisfied without the intent app.
+Even though it isn't necessary to use the intent application for simple requests, it helps to show how the intent app can be used without making the diagram and the example overcomplicated.
 
 ![img.png](images/exec_3_party.png)
 
-**Step 1-2**: The users create their intent userVPs. It doesn't have to happen at the same time for all users, 
-but for simplicity we describe it as one step. The intent userVPs of all three users have the same structure: 
-users are willing to spend their asset (Alice - a star, Bob - a dolphin, Charlie - a tree) in exchange for some other asset, 
+**Step 1-2**: The users create their intent userVPs. It doesn't have to happen at the same time for all users,
+but for simplicity we describe it as one step. The intent userVPs of all three users have the same structure:
+users are willing to spend their asset (Alice - a star, Bob - a dolphin, Charlie - a tree) in exchange for some other asset,
 and once the user receives the desired asset, the user's intent is satisfied.
 Users create their initial partial transactions spending the asset they want to give away (Alice ptx, Bob ptx, and Charlie ptx).
 
-**Step 3**: A solver sees Alice's ptx and Bob's ptx, matches them together, and creates a new partial transaction 
+**Step 3**: A solver sees Alice's ptx and Bob's ptx, matches them together, and creates a new partial transaction
 (expecting to find a third ptx to create the cycle). Alice's intent userVP is satisfied, and her intent note can be spent.
 The solver adds the required VP proofs to the freshly created partial transactions.
 
@@ -106,4 +106,4 @@ total balance becomes zero, and the transaction can be finalized. If the state i
 another [1] value note with the new (but not final) state is produced, the total balance is non-zero and the transaction cannot be finalized.
 In that case, the step 2 is repeated until the final state is computed.
 
-**Note**: different states imply different token types, and the old state note cannot balance a new state note.
+**Note**: different states imply different note types, and the old state note cannot balance a new state note.

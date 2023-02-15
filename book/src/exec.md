@@ -1,13 +1,6 @@
 # Taiga execution model
-
-balance check, vp check
-partial transactions
-solvers
-
-+ intents extend the execution model further, introducing programmability
-
 ## On a high level
-Taiga's execution model relies on the ideas of partial transactions and solvers. 
+Taiga's execution model relies on the ideas of intents and solvers. 
 Users express their interests and provide the resources to the solvers, and Taiga makes sure that the intents are satisfied atomically.
 
 Here is the high level description of the process, starting from expressing the user's preferences and ending up publishing a blockchain transaction representing the desired state transition:
@@ -30,7 +23,7 @@ Two of the main requirements for an Anoma transaction to be valid are:
 2. The transaction must be **balanced** , i.e the value spent in the transaction minus the value output equals to some predefined value `v`, the **balancing value**. 
    The balancing value is transparent (visible to external observers) and can be involved in interactions with the transparent system.
 
-We call a **partial transaction** a state transition where the first requirement is satisfied (all VPs evaluate to True), but the second one isn't (the state transition is unbalanced). 
+We call a **partial transaction** a state transition for which all VPs evaluate to True, but the state transition is unbalanced. 
 Such a state transition isn't a valid transaction and cannot be published on the blockchain, 
 but can be combined with other partial transactions in order to build a valid transaction. 
 
@@ -82,7 +75,7 @@ Solvers are responsible for creation of all proofs (`Action`, `VP`, etc) require
 
 When solvers receive partial solutions from the gossip network, they must check all of the proofs attached to them.
 
-#### Local `cm` trees
+#### Local commitment trees
 
 To store note commitments of the created notes, a local commitment tree `CMtree` is created. After the transaction is finalized, the tree will be published on the blockchain along with the transaction.
 
@@ -111,9 +104,10 @@ The local CMTree and all of the proofs created are published on the blockchain a
 
 # How to express the preferences
 
-A user can express their preferences in two ways. When a user knows what they want, they can directly create the notes that they want for themselves, 
+A user can express their preferences in two ways. 
+
+When a user knows what they want, they can directly create the notes that they want for themselves, 
 and the counterparty will have to spend the notes that the user has created, balancing the transaction. 
 Such approach works well when a party knows exactly what they want, 
 but if a user can be satisfied with multiple possible state transitions, such approach wouldn't work well.
-In that case, they can use the help of the [intent application](./intent.md). To learn more about the differences between two ways, check [here](./https://hackmd.io/HQM3s-i_TH-VYCQgdk8SXw?both).
-
+In that case, they can use the help of the [intent application](./intent.md). 

@@ -1,25 +1,32 @@
 # Notes
 
-A **note** is an immutable object that represents a unit of value. Each note belongs to a certain application (which defines the note's type), and can store some data.
+A **note** is an immutable object that represents a part of the application state. Each note belongs to a certain application (that defines the note's type), and can store some data.
 
-#### Sending notes
+As notes are immutable, notes cannot be modified, only spent or created. "Modifying" a note would be done by spending the current note and creating the same, but modified, note.
 
-As the notes are immutable, sending a note (transfering the ownership) means **destroying** the existing note (spent note) and **creating** a new note (output note) with a different owner.
 
-`Note(owner: A, application: T, value: V) -> Note(owner: B, application: T, value: V)`
 
-To send a note, the owner needs to prove the ownership which is done by revealing note's nullifier `nf`.  The nullifier is only known to the owner of the note and revealing it destroys the note. All revealed nullifiers are stored in a public nullifier tree `NFtree` to make sure none of the notes are spent twice.
+##### Note privacy
+The notes are distributed in an encrypted form, and only the owner knows the decryption key. 
+To prove properties of the notes (e.g. ownership) without revealing the notes, we use ZK proofs.
 
-##### Proving ownership in ZK
-All of the notes are kept shielded and created notes are sent to users in an encrypted form. To keep the notes shielded, ZK proofs are used. Using ZK proof, one can prove the ownership without revealing the note itself (see [Action circuit](action.md)).
+#### The note commitment tree & the nullifier set
 
-#### The commitment tree
+Each created note is added to a public Merkle tree. To keep the notes private, instead of the notes themselves, 
+the tree contains note commitments `cm` that are binded to the actual notes. 
+This tree is called a note commitment tree `CMTree`. 
 
-Each created note exists in a public merkle tree `CMtree` of notes. To keep the notes shielded, the tree contains note commitments `cm` instead of the notes themselves. This tree is called a note commitment tree.
+Notes are never deleted from the note commitment tree, 
+and to signal that the note has been spent and isn't valid anymore, its nullifier `nf` is added to the public nullifier set.
+
+||`cm` isn't published|`cm` is published|
+|-|-|-|
+|`nf` isn't published|note doesn't exist|note created|
+|`nf` is published|impossible|note spent|
 
 ### Note structure fields
 
-To understand the notes better, let's look at some fields in the note strucutre:
+Let's look at some fields in the note structure:
 
 ```rust
 pub struct Note {
@@ -32,21 +39,29 @@ pub is_merkle_checked: bool,
 }
 ```
 #### The application data
-Note's `value_base` encodes the type of the note. The value base is derived from the application-specific data such as application VP, and some note-type-related details (e.g. for NFTs it would be the NFT description). As value base is the same for all notes of the same type, it should only include fairly long-term data, and the ephemeral data goes into `app_data_dynamic`. That field can contain input parameters for VP circuits, sub-VPs, and other data provided by the app.
+Notes contain quite a lot of data provided by the application the notes belong to. 
+Part of that data is more long-term (e.g. the application VP) and used to derive the note's `value_base`, while
+the other part is more contextual (e.g. the input parameters for the application VP) and is stored in `app_data_dynamic`. 
+In general, all data that is not used to derive the value base is stored in the `app_data_dynamic`.
 
-#### Note values & dummy notes
-For traditional applications like cryptocurrencies value field carries the traditional meaning e.g. USDC note of value 5 is equivalent to 5 dollars, but for more abstract applications the value field might change its meaning or loose it whatsoever. 
-However, no matter that meaning the application gives to the value, value field is still used to check the transaction balance (learn more in the exec model desc)
+#### Note values
+For more traditional applications like cryptocurrencies the `value` field carries the natural meaning 
+e.g. a USDC note of value 5 is equivalent to 5 dollars, but for more abstract applications the value field might change its meaning or even loose it. 
+However, no matter what meaning the application gives to the value, Taiga isn't aware of that and uses the `value` field of notes to check the transaction balance.
 
-Dummy notes are a sort of placeholders that don't a
-ctually contain meaningful for the ledger data but look like real notes.
-In some systems such as Zcash, dummy notes are identified by their values - zero value note is considered dummy. However, this isn't true for Taiga. As Taiga generalizes the idea of a note, zero-value notes can still be important, so in Taiga we mark dummy notes by not checking the merkle path for them. `is_merkle_checked` flag marks if the note is dummy or not.
+#### Dummy notes
+Some notes in Taiga can be dummy, meaning that unlike "normal" notes, the merkle path isn't checked for them (indicated by the `is_merkle_checked` flag), 
+but they can have arbitrary value and are stored in the commitment tree, just like "normal".
 
-#### Who spends the notes?
+Being a dummy note and having zero value are two independent concepts in Taiga, unlike some other systems. 
+Zero value notes aren't necessarily dummy, dummy notes can have non-zero value. 
 
-Each note contains a field `nk_com` encoding the nullifier key (nk) of the note's owner. Notes don't have explicit owners, but are rather linked to the owner via the nullifier key. Whoever knows the nullifier key, can compute the note's nullifier and spend the note. The note doesn't contain the nullifier key itself, but only a commitment to it, which hides the key value (so it isn't enough to look at the note's content to be able to spend it).
+#### Who owns the notes?
 
-
+Each note contains a field `nk_com` encoding the nullifier key `nk` of the note's owner. 
+Whoever knows the nullifier key, can compute the note's nullifier and spend the note. 
+The field `nk_com` doesn't actually contain the nullifier key itself, but a commitment to it, 
+which hides the key value (so it isn't enough to look at the decrypted note to be able to spend it).
 
 
 

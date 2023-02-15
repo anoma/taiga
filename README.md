@@ -8,7 +8,7 @@ This repository contains the implementation of Taiga in Rust.
 
 ### Taiga overview & specification
 
-* To see the Taiga overview, run
+* To access the Taiga overview, run
 ```
 cd book
 mdbook serve --open
