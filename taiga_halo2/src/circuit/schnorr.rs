@@ -187,14 +187,14 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
             Value::known(self.m),
         )?;
         let r_cell = assign_free_advice(
-            layouter.namespace(|| "message"),
+            layouter.namespace(|| "r"),
             config.advices[0],
             Value::known(self.r),
         )?;
         let p_cell = {
             let (p, _, _) = self.vk.jacobian_coordinates();
             assign_free_advice(
-                layouter.namespace(|| "message"),
+                layouter.namespace(|| "p"),
                 config.advices[0],
                 Value::known(p),
             )?
