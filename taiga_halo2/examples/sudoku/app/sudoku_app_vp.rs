@@ -148,13 +148,14 @@ impl SudokuAppValidityPredicateCircuit {
     #![allow(dead_code)]
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
         let spend_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let is_spend_note = pallas::Base::zero();
-        let encoded_init_state = pallas::Base::zero();
+        let encoded_init_state = SudokuState::default().encode();
         let previous_state = SudokuState::default();
         let current_state = SudokuState::default();
-        // output_notes[0].value_base.app_data = sudoku_state.encode_to_app_data();
-        // spend_notes[0].value_base.app_data = sudoku_state.encode_to_app_data();
+        output_notes[0].value_base.app_data =
+            poseidon_hash(encoded_init_state, current_state.encode());
+        output_notes[0].value = 1u64;
         Self {
             spend_notes,
             output_notes,
@@ -850,15 +851,15 @@ impl ValueCheckConfig {
     }
 }
 
-// #[test]
-// fn test_halo2_sudoku_app_vp_circuit() {
-//     use halo2_proofs::dev::MockProver;
-//     use rand::rngs::OsRng;
+#[test]
+fn test_halo2_sudoku_app_vp_circuit() {
+    use halo2_proofs::dev::MockProver;
+    use rand::rngs::OsRng;
 
-//     let mut rng = OsRng;
-//     let circuit = SudokuAppValidityPredicateCircuit::dummy(&mut rng);
-//     let instances = circuit.get_instances();
+    let mut rng = OsRng;
+    let circuit = SudokuAppValidityPredicateCircuit::dummy(&mut rng);
+    let instances = circuit.get_instances();
 
-//     let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances]).unwrap();
-//     assert_eq!(prover.verify(), Ok(()));
-// }
+    let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances]).unwrap();
+    assert_eq!(prover.verify(), Ok(()));
+}
