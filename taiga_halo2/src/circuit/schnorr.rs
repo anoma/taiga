@@ -1,6 +1,8 @@
+use std::ops::Mul;
+
 use ff::PrimeField;
 use halo2_proofs::{
-    arithmetic::{FieldExt, CurveExt},
+    arithmetic::{FieldExt, CurveExt, SqrtRatio},
     circuit::{floor_planner, AssignedCell, Layouter, Value},
     plonk::{self, Advice, Column, Instance as InstanceColumn},
 };
@@ -212,17 +214,27 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
             &s_scalar,
         )?;
 
-        let poseidon_chip = PoseidonChip::construct(config.poseidon_config.clone());
-        let poseidon_message = [r_cell, p_cell, m_cell];
-        let poseidon_hasher =
-            PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<3>, 3, 2>::init(
-                poseidon_chip,
-                layouter.namespace(|| "Poseidon init"),
+        let h_scalar = {
+            let poseidon_chip = PoseidonChip::construct(config.poseidon_config.clone());
+            let poseidon_message = [r_cell, p_cell, m_cell];
+            let poseidon_hasher =
+                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<3>, 3, 2>::init(
+                    poseidon_chip,
+                    layouter.namespace(|| "Poseidon init"),
+                )?;
+            let h = poseidon_hasher.hash(
+                layouter.namespace(|| "Poseidon_hash(r, P, m)"),
+                poseidon_message,
             )?;
-        let h = poseidon_hasher.hash(
-            layouter.namespace(|| "Poseidon_hash(r, P, m)"),
-            poseidon_message,
-        )?;
+            let h_value = h.value().map(|fp| pallas::Scalar::from(fp.get_lower_32() as u64));
+            ScalarFixed::new(
+                ecc_chip.clone(),
+                layouter.namespace(|| "h"),
+                h_value,
+            )?
+        };
+        // TODO: Convert vk to FixedPoint
+        // let hP = self.vk.mul(rhs)
     
         // let _ = add_chip.add(
         //     layouter.namespace(|| ""),
