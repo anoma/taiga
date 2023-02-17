@@ -8,13 +8,13 @@ If the application VP doesn't consider a state transition valid, the state will 
 An application VP might require validity of other VPs, enforcing the VP hierarchy with the application VP being the main VP checked.
 
 #### Application address
-Each application has an address that identifies the application. The application address is derived from its application VP (or VPs, if there is more than one).
+Each application has an address that identifies the application. The application address is derived from its application VP.
 
 ### Application state
 As Taiga works in the UTXO model, application states are stored in notes, and changing the application state is done by spending the old application state notes and creating new application state notes.
 
 The application a note belongs to is indicated by the note's type which is derived using the application address, binding the note with the application.
-One application can have notes of multiple types, all of which are derived using the application address and some additional information that helps to distinguish the application types.
+One application can have notes of multiple types, all of which are derived using the application address and some additional information that helps to distinguish the note types.
 Notes of distinct types are independent of each other, unless explicitly designed.
 
 ![img.png](images/app_note_with_multiple_types.png)

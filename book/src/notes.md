@@ -1,8 +1,7 @@
 # Notes
 
 A **note** is an immutable object that represents a part of the application state. Each note belongs to a certain application (that defines the note's type), and can store some data.
-
-As notes are immutable, notes cannot be modified, only spent or created. "Modifying" a note would be done by spending the current note and creating the same, but modified, note.
+As notes are immutable, notes cannot be modified, only spent or created. "Modifying" a note would be done by spending the current note and creating a new note of the same type and modified fields.
 
 
 

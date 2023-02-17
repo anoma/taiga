@@ -35,10 +35,7 @@ and whoever has the verifying key (VK), can verify the proofs.
 
 ![img.png](images/vp_img.png)
 
-Taiga uses the Halo2 proving system and validity predicates are represented as [PLONKish circuits](https://zcash.github.io/halo2/concepts/arithmetization.html). 
-For privacy reasons, all Taiga VPs share the same configuration (the set of building blocks available for the circuits), 
-and distinct VPs are created by specifying the *selectors* (that select which blocks to use).
-
+Taiga uses the Halo2 proving system and validity predicates are represented as [PLONKish circuits](https://zcash.github.io/halo2/concepts/arithmetization.html).
 Zero-knowledge proofs hide the data, but they aren't always enough to hide the validity predicates themselves (to provide functional privacy).
 The halo2 proving system is designed to handle this issue naturally, accumulating the proofs together.
 
