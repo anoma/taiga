@@ -1,6 +1,7 @@
 use std::ops::Mul;
 
 use ff::PrimeField;
+use group::Curve;
 use halo2_proofs::{
     arithmetic::{FieldExt, CurveExt, SqrtRatio},
     circuit::{floor_planner, AssignedCell, Layouter, Value},
@@ -13,7 +14,7 @@ use halo2_gadgets::{
     primitives::{self as poseidon, P128Pow5T3, ConstantLength},
     Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig, Hash as PoseidonHash
     },
-    ecc::{chip::{EccConfig, EccChip}, FixedPoints, FixedPoint, FixedPointBaseField, ScalarFixed}, utilities::lookup_range_check::LookupRangeCheckConfig
+    ecc::{chip::{EccConfig, EccChip}, FixedPoints, FixedPoint, FixedPointBaseField, ScalarFixed, NonIdentityPoint, ScalarVar}, utilities::lookup_range_check::LookupRangeCheckConfig
 };
 use crate::{circuit::gadgets::{
     assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
@@ -178,11 +179,11 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         // Obtain the signature: (r,s)
         // Obtain public key : P
         // Obtain message: m
-        // TODO: Obtain signature, public key and message from witness
         // Calculate the random point R from r
         // Verify: s*G = R + Hash(r||P||m)*P
         // Construct an ECC chip
         let ecc_chip = EccChip::construct(config.ecc_config);
+        // TODO: Message length (256bits) is bigger than the size of Fp (255bits)
         let m_cell = assign_free_advice(
             layouter.namespace(|| "message"),
             config.advices[0],
@@ -208,7 +209,7 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
             Value::known(self.s),
         )?;
 
-        let generator = FixedPoint::from_inner(ecc_chip, NoteCommitmentFixedBasesFull);
+        let generator = FixedPoint::from_inner(ecc_chip.clone(), NoteCommitmentFixedBasesFull);
         let (sG, _) = generator.mul(
             layouter.namespace(|| "s_scalar * generator"),
             &s_scalar,
@@ -226,22 +227,19 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
                 layouter.namespace(|| "Poseidon_hash(r, P, m)"),
                 poseidon_message,
             )?;
-            let h_value = h.value().map(|fp| pallas::Scalar::from(fp.get_lower_32() as u64));
-            ScalarFixed::new(
-                ecc_chip.clone(),
-                layouter.namespace(|| "h"),
-                h_value,
-            )?
-        };
-        // TODO: Convert vk to FixedPoint
-        // let hP = self.vk.mul(rhs)
-    
-        // let _ = add_chip.add(
-        //     layouter.namespace(|| ""),
-        //     &hash_nk_rho,
-        //     &psi,
-        // )?;
 
+            ScalarVar::from_base(
+                    ecc_chip.clone(),
+                    layouter.namespace(|| "ScalarVar from_base"),
+                    &h,
+                )?
+        };
+        let non_identity_point_var = NonIdentityPoint::new(
+            ecc_chip.clone(),
+            layouter.namespace(|| "non-identity value base"),
+            Value::known(self.vk.to_affine()),
+        )?;
+        let hP = non_identity_point_var.mul(layouter.namespace(|| "spend value point"), h_scalar)?;
 
         Ok(())
     }
