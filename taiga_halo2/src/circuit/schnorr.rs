@@ -181,6 +181,16 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<(), plonk::Error> {
+
+        // Private key :             k            (integer)
+        // Public key :              P = k*G      (curve point)
+        // Message hash:             m            (integer)
+        // Generate a random number: z            (integer)
+        // Calculate:                R = z*G      (curve point)
+        // Calculate: s = z + Hash(r||P||m)*k     (integer)
+        // where: r = X-coordinate of curve point R
+        //        and || denotes binary concatenation
+        // Signature = (r, s)     (integer, integer)
         // We implement the verification algorithm first
         // and assume that the signature is given
         // Obtain the signature: (r,s)
@@ -292,23 +302,27 @@ mod tests {
             arithmetic::CurveExt,
             pallas::Point
         };
-
-
         let mut rng = OsRng;
         const K: u32 = 13;
         let G = pallas::Point::generator();
-        let m = pallas::Base::from(calculate_hash("Every day you play with the light of the universe"));
+        // Message hash: m
+        let m = pallas::Base::from(calculate_hash("Every day you play with the light of the universe. Subtle visitor"));
+        // Private key: sk            
         let sk = pallas::Scalar::from(rng.next_u64());
+        // Public key: P = sk*G
         let pk = G * sk;
-        assert!(pk.to_affine() != pallas::Affine::identity());
-
-        let z = pallas::Scalar::from(rng.next_u64());
-        let R = G * z;
         let (p, _, _) = pk.jacobian_coordinates();
+        // Generate a random number: z    
+        let z = pallas::Scalar::from(rng.next_u64());
+        // Calculate: R = z*G     
+        let R = G * z;
+        // where: r = X-coordinate of curve point R
+        //        and || denotes binary concatenation
         let (r, _, _) = R.jacobian_coordinates();
-        // Verify: s*G = R + Hash(r||P||m)*P
-        let s = z + mod_r_p(poseidon_hash_4(r, p, m));
-        // pallas::Scalar::from(calculate_hash(&rb.extend(mb)));
+        // Calculate: s = z + Hash(r||P||m)*sk   
+        let h = mod_r_p(poseidon_hash_4(r, p, m));
+        let s = z + h * sk;
+        // Signature = (r, s)     
         let circuit = SchnorrCircuit { m, pk, r, s };
 
         // ------- PLOTTING SECTION --------
