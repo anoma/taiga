@@ -1002,12 +1002,158 @@ impl ValueCheckConfig {
 }
 
 #[test]
-fn test_halo2_sudoku_app_vp_circuit() {
+fn test_halo2_sudoku_app_vp_circuit_init() {
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     let circuit = SudokuAppValidityPredicateCircuit::dummy(&mut rng);
+    let instances = circuit.get_instances();
+
+    let prover = MockProver::<pallas::Base>::run(13, &circuit, vec![instances]).unwrap();
+    assert_eq!(prover.verify(), Ok(()));
+}
+
+#[test]
+fn test_halo2_sudoku_app_vp_circuit_update() {
+    use halo2_proofs::dev::MockProver;
+    use rand::rngs::OsRng;
+
+    let mut rng = OsRng;
+    // Construct circuit
+    let circuit = {
+        let mut spend_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let is_spend_note = pallas::Base::one();
+        let init_state = SudokuState {
+            state: [
+                [5, 0, 1, 6, 7, 2, 4, 3, 9],
+                [7, 0, 2, 8, 4, 3, 6, 5, 1],
+                [3, 0, 4, 5, 9, 1, 7, 8, 2],
+                [4, 0, 8, 9, 5, 7, 2, 1, 6],
+                [2, 0, 6, 1, 8, 4, 9, 7, 3],
+                [1, 0, 9, 3, 2, 6, 8, 4, 5],
+                [8, 0, 5, 2, 1, 9, 3, 6, 7],
+                [9, 0, 3, 7, 6, 8, 5, 2, 4],
+                [6, 0, 7, 4, 3, 5, 1, 9, 8],
+            ],
+        };
+        let encoded_init_state = init_state.encode();
+        let previous_state = SudokuState {
+            state: [
+                [5, 8, 1, 6, 7, 2, 4, 3, 9],
+                [7, 9, 2, 8, 4, 3, 6, 5, 1],
+                [3, 0, 4, 5, 9, 1, 7, 8, 2],
+                [4, 0, 8, 9, 5, 7, 2, 1, 6],
+                [2, 0, 6, 1, 8, 4, 9, 7, 3],
+                [1, 0, 9, 3, 2, 6, 8, 4, 5],
+                [8, 0, 5, 2, 1, 9, 3, 6, 7],
+                [9, 0, 3, 7, 6, 8, 5, 2, 4],
+                [6, 0, 7, 4, 3, 5, 1, 9, 8],
+            ],
+        };
+        let current_state = SudokuState {
+            state: [
+                [5, 8, 1, 6, 7, 2, 4, 3, 9],
+                [7, 9, 2, 8, 4, 3, 6, 5, 1],
+                [3, 6, 4, 5, 9, 1, 7, 8, 2],
+                [4, 3, 8, 9, 5, 7, 2, 1, 6],
+                [2, 0, 6, 1, 8, 4, 9, 7, 3],
+                [1, 0, 9, 3, 2, 6, 8, 4, 5],
+                [8, 0, 5, 2, 1, 9, 3, 6, 7],
+                [9, 0, 3, 7, 6, 8, 5, 2, 4],
+                [6, 0, 7, 4, 3, 5, 1, 9, 8],
+            ],
+        };
+        spend_notes[0].value_base.app_data =
+            poseidon_hash(encoded_init_state, previous_state.encode());
+        spend_notes[0].value = 1u64;
+        output_notes[0].value_base.app_data =
+            poseidon_hash(encoded_init_state, current_state.encode());
+        output_notes[0].value = 1u64;
+        output_notes[0].value_base.app_vk = spend_notes[0].value_base.app_vk.clone();
+        SudokuAppValidityPredicateCircuit {
+            spend_notes,
+            output_notes,
+            is_spend_note,
+            encoded_init_state,
+            previous_state,
+            current_state,
+        }
+    };
+    let instances = circuit.get_instances();
+
+    let prover = MockProver::<pallas::Base>::run(13, &circuit, vec![instances]).unwrap();
+    assert_eq!(prover.verify(), Ok(()));
+}
+
+#[test]
+fn test_halo2_sudoku_app_vp_circuit_final() {
+    use halo2_proofs::dev::MockProver;
+    use rand::rngs::OsRng;
+
+    let mut rng = OsRng;
+    // Construct circuit
+    let circuit = {
+        let mut spend_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let is_spend_note = pallas::Base::one();
+        let init_state = SudokuState {
+            state: [
+                [5, 0, 1, 6, 7, 2, 4, 3, 9],
+                [7, 0, 2, 8, 4, 3, 6, 5, 1],
+                [3, 0, 4, 5, 9, 1, 7, 8, 2],
+                [4, 0, 8, 9, 5, 7, 2, 1, 6],
+                [2, 0, 6, 1, 8, 4, 9, 7, 3],
+                [1, 0, 9, 3, 2, 6, 8, 4, 5],
+                [8, 0, 5, 2, 1, 9, 3, 6, 7],
+                [9, 0, 3, 7, 6, 8, 5, 2, 4],
+                [6, 0, 7, 4, 3, 5, 1, 9, 8],
+            ],
+        };
+        let encoded_init_state = init_state.encode();
+        let previous_state = SudokuState {
+            state: [
+                [5, 8, 1, 6, 7, 2, 4, 3, 9],
+                [7, 9, 2, 8, 4, 3, 6, 5, 1],
+                [3, 0, 4, 5, 9, 1, 7, 8, 2],
+                [4, 0, 8, 9, 5, 7, 2, 1, 6],
+                [2, 0, 6, 1, 8, 4, 9, 7, 3],
+                [1, 0, 9, 3, 2, 6, 8, 4, 5],
+                [8, 0, 5, 2, 1, 9, 3, 6, 7],
+                [9, 0, 3, 7, 6, 8, 5, 2, 4],
+                [6, 0, 7, 4, 3, 5, 1, 9, 8],
+            ],
+        };
+        let current_state = SudokuState {
+            state: [
+                [5, 8, 1, 6, 7, 2, 4, 3, 9],
+                [7, 9, 2, 8, 4, 3, 6, 5, 1],
+                [3, 6, 4, 5, 9, 1, 7, 8, 2],
+                [4, 3, 8, 9, 5, 7, 2, 1, 6],
+                [2, 5, 6, 1, 8, 4, 9, 7, 3],
+                [1, 7, 9, 3, 2, 6, 8, 4, 5],
+                [8, 4, 5, 2, 1, 9, 3, 6, 7],
+                [9, 1, 3, 7, 6, 8, 5, 2, 4],
+                [6, 2, 7, 4, 3, 5, 1, 9, 8],
+            ],
+        };
+        spend_notes[0].value_base.app_data =
+            poseidon_hash(encoded_init_state, previous_state.encode());
+        spend_notes[0].value = 1u64;
+        output_notes[0].value_base.app_data =
+            poseidon_hash(encoded_init_state, current_state.encode());
+        output_notes[0].value = 0u64;
+        output_notes[0].value_base.app_vk = spend_notes[0].value_base.app_vk.clone();
+        SudokuAppValidityPredicateCircuit {
+            spend_notes,
+            output_notes,
+            is_spend_note,
+            encoded_init_state,
+            previous_state,
+            current_state,
+        }
+    };
     let instances = circuit.get_instances();
 
     let prover = MockProver::<pallas::Base>::run(13, &circuit, vec![instances]).unwrap();
