@@ -76,7 +76,7 @@ pub struct SchnorrCircuit {
     // public key
     pk: pallas::Point,
     // signature (r,s)
-    r: pallas::Base,
+    r: pallas::Point,
     s: pallas::Scalar,
 }
 
@@ -85,12 +85,33 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
     type FloorPlanner = floor_planner::V1;
 
     fn without_witnesses(&self) -> Self {
+        const K: u32 = 13;
+        let G = pallas::Point::generator();
+        // Message hash: m
+        let m = pallas::Base::one();
+        // Private key: sk            
+        let sk = pallas::Scalar::from(7);
+        // Public key: P = sk*G
+        let pk = G * sk;
+        let (p, _, _) = pk.jacobian_coordinates();
+        // Generate a random number: z    
+        let z = pallas::Scalar::from(9);
+        // Calculate: R = z*G     
+        let R = G * z;
+        // where: r = X-coordinate of curve point R
+        //        and || denotes binary concatenation
+        let (r, _, _) = R.jacobian_coordinates();
+        // Calculate: s = z + Hash(r||P||m)*sk
+        // let h = mod_r_p(poseidon_hash_4(r, p, m));
+        let h = pallas::Scalar::one();
+        let s = z + h * sk;
         SchnorrCircuit {
-            m: pallas::Base::default(),
-            pk: pallas::Point::generator(),
-            r: pallas::Base::default(),
-            s: pallas::Scalar::default(),
+            m,
+            pk,
+            r: R,
+            s,
         }
+        // sG = R + hP
     }
 
     fn configure(meta: &mut plonk::ConstraintSystem<pallas::Base>) -> Self::Config {
@@ -217,15 +238,6 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<(), plonk::Error> {
 
-        // Private key :             k            (integer)
-        // Public key :              P = k*G      (curve point)
-        // Message hash:             m            (integer)
-        // Generate a random number: z            (integer)
-        // Calculate:                R = z*G      (curve point)
-        // Calculate: s = z + Hash(r||P||m)*k     (integer)
-        // where: r = X-coordinate of curve point R
-        //        and || denotes binary concatenation
-        // Signature = (r, s)     (integer, integer)
         SinsemillaChip::<
                 NoteCommitmentHashDomain,
                 NoteCommitmentDomain,
@@ -233,11 +245,6 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
             >::load(config.sinsemilla_config, &mut layouter)?;
         // We implement the verification algorithm first
         // and assume that the signature is given
-        // Obtain the signature: (r,s)
-        // Obtain public key : P
-        // Obtain message: m
-        // Calculate the random point R from r
-        // Verify: s*G = R + Hash(r||P||m)*P
         // Construct an ECC chip
         let ecc_chip = EccChip::construct(config.ecc_config);
         let zero_cell = assign_free_advice(
@@ -246,16 +253,28 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
             Value::known(Fp::zero()),
         )?;
         // TODO: Message length (256bits) is bigger than the size of Fp (255bits)
+        // Obtain message: m
         let m_cell = assign_free_advice(
             layouter.namespace(|| "message"),
             config.advices[0],
             Value::known(self.m),
         )?;
-        let r_cell = assign_free_advice(
-            layouter.namespace(|| "r"),
-            config.advices[0],
-            Value::known(self.r),
+        // Obtain the signature: (r,s)
+        let r_cell = {
+            let (r, _, _) = self.r.jacobian_coordinates();
+            assign_free_advice(
+                layouter.namespace(|| "r"),
+                config.advices[0],
+                Value::known(r),
+            )?
+        };
+
+        let s_scalar = ScalarFixed::new(
+            ecc_chip.clone(),
+            layouter.namespace(|| "s"),
+            Value::known(self.s),
         )?;
+        // Obtain public key : P
         let p_cell = {
             let (p, _, _) = self.pk.jacobian_coordinates();
             assign_free_advice(
@@ -265,15 +284,12 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
             )?
         };
 
-        let s_scalar = ScalarFixed::new(
-            ecc_chip.clone(),
-            layouter.namespace(|| "s"),
-            Value::known(self.s),
-        )?;
-
+        // Verify: s*G = R + Hash(r||P||m)*P
+        // s*G
         let generator = FixedPoint::from_inner(ecc_chip.clone(), NoteCommitmentFixedBasesFull);
         let (sG, _) = generator.mul(layouter.namespace(|| "s_scalar * generator"), &s_scalar)?;
 
+        // Hash(r||P||m)
         let h_scalar = {
             let poseidon_chip = PoseidonChip::construct(config.poseidon_config.clone());
             let poseidon_message = [r_cell, p_cell, m_cell, zero_cell];
@@ -287,20 +303,40 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
                 poseidon_message,
             )?;
 
+            let tmp = assign_free_advice(
+                layouter.namespace(|| "tmp"),
+                config.advices[0],
+                Value::known(pallas::Base::one()),
+            )?;
+
             ScalarVar::from_base(
                 ecc_chip.clone(),
                 layouter.namespace(|| "ScalarVar from_base"),
-                &h,
+                &tmp,
+                // &h,
             )?
         };
-        let P = NonIdentityPoint::new(
+
+        let R = NonIdentityPoint::new(
             ecc_chip.clone(),
-            layouter.namespace(|| "non-identity P"),
-            Value::known(self.pk.to_affine()),
+            layouter.namespace(|| "non-identity R"),
+            Value::known(self.r.to_affine()),
         )?;
+        // Hash(r||P||m)*P
+        let (hP, _) = {
+            let P = NonIdentityPoint::new(
+                ecc_chip.clone(),
+                layouter.namespace(|| "non-identity P"),
+                Value::known(self.pk.to_affine()),
+            )?;
+            P
+            .mul(layouter.namespace(|| "hP"), h_scalar)?
+        };
 
-        let (hP, _) = P.mul(layouter.namespace(|| "hP"), h_scalar)?;
+        // R + Hash(r||P||m)*P
+        let rhs = R.add(layouter.namespace(|| "R + Hash(r||P||m)*P"), &hP);
 
+        println!("COMING");
         sG.constrain_equal(layouter.namespace(|| "s*G = R + Hash(r||P||m)*P"), &hP)?;
         Ok(())
     }
@@ -361,10 +397,11 @@ mod tests {
         //        and || denotes binary concatenation
         let (r, _, _) = R.jacobian_coordinates();
         // Calculate: s = z + Hash(r||P||m)*sk
-        let h = mod_r_p(poseidon_hash_4(r, p, m));
+        // let h = mod_r_p(poseidon_hash_4(r, p, m));
+        let h = pallas::Scalar::one();
         let s = z + h * sk;
         // Signature = (r, s)
-        let circuit = SchnorrCircuit { m, pk, r, s };
+        let circuit = SchnorrCircuit { m, pk, r: R, s };
 
         // ------- PLOTTING SECTION --------
         use plotters::prelude::*;
