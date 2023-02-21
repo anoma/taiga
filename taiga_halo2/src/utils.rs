@@ -40,9 +40,17 @@ pub(crate) fn poseidon_hash(left: pallas::Base, right: pallas::Base) -> pallas::
         .hash([left, right])
 }
 
-pub(crate) fn poseidon_hash_4(i_1: pallas::Base, i_2: pallas::Base, i_3: pallas::Base) -> pallas::Base {
-    poseidon::Hash::<_, poseidon::P128Pow5T3, poseidon::ConstantLength<4>, 3, 2>::init()
-        .hash([i_1, i_2, i_3, pallas::Base::zero()])
+pub(crate) fn poseidon_hash_4(
+    i_1: pallas::Base,
+    i_2: pallas::Base,
+    i_3: pallas::Base,
+) -> pallas::Base {
+    poseidon::Hash::<_, poseidon::P128Pow5T3, poseidon::ConstantLength<4>, 3, 2>::init().hash([
+        i_1,
+        i_2,
+        i_3,
+        pallas::Base::zero(),
+    ])
 }
 
 pub fn poseidon_to_curve<const L: usize>(message: &[pallas::Base]) -> pallas::Point {

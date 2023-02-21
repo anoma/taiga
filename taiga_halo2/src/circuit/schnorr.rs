@@ -3,23 +3,34 @@ use std::ops::Mul;
 use ff::PrimeField;
 use group::Curve;
 use halo2_proofs::{
-    arithmetic::{FieldExt, CurveExt, SqrtRatio},
+    arithmetic::{CurveExt, FieldExt, SqrtRatio},
     circuit::{floor_planner, AssignedCell, Layouter, Value},
     plonk::{self, Advice, Column, Instance as InstanceColumn},
 };
 use pasta_curves::{pallas, Fp};
 
-use halo2_gadgets::{
-    poseidon::{
-    primitives::{self as poseidon, P128Pow5T3, ConstantLength},
-    Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig, Hash as PoseidonHash
+use crate::{
+    circuit::gadgets::{
+        assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
+        MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
     },
-    ecc::{chip::{EccConfig, EccChip}, FixedPoints, FixedPoint, FixedPointBaseField, ScalarFixed, NonIdentityPoint, ScalarVar}, utilities::lookup_range_check::LookupRangeCheckConfig
+    constant::{
+        NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentFixedBasesFull,
+        NoteCommitmentHashDomain, NullifierK,
+    },
 };
-use crate::{circuit::gadgets::{
-    assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
-    MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
-}, constant::{NoteCommitmentFixedBases, NullifierK, NoteCommitmentFixedBasesFull}};
+use halo2_gadgets::{
+    ecc::{
+        chip::{EccChip, EccConfig},
+        FixedPoint, FixedPointBaseField, FixedPoints, NonIdentityPoint, ScalarFixed, ScalarVar,
+    },
+    poseidon::{
+        primitives::{self as poseidon, ConstantLength, P128Pow5T3},
+        Hash as PoseidonHash, Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
+    },
+    sinsemilla::chip::{SinsemillaChip, SinsemillaConfig},
+    utilities::lookup_range_check::LookupRangeCheckConfig,
+};
 
 use group::prime::PrimeCurveAffine;
 use group::Group;
@@ -32,6 +43,8 @@ pub struct SchnorrConfig {
     mul_config: MulConfig,
     ecc_config: EccConfig<NoteCommitmentFixedBases>, // TODO: Maybe replace
     poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
+    sinsemilla_config:
+        SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
 }
 
 impl SchnorrConfig {
@@ -56,7 +69,6 @@ impl SchnorrConfig {
     }
 }
 
-
 #[derive(Clone, Debug, Default)]
 pub struct SchnorrCircuit {
     // message
@@ -65,7 +77,7 @@ pub struct SchnorrCircuit {
     pk: pallas::Point,
     // signature (r,s)
     r: pallas::Base,
-    s: pallas::Scalar
+    s: pallas::Scalar,
 }
 
 impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
@@ -74,10 +86,10 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
 
     fn without_witnesses(&self) -> Self {
         SchnorrCircuit {
-            m: pallas::Base::default(), 
-            pk: pallas::Point::generator(), 
-            r: pallas::Base::default(), 
-            s: pallas::Scalar::default()
+            m: pallas::Base::default(),
+            pk: pallas::Point::generator(),
+            r: pallas::Base::default(),
+            s: pallas::Scalar::default(),
         }
     }
 
@@ -120,8 +132,30 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
 
         let range_check = LookupRangeCheckConfig::configure(meta, advices[9], table_idx);
 
+        let lookup = (
+            table_idx,
+            meta.lookup_table_column(),
+            meta.lookup_table_column(),
+        );
+        let sinsemilla_config = SinsemillaChip::<
+            NoteCommitmentHashDomain,
+            NoteCommitmentDomain,
+            NoteCommitmentFixedBases,
+        >::configure(
+            meta,
+            advices[..5].try_into().unwrap(),
+            advices[2],
+            lagrange_coeffs[0],
+            lookup,
+            range_check,
+        );
 
-        let ecc_config = EccChip::<NoteCommitmentFixedBases>::configure(meta, advices, lagrange_coeffs, range_check);
+        let ecc_config = EccChip::<NoteCommitmentFixedBases>::configure(
+            meta,
+            advices,
+            lagrange_coeffs,
+            range_check,
+        );
         // Instance column used for public inputs
         let primary = meta.instance_column();
         meta.enable_equality(primary);
@@ -172,6 +206,7 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
             mul_config,
             ecc_config,
             poseidon_config,
+            sinsemilla_config,
         }
     }
 
@@ -191,6 +226,11 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         // where: r = X-coordinate of curve point R
         //        and || denotes binary concatenation
         // Signature = (r, s)     (integer, integer)
+        SinsemillaChip::<
+                NoteCommitmentHashDomain,
+                NoteCommitmentDomain,
+                NoteCommitmentFixedBases,
+            >::load(config.sinsemilla_config, &mut layouter)?;
         // We implement the verification algorithm first
         // and assume that the signature is given
         // Obtain the signature: (r,s)
@@ -224,7 +264,7 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
                 Value::known(p),
             )?
         };
-    
+
         let s_scalar = ScalarFixed::new(
             ecc_chip.clone(),
             layouter.namespace(|| "s"),
@@ -232,10 +272,7 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         )?;
 
         let generator = FixedPoint::from_inner(ecc_chip.clone(), NoteCommitmentFixedBasesFull);
-        let (sG, _) = generator.mul(
-            layouter.namespace(|| "s_scalar * generator"),
-            &s_scalar,
-        )?;
+        let (sG, _) = generator.mul(layouter.namespace(|| "s_scalar * generator"), &s_scalar)?;
 
         let h_scalar = {
             let poseidon_chip = PoseidonChip::construct(config.poseidon_config.clone());
@@ -251,22 +288,20 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
             )?;
 
             ScalarVar::from_base(
-                    ecc_chip.clone(),
-                    layouter.namespace(|| "ScalarVar from_base"),
-                    &h,
-                )?
+                ecc_chip.clone(),
+                layouter.namespace(|| "ScalarVar from_base"),
+                &h,
+            )?
         };
         let P = NonIdentityPoint::new(
             ecc_chip.clone(),
             layouter.namespace(|| "non-identity P"),
             Value::known(self.pk.to_affine()),
         )?;
+
         let (hP, _) = P.mul(layouter.namespace(|| "hP"), h_scalar)?;
 
-        sG.constrain_equal(
-            layouter.namespace(|| "s*G = R + Hash(r||P||m)*P"),
-            &hP,
-        )?;
+        sG.constrain_equal(layouter.namespace(|| "s*G = R + Hash(r||P||m)*P"), &hP)?;
         Ok(())
     }
 }
@@ -279,15 +314,21 @@ mod tests {
 
     use super::SchnorrCircuit;
 
+    use crate::{
+        proof::Proof,
+        utils::{mod_r_p, poseidon_hash_4},
+    };
     use halo2_proofs::{
         plonk::{self, ProvingKey, VerifyingKey},
         poly::commitment::Params,
     };
     use pasta_curves::{pallas, vesta};
     use std::time::Instant;
-    use crate::{proof::Proof, utils::{poseidon_hash_4, mod_r_p}};
 
-    use std::{collections::hash_map::DefaultHasher, hash::{Hasher, Hash}};
+    use std::{
+        collections::hash_map::DefaultHasher,
+        hash::{Hash, Hasher},
+    };
 
     fn calculate_hash<T: Hash + ?Sized>(t: &T) -> u64 {
         let mut s = DefaultHasher::new();
@@ -319,10 +360,10 @@ mod tests {
         // where: r = X-coordinate of curve point R
         //        and || denotes binary concatenation
         let (r, _, _) = R.jacobian_coordinates();
-        // Calculate: s = z + Hash(r||P||m)*sk   
+        // Calculate: s = z + Hash(r||P||m)*sk
         let h = mod_r_p(poseidon_hash_4(r, p, m));
         let s = z + h * sk;
-        // Signature = (r, s)     
+        // Signature = (r, s)
         let circuit = SchnorrCircuit { m, pk, r, s };
 
         // ------- PLOTTING SECTION --------
@@ -332,7 +373,7 @@ mod tests {
         let root = root
             .titled("Schnorr Layout", ("sans-serif", 40))
             .unwrap();
-        
+
         halo2_proofs::dev::CircuitLayout::default()
             // You can optionally render only a section of the circuit.
             // .view_width(0..7)
@@ -343,15 +384,13 @@ mod tests {
             // The first argument is the size parameter for the circuit.
             .render(9, &circuit, &root)
             .unwrap();
-        
+
         let dot_string = halo2_proofs::dev::circuit_dot_graph(&circuit);
-        
+
         // Now you can either handle it in Rust, or just
         // print it out to use with command-line tools.
         print!("{}", dot_string);
         // ---- END OF PLOTTING SECTION --------
-        
-
 
         let prover = MockProver::run(K, &circuit, vec![vec![]]).unwrap();
         prover.assert_satisfied();

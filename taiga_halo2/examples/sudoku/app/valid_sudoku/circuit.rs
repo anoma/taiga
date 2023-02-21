@@ -439,7 +439,6 @@ mod tests {
         );
         let pub_instance: [pallas::Base; 108] = pub_instance_vec.try_into().unwrap();
 
-
         // ------- PLOTTING SECTION --------
         use plotters::prelude::*;
         let root = BitMapBackend::new("layout.png", (1024, 768)).into_drawing_area();
@@ -447,7 +446,7 @@ mod tests {
         let root = root
             .titled("Example Circuit Layout", ("sans-serif", 60))
             .unwrap();
-        
+
         halo2_proofs::dev::CircuitLayout::default()
             // You can optionally render only a section of the circuit.
             // .view_width(0..7)
@@ -458,14 +457,13 @@ mod tests {
             // The first argument is the size parameter for the circuit.
             .render(K, &circuit, &root)
             .unwrap();
-        
+
         let dot_string = halo2_proofs::dev::circuit_dot_graph(&circuit);
-        
+
         // Now you can either handle it in Rust, or just
         // print it out to use with command-line tools.
         print!("{}", dot_string);
         // ---- END OF PLOTTING SECTION --------
-
 
         println!("Success!");
         let time = Instant::now();
@@ -480,7 +478,8 @@ mod tests {
 
         let mut rng = OsRng;
         let time = Instant::now();
-        let proof = Proof::create(&pk, &params, circuit.clone(), &[&pub_instance], &mut rng).unwrap();
+        let proof =
+            Proof::create(&pk, &params, circuit.clone(), &[&pub_instance], &mut rng).unwrap();
         println!("proof: \t\t\t{:?}ms", (Instant::now() - time).as_millis());
 
         let time = Instant::now();
@@ -489,8 +488,6 @@ mod tests {
             "verification: \t\t{:?}ms",
             (Instant::now() - time).as_millis()
         );
-
-
     }
 
     #[test]
