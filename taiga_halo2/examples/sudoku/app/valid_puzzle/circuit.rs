@@ -238,12 +238,12 @@ impl plonk::Circuit<pallas::Base> for PuzzleCircuit {
                 )
                 .unwrap();
 
-                assign_free_advice(
-                    layouter.namespace(|| "non-zero sudoku_cell"),
-                    config.i,
-                    Value::known(pallas::Base::from_u128(i as u128)),
-                )
-                .unwrap();
+                // let i_cell = assign_free_advice(
+                //     layouter.namespace(|| "non-zero sudoku_cell"),
+                //     config.i,
+                //     Value::known(pallas::Base::from_u128(i as u128)),
+                // )
+                // .unwrap();
 
                 layouter
                     .assign_region(

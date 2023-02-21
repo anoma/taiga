@@ -20,7 +20,10 @@ use rand::rngs::OsRng;
 use rand::RngCore;
 use taiga_halo2::{
     circuit::{
-        gadgets::assign_free_advice,
+        gadgets::{
+            assign_free_advice, assign_free_constant, MulChip, MulConfig, MulInstructions, SubChip,
+            SubConfig, SubInstructions,
+        },
         integrity::{OutputNoteVar, SpendNoteVar},
         note_circuit::NoteConfig,
         vp_circuit::{
@@ -36,7 +39,7 @@ use taiga_halo2::{
     vp_vk::ValidityPredicateVerifyingKey,
 };
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct SudokuState {
     pub state: [[u8; 9]; 9],
 }
@@ -88,6 +91,24 @@ impl SudokuState {
     }
 }
 
+impl Default for SudokuState {
+    fn default() -> Self {
+        SudokuState {
+            state: [
+                [7, 0, 9, 5, 3, 8, 1, 2, 4],
+                [2, 0, 3, 7, 1, 9, 6, 5, 8],
+                [8, 0, 1, 4, 6, 2, 9, 7, 3],
+                [4, 0, 6, 9, 7, 5, 3, 1, 2],
+                [5, 0, 7, 6, 2, 1, 4, 8, 9],
+                [1, 0, 2, 8, 4, 3, 7, 6, 5],
+                [6, 0, 8, 3, 5, 4, 2, 9, 7],
+                [9, 0, 4, 2, 8, 6, 5, 3, 1],
+                [3, 0, 5, 1, 9, 7, 8, 4, 6],
+            ],
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 struct SudokuAppValidityPredicateCircuit {
     spend_notes: [Note; NUM_NOTE],
@@ -112,6 +133,18 @@ struct SudokuAppValidityPredicateConfig {
     state_update_config: StateUpdateConfig,
     triple_mul_config: TripleMulConfig,
     value_check_config: ValueCheckConfig,
+    sub_config: SubConfig,
+    mul_config: MulConfig,
+}
+
+impl SudokuAppValidityPredicateConfig {
+    pub fn sub_chip(&self) -> SubChip<pallas::Base> {
+        SubChip::construct(self.sub_config.clone(), ())
+    }
+
+    pub fn mul_chip(&self) -> MulChip<pallas::Base> {
+        MulChip::construct(self.mul_config.clone())
+    }
 }
 
 impl ValidityPredicateConfig for SudokuAppValidityPredicateConfig {
@@ -132,6 +165,8 @@ impl ValidityPredicateConfig for SudokuAppValidityPredicateConfig {
             StateUpdateConfig::configure(meta, advices[0], advices[1], advices[2]);
         let triple_mul_config = TripleMulConfig::configure(meta, advices[0..3].try_into().unwrap());
         let value_check_config = ValueCheckConfig::configure(meta, advices[0], advices[1]);
+        let sub_config = SubChip::configure(meta, [advices[0], advices[1]]);
+        let mul_config = MulChip::configure(meta, [advices[0], advices[1]]);
         Self {
             note_conifg,
             advices,
@@ -140,6 +175,8 @@ impl ValidityPredicateConfig for SudokuAppValidityPredicateConfig {
             state_update_config,
             triple_mul_config,
             value_check_config,
+            sub_config,
+            mul_config,
         }
     }
 }
@@ -164,6 +201,115 @@ impl SudokuAppValidityPredicateCircuit {
             previous_state,
             current_state,
         }
+    }
+
+    // Copy from valid_puzzle/circuit.rs
+    #[allow(clippy::too_many_arguments)]
+    fn check_puzzle(
+        mut layouter: impl Layouter<pallas::Base>,
+        config: &SudokuAppValidityPredicateConfig,
+        // advice: Column<Advice>,
+        state: &[AssignedCell<pallas::Base, pallas::Base>],
+    ) -> Result<(), Error> {
+        let non_zero_sudoku_cells: Vec<AssignedCell<pallas::Base, pallas::Base>> = state
+            .iter()
+            .enumerate()
+            .map(|(i, x)| {
+                // TODO: fix it, add constraints for non_zero_sudoku_cells assignment
+                let ret = x.value().map(|x| {
+                    if *x == pallas::Base::zero() {
+                        pallas::Base::from_u128(10 + i as u128)
+                    } else {
+                        *x
+                    }
+                });
+                assign_free_advice(layouter.namespace(|| "sudoku_cell"), config.advices[0], ret)
+                    .unwrap()
+            })
+            .collect();
+
+        // rows
+        let rows: Vec<Vec<AssignedCell<pallas::Base, pallas::Base>>> = non_zero_sudoku_cells
+            .chunks(9)
+            .map(|row| row.to_vec())
+            .collect();
+        // cols
+        let cols: Vec<Vec<AssignedCell<pallas::Base, pallas::Base>>> = (1..10)
+            .map(|i| {
+                let col: Vec<AssignedCell<pallas::Base, pallas::Base>> = non_zero_sudoku_cells
+                    .chunks(9)
+                    .map(|row| row[i - 1].clone())
+                    .collect();
+                col
+            })
+            .collect();
+        // small squares
+        let mut squares: Vec<Vec<AssignedCell<pallas::Base, pallas::Base>>> = vec![];
+        for i in 1..4 {
+            for j in 1..4 {
+                let sub_lines = &rows[(i - 1) * 3..i * 3];
+
+                let square: Vec<&[AssignedCell<pallas::Base, pallas::Base>]> = sub_lines
+                    .iter()
+                    .map(|line| &line[(j - 1) * 3..j * 3])
+                    .collect();
+                squares.push(square.concat());
+            }
+        }
+
+        for perm in [rows, cols, squares].concat().iter() {
+            let mut cell_lhs = assign_free_advice(
+                layouter.namespace(|| "lhs init"),
+                config.advices[0],
+                Value::known(pallas::Base::one()),
+            )
+            .unwrap();
+            for i in 0..9 {
+                for j in (i + 1)..9 {
+                    let diff = SubInstructions::sub(
+                        &config.sub_chip(),
+                        layouter.namespace(|| "diff"),
+                        &perm[i],
+                        &perm[j],
+                    )
+                    .unwrap();
+                    cell_lhs = MulInstructions::mul(
+                        &config.mul_chip(),
+                        layouter.namespace(|| "lhs * diff"),
+                        &cell_lhs,
+                        &diff,
+                    )
+                    .unwrap();
+                }
+            }
+            let cell_lhs_inv = assign_free_advice(
+                layouter.namespace(|| "non-zero sudoku_cell"),
+                config.advices[0],
+                cell_lhs.value().map(|x| x.invert().unwrap()),
+            )
+            .unwrap();
+
+            let cell_div = MulInstructions::mul(
+                &config.mul_chip(),
+                layouter.namespace(|| "lhs * 1/lhs"),
+                &cell_lhs,
+                &cell_lhs_inv,
+            )
+            .unwrap();
+
+            let constant_one = assign_free_constant(
+                layouter.namespace(|| "constant one"),
+                config.advices[0],
+                pallas::Base::one(),
+            )?;
+
+            layouter.assign_region(
+                || "lhs * 1/lhs = 1",
+                |mut region| region.constrain_equal(cell_div.cell(), constant_one.cell()),
+            )?;
+        }
+
+        Ok(())
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -453,7 +599,11 @@ impl ValidityPredicateCircuit for SudokuAppValidityPredicateCircuit {
             },
         )?;
 
-        // TODO: check that current_state(puzzle) is valid. move the circuit in valid_puzzle/circuit.rs here
+        Self::check_puzzle(
+            layouter.namespace(|| "check puzzle"),
+            &config,
+            &current_sudoku_cells,
+        )?;
 
         // check state
         Self::check_state(
@@ -860,6 +1010,6 @@ fn test_halo2_sudoku_app_vp_circuit() {
     let circuit = SudokuAppValidityPredicateCircuit::dummy(&mut rng);
     let instances = circuit.get_instances();
 
-    let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances]).unwrap();
+    let prover = MockProver::<pallas::Base>::run(13, &circuit, vec![instances]).unwrap();
     assert_eq!(prover.verify(), Ok(()));
 }
