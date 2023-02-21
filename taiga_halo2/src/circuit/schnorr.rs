@@ -21,6 +21,8 @@ use crate::{circuit::gadgets::{
     MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
 }, constant::{NoteCommitmentFixedBases, NullifierK, NoteCommitmentFixedBasesFull}};
 
+use group::prime::PrimeCurveAffine;
+use group::Group;
 #[derive(Clone, Debug)]
 pub struct SchnorrConfig {
     primary: Column<InstanceColumn>,
@@ -60,7 +62,7 @@ pub struct SchnorrCircuit {
     // message
     m: pallas::Base,
     // public key
-    vk: pallas::Point,
+    pk: pallas::Point,
     // signature (r,s)
     r: pallas::Base,
     s: pallas::Scalar
@@ -71,7 +73,12 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
     type FloorPlanner = floor_planner::V1;
 
     fn without_witnesses(&self) -> Self {
-        Self::default()
+        SchnorrCircuit {
+            m: pallas::Base::default(), 
+            pk: pallas::Point::generator(), 
+            r: pallas::Base::default(), 
+            s: pallas::Scalar::default()
+        }
     }
 
     fn configure(meta: &mut plonk::ConstraintSystem<pallas::Base>) -> Self::Config {
@@ -183,6 +190,11 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         // Verify: s*G = R + Hash(r||P||m)*P
         // Construct an ECC chip
         let ecc_chip = EccChip::construct(config.ecc_config);
+        let zero_cell = assign_free_advice(
+            layouter.namespace(|| "zero"),
+            config.advices[0],
+            Value::known(Fp::zero()),
+        )?;
         // TODO: Message length (256bits) is bigger than the size of Fp (255bits)
         let m_cell = assign_free_advice(
             layouter.namespace(|| "message"),
@@ -195,7 +207,7 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
             Value::known(self.r),
         )?;
         let p_cell = {
-            let (p, _, _) = self.vk.jacobian_coordinates();
+            let (p, _, _) = self.pk.jacobian_coordinates();
             assign_free_advice(
                 layouter.namespace(|| "p"),
                 config.advices[0],
@@ -217,9 +229,9 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
 
         let h_scalar = {
             let poseidon_chip = PoseidonChip::construct(config.poseidon_config.clone());
-            let poseidon_message = [r_cell, p_cell, m_cell];
+            let poseidon_message = [r_cell, p_cell, m_cell, zero_cell];
             let poseidon_hasher =
-                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<3>, 3, 2>::init(
+                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<4>, 3, 2>::init(
                     poseidon_chip,
                     layouter.namespace(|| "Poseidon init"),
                 )?;
@@ -234,13 +246,17 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
                     &h,
                 )?
         };
-        let non_identity_point_var = NonIdentityPoint::new(
+        let P = NonIdentityPoint::new(
             ecc_chip.clone(),
-            layouter.namespace(|| "non-identity value base"),
-            Value::known(self.vk.to_affine()),
+            layouter.namespace(|| "non-identity P"),
+            Value::known(self.pk.to_affine()),
         )?;
-        let hP = non_identity_point_var.mul(layouter.namespace(|| "spend value point"), h_scalar)?;
+        let (hP, _) = P.mul(layouter.namespace(|| "hP"), h_scalar)?;
 
+        sG.constrain_equal(
+            layouter.namespace(|| "s*G = R + Hash(r||P||m)*P"),
+            &hP,
+        )?;
         Ok(())
     }
 }
@@ -248,6 +264,7 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
 #[cfg(test)]
 mod tests {
     use halo2_proofs::{arithmetic::FieldExt, dev::MockProver};
+    use plotters::style::full_palette::WHITE;
     use rand::{rngs::OsRng, RngCore};
 
     use super::SchnorrCircuit;
@@ -258,7 +275,7 @@ mod tests {
     };
     use pasta_curves::{pallas, vesta};
     use std::time::Instant;
-    use crate::proof::Proof;
+    use crate::{proof::Proof, utils::{poseidon_hash_4, mod_r_p}};
 
     use std::{collections::hash_map::DefaultHasher, hash::{Hasher, Hash}};
 
@@ -271,43 +288,61 @@ mod tests {
     #[test]
     fn test_schnorr() {
         use group::{prime::PrimeCurveAffine, Curve, Group};
-        use pasta_curves::arithmetic::CurveExt;
+        use pasta_curves::{
+            arithmetic::CurveExt,
+            pallas::Point
+        };
 
 
         let mut rng = OsRng;
+        const K: u32 = 13;
         let G = pallas::Point::generator();
         let m = pallas::Base::from(calculate_hash("Every day you play with the light of the universe"));
         let sk = pallas::Scalar::from(rng.next_u64());
-        let vk = G * sk;
+        let pk = G * sk;
+        assert!(pk.to_affine() != pallas::Affine::identity());
 
         let z = pallas::Scalar::from(rng.next_u64());
         let R = G * z;
+        let (p, _, _) = pk.jacobian_coordinates();
         let (r, _, _) = R.jacobian_coordinates();
-        let mut rb = {
-            let r2 = <[u8; 32]>::from(r);
-            vec!(r2)
-        };
+        // Verify: s*G = R + Hash(r||P||m)*P
+        let s = z + mod_r_p(poseidon_hash_4(r, p, m));
+        // pallas::Scalar::from(calculate_hash(&rb.extend(mb)));
+        let circuit = SchnorrCircuit { m, pk, r, s };
 
-        let mb = {
-            let m1 = <[u8; 32]>::from(m);
-            vec!(m1) 
-        };
-        let s = z + pallas::Scalar::from(calculate_hash(&rb.extend(mb)));
-        let circuit = SchnorrCircuit { m, vk, r, s };
+        // ------- PLOTTING SECTION --------
+        use plotters::prelude::*;
+        let root = BitMapBackend::new("schnorr.png", (1024, 768)).into_drawing_area();
+        root.fill(&WHITE).unwrap();
+        let root = root
+            .titled("Schnorr Layout", ("sans-serif", 40))
+            .unwrap();
+        
+        halo2_proofs::dev::CircuitLayout::default()
+            // You can optionally render only a section of the circuit.
+            // .view_width(0..7)
+            // .view_height(0..60)
+            // You can hide labels, which can be useful with smaller areas.
+            .show_labels(true)
+            // Render the circuit onto your area!
+            // The first argument is the size parameter for the circuit.
+            .render(9, &circuit, &root)
+            .unwrap();
+        
+        let dot_string = halo2_proofs::dev::circuit_dot_graph(&circuit);
+        
+        // Now you can either handle it in Rust, or just
+        // print it out to use with command-line tools.
+        print!("{}", dot_string);
+        // ---- END OF PLOTTING SECTION --------
+        
 
-        // const K: u32 = 13;
-        // let zeros = [pallas::Base::zero(); 27];
-        // let mut pub_instance_vec = zeros.to_vec();
-        // pub_instance_vec.append(&mut vec_puzzle);
-        // assert_eq!(
-        //     MockProver::run(13, &circuit, vec![pub_instance_vec.clone()])
-        //         .unwrap()
-        //         .verify(),
-        //     Ok(())
-        // );
-        // let pub_instance: [pallas::Base; 108] = pub_instance_vec.try_into().unwrap();
 
-        // println!("Success!");
+        let prover = MockProver::run(K, &circuit, vec![vec![]]).unwrap();
+        prover.assert_satisfied();
+
+        println!("Success!");
         // let time = Instant::now();
         // let params = Params::new(K);
 
