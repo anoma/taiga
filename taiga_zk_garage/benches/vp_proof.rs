@@ -71,7 +71,7 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    bench_vp_proof("vp-proof", c);
+    bench_vp_proof("zk-garage-vp-proof", c);
 }
 
 criterion_group!(benches, criterion_benchmark);
