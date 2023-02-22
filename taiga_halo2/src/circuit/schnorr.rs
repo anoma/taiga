@@ -308,8 +308,8 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
 
 #[cfg(test)]
 mod tests {
-    use ff::Field;
-    use halo2_proofs::{dev::MockProver, plonk::Circuit};
+    
+    use halo2_proofs::{dev::MockProver};
     
     use rand::{rngs::OsRng, RngCore};
 
