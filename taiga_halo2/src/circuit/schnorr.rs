@@ -335,7 +335,8 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
 
 #[cfg(test)]
 mod tests {
-    use halo2_proofs::{arithmetic::FieldExt, dev::MockProver};
+    use ff::Field;
+    use halo2_proofs::{arithmetic::FieldExt, dev::MockProver, plonk::Circuit};
     use plotters::style::full_palette::WHITE;
     use rand::{rngs::OsRng, RngCore};
 
@@ -364,6 +365,32 @@ mod tests {
         s.finish()
     }
 
+    fn plot_it<F: Field, ConcreteCircuit: Circuit<F>>(circuit: &ConcreteCircuit) {
+        // ------- PLOTTING SECTION --------
+        use plotters::prelude::*;
+        let root = BitMapBackend::new("schnorr.png", (1024, 768)).into_drawing_area();
+        root.fill(&WHITE).unwrap();
+        let root = root.titled("Schnorr Layout", ("sans-serif", 40)).unwrap();
+
+        halo2_proofs::dev::CircuitLayout::default()
+            // You can optionally render only a section of the circuit.
+            // .view_width(0..7)
+            // .view_height(0..60)
+            // You can hide labels, which can be useful with smaller areas.
+            .show_labels(true)
+            // Render the circuit onto your area!
+            // The first argument is the size parameter for the circuit.
+            .render(9, circuit, &root)
+            .unwrap();
+
+        let dot_string = halo2_proofs::dev::circuit_dot_graph(circuit);
+
+        // Now you can either handle it in Rust, or just
+        // print it out to use with command-line tools.
+        print!("{}", dot_string);
+        // ---- END OF PLOTTING SECTION --------
+    }
+
     #[test]
     fn test_schnorr() {
         use group::{prime::PrimeCurveAffine, Curve, Group};
@@ -383,45 +410,19 @@ mod tests {
         // Generate a random number: z
         let z = pallas::Scalar::from(rng.next_u64());
         // Calculate: R = z*G
-        let R = G * z;
-        // where: r = X-coordinate of curve point R
-        //        and || denotes binary concatenation
-        let (r, _, _) = R.jacobian_coordinates();
+        let r = G * z;
         // Calculate: s = z + Hash(r||P||m)*sk
         // let h = mod_r_p(poseidon_hash_4(r, p, m));
         let h = pallas::Scalar::one();
         let s = z + h * sk;
         // Signature = (r, s)
-        let circuit = SchnorrCircuit { m, pk, r: R, s };
+        let circuit = SchnorrCircuit { m, pk, r, s };
 
-        // ------- PLOTTING SECTION --------
-        use plotters::prelude::*;
-        let root = BitMapBackend::new("schnorr.png", (1024, 768)).into_drawing_area();
-        root.fill(&WHITE).unwrap();
-        let root = root.titled("Schnorr Layout", ("sans-serif", 40)).unwrap();
-
-        halo2_proofs::dev::CircuitLayout::default()
-            // You can optionally render only a section of the circuit.
-            // .view_width(0..7)
-            // .view_height(0..60)
-            // You can hide labels, which can be useful with smaller areas.
-            .show_labels(true)
-            // Render the circuit onto your area!
-            // The first argument is the size parameter for the circuit.
-            .render(9, &circuit, &root)
-            .unwrap();
-
-        let dot_string = halo2_proofs::dev::circuit_dot_graph(&circuit);
-
-        // Now you can either handle it in Rust, or just
-        // print it out to use with command-line tools.
-        print!("{}", dot_string);
-        // ---- END OF PLOTTING SECTION --------
+        plot_it(&circuit);
 
         let prover = MockProver::run(K, &circuit, vec![vec![]]).unwrap();
         prover.assert_satisfied();
 
-        println!("Success!");
         let time = Instant::now();
         let params = Params::new(K);
 
