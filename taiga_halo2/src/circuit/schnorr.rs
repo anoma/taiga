@@ -83,7 +83,11 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
     type FloorPlanner = floor_planner::V1;
 
     fn without_witnesses(&self) -> Self {
-        SchnorrCircuit { pk: pallas::Point::generator(), r: pallas::Point::generator(), s: pallas::Scalar::one() }
+        SchnorrCircuit {
+            pk: pallas::Point::generator(),
+            r: pallas::Point::generator(),
+            s: pallas::Scalar::one(),
+        }
     }
 
     fn configure(meta: &mut plonk::ConstraintSystem<pallas::Base>) -> Self::Config {
