@@ -1,14 +1,13 @@
 use ff::Field;
-use halo2_gadgets::utilities::ternary;
+
 use halo2_proofs::{
-    circuit::{AssignedCell, Chip, Layouter, Region, Value},
-    plonk::{Advice, Assigned, Column, ConstraintSystem, Constraints, Error, Instance, Selector},
-    poly::Rotation,
+    circuit::{AssignedCell, Layouter, Value},
+    plonk::{Advice, Assigned, Column, Error, Instance},
 };
-use pasta_curves::arithmetic::FieldExt;
-use pasta_curves::pallas;
-use std::marker::PhantomData;
-use subtle::ConditionallySelectable;
+
+
+
+
 
 pub mod add;
 pub mod mul;

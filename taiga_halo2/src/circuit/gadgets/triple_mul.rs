@@ -1,14 +1,14 @@
-use ff::Field;
-use halo2_gadgets::utilities::ternary;
+
+
 use halo2_proofs::{
-    circuit::{AssignedCell, Chip, Layouter, Region, Value},
-    plonk::{Advice, Assigned, Column, ConstraintSystem, Constraints, Error, Instance, Selector},
+    circuit::{AssignedCell, Region},
+    plonk::{Advice, Column, ConstraintSystem, Error, Selector},
     poly::Rotation,
 };
-use pasta_curves::arithmetic::FieldExt;
+
 use pasta_curves::pallas;
-use std::marker::PhantomData;
-use subtle::ConditionallySelectable;
+
+
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TripleMulConfig {

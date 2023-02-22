@@ -13,7 +13,7 @@ use halo2_proofs::{
 use pasta_curves::{pallas, Fp};
 
 use taiga_halo2::circuit::gadgets::{
-    add::{AddChip, AddConfig, AddInstructions},
+    add::{AddChip, AddConfig},
     assign_free_advice,
     mul::{MulChip, MulConfig, MulInstructions},
     sub::{SubChip, SubConfig, SubInstructions},

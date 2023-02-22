@@ -1,17 +1,17 @@
 use ff::Field;
-use halo2_gadgets::utilities::{bool_check, ternary};
+use halo2_gadgets::utilities::{bool_check};
 use halo2_proofs::{
-    circuit::{AssignedCell, Chip, Layouter, Region, Value},
+    circuit::{AssignedCell, Region},
     plonk::{
-        Advice, Assigned, Column, ConstraintSystem, Constraints, Error, Expression, Instance,
+        Advice, Column, ConstraintSystem, Constraints, Error, Expression,
         Selector,
     },
     poly::Rotation,
 };
-use pasta_curves::arithmetic::FieldExt;
+
 use pasta_curves::pallas;
-use std::marker::PhantomData;
-use subtle::ConditionallySelectable;
+
+
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ValueCheckConfig {
