@@ -1,6 +1,6 @@
 use group::Curve;
 use halo2_proofs::{
-    arithmetic::{CurveExt},
+    arithmetic::CurveExt,
     circuit::{floor_planner, Layouter, Value},
     plonk::{self, Advice, Column, Instance as InstanceColumn},
 };
@@ -8,8 +8,8 @@ use pasta_curves::{pallas, Fp};
 
 use crate::{
     circuit::gadgets::{
-        assign_free_advice, assign_free_instance, AddChip, AddConfig, MulChip,
-        MulConfig, SubChip, SubConfig,
+        assign_free_advice, assign_free_instance, AddChip, AddConfig, MulChip, MulConfig, SubChip,
+        SubConfig,
     },
     constant::{
         NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentFixedBasesFull,
@@ -308,15 +308,15 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
 
 #[cfg(test)]
 mod tests {
-    
-    use halo2_proofs::{dev::MockProver};
-    
+
+    use halo2_proofs::dev::MockProver;
+
     use rand::{rngs::OsRng, RngCore};
 
     use super::SchnorrCircuit;
 
     use crate::{
-        constant::{NOTE_COMMIT_DOMAIN},
+        constant::NOTE_COMMIT_DOMAIN,
         proof::Proof,
         utils::{mod_r_p, poseidon_hash_4},
     };
@@ -324,7 +324,7 @@ mod tests {
         plonk::{self},
         poly::commitment::Params,
     };
-    use pasta_curves::{pallas};
+    use pasta_curves::pallas;
     use std::time::Instant;
 
     use std::{
@@ -338,13 +338,12 @@ mod tests {
         s.finish()
     }
 
-
     #[test]
     fn test_schnorr() {
-        use pasta_curves::{arithmetic::CurveExt};
+        use pasta_curves::arithmetic::CurveExt;
         let mut rng = OsRng;
         const K: u32 = 13;
-        let G = NOTE_COMMIT_DOMAIN.R();
+        let generator = NOTE_COMMIT_DOMAIN.R();
         // Message hash: m
         let m = pallas::Base::from(calculate_hash(
             "Every day you play with the light of the universe. Subtle visitor",
@@ -352,12 +351,12 @@ mod tests {
         // Private key: sk
         let sk = pallas::Scalar::from(rng.next_u64());
         // Public key: P = sk*G
-        let pk = G * sk;
+        let pk = generator * sk;
         let (p, _, _) = pk.jacobian_coordinates();
         // Generate a random number: z
         let z = pallas::Scalar::from(rng.next_u64());
         // Calculate: R = z*G
-        let r = G * z;
+        let r = generator * z;
         let (rx, _, _) = r.jacobian_coordinates();
         // Calculate: s = z + Hash(r||P||m)*sk
         let h = mod_r_p(poseidon_hash_4(rx, p, m));
@@ -372,7 +371,7 @@ mod tests {
                 .verify(),
             Ok(())
         );
-        let prover = MockProver::run(K, &circuit, vec![pub_instance_vec.clone()]).unwrap();
+        let prover = MockProver::run(K, &circuit, vec![pub_instance_vec]).unwrap();
         prover.assert_satisfied();
 
         let time = Instant::now();
