@@ -19,7 +19,7 @@ use rand::rngs::OsRng;
 use rand::RngCore;
 use taiga_halo2::{
     circuit::{
-        gadgets::{assign_free_advice, GetTargetNoteVariableConfig},
+        gadgets::{assign_free_advice, target_note_variable::GetTargetNoteVariableConfig},
         integrity::{OutputNoteVar, SpendNoteVar},
         note_circuit::NoteConfig,
         vp_circuit::{

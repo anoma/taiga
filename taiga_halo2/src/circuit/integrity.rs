@@ -1,6 +1,9 @@
 use std::ops::Neg;
 
-use crate::circuit::gadgets::{assign_free_advice, assign_free_constant, AddChip, AddInstructions};
+use crate::circuit::gadgets::{
+    add::{AddChip, AddInstructions},
+    assign_free_advice, assign_free_constant,
+};
 use crate::circuit::hash_to_curve::{hash_to_curve_circuit, HashToCurveConfig};
 use crate::circuit::note_circuit::{note_commitment_gadget, NoteCommitmentChip};
 use crate::constant::{
@@ -495,8 +498,8 @@ pub fn compute_value_commitment(
 
 #[test]
 fn test_halo2_nullifier_circuit() {
+    use crate::circuit::gadgets::add::AddConfig;
     use crate::circuit::gadgets::assign_free_advice;
-    use crate::circuit::gadgets::AddConfig;
     use crate::constant::{
         NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain,
     };

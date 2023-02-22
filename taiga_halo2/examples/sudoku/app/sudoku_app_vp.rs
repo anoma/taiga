@@ -21,8 +21,11 @@ use rand::RngCore;
 use taiga_halo2::{
     circuit::{
         gadgets::{
-            assign_free_advice, assign_free_constant, MulChip, MulConfig, MulInstructions, SubChip,
-            SubConfig, SubInstructions,
+            assign_free_advice, assign_free_constant,
+            mul::{MulChip, MulConfig, MulInstructions},
+            sub::{SubChip, SubConfig, SubInstructions},
+            triple_mul::TripleMulConfig,
+            value_check::ValueCheckConfig,
         },
         integrity::{OutputNoteVar, SpendNoteVar},
         note_circuit::NoteConfig,
@@ -116,7 +119,7 @@ struct SudokuAppValidityPredicateCircuit {
     // The note that vp owned is set at spend_notes[0] or output_notes[0] by default. Make it mandatory later.
     // is_spend_note helps locate the target note in spend_notes and output_notes.
     is_spend_note: pallas::Base,
-    //
+    // Initial puzzle encoded in a single field
     encoded_init_state: pallas::Base,
     // If it is a init state, previous_state is equal to current_state
     previous_state: SudokuState,
@@ -125,7 +128,7 @@ struct SudokuAppValidityPredicateCircuit {
 
 #[derive(Clone, Debug)]
 struct SudokuAppValidityPredicateConfig {
-    note_conifg: NoteConfig,
+    note_config: NoteConfig,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
     // get_target_variable_config: GetTargetNoteVariableConfig,
@@ -149,14 +152,14 @@ impl SudokuAppValidityPredicateConfig {
 
 impl ValidityPredicateConfig for SudokuAppValidityPredicateConfig {
     fn get_note_config(&self) -> NoteConfig {
-        self.note_conifg.clone()
+        self.note_config.clone()
     }
 
     fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
-        let note_conifg = Self::configure_note(meta);
+        let note_config = Self::configure_note(meta);
 
-        let advices = note_conifg.advices;
-        let instances = note_conifg.instances;
+        let advices = note_config.advices;
+        let instances = note_config.instances;
         let sudoku_state_check_config = SudokuStateCheckConfig::configure(
             meta, advices[0], advices[1], advices[2], advices[3], advices[4], advices[5],
             advices[6], advices[7],
@@ -168,7 +171,7 @@ impl ValidityPredicateConfig for SudokuAppValidityPredicateConfig {
         let sub_config = SubChip::configure(meta, [advices[0], advices[1]]);
         let mul_config = MulChip::configure(meta, [advices[0], advices[1]]);
         Self {
-            note_conifg,
+            note_config,
             advices,
             instances,
             sudoku_state_check_config,
@@ -870,133 +873,6 @@ impl StateUpdateConfig {
         is_spend_note.copy_advice(|| "is_spend_notex", region, self.is_spend_note, offset)?;
         pre_state_cell.copy_advice(|| "pre_state_cell", region, self.pre_state_cell, offset)?;
         cur_state_cell.copy_advice(|| "cur_state_cell", region, self.cur_state_cell, offset)?;
-        Ok(())
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct TripleMulConfig {
-    q_triple_mul: Selector,
-    advice: [Column<Advice>; 3],
-}
-
-impl TripleMulConfig {
-    #[allow(clippy::too_many_arguments)]
-    pub fn configure(
-        meta: &mut ConstraintSystem<pallas::Base>,
-        advice: [Column<Advice>; 3],
-    ) -> Self {
-        let config = Self {
-            q_triple_mul: meta.selector(),
-            advice,
-        };
-
-        config.create_gate(meta);
-
-        config
-    }
-
-    fn create_gate(&self, meta: &mut ConstraintSystem<pallas::Base>) {
-        meta.create_gate("triple mul", |meta| {
-            let q_triple_mul = meta.query_selector(self.q_triple_mul);
-            let first = meta.query_advice(self.advice[0], Rotation::cur());
-            let second = meta.query_advice(self.advice[1], Rotation::cur());
-            let third = meta.query_advice(self.advice[2], Rotation::cur());
-            let out = meta.query_advice(self.advice[0], Rotation::next());
-
-            vec![q_triple_mul * (first * second * third - out)]
-        });
-    }
-
-    pub fn assign_region(
-        &self,
-        first: &AssignedCell<pallas::Base, pallas::Base>,
-        second: &AssignedCell<pallas::Base, pallas::Base>,
-        third: &AssignedCell<pallas::Base, pallas::Base>,
-        offset: usize,
-        region: &mut Region<'_, pallas::Base>,
-    ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
-        // Enable `q_triple_mul` selector
-        self.q_triple_mul.enable(region, offset)?;
-
-        first.copy_advice(|| "first", region, self.advice[0], offset)?;
-        second.copy_advice(|| "second", region, self.advice[1], offset)?;
-        third.copy_advice(|| "third", region, self.advice[2], offset)?;
-        let value = first.value() * second.value() * third.value();
-
-        region.assign_advice(|| "out", self.advice[0], 1, || value)
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ValueCheckConfig {
-    q_value_check: Selector,
-    state_product: Column<Advice>,
-    value: Column<Advice>,
-}
-
-impl ValueCheckConfig {
-    #[allow(clippy::too_many_arguments)]
-    pub fn configure(
-        meta: &mut ConstraintSystem<pallas::Base>,
-        state_product: Column<Advice>,
-        value: Column<Advice>,
-    ) -> Self {
-        let config = Self {
-            q_value_check: meta.selector(),
-            state_product,
-            value,
-        };
-
-        config.create_gate(meta);
-
-        config
-    }
-
-    fn create_gate(&self, meta: &mut ConstraintSystem<pallas::Base>) {
-        meta.create_gate("check state update", |meta| {
-            let q_value_check = meta.query_selector(self.q_value_check);
-            let state_product = meta.query_advice(self.state_product, Rotation::cur());
-            let value = meta.query_advice(self.value, Rotation::cur());
-            let state_product_inv = meta.query_advice(self.state_product, Rotation::next());
-            let one = Expression::Constant(pallas::Base::one());
-            let state_product_is_zero = one - state_product.clone() * state_product_inv;
-            let poly = state_product_is_zero.clone() * state_product;
-
-            let bool_check_value = bool_check(value.clone());
-
-            Constraints::with_selector(
-                q_value_check,
-                [
-                    ("bool_check_value", bool_check_value),
-                    ("is_zero check", poly),
-                    ("value check", (state_product_is_zero - value)),
-                ],
-            )
-        });
-    }
-
-    pub fn assign_region(
-        &self,
-        state_product: &AssignedCell<pallas::Base, pallas::Base>,
-        value: &AssignedCell<pallas::Base, pallas::Base>,
-        offset: usize,
-        region: &mut Region<'_, pallas::Base>,
-    ) -> Result<(), Error> {
-        // Enable `q_value_check` selector
-        self.q_value_check.enable(region, offset)?;
-
-        state_product.copy_advice(|| "state_product", region, self.state_product, offset)?;
-        value.copy_advice(|| "value", region, self.value, offset)?;
-        let state_product_inv = state_product
-            .value()
-            .map(|state_product| state_product.invert().unwrap_or(pallas::Base::zero()));
-        region.assign_advice(
-            || "state_product_inv",
-            self.state_product,
-            offset + 1,
-            || state_product_inv,
-        )?;
         Ok(())
     }
 }

@@ -122,8 +122,10 @@ mod tests {
 
     use taiga_halo2::{
         circuit::gadgets::{
-            assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
-            MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
+            add::{AddChip, AddConfig, AddInstructions},
+            assign_free_advice, assign_free_instance,
+            mul::{MulChip, MulConfig, MulInstructions},
+            sub::{SubChip, SubConfig, SubInstructions},
         },
         constant::NUM_NOTE,
         note::Note,

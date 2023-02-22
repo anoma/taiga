@@ -12,8 +12,10 @@ use halo2_gadgets::poseidon::{
     Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
 };
 use taiga_halo2::circuit::gadgets::{
-    assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
-    MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
+    add::{AddChip, AddConfig, AddInstructions},
+    assign_free_advice, assign_free_instance,
+    mul::{MulChip, MulConfig, MulInstructions},
+    sub::{SubChip, SubConfig, SubInstructions},
 };
 
 #[derive(Clone, Debug)]
