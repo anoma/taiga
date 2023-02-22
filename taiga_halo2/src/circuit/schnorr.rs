@@ -16,7 +16,7 @@ use crate::{
     },
     constant::{
         NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentFixedBasesFull,
-        NoteCommitmentHashDomain, NullifierK,
+        NoteCommitmentHashDomain, NullifierK, NOTE_COMMIT_DOMAIN,
     },
 };
 use halo2_gadgets::{
@@ -86,17 +86,17 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
 
     fn without_witnesses(&self) -> Self {
         const K: u32 = 13;
-        let G = pallas::Point::generator();
+        let G = NOTE_COMMIT_DOMAIN.R();
         // Message hash: m
         let m = pallas::Base::one();
-        // Private key: sk            
+        // Private key: sk
         let sk = pallas::Scalar::from(7);
         // Public key: P = sk*G
         let pk = G * sk;
         let (p, _, _) = pk.jacobian_coordinates();
-        // Generate a random number: z    
+        // Generate a random number: z
         let z = pallas::Scalar::from(9);
-        // Calculate: R = z*G     
+        // Calculate: R = z*G
         let R = G * z;
         // where: r = X-coordinate of curve point R
         //        and || denotes binary concatenation
@@ -105,12 +105,7 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         // let h = mod_r_p(poseidon_hash_4(r, p, m));
         let h = pallas::Scalar::one();
         let s = z + h * sk;
-        SchnorrCircuit {
-            m,
-            pk,
-            r: R,
-            s,
-        }
+        SchnorrCircuit { m, pk, r: R, s }
         // sG = R + hP
     }
 
@@ -237,7 +232,6 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<(), plonk::Error> {
-
         SinsemillaChip::<
                 NoteCommitmentHashDomain,
                 NoteCommitmentDomain,
@@ -268,7 +262,6 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
                 Value::known(r),
             )?
         };
-
         let s_scalar = ScalarFixed::new(
             ecc_chip.clone(),
             layouter.namespace(|| "s"),
@@ -329,15 +322,13 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
                 layouter.namespace(|| "non-identity P"),
                 Value::known(self.pk.to_affine()),
             )?;
-            P
-            .mul(layouter.namespace(|| "hP"), h_scalar)?
+            P.mul(layouter.namespace(|| "hP"), h_scalar)?
         };
 
         // R + Hash(r||P||m)*P
-        let rhs = R.add(layouter.namespace(|| "R + Hash(r||P||m)*P"), &hP);
+        let rhs = R.add(layouter.namespace(|| "R + Hash(r||P||m)*P"), &hP)?;
 
-        println!("COMING");
-        sG.constrain_equal(layouter.namespace(|| "s*G = R + Hash(r||P||m)*P"), &hP)?;
+        sG.constrain_equal(layouter.namespace(|| "s*G = R + Hash(r||P||m)*P"), &rhs)?;
         Ok(())
     }
 }
@@ -351,6 +342,7 @@ mod tests {
     use super::SchnorrCircuit;
 
     use crate::{
+        constant::{NOTE_COMMITMENT_R_GENERATOR, NOTE_COMMIT_DOMAIN},
         proof::Proof,
         utils::{mod_r_p, poseidon_hash_4},
     };
@@ -375,23 +367,22 @@ mod tests {
     #[test]
     fn test_schnorr() {
         use group::{prime::PrimeCurveAffine, Curve, Group};
-        use pasta_curves::{
-            arithmetic::CurveExt,
-            pallas::Point
-        };
+        use pasta_curves::{arithmetic::CurveExt, pallas::Point};
         let mut rng = OsRng;
         const K: u32 = 13;
-        let G = pallas::Point::generator();
+        let G = NOTE_COMMIT_DOMAIN.R();
         // Message hash: m
-        let m = pallas::Base::from(calculate_hash("Every day you play with the light of the universe. Subtle visitor"));
-        // Private key: sk            
+        let m = pallas::Base::from(calculate_hash(
+            "Every day you play with the light of the universe. Subtle visitor",
+        ));
+        // Private key: sk
         let sk = pallas::Scalar::from(rng.next_u64());
         // Public key: P = sk*G
         let pk = G * sk;
         let (p, _, _) = pk.jacobian_coordinates();
-        // Generate a random number: z    
+        // Generate a random number: z
         let z = pallas::Scalar::from(rng.next_u64());
-        // Calculate: R = z*G     
+        // Calculate: R = z*G
         let R = G * z;
         // where: r = X-coordinate of curve point R
         //        and || denotes binary concatenation
@@ -407,9 +398,7 @@ mod tests {
         use plotters::prelude::*;
         let root = BitMapBackend::new("schnorr.png", (1024, 768)).into_drawing_area();
         root.fill(&WHITE).unwrap();
-        let root = root
-            .titled("Schnorr Layout", ("sans-serif", 40))
-            .unwrap();
+        let root = root.titled("Schnorr Layout", ("sans-serif", 40)).unwrap();
 
         halo2_proofs::dev::CircuitLayout::default()
             // You can optionally render only a section of the circuit.
@@ -433,25 +422,25 @@ mod tests {
         prover.assert_satisfied();
 
         println!("Success!");
-        // let time = Instant::now();
-        // let params = Params::new(K);
+        let time = Instant::now();
+        let params = Params::new(K);
 
-        // let vk = plonk::keygen_vk(&params, &circuit).unwrap();
-        // let pk = plonk::keygen_pk(&params, vk.clone(), &circuit).unwrap();
-        // println!(
-        //     "key generation: \t{:?}ms",
-        //     (Instant::now() - time).as_millis()
-        // );
+        let vk = plonk::keygen_vk(&params, &circuit).unwrap();
+        let pk = plonk::keygen_pk(&params, vk.clone(), &circuit).unwrap();
+        println!(
+            "key generation: \t{:?}ms",
+            (Instant::now() - time).as_millis()
+        );
 
-        // let time = Instant::now();
-        // let proof = Proof::create(&pk, &params, circuit, &[&pub_instance], &mut rng).unwrap();
-        // println!("proof: \t\t\t{:?}ms", (Instant::now() - time).as_millis());
+        let time = Instant::now();
+        let proof = Proof::create(&pk, &params, circuit, &[&[]], &mut rng).unwrap();
+        println!("proof: \t\t\t{:?}ms", (Instant::now() - time).as_millis());
 
-        // let time = Instant::now();
-        // assert!(proof.verify(&vk, &params, &[&pub_instance]).is_ok());
-        // println!(
-        //     "verification: \t\t{:?}ms",
-        //     (Instant::now() - time).as_millis()
-        // );
+        let time = Instant::now();
+        assert!(proof.verify(&vk, &params, &[&[]]).is_ok());
+        println!(
+            "verification: \t\t{:?}ms",
+            (Instant::now() - time).as_millis()
+        );
     }
 }
