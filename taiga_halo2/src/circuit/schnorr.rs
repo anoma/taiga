@@ -338,35 +338,9 @@ mod tests {
         s.finish()
     }
 
-    fn plot_it<F: Field, ConcreteCircuit: Circuit<F>>(circuit: &ConcreteCircuit) {
-        // ------- PLOTTING SECTION --------
-        use plotters::prelude::*;
-        let root = BitMapBackend::new("schnorr.png", (1024, 768)).into_drawing_area();
-        root.fill(&WHITE).unwrap();
-        let root = root.titled("Schnorr Layout", ("sans-serif", 40)).unwrap();
-
-        halo2_proofs::dev::CircuitLayout::default()
-            // You can optionally render only a section of the circuit.
-            // .view_width(0..7)
-            // .view_height(0..60)
-            // You can hide labels, which can be useful with smaller areas.
-            .show_labels(true)
-            // Render the circuit onto your area!
-            // The first argument is the size parameter for the circuit.
-            .render(9, circuit, &root)
-            .unwrap();
-
-        let dot_string = halo2_proofs::dev::circuit_dot_graph(circuit);
-
-        // Now you can either handle it in Rust, or just
-        // print it out to use with command-line tools.
-        print!("{}", dot_string);
-        // ---- END OF PLOTTING SECTION --------
-    }
 
     #[test]
     fn test_schnorr() {
-        
         use pasta_curves::{arithmetic::CurveExt};
         let mut rng = OsRng;
         const K: u32 = 13;
@@ -391,9 +365,6 @@ mod tests {
         // Signature = (r, s)
         let circuit = SchnorrCircuit { pk, r, s };
 
-        plot_it(&circuit);
-        // pallas::Point::new_jacobian(x, y, z)
-        // s = s1 + s2 * 2^128
         let pub_instance_vec = vec![m];
         assert_eq!(
             MockProver::run(K, &circuit, vec![pub_instance_vec.clone()])

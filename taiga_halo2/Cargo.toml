@@ -20,7 +20,6 @@ reddsa = "0.3"
 [dev-dependencies]
 criterion = "0.3"
 proptest = "1.0.0"
-plotters = "0.3"
 
 [[bench]]
 name = "action_proof"
