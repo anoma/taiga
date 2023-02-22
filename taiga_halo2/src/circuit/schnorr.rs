@@ -71,8 +71,6 @@ impl SchnorrConfig {
 
 #[derive(Clone, Debug, Default)]
 pub struct SchnorrCircuit {
-    // message
-    m: pallas::Base,
     // public key
     pk: pallas::Point,
     // signature (r,s)
@@ -85,28 +83,7 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
     type FloorPlanner = floor_planner::V1;
 
     fn without_witnesses(&self) -> Self {
-        const K: u32 = 13;
-        let G = NOTE_COMMIT_DOMAIN.R();
-        // Message hash: m
-        let m = pallas::Base::one();
-        // Private key: sk
-        let sk = pallas::Scalar::from(7);
-        // Public key: P = sk*G
-        let pk = G * sk;
-        let (p, _, _) = pk.jacobian_coordinates();
-        // Generate a random number: z
-        let z = pallas::Scalar::from(9);
-        // Calculate: R = z*G
-        let R = G * z;
-        // where: r = X-coordinate of curve point R
-        //        and || denotes binary concatenation
-        let (r, _, _) = R.jacobian_coordinates();
-        // Calculate: s = z + Hash(r||P||m)*sk
-        // let h = mod_r_p(poseidon_hash_4(r, p, m));
-        let h = pallas::Scalar::one();
-        let s = z + h * sk;
-        SchnorrCircuit { m, pk, r: R, s }
-        // sG = R + hP
+        SchnorrCircuit { pk: pallas::Point::generator(), r: pallas::Point::generator(), s: pallas::Scalar::one() }
     }
 
     fn configure(meta: &mut plonk::ConstraintSystem<pallas::Base>) -> Self::Config {
@@ -172,6 +149,7 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
             lagrange_coeffs,
             range_check,
         );
+
         // Instance column used for public inputs
         let primary = meta.instance_column();
         meta.enable_equality(primary);
@@ -248,11 +226,13 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         )?;
         // TODO: Message length (256bits) is bigger than the size of Fp (255bits)
         // Obtain message: m
-        let m_cell = assign_free_advice(
-            layouter.namespace(|| "message"),
+        let m_cell = assign_free_instance(
+            layouter.namespace(|| "message instance"),
+            config.primary,
+            0,
             config.advices[0],
-            Value::known(self.m),
-        )?;
+        )
+        .unwrap();
         // Obtain the signature: (r,s)
         let r_cell = {
             let (r, _, _) = self.r.jacobian_coordinates();
@@ -296,17 +276,10 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
                 poseidon_message,
             )?;
 
-            let tmp = assign_free_advice(
-                layouter.namespace(|| "tmp"),
-                config.advices[0],
-                Value::known(pallas::Base::one()),
-            )?;
-
             ScalarVar::from_base(
                 ecc_chip.clone(),
                 layouter.namespace(|| "ScalarVar from_base"),
-                &tmp,
-                // &h,
+                &h,
             )?
         };
 
@@ -411,16 +384,24 @@ mod tests {
         let z = pallas::Scalar::from(rng.next_u64());
         // Calculate: R = z*G
         let r = G * z;
+        let (rx, _, _) = r.jacobian_coordinates();
         // Calculate: s = z + Hash(r||P||m)*sk
-        // let h = mod_r_p(poseidon_hash_4(r, p, m));
-        let h = pallas::Scalar::one();
+        let h = mod_r_p(poseidon_hash_4(rx, p, m));
         let s = z + h * sk;
         // Signature = (r, s)
-        let circuit = SchnorrCircuit { m, pk, r, s };
+        let circuit = SchnorrCircuit { pk, r, s };
 
         plot_it(&circuit);
-
-        let prover = MockProver::run(K, &circuit, vec![vec![]]).unwrap();
+        // pallas::Point::new_jacobian(x, y, z)
+        // s = s1 + s2 * 2^128
+        let pub_instance_vec = vec![m];
+        assert_eq!(
+            MockProver::run(K, &circuit, vec![pub_instance_vec.clone()])
+                .unwrap()
+                .verify(),
+            Ok(())
+        );
+        let prover = MockProver::run(K, &circuit, vec![pub_instance_vec.clone()]).unwrap();
         prover.assert_satisfied();
 
         let time = Instant::now();
@@ -434,11 +415,11 @@ mod tests {
         );
 
         let time = Instant::now();
-        let proof = Proof::create(&pk, &params, circuit, &[&[]], &mut rng).unwrap();
+        let proof = Proof::create(&pk, &params, circuit, &[&[m]], &mut rng).unwrap();
         println!("proof: \t\t\t{:?}ms", (Instant::now() - time).as_millis());
 
         let time = Instant::now();
-        assert!(proof.verify(&vk, &params, &[&[]]).is_ok());
+        assert!(proof.verify(&vk, &params, &[&[m]]).is_ok());
         println!(
             "verification: \t\t{:?}ms",
             (Instant::now() - time).as_millis()
