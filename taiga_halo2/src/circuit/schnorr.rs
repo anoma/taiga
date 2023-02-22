@@ -1,6 +1,3 @@
-use std::ops::Mul;
-
-
 use group::Curve;
 use halo2_proofs::{
     arithmetic::{CurveExt},
@@ -11,8 +8,8 @@ use pasta_curves::{pallas, Fp};
 
 use crate::{
     circuit::gadgets::{
-        assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
-        MulConfig, MulInstructions, SubChip, SubConfig,
+        assign_free_advice, assign_free_instance, AddChip, AddConfig, MulChip,
+        MulConfig, SubChip, SubConfig,
     },
     constant::{
         NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentFixedBasesFull,
@@ -32,7 +29,6 @@ use halo2_gadgets::{
     utilities::lookup_range_check::LookupRangeCheckConfig,
 };
 
-use group::prime::PrimeCurveAffine;
 use group::Group;
 #[derive(Clone, Debug)]
 pub struct SchnorrConfig {
@@ -268,7 +264,7 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
 
         // Hash(r||P||m)
         let h_scalar = {
-            let poseidon_chip = PoseidonChip::construct(config.poseidon_config.clone());
+            let poseidon_chip = PoseidonChip::construct(config.poseidon_config);
             let poseidon_message = [r_cell, p_cell, m_cell, zero_cell];
             let poseidon_hasher =
                 PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<4>, 3, 2>::init(
@@ -295,7 +291,7 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         // Hash(r||P||m)*P
         let (hP, _) = {
             let P = NonIdentityPoint::new(
-                ecc_chip.clone(),
+                ecc_chip,
                 layouter.namespace(|| "non-identity P"),
                 Value::known(self.pk.to_affine()),
             )?;
