@@ -1,10 +1,10 @@
 use std::ops::Mul;
 
-use ff::PrimeField;
+
 use group::Curve;
 use halo2_proofs::{
-    arithmetic::{CurveExt, FieldExt, SqrtRatio},
-    circuit::{floor_planner, AssignedCell, Layouter, Value},
+    arithmetic::{CurveExt},
+    circuit::{floor_planner, Layouter, Value},
     plonk::{self, Advice, Column, Instance as InstanceColumn},
 };
 use pasta_curves::{pallas, Fp};
@@ -12,20 +12,20 @@ use pasta_curves::{pallas, Fp};
 use crate::{
     circuit::gadgets::{
         assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
-        MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
+        MulConfig, MulInstructions, SubChip, SubConfig,
     },
     constant::{
         NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentFixedBasesFull,
-        NoteCommitmentHashDomain, NullifierK, NOTE_COMMIT_DOMAIN,
+        NoteCommitmentHashDomain,
     },
 };
 use halo2_gadgets::{
     ecc::{
         chip::{EccChip, EccConfig},
-        FixedPoint, FixedPointBaseField, FixedPoints, NonIdentityPoint, ScalarFixed, ScalarVar,
+        FixedPoint, NonIdentityPoint, ScalarFixed, ScalarVar,
     },
     poseidon::{
-        primitives::{self as poseidon, ConstantLength, P128Pow5T3},
+        primitives::{self as poseidon, ConstantLength},
         Hash as PoseidonHash, Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
     },
     sinsemilla::chip::{SinsemillaChip, SinsemillaConfig},
@@ -313,22 +313,22 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
 #[cfg(test)]
 mod tests {
     use ff::Field;
-    use halo2_proofs::{arithmetic::FieldExt, dev::MockProver, plonk::Circuit};
-    use plotters::style::full_palette::WHITE;
+    use halo2_proofs::{dev::MockProver, plonk::Circuit};
+    
     use rand::{rngs::OsRng, RngCore};
 
     use super::SchnorrCircuit;
 
     use crate::{
-        constant::{NOTE_COMMITMENT_R_GENERATOR, NOTE_COMMIT_DOMAIN},
+        constant::{NOTE_COMMIT_DOMAIN},
         proof::Proof,
         utils::{mod_r_p, poseidon_hash_4},
     };
     use halo2_proofs::{
-        plonk::{self, ProvingKey, VerifyingKey},
+        plonk::{self},
         poly::commitment::Params,
     };
-    use pasta_curves::{pallas, vesta};
+    use pasta_curves::{pallas};
     use std::time::Instant;
 
     use std::{
@@ -370,8 +370,8 @@ mod tests {
 
     #[test]
     fn test_schnorr() {
-        use group::{prime::PrimeCurveAffine, Curve, Group};
-        use pasta_curves::{arithmetic::CurveExt, pallas::Point};
+        
+        use pasta_curves::{arithmetic::CurveExt};
         let mut rng = OsRng;
         const K: u32 = 13;
         let G = NOTE_COMMIT_DOMAIN.R();
