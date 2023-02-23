@@ -1,5 +1,3 @@
-
-
 use halo2_proofs::{
     circuit::{AssignedCell, Region},
     plonk::{Advice, Column, ConstraintSystem, Error, Selector},
@@ -7,8 +5,6 @@ use halo2_proofs::{
 };
 
 use pasta_curves::pallas;
-
-
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TripleMulConfig {

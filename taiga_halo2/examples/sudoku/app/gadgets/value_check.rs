@@ -1,17 +1,12 @@
 use ff::Field;
-use halo2_gadgets::utilities::{bool_check};
+use halo2_gadgets::utilities::bool_check;
 use halo2_proofs::{
     circuit::{AssignedCell, Region},
-    plonk::{
-        Advice, Column, ConstraintSystem, Constraints, Error, Expression,
-        Selector,
-    },
+    plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Expression, Selector},
     poly::Rotation,
 };
 
 use pasta_curves::pallas;
-
-
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ValueCheckConfig {

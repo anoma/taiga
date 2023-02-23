@@ -5,16 +5,11 @@ use halo2_proofs::{
     plonk::{Advice, Assigned, Column, Error, Instance},
 };
 
-
-
-
-
 pub mod add;
 pub mod mul;
 pub mod sub;
 pub mod target_note_variable;
 pub mod triple_mul;
-pub mod value_check;
 
 pub fn assign_free_advice<F: Field, V: Copy>(
     mut layouter: impl Layouter<F>,

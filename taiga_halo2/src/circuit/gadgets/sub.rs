@@ -1,5 +1,3 @@
-
-
 use halo2_proofs::{
     circuit::{AssignedCell, Chip, Layouter, Region},
     plonk::{Advice, Column, ConstraintSystem, Error, Selector},
@@ -8,7 +6,6 @@ use halo2_proofs::{
 use pasta_curves::arithmetic::FieldExt;
 
 use std::marker::PhantomData;
-
 
 #[derive(Clone, Debug)]
 pub struct SubChip<F: FieldExt> {
