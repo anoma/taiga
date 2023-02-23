@@ -4,16 +4,13 @@ use halo2_gadgets::{
         primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
         Pow5Chip as PoseidonChip,
     },
-    utilities::bool_check,
 };
 use halo2_proofs::{
     arithmetic::FieldExt,
-    circuit::{floor_planner, AssignedCell, Layouter, Region, Value},
+    circuit::{floor_planner, AssignedCell, Layouter, Value},
     plonk::{
-        keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Constraints, Error,
-        Expression, Instance, Selector,
+        keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance,
     },
-    poly::Rotation,
 };
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
