@@ -386,7 +386,7 @@ mod tests {
     use halo2_proofs::{arithmetic::FieldExt, dev::MockProver};
     use rand::rngs::OsRng;
 
-    use crate::app::valid_sudoku::circuit::SudokuCircuit;
+    use crate::valid_sudoku::circuit::SudokuCircuit;
 
     use halo2_proofs::{
         plonk::{self, ProvingKey, VerifyingKey},
@@ -467,7 +467,7 @@ mod tests {
 
     #[test]
     fn test_synthesize() {
-        use crate::app::valid_sudoku::circuit::SudokuCircuit;
+        use crate::valid_sudoku::circuit::SudokuCircuit;
 
         let sudoku = [
             [5, 8, 1, 6, 7, 2, 4, 3, 9],

@@ -21,7 +21,7 @@ use taiga_halo2::{
     vp_vk::ValidityPredicateVerifyingKey,
 };
 
-use crate::app::valid_sudoku::circuit::{SudokuCircuit, SudokuConfig};
+use crate::circuit::{SudokuCircuit, SudokuConfig};
 use rand::rngs::OsRng;
 
 #[derive(Clone, Debug)]
@@ -142,11 +142,10 @@ mod tests {
         poly::commitment::Params,
     };
 
-    use crate::app::valid_sudoku::{circuit::SudokuCircuit, vp::SudokuVP};
+    use crate::valid_sudoku::{circuit::SudokuCircuit, vp::SudokuVP};
 
     #[test]
     fn test_vp() {
-        // TODO: What do notes contain in Sudoku?
         let mut rng = OsRng;
         let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
