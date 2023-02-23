@@ -1,19 +1,12 @@
 use ff::{Field, PrimeField};
-use halo2_gadgets::{
-    poseidon::{
-        primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
-        Pow5Chip as PoseidonChip,
-    },
-    utilities::bool_check,
+use halo2_gadgets::poseidon::{
+    primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
+    Pow5Chip as PoseidonChip,
 };
 use halo2_proofs::{
     arithmetic::FieldExt,
-    circuit::{floor_planner, AssignedCell, Layouter, Region, Value},
-    plonk::{
-        keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Constraints, Error,
-        Expression, Instance, Selector,
-    },
-    poly::Rotation,
+    circuit::{floor_planner, AssignedCell, Layouter, Value},
+    plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
 };
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
@@ -21,8 +14,10 @@ use rand::RngCore;
 use taiga_halo2::{
     circuit::{
         gadgets::{
-            assign_free_advice, assign_free_constant, MulChip, MulConfig, MulInstructions, SubChip,
-            SubConfig, SubInstructions,
+            assign_free_advice, assign_free_constant,
+            mul::{MulChip, MulConfig, MulInstructions},
+            sub::{SubChip, SubConfig, SubInstructions},
+            triple_mul::TripleMulConfig,
         },
         integrity::{OutputNoteVar, SpendNoteVar},
         note_circuit::NoteConfig,
@@ -39,6 +34,10 @@ use taiga_halo2::{
     vp_vk::ValidityPredicateVerifyingKey,
 };
 
+use crate::gadgets::{
+    state_check::SudokuStateCheckConfig, state_update::StateUpdateConfig,
+    value_check::ValueCheckConfig,
+};
 #[derive(Clone, Debug)]
 pub struct SudokuState {
     pub state: [[u8; 9]; 9],
@@ -116,7 +115,7 @@ struct SudokuAppValidityPredicateCircuit {
     // The note that vp owned is set at spend_notes[0] or output_notes[0] by default. Make it mandatory later.
     // is_spend_note helps locate the target note in spend_notes and output_notes.
     is_spend_note: pallas::Base,
-    //
+    // Initial puzzle encoded in a single field
     encoded_init_state: pallas::Base,
     // If it is a init state, previous_state is equal to current_state
     previous_state: SudokuState,
@@ -125,7 +124,7 @@ struct SudokuAppValidityPredicateCircuit {
 
 #[derive(Clone, Debug)]
 struct SudokuAppValidityPredicateConfig {
-    note_conifg: NoteConfig,
+    note_config: NoteConfig,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
     // get_target_variable_config: GetTargetNoteVariableConfig,
@@ -149,14 +148,14 @@ impl SudokuAppValidityPredicateConfig {
 
 impl ValidityPredicateConfig for SudokuAppValidityPredicateConfig {
     fn get_note_config(&self) -> NoteConfig {
-        self.note_conifg.clone()
+        self.note_config.clone()
     }
 
     fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
-        let note_conifg = Self::configure_note(meta);
+        let note_config = Self::configure_note(meta);
 
-        let advices = note_conifg.advices;
-        let instances = note_conifg.instances;
+        let advices = note_config.advices;
+        let instances = note_config.instances;
         let sudoku_state_check_config = SudokuStateCheckConfig::configure(
             meta, advices[0], advices[1], advices[2], advices[3], advices[4], advices[5],
             advices[6], advices[7],
@@ -168,7 +167,7 @@ impl ValidityPredicateConfig for SudokuAppValidityPredicateConfig {
         let sub_config = SubChip::configure(meta, [advices[0], advices[1]]);
         let mul_config = MulChip::configure(meta, [advices[0], advices[1]]);
         Self {
-            note_conifg,
+            note_config,
             advices,
             instances,
             sudoku_state_check_config,
@@ -638,369 +637,6 @@ impl ValidityPredicateCircuit for SudokuAppValidityPredicateCircuit {
 
 vp_circuit_impl!(SudokuAppValidityPredicateCircuit);
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct SudokuStateCheckConfig {
-    q_state_check: Selector,
-    is_spend_note: Column<Advice>,
-    init_state: Column<Advice>,
-    spend_note_app_data: Column<Advice>,
-    spend_note_app_data_encoding: Column<Advice>,
-    spend_note_vk: Column<Advice>,
-    output_note_vk: Column<Advice>,
-    spend_note_pre_state: Column<Advice>,
-    output_note_cur_state: Column<Advice>,
-}
-
-impl SudokuStateCheckConfig {
-    #[allow(clippy::too_many_arguments)]
-    pub fn configure(
-        meta: &mut ConstraintSystem<pallas::Base>,
-        is_spend_note: Column<Advice>,
-        init_state: Column<Advice>,
-        spend_note_app_data: Column<Advice>,
-        spend_note_app_data_encoding: Column<Advice>,
-        spend_note_vk: Column<Advice>,
-        output_note_vk: Column<Advice>,
-        spend_note_pre_state: Column<Advice>,
-        output_note_cur_state: Column<Advice>,
-    ) -> Self {
-        meta.enable_equality(is_spend_note);
-        meta.enable_equality(init_state);
-        meta.enable_equality(spend_note_app_data);
-        meta.enable_equality(spend_note_app_data_encoding);
-        meta.enable_equality(spend_note_vk);
-        meta.enable_equality(output_note_vk);
-        meta.enable_equality(spend_note_pre_state);
-        meta.enable_equality(output_note_cur_state);
-
-        let config = Self {
-            q_state_check: meta.selector(),
-            is_spend_note,
-            init_state,
-            spend_note_app_data,
-            spend_note_app_data_encoding,
-            spend_note_vk,
-            output_note_vk,
-            spend_note_pre_state,
-            output_note_cur_state,
-        };
-
-        config.create_gate(meta);
-
-        config
-    }
-
-    fn create_gate(&self, meta: &mut ConstraintSystem<pallas::Base>) {
-        meta.create_gate("check state", |meta| {
-            let q_state_check = meta.query_selector(self.q_state_check);
-            let is_spend_note = meta.query_advice(self.is_spend_note, Rotation::cur());
-            let init_state = meta.query_advice(self.init_state, Rotation::cur());
-            let spend_note_app_data = meta.query_advice(self.spend_note_app_data, Rotation::cur());
-            let spend_note_app_data_encoding =
-                meta.query_advice(self.spend_note_app_data_encoding, Rotation::cur());
-            let spend_note_vk = meta.query_advice(self.spend_note_vk, Rotation::cur());
-            let output_note_vk = meta.query_advice(self.output_note_vk, Rotation::cur());
-
-            let spend_note_pre_state =
-                meta.query_advice(self.spend_note_pre_state, Rotation::cur());
-            let output_note_cur_state =
-                meta.query_advice(self.output_note_cur_state, Rotation::cur());
-            let pre_state_minus_cur_state = spend_note_pre_state - output_note_cur_state.clone();
-            let pre_state_minus_cur_state_inv =
-                meta.query_advice(self.spend_note_pre_state, Rotation::next());
-            let one = Expression::Constant(pallas::Base::one());
-            let pre_state_minus_cur_state_is_zero =
-                one - pre_state_minus_cur_state.clone() * pre_state_minus_cur_state_inv;
-            let poly = pre_state_minus_cur_state_is_zero.clone() * pre_state_minus_cur_state;
-
-            let bool_check_is_spend = bool_check(is_spend_note.clone());
-
-            Constraints::with_selector(
-                q_state_check,
-                [
-                    ("bool_check_is_spend", bool_check_is_spend),
-                    (
-                        "check vk",
-                        is_spend_note.clone() * (spend_note_vk.clone() - output_note_vk.clone()),
-                    ),
-                    (
-                        "check spend_note_app_data_encoding",
-                        is_spend_note.clone()
-                            * (spend_note_app_data_encoding - spend_note_app_data),
-                    ),
-                    (
-                        "check puzzle init",
-                        (init_state - output_note_cur_state) * (output_note_vk - spend_note_vk),
-                    ),
-                    ("is_zero check", poly),
-                    (
-                        "pre_state != cur_state",
-                        is_spend_note * pre_state_minus_cur_state_is_zero,
-                    ),
-                ],
-            )
-        });
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub fn assign_region(
-        &self,
-        is_spend_note: &AssignedCell<pallas::Base, pallas::Base>,
-        init_state: &AssignedCell<pallas::Base, pallas::Base>,
-        spend_note_app_data: &AssignedCell<pallas::Base, pallas::Base>,
-        spend_note_app_data_encoding: &AssignedCell<pallas::Base, pallas::Base>,
-        spend_note_vk: &AssignedCell<pallas::Base, pallas::Base>,
-        output_note_vk: &AssignedCell<pallas::Base, pallas::Base>,
-        spend_note_pre_state: &AssignedCell<pallas::Base, pallas::Base>,
-        output_note_cur_state: &AssignedCell<pallas::Base, pallas::Base>,
-        offset: usize,
-        region: &mut Region<'_, pallas::Base>,
-    ) -> Result<(), Error> {
-        // Enable `q_state_check` selector
-        self.q_state_check.enable(region, offset)?;
-
-        is_spend_note.copy_advice(|| "is_spend_notex", region, self.is_spend_note, offset)?;
-        init_state.copy_advice(|| "init_state", region, self.init_state, offset)?;
-        spend_note_app_data.copy_advice(
-            || "spend_note_app_data",
-            region,
-            self.spend_note_app_data,
-            offset,
-        )?;
-        spend_note_app_data_encoding.copy_advice(
-            || "spend_note_app_data_encoding",
-            region,
-            self.spend_note_app_data_encoding,
-            offset,
-        )?;
-        spend_note_vk.copy_advice(|| "spend_note_vk", region, self.spend_note_vk, offset)?;
-        output_note_vk.copy_advice(|| "output_note_vk", region, self.output_note_vk, offset)?;
-        spend_note_pre_state.copy_advice(
-            || "spend_note_pre_state",
-            region,
-            self.spend_note_pre_state,
-            offset,
-        )?;
-        output_note_cur_state.copy_advice(
-            || "output_note_cur_state",
-            region,
-            self.output_note_cur_state,
-            offset,
-        )?;
-        let pre_state_minus_cur_state_inv = spend_note_pre_state
-            .value()
-            .zip(output_note_cur_state.value())
-            .map(|(pre, cur)| (pre - cur).invert().unwrap_or(pallas::Base::zero()));
-        region.assign_advice(
-            || "pre_state_minus_cur_state_inv",
-            self.spend_note_pre_state,
-            offset + 1,
-            || pre_state_minus_cur_state_inv,
-        )?;
-
-        Ok(())
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct StateUpdateConfig {
-    q_state_update: Selector,
-    is_spend_note: Column<Advice>,
-    pre_state_cell: Column<Advice>,
-    cur_state_cell: Column<Advice>,
-}
-
-impl StateUpdateConfig {
-    #[allow(clippy::too_many_arguments)]
-    pub fn configure(
-        meta: &mut ConstraintSystem<pallas::Base>,
-        is_spend_note: Column<Advice>,
-        pre_state_cell: Column<Advice>,
-        cur_state_cell: Column<Advice>,
-    ) -> Self {
-        meta.enable_equality(is_spend_note);
-        meta.enable_equality(pre_state_cell);
-        meta.enable_equality(cur_state_cell);
-
-        let config = Self {
-            q_state_update: meta.selector(),
-            is_spend_note,
-            pre_state_cell,
-            cur_state_cell,
-        };
-
-        config.create_gate(meta);
-
-        config
-    }
-
-    fn create_gate(&self, meta: &mut ConstraintSystem<pallas::Base>) {
-        meta.create_gate("check state update", |meta| {
-            let q_state_update = meta.query_selector(self.q_state_update);
-            let is_spend_note = meta.query_advice(self.is_spend_note, Rotation::cur());
-            let pre_state_cell = meta.query_advice(self.pre_state_cell, Rotation::cur());
-            let cur_state_cell = meta.query_advice(self.cur_state_cell, Rotation::cur());
-
-            let bool_check_is_spend = bool_check(is_spend_note.clone());
-
-            Constraints::with_selector(
-                q_state_update,
-                [
-                    ("bool_check_is_spend", bool_check_is_spend),
-                    (
-                        "check state update",
-                        is_spend_note * pre_state_cell.clone() * (pre_state_cell - cur_state_cell),
-                    ),
-                ],
-            )
-        });
-    }
-
-    pub fn assign_region(
-        &self,
-        is_spend_note: &AssignedCell<pallas::Base, pallas::Base>,
-        pre_state_cell: &AssignedCell<pallas::Base, pallas::Base>,
-        cur_state_cell: &AssignedCell<pallas::Base, pallas::Base>,
-        offset: usize,
-        region: &mut Region<'_, pallas::Base>,
-    ) -> Result<(), Error> {
-        // Enable `q_state_update` selector
-        self.q_state_update.enable(region, offset)?;
-
-        is_spend_note.copy_advice(|| "is_spend_notex", region, self.is_spend_note, offset)?;
-        pre_state_cell.copy_advice(|| "pre_state_cell", region, self.pre_state_cell, offset)?;
-        cur_state_cell.copy_advice(|| "cur_state_cell", region, self.cur_state_cell, offset)?;
-        Ok(())
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct TripleMulConfig {
-    q_triple_mul: Selector,
-    advice: [Column<Advice>; 3],
-}
-
-impl TripleMulConfig {
-    #[allow(clippy::too_many_arguments)]
-    pub fn configure(
-        meta: &mut ConstraintSystem<pallas::Base>,
-        advice: [Column<Advice>; 3],
-    ) -> Self {
-        let config = Self {
-            q_triple_mul: meta.selector(),
-            advice,
-        };
-
-        config.create_gate(meta);
-
-        config
-    }
-
-    fn create_gate(&self, meta: &mut ConstraintSystem<pallas::Base>) {
-        meta.create_gate("triple mul", |meta| {
-            let q_triple_mul = meta.query_selector(self.q_triple_mul);
-            let first = meta.query_advice(self.advice[0], Rotation::cur());
-            let second = meta.query_advice(self.advice[1], Rotation::cur());
-            let third = meta.query_advice(self.advice[2], Rotation::cur());
-            let out = meta.query_advice(self.advice[0], Rotation::next());
-
-            vec![q_triple_mul * (first * second * third - out)]
-        });
-    }
-
-    pub fn assign_region(
-        &self,
-        first: &AssignedCell<pallas::Base, pallas::Base>,
-        second: &AssignedCell<pallas::Base, pallas::Base>,
-        third: &AssignedCell<pallas::Base, pallas::Base>,
-        offset: usize,
-        region: &mut Region<'_, pallas::Base>,
-    ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
-        // Enable `q_triple_mul` selector
-        self.q_triple_mul.enable(region, offset)?;
-
-        first.copy_advice(|| "first", region, self.advice[0], offset)?;
-        second.copy_advice(|| "second", region, self.advice[1], offset)?;
-        third.copy_advice(|| "third", region, self.advice[2], offset)?;
-        let value = first.value() * second.value() * third.value();
-
-        region.assign_advice(|| "out", self.advice[0], 1, || value)
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ValueCheckConfig {
-    q_value_check: Selector,
-    state_product: Column<Advice>,
-    value: Column<Advice>,
-}
-
-impl ValueCheckConfig {
-    #[allow(clippy::too_many_arguments)]
-    pub fn configure(
-        meta: &mut ConstraintSystem<pallas::Base>,
-        state_product: Column<Advice>,
-        value: Column<Advice>,
-    ) -> Self {
-        let config = Self {
-            q_value_check: meta.selector(),
-            state_product,
-            value,
-        };
-
-        config.create_gate(meta);
-
-        config
-    }
-
-    fn create_gate(&self, meta: &mut ConstraintSystem<pallas::Base>) {
-        meta.create_gate("check state update", |meta| {
-            let q_value_check = meta.query_selector(self.q_value_check);
-            let state_product = meta.query_advice(self.state_product, Rotation::cur());
-            let value = meta.query_advice(self.value, Rotation::cur());
-            let state_product_inv = meta.query_advice(self.state_product, Rotation::next());
-            let one = Expression::Constant(pallas::Base::one());
-            let state_product_is_zero = one - state_product.clone() * state_product_inv;
-            let poly = state_product_is_zero.clone() * state_product;
-
-            let bool_check_value = bool_check(value.clone());
-
-            Constraints::with_selector(
-                q_value_check,
-                [
-                    ("bool_check_value", bool_check_value),
-                    ("is_zero check", poly),
-                    ("value check", (state_product_is_zero - value)),
-                ],
-            )
-        });
-    }
-
-    pub fn assign_region(
-        &self,
-        state_product: &AssignedCell<pallas::Base, pallas::Base>,
-        value: &AssignedCell<pallas::Base, pallas::Base>,
-        offset: usize,
-        region: &mut Region<'_, pallas::Base>,
-    ) -> Result<(), Error> {
-        // Enable `q_value_check` selector
-        self.q_value_check.enable(region, offset)?;
-
-        state_product.copy_advice(|| "state_product", region, self.state_product, offset)?;
-        value.copy_advice(|| "value", region, self.value, offset)?;
-        let state_product_inv = state_product
-            .value()
-            .map(|state_product| state_product.invert().unwrap_or(pallas::Base::zero()));
-        region.assign_advice(
-            || "state_product_inv",
-            self.state_product,
-            offset + 1,
-            || state_product_inv,
-        )?;
-        Ok(())
-    }
-}
-
 #[test]
 fn test_halo2_sudoku_app_vp_circuit_init() {
     use halo2_proofs::dev::MockProver;
@@ -1087,10 +723,8 @@ fn test_halo2_sudoku_app_vp_circuit_update() {
     assert_eq!(prover.verify(), Ok(()));
 }
 
-#[test]
-fn test_halo2_sudoku_app_vp_circuit_final() {
+pub fn halo2_sudoku_app_vp_circuit_final() {
     use halo2_proofs::dev::MockProver;
-    use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     // Construct circuit
@@ -1158,4 +792,9 @@ fn test_halo2_sudoku_app_vp_circuit_final() {
 
     let prover = MockProver::<pallas::Base>::run(13, &circuit, vec![instances]).unwrap();
     assert_eq!(prover.verify(), Ok(()));
+}
+
+#[test]
+pub fn test_halo2_sudoku_app_vp_circuit_final() {
+    halo2_sudoku_app_vp_circuit_final();
 }

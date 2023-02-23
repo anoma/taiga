@@ -12,8 +12,10 @@ use halo2_gadgets::poseidon::{
     Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
 };
 use taiga_halo2::circuit::gadgets::{
-    assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
-    MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
+    add::{AddChip, AddConfig, AddInstructions},
+    assign_free_advice, assign_free_instance,
+    mul::{MulChip, MulConfig, MulInstructions},
+    sub::{SubChip, SubConfig, SubInstructions},
 };
 
 #[derive(Clone, Debug)]
@@ -384,7 +386,7 @@ mod tests {
     use halo2_proofs::{arithmetic::FieldExt, dev::MockProver};
     use rand::rngs::OsRng;
 
-    use crate::app::valid_sudoku::circuit::SudokuCircuit;
+    use crate::valid_sudoku::circuit::SudokuCircuit;
 
     use halo2_proofs::{
         plonk::{self, ProvingKey, VerifyingKey},
@@ -465,7 +467,7 @@ mod tests {
 
     #[test]
     fn test_synthesize() {
-        use crate::app::valid_sudoku::circuit::SudokuCircuit;
+        use crate::valid_sudoku::circuit::SudokuCircuit;
 
         let sudoku = [
             [5, 8, 1, 6, 7, 2, 4, 3, 9],

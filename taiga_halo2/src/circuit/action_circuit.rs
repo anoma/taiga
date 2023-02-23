@@ -1,4 +1,4 @@
-use crate::circuit::gadgets::AddChip;
+use crate::circuit::gadgets::add::AddChip;
 use crate::circuit::hash_to_curve::HashToCurveConfig;
 use crate::circuit::integrity::{check_output_note, check_spend_note, compute_value_commitment};
 use crate::circuit::merkle_circuit::{

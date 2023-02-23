@@ -1,4 +1,4 @@
-use crate::circuit::gadgets::{AddChip, AddConfig};
+use crate::circuit::gadgets::add::{AddChip, AddConfig};
 use crate::constant::{NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain};
 use halo2_gadgets::{
     ecc::chip::EccConfig,
