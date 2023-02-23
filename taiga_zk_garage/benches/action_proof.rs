@@ -67,7 +67,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
     verify_proof::<Fr, P, PC>(pp, verifier_data.key, &proof, &verifier_data.pi, b"Test").unwrap();
 }
 fn criterion_benchmark(c: &mut Criterion) {
-    bench_action_proof("action-proof", c);
+    bench_action_proof("zk-garage-action-proof", c);
 }
 
 criterion_group!(benches, criterion_benchmark);
