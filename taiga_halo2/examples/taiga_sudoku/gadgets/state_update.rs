@@ -1,4 +1,3 @@
-
 use halo2_gadgets::utilities::bool_check;
 use halo2_proofs::{
     circuit::{AssignedCell, Region},

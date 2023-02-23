@@ -1,16 +1,12 @@
 use ff::{Field, PrimeField};
-use halo2_gadgets::{
-    poseidon::{
-        primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
-        Pow5Chip as PoseidonChip,
-    },
+use halo2_gadgets::poseidon::{
+    primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
+    Pow5Chip as PoseidonChip,
 };
 use halo2_proofs::{
     arithmetic::FieldExt,
     circuit::{floor_planner, AssignedCell, Layouter, Value},
-    plonk::{
-        keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance,
-    },
+    plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
 };
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
@@ -38,7 +34,7 @@ use taiga_halo2::{
     vp_vk::ValidityPredicateVerifyingKey,
 };
 
-use crate::app::gadgets::{
+use crate::gadgets::{
     state_check::SudokuStateCheckConfig, state_update::StateUpdateConfig,
     value_check::ValueCheckConfig,
 };
@@ -727,8 +723,7 @@ fn test_halo2_sudoku_app_vp_circuit_update() {
     assert_eq!(prover.verify(), Ok(()));
 }
 
-#[test]
-fn test_halo2_sudoku_app_vp_circuit_final() {
+pub fn halo2_sudoku_app_vp_circuit_final() {
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
@@ -798,4 +793,9 @@ fn test_halo2_sudoku_app_vp_circuit_final() {
 
     let prover = MockProver::<pallas::Base>::run(13, &circuit, vec![instances]).unwrap();
     assert_eq!(prover.verify(), Ok(()));
+}
+
+#[test]
+pub fn test_halo2_sudoku_app_vp_circuit_final() {
+    halo2_sudoku_app_vp_circuit_final();
 }
