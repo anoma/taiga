@@ -725,7 +725,6 @@ fn test_halo2_sudoku_app_vp_circuit_update() {
 
 pub fn halo2_sudoku_app_vp_circuit_final() {
     use halo2_proofs::dev::MockProver;
-    use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     // Construct circuit
