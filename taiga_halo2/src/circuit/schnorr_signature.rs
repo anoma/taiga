@@ -1,6 +1,6 @@
 use group::Curve;
 use halo2_proofs::{
-    arithmetic::{CurveAffine, CurveExt},
+    arithmetic::{CurveAffine},
     circuit::{floor_planner, Layouter, Value},
     plonk::{self, Advice, Column, Instance as InstanceColumn},
 };
@@ -362,7 +362,7 @@ mod tests {
 
     #[test]
     fn test_schnorr() {
-        use pasta_curves::arithmetic::CurveExt;
+        
         let mut rng = OsRng;
         const K: u32 = 13;
         let generator = NOTE_COMMIT_DOMAIN.R();
