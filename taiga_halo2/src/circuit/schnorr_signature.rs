@@ -263,10 +263,25 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         // Hash(r||P||m)
         let h_scalar = {
             let poseidon_chip = PoseidonChip::construct(config.poseidon_config);
-            let rx_cell = R.extract_p().inner().clone();
-            let poseidon_message = [rx_cell, px_cell, py_cell, m_cell];
+            let rx_cell = R.inner().x();
+            let ry_cell = R.inner().y();
+            let zero_cell = assign_free_advice(
+                layouter.namespace(|| "zero"),
+                config.advices[0],
+                Value::known(pallas::Base::zero()),
+            )?;
+            let poseidon_message = [
+                rx_cell,
+                ry_cell,
+                px_cell,
+                py_cell,
+                m_cell,
+                zero_cell.clone(),
+                zero_cell.clone(),
+                zero_cell,
+            ];
             let poseidon_hasher =
-                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<4>, 3, 2>::init(
+                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<8>, 3, 2>::init(
                     poseidon_chip,
                     layouter.namespace(|| "Poseidon init"),
                 )?;
@@ -353,11 +368,15 @@ mod tests {
         let r = generator * z;
         let r_coord = r.to_affine().coordinates().unwrap();
         // Calculate: s = z + Hash(r||P||m)*sk
-        let h = mod_r_p(poseidon_hash_n::<4>([
+        let h = mod_r_p(poseidon_hash_n::<8>([
             *r_coord.x(),
+            *r_coord.y(),
             *pk_coord.x(),
             *pk_coord.y(),
             m,
+            pallas::Base::zero(),
+            pallas::Base::zero(),
+            pallas::Base::zero(),
         ]));
         let s = z + h * sk;
         // Signature = (r, s)
