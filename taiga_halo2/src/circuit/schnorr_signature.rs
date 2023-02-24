@@ -4,7 +4,7 @@ use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
     plonk::{self, Advice, Column, Instance as InstanceColumn},
 };
-use pasta_curves::{pallas, Fp};
+use pasta_curves::{pallas};
 
 use crate::{
     circuit::gadgets::{
