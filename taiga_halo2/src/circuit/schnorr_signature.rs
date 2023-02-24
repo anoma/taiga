@@ -219,11 +219,6 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         // and assume that the signature is given
         // Construct an ECC chip
         let ecc_chip = EccChip::construct(config.ecc_config);
-        let zero_cell = assign_free_advice(
-            layouter.namespace(|| "zero"),
-            config.advices[0],
-            Value::known(Fp::zero()),
-        )?;
         // TODO: Message length (256bits) is bigger than the size of Fp (255bits)
         // Obtain message: m
         let m_cell = assign_free_instance(
