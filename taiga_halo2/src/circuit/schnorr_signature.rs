@@ -1,6 +1,6 @@
 use group::Curve;
 use halo2_proofs::{
-    arithmetic::{CurveAffine},
+    arithmetic::CurveAffine,
     circuit::{floor_planner, Layouter, Value},
     plonk::{self, Advice, Column, Instance as InstanceColumn},
 };
@@ -362,7 +362,6 @@ mod tests {
 
     #[test]
     fn test_schnorr() {
-        
         let mut rng = OsRng;
         const K: u32 = 13;
         let generator = NOTE_COMMIT_DOMAIN.R();
@@ -381,16 +380,15 @@ mod tests {
         let r = generator * z;
         let r_coord = r.to_affine().coordinates().unwrap();
         // Calculate: s = z + Hash(r||P||m)*sk
-        let zero = pallas::Base::zero();
         let h = mod_r_p(poseidon_hash_8([
             *r_coord.x(),
             *r_coord.y(),
             *pk_coord.x(),
             *pk_coord.y(),
             m,
-            zero.clone(),
-            zero.clone(),
-            zero,
+            pallas::Base::zero(),
+            pallas::Base::zero(),
+            pallas::Base::zero(),
         ]));
         let s = z + h * sk;
         // Signature = (r, s)
