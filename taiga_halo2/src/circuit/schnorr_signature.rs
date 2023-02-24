@@ -1,6 +1,6 @@
 use group::Curve;
 use halo2_proofs::{
-    arithmetic::CurveExt,
+    arithmetic::{CurveAffine, CurveExt},
     circuit::{floor_planner, Layouter, Value},
     plonk::{self, Advice, Column, Instance as InstanceColumn},
 };
@@ -234,13 +234,19 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         )
         .unwrap();
         // Obtain the signature: (r,s)
-        let r_cell = {
-            let (r, _, _) = self.r.jacobian_coordinates();
-            assign_free_advice(
-                layouter.namespace(|| "r"),
+        let (rx_cell, ry_cell) = {
+            let r_coord = self.r.to_affine().coordinates().unwrap();
+            let rx_cell = assign_free_advice(
+                layouter.namespace(|| "rx"),
                 config.advices[0],
-                Value::known(r),
-            )?
+                Value::known(*r_coord.x()),
+            )?;
+            let ry_cell = assign_free_advice(
+                layouter.namespace(|| "ry"),
+                config.advices[0],
+                Value::known(*r_coord.y()),
+            )?;
+            (rx_cell, ry_cell)
         };
         let s_scalar = ScalarFixed::new(
             ecc_chip.clone(),
@@ -248,13 +254,19 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
             Value::known(self.s),
         )?;
         // Obtain public key : P
-        let p_cell = {
-            let (p, _, _) = self.pk.jacobian_coordinates();
-            assign_free_advice(
-                layouter.namespace(|| "p"),
+        let (px_cell, py_cell) = {
+            let p_coord = self.pk.to_affine().coordinates().unwrap();
+            let px_cell = assign_free_advice(
+                layouter.namespace(|| "px"),
                 config.advices[0],
-                Value::known(p),
-            )?
+                Value::known(*p_coord.x()),
+            )?;
+            let py_cell = assign_free_advice(
+                layouter.namespace(|| "py"),
+                config.advices[1],
+                Value::known(*p_coord.y()),
+            )?;
+            (px_cell, py_cell)
         };
 
         // Verify: s*G = R + Hash(r||P||m)*P
@@ -265,9 +277,18 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         // Hash(r||P||m)
         let h_scalar = {
             let poseidon_chip = PoseidonChip::construct(config.poseidon_config);
-            let poseidon_message = [r_cell, p_cell, m_cell, zero_cell];
+            let poseidon_message = [
+                rx_cell,
+                ry_cell,
+                px_cell,
+                py_cell,
+                m_cell,
+                zero_cell.clone(),
+                zero_cell.clone(),
+                zero_cell,
+            ];
             let poseidon_hasher =
-                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<4>, 3, 2>::init(
+                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<8>, 3, 2>::init(
                     poseidon_chip,
                     layouter.namespace(|| "Poseidon init"),
                 )?;
@@ -309,7 +330,8 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
 #[cfg(test)]
 mod tests {
 
-    use halo2_proofs::dev::MockProver;
+    use group::Curve;
+    use halo2_proofs::{arithmetic::CurveAffine, dev::MockProver};
 
     use rand::{rngs::OsRng, RngCore};
 
@@ -318,7 +340,7 @@ mod tests {
     use crate::{
         constant::NOTE_COMMIT_DOMAIN,
         proof::Proof,
-        utils::{mod_r_p, poseidon_hash_4},
+        utils::{mod_r_p, poseidon_hash_8},
     };
     use halo2_proofs::{
         plonk::{self},
@@ -352,14 +374,24 @@ mod tests {
         let sk = pallas::Scalar::from(rng.next_u64());
         // Public key: P = sk*G
         let pk = generator * sk;
-        let (p, _, _) = pk.jacobian_coordinates();
+        let pk_coord = pk.to_affine().coordinates().unwrap();
         // Generate a random number: z
         let z = pallas::Scalar::from(rng.next_u64());
         // Calculate: R = z*G
         let r = generator * z;
-        let (rx, _, _) = r.jacobian_coordinates();
+        let r_coord = r.to_affine().coordinates().unwrap();
         // Calculate: s = z + Hash(r||P||m)*sk
-        let h = mod_r_p(poseidon_hash_4(rx, p, m));
+        let zero = pallas::Base::zero();
+        let h = mod_r_p(poseidon_hash_8([
+            *r_coord.x(),
+            *r_coord.y(),
+            *pk_coord.x(),
+            *pk_coord.y(),
+            m,
+            zero.clone(),
+            zero.clone(),
+            zero,
+        ]));
         let s = z + h * sk;
         // Signature = (r, s)
         let circuit = SchnorrCircuit { pk, r, s };
