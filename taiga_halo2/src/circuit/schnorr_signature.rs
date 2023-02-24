@@ -233,21 +233,12 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
             config.advices[0],
         )
         .unwrap();
-        // Obtain the signature: (r,s)
-        let (rx_cell, ry_cell) = {
-            let r_coord = self.r.to_affine().coordinates().unwrap();
-            let rx_cell = assign_free_advice(
-                layouter.namespace(|| "rx"),
-                config.advices[0],
-                Value::known(*r_coord.x()),
-            )?;
-            let ry_cell = assign_free_advice(
-                layouter.namespace(|| "ry"),
-                config.advices[0],
-                Value::known(*r_coord.y()),
-            )?;
-            (rx_cell, ry_cell)
-        };
+        // Obtain the signature: (R,s)
+        let R = NonIdentityPoint::new(
+            ecc_chip.clone(),
+            layouter.namespace(|| "non-identity R"),
+            Value::known(self.r.to_affine()),
+        )?;
         let s_scalar = ScalarFixed::new(
             ecc_chip.clone(),
             layouter.namespace(|| "s"),
@@ -277,18 +268,10 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         // Hash(r||P||m)
         let h_scalar = {
             let poseidon_chip = PoseidonChip::construct(config.poseidon_config);
-            let poseidon_message = [
-                rx_cell,
-                ry_cell,
-                px_cell,
-                py_cell,
-                m_cell,
-                zero_cell.clone(),
-                zero_cell.clone(),
-                zero_cell,
-            ];
+            let rx_cell = R.extract_p().inner().clone();
+            let poseidon_message = [rx_cell, px_cell, py_cell, m_cell];
             let poseidon_hasher =
-                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<8>, 3, 2>::init(
+                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<4>, 3, 2>::init(
                     poseidon_chip,
                     layouter.namespace(|| "Poseidon init"),
                 )?;
@@ -304,11 +287,6 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
             )?
         };
 
-        let R = NonIdentityPoint::new(
-            ecc_chip.clone(),
-            layouter.namespace(|| "non-identity R"),
-            Value::known(self.r.to_affine()),
-        )?;
         // Hash(r||P||m)*P
         let (hP, _) = {
             let P = NonIdentityPoint::new(
@@ -340,7 +318,7 @@ mod tests {
     use crate::{
         constant::NOTE_COMMIT_DOMAIN,
         proof::Proof,
-        utils::{mod_r_p, poseidon_hash_8},
+        utils::{mod_r_p, poseidon_hash_n},
     };
     use halo2_proofs::{
         plonk::{self},
@@ -380,15 +358,11 @@ mod tests {
         let r = generator * z;
         let r_coord = r.to_affine().coordinates().unwrap();
         // Calculate: s = z + Hash(r||P||m)*sk
-        let h = mod_r_p(poseidon_hash_8([
+        let h = mod_r_p(poseidon_hash_n::<4>([
             *r_coord.x(),
-            *r_coord.y(),
             *pk_coord.x(),
             *pk_coord.y(),
             m,
-            pallas::Base::zero(),
-            pallas::Base::zero(),
-            pallas::Base::zero(),
         ]));
         let s = z + h * sk;
         // Signature = (r, s)
