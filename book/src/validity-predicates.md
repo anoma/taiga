@@ -28,6 +28,8 @@ The application VP then will enforce checking the `userVP` of each user involved
 
 ![img.png](images/vp_hierarchy.png)
 
+⚠️ If the application VP allows its users to define VPs, it is the user's responsibility to make sure the `userVP` is correct and only allows the actions that the user intended to allow. An incorrectly defined `userVP` might lead to a loss of assets guarded by that `userVP`. 
+
 ### Transparent vs shielded VPs
 Validity predicates in principle can be both transparent and shielded. Transparent VPs are represented as WASM code and publicly visible, 
 shielded VPs are represented as arithmetic circuits hidden under ZKPs. Each transaction in Taiga has VP proofs attached to it, 

@@ -75,10 +75,6 @@ Solvers are responsible for creation of all proofs (`Action`, `VP`, etc) require
 
 When solvers receive partial solutions from the gossip network, they must check all of the proofs attached to them.
 
-#### Local commitment trees
-
-To store note commitments of the created notes, a local commitment tree `CMtree` is created. After the transaction is finalized, the tree will be published on the blockchain along with the transaction.
-
 ### Partial vs final match
 
 After the solver matches the notes, two cases are possible:
@@ -100,8 +96,6 @@ A created transaction contains information about the proposed state transition t
 - Action circuit proofs
 - and some additional data
   
-The local CMTree and all of the proofs created are published on the blockchain as well.
-
 # How to express the preferences
 
 A user can express their preferences in two ways. 

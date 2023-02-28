@@ -27,9 +27,10 @@ All total (accumulated over ptxs) per-token balances are equal to 0, and the fin
 
 ||spent notes|created notes|Apps|VP proofs|total balance (accumulated)|
 |-|-|-|-|-|-|
-|ptx #1 (Alice)|[1]A, [2]B|[Alice intent note]|intent app, A token, B token|Alice intentVP, intent App VP, Alice A userVP, A appVP, Alice B userVP, B appVP (6)|-[1]A-[2]B + [Alice intent note]|
-|ptx #2 (Bob)|[blue dolphin NFT]|[1]A|blue dolphin NFT app, A token|Bob A userVP, A appVP, Bob NFT userVP, NFT appVP (4)|-2[B] - [blue dolphin NFT] + [Alice intent note]
-|ptx #3 (Solver)|[Alice intent note]|[blue dolphin NFT], [2]B|intent app, blue dolphin NFT app, B token|Alice NFT userVP, NFT appVP, Alice intent userVP, intent AppVP, Alice B user VP, B appVP (6)|0|
+|ptx #1 (Alice)|[1]A, [2]B|[1]Alice-intent-note|intent app, A app, B app|Alice intent userVP, intent app 
+VP, Alice A userVP, A appVP, Alice B userVP, B appVP (6)|-[1]A-[2]B + [1]Alice-intent-note|
+|ptx #2 (Bob)|[1]blue-dolphin-NFT|[1]A|blue-dolphin-NFT app, A app|Bob A userVP, A appVP, Bob blue-dolphin-NFT userVP, blue-dolphin-NFT appVP (4)|-2[B] - [1]blue-dolphin-NFT + [1]Alice-intent-note
+|ptx #3 (Solver)|[1]Alice-intent-note|[1]blue-dolphin-NFT, [2]B|intent app, blue-dolphin-NFT app, B app|Alice blue-dolphin-NFT userVP, NFT appVP, Alice intent userVP, intent appVP, Alice B userVP, B appVP (6)|0|
 
 We assume here that all applications support userVPs and that both Alice and Bob have a userVP in each application.
 
@@ -60,9 +61,9 @@ Total per-token balances:
 |token|spent|output|spent - output|
 |-|-|-|-|
 |star NFT|1|0|1|
-|blue dolphin NFT|1|1||
-|blue intent|[1] - [1]|-|0|
-|yellow intent|[1] |-|[1]|
+|blue dolphin NFT|1|1|0|
+|blue intent|1|1|0|
+|yellow intent|0|1|1|
 
 **Step 4**: A solver sees all previous partial transactions, and the initial transaction created by Charlie.
 The solver matches them together and creates new partial transactions, sending the tree to Bob and the star to Charlie.
@@ -72,12 +73,14 @@ Total per-token balances:
 
 |token|spent|output|spent - output|
 |-|-|-|-|
+|token|spent|output|spent - output|
+|-|-|-|-|
 |star NFT|1|1|0|
 |blue dolphin NFT|1|1|0|
-|blue intent|[1] - [1] = [0]|-|0|
-|yellow intent|[1] - [1]|-|0|
+|blue intent|1|1|0|
+|yellow intent|1|1|0|
 |tree NFT|1|1|0|
-|green intent|[1] - [1]|-|0|
+|green intent|1|1|0|
 
 **Step 5**:
 The final transaction containing the spent and output notes from partial transactions is created with all proofs attached.

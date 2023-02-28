@@ -1,7 +1,7 @@
 # Performance
 To give you a sense of performance, we benchmarked the action circuit and a simple VP circuit. 
-Action circuit is always the same and has a size about about $2^{15}$ gates, while the VP circuit size changes as the VPs differ from application to application. 
-In our benchmarks we used a VP circuit containing about $2^{17}$ gates.
+Action circuit is always the same and has a size about about $2^{13}$ gates, while the VP circuit size changes as the VPs differ from application to application. 
+In our benchmarks we used a VP circuit containing about $2^{13}$ gates.
 
 |Step|Action circuit|VP circuit|
 |-|-|-|

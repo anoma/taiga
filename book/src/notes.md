@@ -23,44 +23,35 @@ and to signal that the note has been spent and isn't valid anymore, its nullifie
 |`nf` isn't published|note doesn't exist|note created|
 |`nf` is published|impossible|note spent|
 
-### Note structure fields
+### Note fields
 
-Let's look at some fields in the note structure:
-
-```rust
-pub struct Note {
-pub value_base: NoteType,
-pub app_data_dynamic: pallas::Base,
-pub value: u64,
-pub nk_com: NullifierKeyCom,
-pub is_merkle_checked: bool,
-...
-}
-```
 #### The application data
-Notes contain quite a lot of data provided by the application the notes belong to. 
-Part of that data is more long-term (e.g. the application VP) and used to derive the note's `value_base`, while
-the other part is more contextual (e.g. the input parameters for the application VP) and is stored in `app_data_dynamic`. 
-In general, all data that is not used to derive the value base is stored in the `app_data_dynamic`.
+The application data stored in notes can be divided into two parts.
+One part of the data is more long-term (e.g. the application VP) and is used to derive the note's value type, the other is more contextual (e.g. the input parameters for the application VP).
+It is completely up to the application to decide which data should be used for the type derivation.
 
 #### Note values
-For more traditional applications like cryptocurrencies the `value` field carries the natural meaning 
+For more traditional applications like cryptocurrencies the `value` field of a note carries the natural meaning 
 e.g. a USDC note of value 5 is equivalent to 5 dollars, but for more abstract applications the value field might change its meaning or even loose it. 
 However, no matter what meaning the application gives to the value, Taiga isn't aware of that and uses the `value` field of notes to check the transaction balance.
 
 #### Dummy notes
-Some notes in Taiga can be dummy, meaning that unlike "normal" notes, the merkle path isn't checked for them (indicated by the `is_merkle_checked` flag), 
+Some notes in Taiga can be dummy, meaning that unlike "normal" notes, the merkle path isn't checked for them, 
 but they can have arbitrary value and are stored in the commitment tree, just like "normal".
 
 Being a dummy note and having zero value are two independent concepts in Taiga, unlike some other systems. 
 Zero value notes aren't necessarily dummy, dummy notes can have non-zero value. 
 
 #### Who owns the notes?
+Each note contains a commitment to the nullifier key `nk` of the note's owner. 
+Whoever knows the nullifier key, can compute the note's nullifier and spend the note.
 
-Each note contains a field `nk_com` encoding the nullifier key `nk` of the note's owner. 
-Whoever knows the nullifier key, can compute the note's nullifier and spend the note. 
-The field `nk_com` doesn't actually contain the nullifier key itself, but a commitment to it, 
-which hides the key value (so it isn't enough to look at the decrypted note to be able to spend it).
+#### Note encryption
+
+The notes are kept in the storage encrypted, and only the owner of the note (or anyone the owner shared the decryption key with) can decrypt it. 
+The encryption correctness must be proven by the creator of the note and will be checked in the [Action circuit](./action.md).
+
+⚠️ Verifiable encryption is not implemented in Taiga yet.
 
 
 

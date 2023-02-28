@@ -19,5 +19,6 @@ For spent notes, the Action circuit checks that:
 For the notes being created, the Action circuit checks that:
 * the correct application approves it (same check as for spent notes)
 * and the note commitment is derived correctly (the thing that makes everyone to know that the note exists must indeed represent the note)
+* if the note is encrypted, check the encryption correctness (will the owner be able to decrypt it?)
 
 To learn in details about the checks the Action circuit performs, check the [technical specification of Taiga](./spec.md).
