@@ -118,15 +118,7 @@ vp_circuit_impl!(SudokuVP);
 
 #[cfg(test)]
 mod tests {
-    use std::time::Instant;
-
     use taiga_halo2::{
-        circuit::gadgets::{
-            add::{AddChip, AddConfig, AddInstructions},
-            assign_free_advice, assign_free_instance,
-            mul::{MulChip, MulConfig, MulInstructions},
-            sub::{SubChip, SubConfig, SubInstructions},
-        },
         constant::NUM_NOTE,
         note::Note,
         nullifier::{Nullifier, NullifierKeyCom},
@@ -137,12 +129,9 @@ mod tests {
     use pasta_curves::pallas;
     use rand::rngs::OsRng;
 
-    use halo2_proofs::{
-        plonk::{self, ProvingKey, VerifyingKey},
-        poly::commitment::Params,
-    };
+    use halo2_proofs::{plonk, poly::commitment::Params};
 
-    use crate::valid_sudoku::{circuit::SudokuCircuit, vp::SudokuVP};
+    use crate::{circuit::SudokuCircuit, vp::SudokuVP};
 
     #[test]
     fn test_vp() {
@@ -190,7 +179,6 @@ mod tests {
             psi,
             rcm,
             true,
-            vec![],
         );
     }
 }
