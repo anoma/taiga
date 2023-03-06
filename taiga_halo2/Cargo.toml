@@ -30,4 +30,4 @@ name = "vp_proof"
 harness = false
 
 [[example]]
-name = "sudoku"
+name = "taiga_sudoku"

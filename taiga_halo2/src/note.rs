@@ -65,9 +65,9 @@ pub struct Note {
 #[derive(Debug, Clone, Default)]
 pub struct NoteType {
     /// app_vk is the verifying key of VP
-    app_vk: ValidityPredicateVerifyingKey,
+    pub app_vk: ValidityPredicateVerifyingKey,
     /// app_data is the encoded data that is defined in application vp
-    app_data: pallas::Base,
+    pub app_data: pallas::Base,
 }
 
 #[derive(Clone)]

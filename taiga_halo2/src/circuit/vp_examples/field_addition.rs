@@ -1,6 +1,9 @@
 use crate::{
     circuit::{
-        gadgets::{assign_free_advice, AddChip, AddConfig, AddInstructions},
+        gadgets::{
+            add::{AddChip, AddConfig, AddInstructions},
+            assign_free_advice,
+        },
         integrity::{OutputNoteVar, SpendNoteVar},
         note_circuit::NoteConfig,
         vp_circuit::{

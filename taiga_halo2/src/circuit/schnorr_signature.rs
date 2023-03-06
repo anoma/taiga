@@ -8,8 +8,10 @@ use pasta_curves::pallas;
 
 use crate::{
     circuit::gadgets::{
-        assign_free_advice, assign_free_instance, AddChip, AddConfig, MulChip, MulConfig, SubChip,
-        SubConfig,
+        add::{AddChip, AddConfig},
+        assign_free_advice, assign_free_instance,
+        mul::{MulChip, MulConfig},
+        sub::{SubChip, SubConfig},
     },
     constant::{
         NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentFixedBasesFull,
