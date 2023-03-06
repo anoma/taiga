@@ -92,7 +92,7 @@ impl DealerIntentValidityPredicateCircuit {
         let is_spend_note = pallas::Base::zero();
         let encoded_puzzle = pallas::Base::random(&mut rng);
         let sudoku_app_vk = ValidityPredicateVerifyingKey::dummy(&mut rng).get_compressed();
-        output_notes[0].value_base.app_data = Self::compute_app_data(encoded_puzzle, sudoku_app_vk);
+        output_notes[0].note_type.app_data = Self::compute_app_data(encoded_puzzle, sudoku_app_vk);
         let encoded_solution = pallas::Base::random(&mut rng);
         Self {
             spend_notes,

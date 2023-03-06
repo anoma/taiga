@@ -190,7 +190,7 @@ impl SudokuAppValidityPredicateCircuit {
         let encoded_init_state = SudokuState::default().encode();
         let previous_state = SudokuState::default();
         let current_state = SudokuState::default();
-        output_notes[0].value_base.app_data =
+        output_notes[0].note_type.app_data =
             poseidon_hash(encoded_init_state, current_state.encode());
         output_notes[0].value = 1u64;
         Self {
@@ -709,13 +709,13 @@ fn test_halo2_sudoku_app_vp_circuit_update() {
                 [6, 0, 7, 4, 3, 5, 1, 9, 8],
             ],
         };
-        spend_notes[0].value_base.app_data =
+        spend_notes[0].note_type.app_data =
             poseidon_hash(encoded_init_state, previous_state.encode());
         spend_notes[0].value = 1u64;
-        output_notes[0].value_base.app_data =
+        output_notes[0].note_type.app_data =
             poseidon_hash(encoded_init_state, current_state.encode());
         output_notes[0].value = 1u64;
-        output_notes[0].value_base.app_vk = spend_notes[0].value_base.app_vk.clone();
+        output_notes[0].note_type.app_vk = spend_notes[0].note_type.app_vk.clone();
         SudokuAppValidityPredicateCircuit {
             spend_notes,
             output_notes,
@@ -780,13 +780,13 @@ pub fn halo2_sudoku_app_vp_circuit_final() {
                 [6, 2, 7, 4, 3, 5, 1, 9, 8],
             ],
         };
-        spend_notes[0].value_base.app_data =
+        spend_notes[0].note_type.app_data =
             poseidon_hash(encoded_init_state, previous_state.encode());
         spend_notes[0].value = 1u64;
-        output_notes[0].value_base.app_data =
+        output_notes[0].note_type.app_data =
             poseidon_hash(encoded_init_state, current_state.encode());
         output_notes[0].value = 0u64;
-        output_notes[0].value_base.app_vk = spend_notes[0].value_base.app_vk.clone();
+        output_notes[0].note_type.app_vk = spend_notes[0].note_type.app_vk.clone();
         SudokuAppValidityPredicateCircuit {
             spend_notes,
             output_notes,

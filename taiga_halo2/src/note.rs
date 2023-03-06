@@ -42,7 +42,7 @@ impl Default for NoteCommitment {
 /// A note
 #[derive(Debug, Clone, Default)]
 pub struct Note {
-    pub value_base: NoteType,
+    pub note_type: ValueBase,
     /// app_data_dynamic is the data defined in application vp and will NOT be used to derive value base
     /// sub-vps and any other data can be encoded to the app_data_dynamic
     pub app_data_dynamic: pallas::Base,
@@ -61,9 +61,9 @@ pub struct Note {
     pub note_data: Vec<u8>,
 }
 
-/// The parameters in the NoteType are used to derive note value base.
+/// The parameters in the ValueBase are used to derive note value base.
 #[derive(Debug, Clone, Default)]
-pub struct NoteType {
+pub struct ValueBase {
     /// app_vk is the verifying key of VP
     pub app_vk: ValidityPredicateVerifyingKey,
     /// app_data is the encoded data that is defined in application vp
@@ -100,9 +100,9 @@ impl Note {
         is_merkle_checked: bool,
         note_data: Vec<u8>,
     ) -> Self {
-        let value_base = NoteType::new(app_vk, app_data);
+        let note_type = ValueBase::new(app_vk, app_data);
         Self {
-            value_base,
+            note_type,
             app_data_dynamic,
             value,
             nk_com,
@@ -122,7 +122,7 @@ impl Note {
     pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
         let app_vk = ValidityPredicateVerifyingKey::dummy(&mut rng);
         let app_data = pallas::Base::random(&mut rng);
-        let value_base = NoteType::new(app_vk, app_data);
+        let note_type = ValueBase::new(app_vk, app_data);
         let app_data_dynamic = pallas::Base::zero();
         let value: u64 = rng.gen();
         let nk_com = NullifierKeyCom::rand(&mut rng);
@@ -130,7 +130,7 @@ impl Note {
         let psi = pallas::Base::random(&mut rng);
         let note_data = vec![0u8; 32];
         Self {
-            value_base,
+            note_type,
             app_data_dynamic,
             value,
             nk_com,
@@ -208,19 +208,19 @@ impl Note {
     }
 
     pub fn get_value_base(&self) -> pallas::Point {
-        self.value_base.derive_value_base()
+        self.note_type.derive_value_base()
     }
 
     pub fn get_compressed_app_vk(&self) -> pallas::Base {
-        self.value_base.app_vk.get_compressed()
+        self.note_type.app_vk.get_compressed()
     }
 
     pub fn get_value_base_app_data(&self) -> pallas::Base {
-        self.value_base.app_data
+        self.note_type.app_data
     }
 }
 
-impl NoteType {
+impl ValueBase {
     pub fn new(vk: ValidityPredicateVerifyingKey, data: pallas::Base) -> Self {
         Self {
             app_vk: vk,
