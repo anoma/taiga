@@ -835,7 +835,6 @@ fn test_halo2_note_commitment_circuit() {
                 self.psi,
                 self.rcm,
                 self.is_merkle_checked,
-                vec![0u8; 32],
             );
             // Construct a Sinsemilla chip
             let sinsemilla_chip =
