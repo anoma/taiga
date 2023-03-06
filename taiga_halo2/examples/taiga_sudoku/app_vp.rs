@@ -163,7 +163,8 @@ impl ValidityPredicateConfig for SudokuAppValidityPredicateConfig {
         let state_update_config =
             StateUpdateConfig::configure(meta, advices[0], advices[1], advices[2]);
         let triple_mul_config = TripleMulConfig::configure(meta, advices[0..3].try_into().unwrap());
-        let value_check_config = ValueCheckConfig::configure(meta, advices[0], advices[1]);
+        let value_check_config =
+            ValueCheckConfig::configure(meta, advices[0], advices[1], advices[2]);
         let sub_config = SubChip::configure(meta, [advices[0], advices[1]]);
         let mul_config = MulChip::configure(meta, [advices[0], advices[1]]);
         Self {
@@ -351,7 +352,7 @@ impl SudokuAppValidityPredicateCircuit {
         is_spend_note: &AssignedCell<pallas::Base, pallas::Base>,
         pre_state: &[AssignedCell<pallas::Base, pallas::Base>],
         cur_state: &[AssignedCell<pallas::Base, pallas::Base>],
-        _spend_note: &SpendNoteVar,
+        spend_note: &SpendNoteVar,
         output_note: &OutputNoteVar,
     ) -> Result<(), Error> {
         // check state update: the cur_state is updated from pre_state
@@ -444,7 +445,14 @@ impl SudokuAppValidityPredicateCircuit {
         layouter.assign_region(
             || "check value",
             |mut region| {
-                value_check_config.assign_region(&product, &output_note.value, 0, &mut region)
+                value_check_config.assign_region(
+                    is_spend_note,
+                    &product,
+                    &spend_note.value,
+                    &output_note.value,
+                    0,
+                    &mut region,
+                )
             },
         )?;
 
