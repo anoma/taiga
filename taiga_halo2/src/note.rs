@@ -57,8 +57,6 @@ pub struct Note {
     pub rcm: pallas::Scalar,
     /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of the spent note will be checked in ActionProof.
     pub is_merkle_checked: bool,
-    /// note data bytes
-    pub note_data: Vec<u8>,
 }
 
 /// The parameters in the ValueBase are used to derive note value base.
@@ -98,7 +96,6 @@ impl Note {
         psi: pallas::Base,
         rcm: pallas::Scalar,
         is_merkle_checked: bool,
-        note_data: Vec<u8>,
     ) -> Self {
         let note_type = ValueBase::new(app_vk, app_data);
         Self {
@@ -110,7 +107,6 @@ impl Note {
             psi,
             rcm,
             is_merkle_checked,
-            note_data,
         }
     }
 
@@ -128,7 +124,6 @@ impl Note {
         let nk_com = NullifierKeyCom::rand(&mut rng);
         let rcm = pallas::Scalar::random(&mut rng);
         let psi = pallas::Base::random(&mut rng);
-        let note_data = vec![0u8; 32];
         Self {
             note_type,
             app_data_dynamic,
@@ -138,7 +133,6 @@ impl Note {
             psi,
             rcm,
             is_merkle_checked: true,
-            note_data,
         }
     }
 
