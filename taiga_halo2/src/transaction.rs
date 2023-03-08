@@ -5,8 +5,7 @@ use crate::constant::{
     ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, NUM_NOTE,
     SETUP_PARAMS_MAP, TRANSACTION_BINDING_HASH_PERSONALIZATION,
 };
-use crate::note::{NoteCommitment, OutputNoteInfo, SpendNoteInfo};
-use crate::nullifier::Nullifier;
+use crate::note::{OutputNoteInfo, SpendNoteInfo};
 use crate::proof::Proof;
 use crate::value_commitment::ValueCommitment;
 use blake2b_simd::Params as Blake2bParams;
@@ -26,6 +25,10 @@ pub enum TransactionError {
     InvalidBindingSignature,
     /// Binding signature is missing.
     MissingBindingSignatures,
+    /// Nullifier is not consistent between the action and the vp.
+    InconsistentNullifier,
+    /// Output note commitment is not consistent between the action and the vp.
+    InconsistentOutputNoteCommitment,
 }
 
 impl Display for TransactionError {
@@ -35,6 +38,12 @@ impl Display for TransactionError {
             Proof(e) => f.write_str(&format!("Proof error: {e}")),
             InvalidBindingSignature => f.write_str("Binding signature was invalid"),
             MissingBindingSignatures => f.write_str("Binding signature is missing"),
+            InconsistentNullifier => {
+                f.write_str("Nullifier is not consistent between the action and the vp")
+            }
+            InconsistentOutputNoteCommitment => f.write_str(
+                "Output note commitment is not consistent between the action and the vp",
+            ),
         }
     }
 }
@@ -107,10 +116,10 @@ impl Transaction {
             .personal(TRANSACTION_BINDING_HASH_PERSONALIZATION)
             .to_state();
         self.get_nullifiers().iter().for_each(|nf| {
-            h.update(&nf.to_bytes());
+            h.update(&nf.to_repr());
         });
         self.get_output_cms().iter().for_each(|cm| {
-            h.update(&cm.to_bytes());
+            h.update(&cm.to_repr());
         });
         self.get_value_commitments().iter().for_each(|vc| {
             h.update(&vc.to_bytes());
@@ -125,14 +134,14 @@ impl Transaction {
         self.partial_txs.push(ptx);
     }
 
-    pub fn get_nullifiers(&self) -> Vec<Nullifier> {
+    pub fn get_nullifiers(&self) -> Vec<pallas::Base> {
         self.partial_txs
             .iter()
             .flat_map(|ptx| ptx.get_nullifiers())
             .collect()
     }
 
-    pub fn get_output_cms(&self) -> Vec<NoteCommitment> {
+    pub fn get_output_cms(&self) -> Vec<pallas::Base> {
         self.partial_txs
             .iter()
             .flat_map(|ptx| ptx.get_output_cms())
@@ -185,15 +194,29 @@ impl Transaction {
         Ok(())
     }
 
+    pub fn public_inputs_check(&self) -> Result<(), TransactionError> {
+        for partial_tx in self.partial_txs.iter() {
+            // nullifier check
+            partial_tx.check_nullifiers()?;
+            // output note commitment check
+            partial_tx.check_note_commitments()?;
+        }
+
+        Ok(())
+    }
+
     #[allow(clippy::type_complexity)]
     pub fn execute(
         &self,
-    ) -> Result<(Vec<Nullifier>, Vec<NoteCommitment>, Vec<pallas::Base>), TransactionError> {
+    ) -> Result<(Vec<pallas::Base>, Vec<pallas::Base>, Vec<pallas::Base>), TransactionError> {
         // Verify proofs
         self.verify_proofs()?;
 
         // Verify binding signature
         self.verify_binding_sig()?;
+
+        // Public inputs check
+        self.public_inputs_check()?;
 
         // Return Nullifiers to check double-spent, NoteCommitments to store, anchors to check the root-existence
         Ok((
@@ -267,17 +290,17 @@ impl PartialTransaction {
         Ok(())
     }
 
-    pub fn get_nullifiers(&self) -> Vec<Nullifier> {
+    pub fn get_nullifiers(&self) -> Vec<pallas::Base> {
         self.actions
             .iter()
-            .map(|action| action.action_instance.nf)
+            .map(|action| action.action_instance.nf.inner())
             .collect()
     }
 
-    pub fn get_output_cms(&self) -> Vec<NoteCommitment> {
+    pub fn get_output_cms(&self) -> Vec<pallas::Base> {
         self.actions
             .iter()
-            .map(|action| action.action_instance.cm)
+            .map(|action| action.action_instance.cm.get_x())
             .collect()
     }
 
@@ -293,6 +316,34 @@ impl PartialTransaction {
             .iter()
             .map(|action| action.action_instance.anchor)
             .collect()
+    }
+
+    pub fn check_nullifiers(&self) -> Result<(), TransactionError> {
+        let action_nfs = self.get_nullifiers();
+        for vp_info in self.spends.iter() {
+            for nfs in vp_info.get_nullifiers().iter() {
+                if !((action_nfs[0] == nfs[0] && action_nfs[1] == nfs[1])
+                    || (action_nfs[0] == nfs[1] && action_nfs[1] == nfs[0]))
+                {
+                    return Err(TransactionError::InconsistentNullifier);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn check_note_commitments(&self) -> Result<(), TransactionError> {
+        let action_cms = self.get_output_cms();
+        for vp_info in self.outputs.iter() {
+            for cms in vp_info.get_note_commitments().iter() {
+                if !((action_cms[0] == cms[0] && action_cms[1] == cms[1])
+                    && (action_cms[0] == cms[1] && action_cms[1] == cms[0]))
+                {
+                    return Err(TransactionError::InconsistentOutputNoteCommitment);
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -364,6 +415,22 @@ impl NoteVPVerifyingInfoSet {
         // TODO: Verify vp verifier proofs
 
         Ok(())
+    }
+
+    pub fn get_nullifiers(&self) -> Vec<[pallas::Base; NUM_NOTE]> {
+        let mut nfs = vec![self.app_vp_verifying_info.get_nullifiers()];
+        self.app_logic_vp_verifying_info
+            .iter()
+            .for_each(|vp_info| nfs.push(vp_info.get_nullifiers()));
+        nfs
+    }
+
+    pub fn get_note_commitments(&self) -> Vec<[pallas::Base; NUM_NOTE]> {
+        let mut cms = vec![self.app_vp_verifying_info.get_note_commitments()];
+        self.app_logic_vp_verifying_info
+            .iter()
+            .for_each(|vp_info| cms.push(vp_info.get_note_commitments()));
+        cms
     }
 }
 

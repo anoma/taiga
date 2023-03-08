@@ -32,6 +32,14 @@ impl VPVerifyingInfo {
         let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
         self.proof.verify(&self.vk, params, &[&self.instance])
     }
+
+    pub fn get_nullifiers(&self) -> [pallas::Base; NUM_NOTE] {
+        [self.instance[0], self.instance[2]]
+    }
+
+    pub fn get_note_commitments(&self) -> [pallas::Base; NUM_NOTE] {
+        [self.instance[1], self.instance[3]]
+    }
 }
 
 pub trait ValidityPredicateConfig {
