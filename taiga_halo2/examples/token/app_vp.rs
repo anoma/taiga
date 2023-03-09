@@ -204,7 +204,7 @@ mod tests {
         let value = 5000u64;
         let is_merkle_checked = true;
         let spend_note = {
-            let app_data_dynamic = pallas::Base::zero();
+            let app_data_dynamic = pallas::Base::zero(); // TODO: Use userVP vk
             let rho = Nullifier::new(pallas::Base::random(&mut rng));
             let nk_com = NullifierKeyCom::rand(&mut rng);
             let rcm = pallas::Scalar::random(&mut rng);

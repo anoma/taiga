@@ -9,7 +9,7 @@ use pasta_curves::{arithmetic::CurveExt, hashtocurve, pallas};
 ///
 /// This requires no modular reduction because Pallas' base field is smaller than its
 /// scalar field.
-pub(crate) fn mod_r_p(x: pallas::Base) -> pallas::Scalar {
+pub fn mod_r_p(x: pallas::Base) -> pallas::Scalar {
     pallas::Scalar::from_repr(x.to_repr()).unwrap()
 }
 
@@ -40,7 +40,7 @@ pub fn poseidon_hash(left: pallas::Base, right: pallas::Base) -> pallas::Base {
         .hash([left, right])
 }
 
-pub(crate) fn poseidon_hash_n<const L: usize>(message: [pallas::Base; L]) -> pallas::Base {
+pub fn poseidon_hash_n<const L: usize>(message: [pallas::Base; L]) -> pallas::Base {
     poseidon::Hash::<_, poseidon::P128Pow5T3, poseidon::ConstantLength<L>, 3, 2>::init()
         .hash(message)
 }

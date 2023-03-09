@@ -196,7 +196,7 @@ impl SchnorrConfig {
         // signature (r,s)
         r: pallas::Point,
         s: pallas::Scalar,
-    ) -> Result<(), plonk::Error>{
+    ) -> Result<(), plonk::Error> {
         SinsemillaChip::<
         NoteCommitmentHashDomain,
         NoteCommitmentDomain,
@@ -331,8 +331,7 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<(), plonk::Error> {
-        config.verify_signature(layouter, self.pk, self.r, self.s);
-        Ok(())
+        config.verify_signature(layouter, self.pk, self.r, self.s)
     }
 }
 

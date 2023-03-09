@@ -7,9 +7,9 @@ use pasta_curves::pallas;
 extern crate taiga_halo2;
 use taiga_halo2::{
     circuit::{
+        gadgets::schnorr_signature::SchnorrConfig,
         integrity::{OutputNoteVar, SpendNoteVar},
         note_circuit::NoteConfig,
-        schnorr_signature::SchnorrConfig,
         vp_circuit::{
             VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
             ValidityPredicateInfo,
@@ -28,6 +28,11 @@ use rand::rngs::OsRng;
 
 #[derive(Clone, Debug, Default)]
 pub struct UserVP {
+    // public key
+    pk: pallas::Point,
+    // signature (r,s)
+    r: pallas::Point,
+    s: pallas::Scalar,
     spend_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
 }
@@ -54,8 +59,17 @@ impl ValidityPredicateConfig for UserVPConfig {
 }
 
 impl UserVP {
-    pub fn new(spend_notes: [Note; NUM_NOTE], output_notes: [Note; NUM_NOTE]) -> Self {
+    pub fn new(
+        pk: pallas::Point,
+        r: pallas::Point,
+        s: pallas::Scalar,
+        spend_notes: [Note; NUM_NOTE],
+        output_notes: [Note; NUM_NOTE],
+    ) -> Self {
         Self {
+            pk,
+            r,
+            s,
             spend_notes,
             output_notes,
         }
@@ -67,12 +81,14 @@ impl ValidityPredicateCircuit for UserVP {
 
     fn custom_constraints(
         &self,
-        _config: Self::VPConfig,
-        _layouter: impl Layouter<pallas::Base>,
+        config: Self::VPConfig,
+        layouter: impl Layouter<pallas::Base>,
         _spend_note_variables: &[SpendNoteVar],
         _output_note_variables: &[OutputNoteVar],
     ) -> Result<(), plonk::Error> {
-        Ok(())
+        config
+            .schnorr_config
+            .verify_signature(layouter, self.pk, self.r, self.s)
     }
 }
 
@@ -111,3 +127,109 @@ impl ValidityPredicateInfo for UserVP {
 }
 
 vp_circuit_impl!(UserVP);
+
+mod tests {
+
+    use group::Curve;
+    use halo2_proofs::{arithmetic::CurveAffine, dev::MockProver};
+
+    use rand::{rngs::OsRng, RngCore};
+
+    use super::UserVP;
+
+    use halo2_proofs::{
+        plonk::{self},
+        poly::commitment::Params,
+    };
+    use pasta_curves::pallas;
+    use std::time::Instant;
+    use taiga_halo2::{
+        constant::{NOTE_COMMIT_DOMAIN, NUM_NOTE},
+        proof::Proof,
+        utils::{mod_r_p, poseidon_hash_n}, note::Note,
+    };
+
+    use std::{
+        collections::hash_map::DefaultHasher,
+        hash::{Hash, Hasher},
+    };
+
+    fn calculate_hash<T: Hash + ?Sized>(t: &T) -> u64 {
+        let mut s = DefaultHasher::new();
+        t.hash(&mut s);
+        s.finish()
+    }
+    #[test]
+    fn test_user_vp() {
+        let mut rng = OsRng;
+        let spend_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        const K: u32 = 13;
+        let generator = NOTE_COMMIT_DOMAIN.R();
+        // Message hash: m
+        let m = pallas::Base::from(calculate_hash(
+            "Every day you play with the light of the universe. Subtle visitor",
+        ));
+        // Private key: sk
+        let sk = pallas::Scalar::from(rng.next_u64());
+        // Public key: P = sk*G
+        let pk = generator * sk;
+        let pk_coord = pk.to_affine().coordinates().unwrap();
+        // Generate a random number: z
+        let z = pallas::Scalar::from(rng.next_u64());
+        // Calculate: R = z*G
+        let r = generator * z;
+        let r_coord = r.to_affine().coordinates().unwrap();
+        // Calculate: s = z + Hash(r||P||m)*sk
+        let h = mod_r_p(poseidon_hash_n::<8>([
+            *r_coord.x(),
+            *r_coord.y(),
+            *pk_coord.x(),
+            *pk_coord.y(),
+            m,
+            pallas::Base::zero(),
+            pallas::Base::zero(),
+            pallas::Base::zero(),
+        ]));
+        let s = z + h * sk;
+        // Signature = (r, s)
+        let circuit = UserVP {
+            pk,
+            r,
+            s,
+            spend_notes,
+            output_notes,
+        };
+
+        let pub_instance_vec = vec![m];
+        assert_eq!(
+            MockProver::run(K, &circuit, vec![pub_instance_vec.clone()])
+                .unwrap()
+                .verify(),
+            Ok(())
+        );
+        let prover = MockProver::run(K, &circuit, vec![pub_instance_vec]).unwrap();
+        prover.assert_satisfied();
+
+        let time = Instant::now();
+        let params = Params::new(K);
+
+        let vk = plonk::keygen_vk(&params, &circuit).unwrap();
+        let pk = plonk::keygen_pk(&params, vk.clone(), &circuit).unwrap();
+        println!(
+            "key generation: \t{:?}ms",
+            (Instant::now() - time).as_millis()
+        );
+
+        let time = Instant::now();
+        let proof = Proof::create(&pk, &params, circuit, &[&[m]], &mut rng).unwrap();
+        println!("proof: \t\t\t{:?}ms", (Instant::now() - time).as_millis());
+
+        let time = Instant::now();
+        assert!(proof.verify(&vk, &params, &[&[m]]).is_ok());
+        println!(
+            "verification: \t\t{:?}ms",
+            (Instant::now() - time).as_millis()
+        );
+    }
+}
