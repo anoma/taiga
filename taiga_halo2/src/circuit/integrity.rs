@@ -1,6 +1,9 @@
 use std::ops::Neg;
 
-use crate::circuit::gadgets::{assign_free_advice, assign_free_constant, AddChip, AddInstructions};
+use crate::circuit::gadgets::{
+    add::{AddChip, AddInstructions},
+    assign_free_advice, assign_free_constant,
+};
 use crate::circuit::hash_to_curve::{hash_to_curve_circuit, HashToCurveConfig};
 use crate::circuit::note_circuit::{note_commitment_gadget, NoteCommitmentChip};
 use crate::constant::{
@@ -77,6 +80,7 @@ pub struct SpendNoteVar {
     pub nf: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
     pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -99,7 +103,7 @@ pub fn check_spend_note(
     nf_row_idx: usize,
 ) -> Result<SpendNoteVar, Error> {
     // Check spend note user integrity: address = Com_r(Com_r(nk, zero), app_data_dynamic)
-    let (address, nk) = {
+    let (address, nk, app_data_dynamic) = {
         // Witness nk
         let nk = spend_note.get_nk().unwrap();
         let nk_var = assign_free_advice(
@@ -141,11 +145,11 @@ pub fn check_spend_note(
                     poseidon_chip,
                     layouter.namespace(|| "Poseidon init"),
                 )?;
-            let poseidon_message = [app_data_dynamic, nk_com];
+            let poseidon_message = [app_data_dynamic.clone(), nk_com];
             poseidon_hasher.hash(layouter.namespace(|| "spend address"), poseidon_message)?
         };
 
-        (address, nk_var)
+        (address, nk_var, app_data_dynamic)
     };
 
     // Witness app_vk
@@ -237,10 +241,11 @@ pub fn check_spend_note(
         nf,
         cm,
         is_merkle_checked,
+        app_data_dynamic,
     })
 }
 
-// Return variables in the spend note
+// Return variables in the output note
 #[derive(Debug)]
 pub struct OutputNoteVar {
     pub address: AssignedCell<pallas::Base, pallas::Base>,
@@ -249,6 +254,7 @@ pub struct OutputNoteVar {
     pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
     pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -271,7 +277,7 @@ pub fn check_output_note(
     cm_row_idx: usize,
 ) -> Result<OutputNoteVar, Error> {
     // Check output note user integrity: address = Com_r(app_data_dynamic, nk_com)
-    let address = {
+    let (address, app_data_dynamic) = {
         // Witness nk_com
         let nk_com = assign_free_advice(
             layouter.namespace(|| "witness nk_com"),
@@ -292,8 +298,11 @@ pub fn check_output_note(
                 poseidon_chip,
                 layouter.namespace(|| "Poseidon init"),
             )?;
-        let poseidon_message = [app_data_dynamic, nk_com];
-        poseidon_hasher.hash(layouter.namespace(|| "output address"), poseidon_message)?
+        let poseidon_message = [app_data_dynamic.clone(), nk_com];
+        (
+            poseidon_hasher.hash(layouter.namespace(|| "output address"), poseidon_message)?,
+            app_data_dynamic,
+        )
     };
 
     // Witness app_vk
@@ -365,6 +374,7 @@ pub fn check_output_note(
         value,
         cm,
         is_merkle_checked,
+        app_data_dynamic,
     })
 }
 
@@ -488,8 +498,8 @@ pub fn compute_value_commitment(
 
 #[test]
 fn test_halo2_nullifier_circuit() {
+    use crate::circuit::gadgets::add::AddConfig;
     use crate::circuit::gadgets::assign_free_advice;
-    use crate::circuit::gadgets::AddConfig;
     use crate::constant::{
         NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain,
     };

@@ -12,8 +12,10 @@ use halo2_gadgets::poseidon::{
     Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
 };
 use taiga_halo2::circuit::gadgets::{
-    assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
-    MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
+    add::{AddChip, AddConfig, AddInstructions},
+    assign_free_advice, assign_free_instance,
+    mul::{MulChip, MulConfig, MulInstructions},
+    sub::{SubChip, SubConfig, SubInstructions},
 };
 
 #[derive(Clone, Debug)]
@@ -381,15 +383,11 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
 
 #[cfg(test)]
 mod tests {
+    use crate::circuit::SudokuCircuit;
     use halo2_proofs::{arithmetic::FieldExt, dev::MockProver};
     use rand::rngs::OsRng;
 
-    use crate::app::valid_sudoku::circuit::SudokuCircuit;
-
-    use halo2_proofs::{
-        plonk::{self, ProvingKey, VerifyingKey},
-        poly::commitment::Params,
-    };
+    use halo2_proofs::{plonk, poly::commitment::Params};
     use pasta_curves::{pallas, vesta};
     use std::time::Instant;
     use taiga_halo2::proof::Proof;
@@ -432,12 +430,38 @@ mod tests {
         let mut pub_instance_vec = zeros.to_vec();
         pub_instance_vec.append(&mut vec_puzzle);
         assert_eq!(
-            MockProver::run(13, &circuit, vec![pub_instance_vec.clone()])
+            MockProver::run(K, &circuit, vec![pub_instance_vec.clone()])
                 .unwrap()
                 .verify(),
             Ok(())
         );
         let pub_instance: [pallas::Base; 108] = pub_instance_vec.try_into().unwrap();
+
+        // // ------- PLOTTING SECTION --------
+        // use plotters::prelude::*;
+        // let root = BitMapBackend::new("layout.png", (1024, 768)).into_drawing_area();
+        // root.fill(&WHITE).unwrap();
+        // let root = root
+        //     .titled("Example Circuit Layout", ("sans-serif", 60))
+        //     .unwrap();
+
+        // halo2_proofs::dev::CircuitLayout::default()
+        //     // You can optionally render only a section of the circuit.
+        //     // .view_width(0..7)
+        //     // .view_height(0..60)
+        //     // You can hide labels, which can be useful with smaller areas.
+        //     .show_labels(false)
+        //     // Render the circuit onto your area!
+        //     // The first argument is the size parameter for the circuit.
+        //     .render(K, &circuit, &root)
+        //     .unwrap();
+
+        // let dot_string = halo2_proofs::dev::circuit_dot_graph(&circuit);
+
+        // // Now you can either handle it in Rust, or just
+        // // print it out to use with command-line tools.
+        // print!("{}", dot_string);
+        // // ---- END OF PLOTTING SECTION --------
 
         println!("Success!");
         let time = Instant::now();
@@ -452,7 +476,8 @@ mod tests {
 
         let mut rng = OsRng;
         let time = Instant::now();
-        let proof = Proof::create(&pk, &params, circuit, &[&pub_instance], &mut rng).unwrap();
+        let proof =
+            Proof::create(&pk, &params, circuit.clone(), &[&pub_instance], &mut rng).unwrap();
         println!("proof: \t\t\t{:?}ms", (Instant::now() - time).as_millis());
 
         let time = Instant::now();
@@ -465,7 +490,7 @@ mod tests {
 
     #[test]
     fn test_synthesize() {
-        use crate::app::valid_sudoku::circuit::SudokuCircuit;
+        use crate::circuit::SudokuCircuit;
 
         let sudoku = [
             [5, 8, 1, 6, 7, 2, 4, 3, 9],
@@ -484,6 +509,6 @@ mod tests {
         let circuit = SudokuCircuit { sudoku };
         let params: Params<vesta::Affine> = Params::new(K);
 
-        let vk = plonk::keygen_vk(&params, &circuit).unwrap(); // this would fail on this specific puzzle with the old implementation of synthesize
+        let _vk = plonk::keygen_vk(&params, &circuit).unwrap(); // this would fail on this specific puzzle with the old implementation of synthesize
     }
 }

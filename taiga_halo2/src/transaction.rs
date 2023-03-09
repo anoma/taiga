@@ -418,7 +418,6 @@ fn test_transaction_creation() {
             psi,
             rcm,
             is_merkle_checked,
-            vec![0u8; 32],
         )
     };
     let output_note_1 = {
@@ -442,7 +441,6 @@ fn test_transaction_creation() {
             psi,
             rcm,
             is_merkle_checked,
-            vec![0u8; 32],
         )
     };
     let spend_note_2 = spend_note_1.clone();

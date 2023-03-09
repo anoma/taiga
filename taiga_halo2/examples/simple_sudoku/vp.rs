@@ -21,7 +21,7 @@ use taiga_halo2::{
     vp_vk::ValidityPredicateVerifyingKey,
 };
 
-use crate::app::valid_sudoku::circuit::{SudokuCircuit, SudokuConfig};
+use crate::circuit::{SudokuCircuit, SudokuConfig};
 use rand::rngs::OsRng;
 
 #[derive(Clone, Debug)]
@@ -118,13 +118,7 @@ vp_circuit_impl!(SudokuVP);
 
 #[cfg(test)]
 mod tests {
-    use std::time::Instant;
-
     use taiga_halo2::{
-        circuit::gadgets::{
-            assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions, MulChip,
-            MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
-        },
         constant::NUM_NOTE,
         note::Note,
         nullifier::{Nullifier, NullifierKeyCom},
@@ -135,16 +129,12 @@ mod tests {
     use pasta_curves::pallas;
     use rand::rngs::OsRng;
 
-    use halo2_proofs::{
-        plonk::{self, ProvingKey, VerifyingKey},
-        poly::commitment::Params,
-    };
+    use halo2_proofs::{plonk, poly::commitment::Params};
 
-    use crate::app::valid_sudoku::{circuit::SudokuCircuit, vp::SudokuVP};
+    use crate::{circuit::SudokuCircuit, vp::SudokuVP};
 
     #[test]
     fn test_vp() {
-        // TODO: What do notes contain in Sudoku?
         let mut rng = OsRng;
         let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
@@ -189,7 +179,6 @@ mod tests {
             psi,
             rcm,
             true,
-            vec![],
         );
     }
 }

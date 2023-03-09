@@ -35,9 +35,14 @@ pub(crate) fn prf_nf(nk: pallas::Base, rho: pallas::Base) -> pallas::Base {
     poseidon_hash(nk, rho)
 }
 
-pub(crate) fn poseidon_hash(left: pallas::Base, right: pallas::Base) -> pallas::Base {
+pub fn poseidon_hash(left: pallas::Base, right: pallas::Base) -> pallas::Base {
     poseidon::Hash::<_, poseidon::P128Pow5T3, poseidon::ConstantLength<2>, 3, 2>::init()
         .hash([left, right])
+}
+
+pub(crate) fn poseidon_hash_n<const L: usize>(message: [pallas::Base; L]) -> pallas::Base {
+    poseidon::Hash::<_, poseidon::P128Pow5T3, poseidon::ConstantLength<L>, 3, 2>::init()
+        .hash(message)
 }
 
 pub fn poseidon_to_curve<const L: usize>(message: &[pallas::Base]) -> pallas::Point {

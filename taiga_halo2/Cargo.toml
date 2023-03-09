@@ -11,7 +11,7 @@ pasta_curves = "0.4"
 ff = "0.12"
 group = "0.12"
 halo2_gadgets = {version = "0.2", features = ["test-dependencies"]}
-halo2_proofs = "0.2"
+halo2_proofs = {version="0.2", features = ["dev-graph"]}
 bitvec = "1"
 subtle = { version = "2.3", default-features = false }
 dyn-clone = "1.0"
@@ -30,4 +30,4 @@ name = "vp_proof"
 harness = false
 
 [[example]]
-name = "sudoku"
+name = "taiga_sudoku"
