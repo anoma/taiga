@@ -6,7 +6,9 @@ use crate::{
     },
     constant::{
         NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain, NUM_NOTE,
-        SETUP_PARAMS_MAP, VP_CIRCUIT_PARAMS_SIZE,
+        SETUP_PARAMS_MAP, VP_CIRCUIT_NULLIFIER_ONE_INSTANCE_IDX,
+        VP_CIRCUIT_NULLIFIER_TWO_INSTANCE_IDX, VP_CIRCUIT_OUTPUT_CM_ONE_INSTANCE_IDX,
+        VP_CIRCUIT_OUTPUT_CM_TWO_INSTANCE_IDX, VP_CIRCUIT_PARAMS_SIZE,
     },
     note::Note,
     proof::Proof,
@@ -34,11 +36,17 @@ impl VPVerifyingInfo {
     }
 
     pub fn get_nullifiers(&self) -> [pallas::Base; NUM_NOTE] {
-        [self.instance[0], self.instance[2]]
+        [
+            self.instance[VP_CIRCUIT_NULLIFIER_ONE_INSTANCE_IDX],
+            self.instance[VP_CIRCUIT_NULLIFIER_TWO_INSTANCE_IDX],
+        ]
     }
 
     pub fn get_note_commitments(&self) -> [pallas::Base; NUM_NOTE] {
-        [self.instance[1], self.instance[3]]
+        [
+            self.instance[VP_CIRCUIT_OUTPUT_CM_ONE_INSTANCE_IDX],
+            self.instance[VP_CIRCUIT_OUTPUT_CM_TWO_INSTANCE_IDX],
+        ]
     }
 }
 

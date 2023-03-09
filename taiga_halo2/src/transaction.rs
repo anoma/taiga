@@ -5,7 +5,8 @@ use crate::constant::{
     ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, NUM_NOTE,
     SETUP_PARAMS_MAP, TRANSACTION_BINDING_HASH_PERSONALIZATION,
 };
-use crate::note::{OutputNoteInfo, SpendNoteInfo};
+use crate::note::{NoteCommitment, OutputNoteInfo, SpendNoteInfo};
+use crate::nullifier::Nullifier;
 use crate::proof::Proof;
 use crate::value_commitment::ValueCommitment;
 use blake2b_simd::Params as Blake2bParams;
@@ -116,10 +117,10 @@ impl Transaction {
             .personal(TRANSACTION_BINDING_HASH_PERSONALIZATION)
             .to_state();
         self.get_nullifiers().iter().for_each(|nf| {
-            h.update(&nf.to_repr());
+            h.update(&nf.to_bytes());
         });
         self.get_output_cms().iter().for_each(|cm| {
-            h.update(&cm.to_repr());
+            h.update(&cm.to_bytes());
         });
         self.get_value_commitments().iter().for_each(|vc| {
             h.update(&vc.to_bytes());
@@ -134,14 +135,14 @@ impl Transaction {
         self.partial_txs.push(ptx);
     }
 
-    pub fn get_nullifiers(&self) -> Vec<pallas::Base> {
+    pub fn get_nullifiers(&self) -> Vec<Nullifier> {
         self.partial_txs
             .iter()
             .flat_map(|ptx| ptx.get_nullifiers())
             .collect()
     }
 
-    pub fn get_output_cms(&self) -> Vec<pallas::Base> {
+    pub fn get_output_cms(&self) -> Vec<NoteCommitment> {
         self.partial_txs
             .iter()
             .flat_map(|ptx| ptx.get_output_cms())
@@ -208,7 +209,7 @@ impl Transaction {
     #[allow(clippy::type_complexity)]
     pub fn execute(
         &self,
-    ) -> Result<(Vec<pallas::Base>, Vec<pallas::Base>, Vec<pallas::Base>), TransactionError> {
+    ) -> Result<(Vec<Nullifier>, Vec<NoteCommitment>, Vec<pallas::Base>), TransactionError> {
         // Verify proofs
         self.verify_proofs()?;
 
@@ -290,17 +291,17 @@ impl PartialTransaction {
         Ok(())
     }
 
-    pub fn get_nullifiers(&self) -> Vec<pallas::Base> {
+    pub fn get_nullifiers(&self) -> Vec<Nullifier> {
         self.actions
             .iter()
-            .map(|action| action.action_instance.nf.inner())
+            .map(|action| action.action_instance.nf)
             .collect()
     }
 
-    pub fn get_output_cms(&self) -> Vec<pallas::Base> {
+    pub fn get_output_cms(&self) -> Vec<NoteCommitment> {
         self.actions
             .iter()
-            .map(|action| action.action_instance.cm.get_x())
+            .map(|action| action.action_instance.cm)
             .collect()
     }
 
@@ -322,8 +323,8 @@ impl PartialTransaction {
         let action_nfs = self.get_nullifiers();
         for vp_info in self.spends.iter() {
             for nfs in vp_info.get_nullifiers().iter() {
-                if !((action_nfs[0] == nfs[0] && action_nfs[1] == nfs[1])
-                    || (action_nfs[0] == nfs[1] && action_nfs[1] == nfs[0]))
+                if !((action_nfs[0].inner() == nfs[0] && action_nfs[1].inner() == nfs[1])
+                    || (action_nfs[0].inner() == nfs[1] && action_nfs[1].inner() == nfs[0]))
                 {
                     return Err(TransactionError::InconsistentNullifier);
                 }
@@ -336,8 +337,8 @@ impl PartialTransaction {
         let action_cms = self.get_output_cms();
         for vp_info in self.outputs.iter() {
             for cms in vp_info.get_note_commitments().iter() {
-                if !((action_cms[0] == cms[0] && action_cms[1] == cms[1])
-                    && (action_cms[0] == cms[1] && action_cms[1] == cms[0]))
+                if !((action_cms[0].get_x() == cms[0] && action_cms[1].get_x() == cms[1])
+                    && (action_cms[0].get_x() == cms[1] && action_cms[1].get_x() == cms[0]))
                 {
                     return Err(TransactionError::InconsistentOutputNoteCommitment);
                 }
