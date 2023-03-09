@@ -42,6 +42,11 @@ pub const POSEIDON_TO_CURVE_INPUT_LEN: usize = 4;
 pub const CURVE_ID: &str = "pallas";
 pub const VALUE_BASE_DOMAIN_POSTFIX: &str = "Taiga-ValueBase";
 
+pub const VP_CIRCUIT_NULLIFIER_ONE_INSTANCE_IDX: usize = 0;
+pub const VP_CIRCUIT_OUTPUT_CM_ONE_INSTANCE_IDX: usize = 1;
+pub const VP_CIRCUIT_NULLIFIER_TWO_INSTANCE_IDX: usize = 2;
+pub const VP_CIRCUIT_OUTPUT_CM_TWO_INSTANCE_IDX: usize = 3;
+
 // TODO: After moving is_merkle_checked out of value base derivation, POSEIDON_TO_CURVE_INPUT_LEN would be 3.
 // But there is something wrong with poseidon hash gadget in Halo2(probably a padding bug). MockProver is fine. create_proof results in a Synthesis Error.
 // Temporary fix: add a dummy post string to extend the POSEIDON_TO_FIELD_U_0_POSTFIX to two field elements

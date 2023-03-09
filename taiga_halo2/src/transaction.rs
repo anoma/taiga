@@ -26,6 +26,10 @@ pub enum TransactionError {
     InvalidBindingSignature,
     /// Binding signature is missing.
     MissingBindingSignatures,
+    /// Nullifier is not consistent between the action and the vp.
+    InconsistentNullifier,
+    /// Output note commitment is not consistent between the action and the vp.
+    InconsistentOutputNoteCommitment,
 }
 
 impl Display for TransactionError {
@@ -35,6 +39,12 @@ impl Display for TransactionError {
             Proof(e) => f.write_str(&format!("Proof error: {e}")),
             InvalidBindingSignature => f.write_str("Binding signature was invalid"),
             MissingBindingSignatures => f.write_str("Binding signature is missing"),
+            InconsistentNullifier => {
+                f.write_str("Nullifier is not consistent between the action and the vp")
+            }
+            InconsistentOutputNoteCommitment => f.write_str(
+                "Output note commitment is not consistent between the action and the vp",
+            ),
         }
     }
 }
@@ -185,6 +195,17 @@ impl Transaction {
         Ok(())
     }
 
+    pub fn public_inputs_check(&self) -> Result<(), TransactionError> {
+        for partial_tx in self.partial_txs.iter() {
+            // nullifier check
+            partial_tx.check_nullifiers()?;
+            // output note commitment check
+            partial_tx.check_note_commitments()?;
+        }
+
+        Ok(())
+    }
+
     #[allow(clippy::type_complexity)]
     pub fn execute(
         &self,
@@ -194,6 +215,9 @@ impl Transaction {
 
         // Verify binding signature
         self.verify_binding_sig()?;
+
+        // Public inputs check
+        self.public_inputs_check()?;
 
         // Return Nullifiers to check double-spent, NoteCommitments to store, anchors to check the root-existence
         Ok((
@@ -294,6 +318,34 @@ impl PartialTransaction {
             .map(|action| action.action_instance.anchor)
             .collect()
     }
+
+    pub fn check_nullifiers(&self) -> Result<(), TransactionError> {
+        let action_nfs = self.get_nullifiers();
+        for vp_info in self.spends.iter() {
+            for nfs in vp_info.get_nullifiers().iter() {
+                if !((action_nfs[0].inner() == nfs[0] && action_nfs[1].inner() == nfs[1])
+                    || (action_nfs[0].inner() == nfs[1] && action_nfs[1].inner() == nfs[0]))
+                {
+                    return Err(TransactionError::InconsistentNullifier);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn check_note_commitments(&self) -> Result<(), TransactionError> {
+        let action_cms = self.get_output_cms();
+        for vp_info in self.outputs.iter() {
+            for cms in vp_info.get_note_commitments().iter() {
+                if !((action_cms[0].get_x() == cms[0] && action_cms[1].get_x() == cms[1])
+                    && (action_cms[0].get_x() == cms[1] && action_cms[1].get_x() == cms[0]))
+                {
+                    return Err(TransactionError::InconsistentOutputNoteCommitment);
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl ActionVerifyingInfo {
@@ -364,6 +416,22 @@ impl NoteVPVerifyingInfoSet {
         // TODO: Verify vp verifier proofs
 
         Ok(())
+    }
+
+    pub fn get_nullifiers(&self) -> Vec<[pallas::Base; NUM_NOTE]> {
+        let mut nfs = vec![self.app_vp_verifying_info.get_nullifiers()];
+        self.app_logic_vp_verifying_info
+            .iter()
+            .for_each(|vp_info| nfs.push(vp_info.get_nullifiers()));
+        nfs
+    }
+
+    pub fn get_note_commitments(&self) -> Vec<[pallas::Base; NUM_NOTE]> {
+        let mut cms = vec![self.app_vp_verifying_info.get_note_commitments()];
+        self.app_logic_vp_verifying_info
+            .iter()
+            .for_each(|vp_info| cms.push(vp_info.get_note_commitments()));
+        cms
     }
 }
 
