@@ -118,8 +118,10 @@ mod tests {
     use taiga_halo2::{
         circuit::{
             gadgets::{
-                assign_free_advice, assign_free_instance, AddChip, AddConfig, AddInstructions,
-                MulChip, MulConfig, MulInstructions, SubChip, SubConfig, SubInstructions,
+                assign_free_advice, assign_free_instance,
+                add::{AddChip, AddConfig, AddInstructions},
+                mul::{MulChip, MulConfig, MulInstructions},
+                sub::{SubChip, SubConfig, SubInstructions},
             },
             vp_examples::TrivialValidityPredicateCircuit,
         },
@@ -182,7 +184,6 @@ mod tests {
             psi,
             rcm,
             true,
-            vec![],
         );
     }
 
@@ -218,7 +219,6 @@ mod tests {
                 psi,
                 rcm,
                 is_merkle_checked,
-                vec![0u8; 32],
             )
         };
         let output_note = {
@@ -237,7 +237,6 @@ mod tests {
                 psi,
                 rcm,
                 is_merkle_checked,
-                vec![0u8; 32],
             )
         };
 
@@ -269,7 +268,6 @@ mod tests {
                 psi,
                 rcm,
                 is_merkle_checked,
-                vec![0u8; 32],
             )
         };
 
@@ -289,7 +287,6 @@ mod tests {
                 psi,
                 rcm,
                 is_merkle_checked,
-                vec![0u8; 32],
             )
         };
         (spend_note, output_note)
