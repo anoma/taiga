@@ -118,8 +118,8 @@ mod tests {
     use taiga_halo2::{
         circuit::{
             gadgets::{
-                assign_free_advice, assign_free_instance,
                 add::{AddChip, AddConfig, AddInstructions},
+                assign_free_advice, assign_free_instance,
                 mul::{MulChip, MulConfig, MulInstructions},
                 sub::{SubChip, SubConfig, SubInstructions},
             },
@@ -152,7 +152,7 @@ mod tests {
     }
 
     #[test]
-    fn test_vp() {
+    fn test_note_creation() {
         let mut rng = OsRng;
         let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));

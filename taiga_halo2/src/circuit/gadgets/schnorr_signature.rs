@@ -2,7 +2,7 @@ use group::Curve;
 use halo2_proofs::{
     arithmetic::CurveAffine,
     circuit::{floor_planner, Layouter, Value},
-    plonk::{self, Advice, Column, Instance as InstanceColumn},
+    plonk::{self, Advice, Column, ConstraintSystem, Instance as InstanceColumn, Selector},
 };
 use pasta_curves::pallas;
 
@@ -34,6 +34,7 @@ use halo2_gadgets::{
 use group::Group;
 #[derive(Clone, Debug)]
 pub struct SchnorrConfig {
+    q_schnorr: Selector,
     primary: Column<InstanceColumn>,
     advices: [Column<Advice>; 10],
     add_config: AddConfig,
@@ -65,30 +66,8 @@ impl SchnorrConfig {
     pub(super) fn poseidon_chip(&self) -> PoseidonChip<pallas::Base, 3, 2> {
         PoseidonChip::construct(self.poseidon_config.clone())
     }
-}
 
-#[derive(Clone, Debug, Default)]
-pub struct SchnorrCircuit {
-    // public key
-    pk: pallas::Point,
-    // signature (r,s)
-    r: pallas::Point,
-    s: pallas::Scalar,
-}
-
-impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
-    type Config = SchnorrConfig;
-    type FloorPlanner = floor_planner::V1;
-
-    fn without_witnesses(&self) -> Self {
-        SchnorrCircuit {
-            pk: pallas::Point::generator(),
-            r: pallas::Point::generator(),
-            s: pallas::Scalar::one(),
-        }
-    }
-
-    fn configure(meta: &mut plonk::ConstraintSystem<pallas::Base>) -> Self::Config {
+    pub fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
         let advices = [
             meta.advice_column(),
             meta.advice_column(),
@@ -194,7 +173,8 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
             rc_b,
         );
 
-        SchnorrConfig {
+        let schnorr_config = Self {
+            q_schnorr: meta.selector(),
             primary,
             advices,
             add_config,
@@ -203,55 +183,58 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
             ecc_config,
             poseidon_config,
             sinsemilla_config,
-        }
+        };
+
+        schnorr_config
     }
 
-    #[allow(non_snake_case)]
-    fn synthesize(
+    pub fn verify_signature(
         &self,
-        config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
-    ) -> Result<(), plonk::Error> {
+        // public key
+        pk: pallas::Point,
+        // signature (r,s)
+        r: pallas::Point,
+        s: pallas::Scalar,
+    ) -> Result<(), plonk::Error>{
         SinsemillaChip::<
-                NoteCommitmentHashDomain,
-                NoteCommitmentDomain,
-                NoteCommitmentFixedBases,
-            >::load(config.sinsemilla_config, &mut layouter)?;
-        // We implement the verification algorithm first
-        // and assume that the signature is given
+        NoteCommitmentHashDomain,
+        NoteCommitmentDomain,
+        NoteCommitmentFixedBases,
+    >::load(self.sinsemilla_config.clone(), &mut layouter)?;
         // Construct an ECC chip
-        let ecc_chip = EccChip::construct(config.ecc_config);
+        let ecc_chip = EccChip::construct(self.ecc_config.clone());
         // TODO: Message length (256bits) is bigger than the size of Fp (255bits)
         // Obtain message: m
         let m_cell = assign_free_instance(
             layouter.namespace(|| "message instance"),
-            config.primary,
+            self.primary,
             0,
-            config.advices[0],
+            self.advices[0],
         )
         .unwrap();
         // Obtain the signature: (R,s)
         let R = NonIdentityPoint::new(
             ecc_chip.clone(),
             layouter.namespace(|| "non-identity R"),
-            Value::known(self.r.to_affine()),
+            Value::known(r.to_affine()),
         )?;
         let s_scalar = ScalarFixed::new(
             ecc_chip.clone(),
             layouter.namespace(|| "s"),
-            Value::known(self.s),
+            Value::known(s),
         )?;
         // Obtain public key : P
         let (px_cell, py_cell) = {
-            let p_coord = self.pk.to_affine().coordinates().unwrap();
+            let p_coord = pk.to_affine().coordinates().unwrap();
             let px_cell = assign_free_advice(
                 layouter.namespace(|| "px"),
-                config.advices[0],
+                self.advices[0],
                 Value::known(*p_coord.x()),
             )?;
             let py_cell = assign_free_advice(
                 layouter.namespace(|| "py"),
-                config.advices[1],
+                self.advices[1],
                 Value::known(*p_coord.y()),
             )?;
             (px_cell, py_cell)
@@ -264,12 +247,12 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
 
         // Hash(r||P||m)
         let h_scalar = {
-            let poseidon_chip = PoseidonChip::construct(config.poseidon_config);
+            let poseidon_chip = PoseidonChip::construct(self.poseidon_config.clone());
             let rx_cell = R.inner().x();
             let ry_cell = R.inner().y();
             let zero_cell = assign_free_advice(
                 layouter.namespace(|| "zero"),
-                config.advices[0],
+                self.advices[0],
                 Value::known(pallas::Base::zero()),
             )?;
             let poseidon_message = [
@@ -304,7 +287,7 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
             let P = NonIdentityPoint::new(
                 ecc_chip,
                 layouter.namespace(|| "non-identity P"),
-                Value::known(self.pk.to_affine()),
+                Value::known(pk.to_affine()),
             )?;
             P.mul(layouter.namespace(|| "hP"), h_scalar)?
         };
@@ -313,6 +296,42 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         let rhs = R.add(layouter.namespace(|| "R + Hash(r||P||m)*P"), &hP)?;
 
         sG.constrain_equal(layouter.namespace(|| "s*G = R + Hash(r||P||m)*P"), &rhs)?;
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct SchnorrCircuit {
+    // public key
+    pk: pallas::Point,
+    // signature (r,s)
+    r: pallas::Point,
+    s: pallas::Scalar,
+}
+
+impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
+    type Config = SchnorrConfig;
+    type FloorPlanner = floor_planner::V1;
+
+    fn without_witnesses(&self) -> Self {
+        SchnorrCircuit {
+            pk: pallas::Point::generator(),
+            r: pallas::Point::generator(),
+            s: pallas::Scalar::one(),
+        }
+    }
+
+    fn configure(meta: &mut plonk::ConstraintSystem<pallas::Base>) -> Self::Config {
+        SchnorrConfig::configure(meta)
+    }
+
+    #[allow(non_snake_case)]
+    fn synthesize(
+        &self,
+        config: Self::Config,
+        mut layouter: impl Layouter<pallas::Base>,
+    ) -> Result<(), plonk::Error> {
+        config.verify_signature(layouter, self.pk, self.r, self.s);
         Ok(())
     }
 }

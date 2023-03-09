@@ -7,6 +7,7 @@ use halo2_proofs::{
 
 pub mod add;
 pub mod mul;
+pub mod schnorr_signature;
 pub mod sub;
 pub mod target_note_variable;
 pub mod triple_mul;

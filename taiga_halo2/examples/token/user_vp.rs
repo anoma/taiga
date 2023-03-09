@@ -9,6 +9,7 @@ use taiga_halo2::{
     circuit::{
         integrity::{OutputNoteVar, SpendNoteVar},
         note_circuit::NoteConfig,
+        schnorr_signature::SchnorrConfig,
         vp_circuit::{
             VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
             ValidityPredicateInfo,
@@ -34,6 +35,7 @@ pub struct UserVP {
 #[derive(Clone, Debug)]
 pub struct UserVPConfig {
     note_config: NoteConfig,
+    schnorr_config: SchnorrConfig,
 }
 
 impl ValidityPredicateConfig for UserVPConfig {
@@ -43,7 +45,11 @@ impl ValidityPredicateConfig for UserVPConfig {
 
     fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
         let note_config = Self::configure_note(meta);
-        Self { note_config }
+        let schnorr_config = SchnorrConfig::configure(meta);
+        Self {
+            note_config,
+            schnorr_config,
+        }
     }
 }
 

@@ -7,5 +7,4 @@ pub mod note_circuit;
 pub mod vp_circuit;
 pub mod curve;
 pub mod hash_to_curve;
-pub mod schnorr_signature;
 pub mod vp_examples;
