@@ -1,54 +1,33 @@
 # Application
 
-`App` define the type of note (e.g. XAN, ETH, BTC). Each application is identified by an address `appAddress` (the same way as user address identifies a user) and has its own VP `AppVP`.
+### Application logic
+Application VP is the defining structure of an application that contains the application logic. 
+Every time the application state is about to change, the application VP is called to validate the state transition.
+If the application VP doesn't consider a state transition valid, the state will not be changed.
 
-### Application VP
-Each application has its own [validity predicate](./validity-predicates.md) `AppVP` that defines the conditions on which the application can be sent/received/etc (e.g. whitelist VP that only allows using the application a specified set of users). As with other VPs, `AppVP` checks that input and output notes of the tx satisfy certain constraints.
-It is required that the `AppVP` of the applications involved in a tx evaluated to `true`.
+An application VP might require validity of other VPs, enforcing the VP hierarchy with the application VP being the main VP checked.
 
-In Taiga, VPs are shielded, so instead of showing that `AppVP` evaluates to `true` publicly, a ZK proof is created. To make sure that `AppVP`  evaluates to `true`, an observer can verify the proof (using the verifier key):
+#### Application address
+Each application has a unique application identifier that we call an address. The application address is derived from its application VP.
 
-```verify(AppVP_proof, app_VK) = True```
+### Application state
+As Taiga works in the UTXO model, application states are stored in notes, and changing the application state is done by spending the old application state notes and creating new application state notes.
 
-### Application Address
-Each app is identified by an address that is derived from its verifier key `app_VK`:
-`appAddress = Com(app_VK)`
+The application a note belongs to is indicated by the note's type which is derived using the application address, binding the note with the application.
+One application can have notes of multiple types, all of which are derived using the application address and some additional information that helps to distinguish the note types.
+Notes of distinct types are independent of each other, unless explicitly designed otherwise.
 
+![img.png](images/app_note_with_multiple_types.png)
 
-### Example
-##### Create a application
-In order to create a application, we need `AppVP`. Let's use the `TrivialValidityPredicate` (see [more](./validity-predicates.md)):
-```rust
-let mut app_vp = TrivialValidityPredicate::<CP> {
-	input_notes,
-	output_notes,
-};
+#### Shielded applications
+All applications in Taiga are shielded, which means that the application VP of each application is hidden, the notes containing application states are encrypted, 
+and the produced transactions don't reveal any information about the applications they change the state of. 
 
-// transform the VP into a short form 
-let desc_vp = ValidityPredicateDescription::from_vp(&mut app_vp, &vp_setup).unwrap();
+![img.png](images/app_intro.png)
 
-let app = App::<CP>::new(desc_vp);
+#### Are Taiga applications similar to Ethereum applications?
 
-//app address can be used to create notes of that app;
-let app_address = app.address().unwrap();
-```
-This example is reproducible with [this file](https://github.com/anoma/taiga/blob/main/src/doc_examples/app.rs) or with the command
-```
-cargo test doc_examples::app::test_app_creation
-```
+In some sense, Taiga applications are similar to Ethereum applications, but there are two key distinctions that come to mind:
+* Ethereum uses smart contracts when Taiga uses validity predicates to describe the application logic (learn more about the difference [here](https://github.com/anoma/whitepaper/blob/main/whitepaper.pdf), page 3)
+* Taiga applications are shielded by default, but can be defined separately over the transparent pool as well. The shielded and transparent parts of the application can interact with each other, but whatever happens in Taiga is always shielded
 
-#### Dummy app
-
-It is also possible to create a dummy app without VP:
-
-```rust
-let app = App::<CP>::dummy(&mut rng)
-```
-
-Using this app, we can create a [dummy note](./notes.md) of a specific app (all other fields are random):
-
-```rust
-let note = Note::<CP>::dummy_from_app(app, rng)
-```
-
-Next: [User](./users.md)
