@@ -34,7 +34,6 @@ use halo2_gadgets::{
 use group::Group;
 #[derive(Clone, Debug)]
 pub struct SchnorrConfig {
-    q_schnorr: Selector,
     primary: Column<InstanceColumn>,
     advices: [Column<Advice>; 10],
     add_config: AddConfig,
@@ -174,7 +173,6 @@ impl SchnorrConfig {
         );
 
         let schnorr_config = Self {
-            q_schnorr: meta.selector(),
             primary,
             advices,
             add_config,
@@ -329,7 +327,7 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
     fn synthesize(
         &self,
         config: Self::Config,
-        mut layouter: impl Layouter<pallas::Base>,
+        layouter: impl Layouter<pallas::Base>,
     ) -> Result<(), plonk::Error> {
         config.verify_signature(layouter, self.pk, self.r, self.s)
     }

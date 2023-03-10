@@ -147,6 +147,7 @@ mod tests {
         constant::{NOTE_COMMIT_DOMAIN, NUM_NOTE},
         proof::Proof,
         utils::{mod_r_p, poseidon_hash_n}, note::Note,
+        circuit::vp_circuit::ValidityPredicateInfo
     };
 
     use std::{
@@ -201,14 +202,17 @@ mod tests {
             output_notes,
         };
 
-        let pub_instance_vec = vec![m];
+        let zero = pallas::Base::zero();
+
+        let mut pub_instance_vec = circuit.get_instances();
+        instances.push(m);
         assert_eq!(
             MockProver::run(K, &circuit, vec![pub_instance_vec.clone()])
                 .unwrap()
                 .verify(),
             Ok(())
         );
-        let prover = MockProver::run(K, &circuit, vec![pub_instance_vec]).unwrap();
+        let prover = MockProver::run(K, &circuit, pub_instance_vec).unwrap();
         prover.assert_satisfied();
 
         let time = Instant::now();
@@ -222,7 +226,7 @@ mod tests {
         );
 
         let time = Instant::now();
-        let proof = Proof::create(&pk, &params, circuit, &[&[m]], &mut rng).unwrap();
+        let proof = Proof::create(&pk, &params, circuit, &[&[m, zero, zero, zero]], &mut rng).unwrap();
         println!("proof: \t\t\t{:?}ms", (Instant::now() - time).as_millis());
 
         let time = Instant::now();
