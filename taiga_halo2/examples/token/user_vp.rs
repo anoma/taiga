@@ -205,14 +205,14 @@ mod tests {
         let zero = pallas::Base::zero();
 
         let mut pub_instance_vec = circuit.get_instances();
-        instances.push(m);
+        pub_instance_vec.push(m);
         assert_eq!(
             MockProver::run(K, &circuit, vec![pub_instance_vec.clone()])
                 .unwrap()
                 .verify(),
             Ok(())
         );
-        let prover = MockProver::run(K, &circuit, pub_instance_vec).unwrap();
+        let prover = MockProver::run(K, &circuit, vec![pub_instance_vec]).unwrap();
         prover.assert_satisfied();
 
         let time = Instant::now();
