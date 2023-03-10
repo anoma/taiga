@@ -1,33 +1,24 @@
-# Action
+# The Action circuit
 
-The action is a mechanism that allows a user to spend or create [notes](notes.md) by proving the right to do so using ZK proofs.
+The Action circuit is a mechanism that ensures that the proposed state transitions follow the Taiga rules. 
+Unlike validity predicates, the Action circuit checks don't depend on the applications involved and are the same for all transactions.
 
-## Spending a note
+As an application state is contained in notes, and a state transition is represented as spending the old notes and creating new ones,
+the Action circuit checks the correctness of the old state by checking properties of the old notes and the correctness of the new state by checking the properties of the new notes.
 
-To spend a note, the users need to prove that they are allowed to do so, namely:
-- To make sure that the correct `AppVP` is checked, prove the relationship between `app_VK` and the application field in the spent note.
-  ![img_3.png](img/action_img_3.png)
-- To make sure the correct `SendVP`(read more about `SendVP` [here](./users.md)) is checked, prove the relationship between `send_VK` and the owner field in the spent note.
-- Compute the nullifier of the spent note (using the nullifier key `nk`) so that it cannot be double-spent. To make sure that the nullifier is computed correctly, prove the relationship between `nk` and the owner field in the spent note.
+### Check the old state (spent notes)
 
-![img_1.png](img/action_img_1.png)
+For spent notes, the Action circuit checks that:
+* the note existed before (can you spend a note that doesn't exist?),
+* the note haven't been spent yet,
+* the spender has a right to spend it (do you own the note?),
+* and that the application the note belongs to approves the action (sure there is some application approves the check, but is it the one the note belongs to?).
 
-## Creating a note
+### Check the new state (created notes)
 
-To create a note, the user also needs to prove the right to do so. `AppVP` must allow the creation of the note, as well as recipient user's `RecvVP`:
+For the notes being created, the Action circuit checks that:
+* the correct application approves it (same check as for spent notes)
+* and the note commitment is derived correctly (the thing that makes everyone to know that the note exists must indeed represent the note)
+* if the note is encrypted, check the encryption correctness (will the owner be able to decrypt it?)
 
-- To make sure that the correct `AppVP` is checked, prove the relationship between `app_VK` and the application field in the note to be created.
-  ![img_4.png](img/action_img_4.png)
-
-- To make sure the correct `RecvVP` is checked (read more about `RecvVP` [here](./users.md)), prove the relationship between `recv_VK` and the owner field of the note to be created.
-  ![img.png](img/action_img.png)
-  
-- To make sure that the [note](./notes.md) commitment `cm` is derived correctly, prove the relationship between `cm`, the note, and the receiver of the note
-
-![img_2.png](img/action_img_2.png)
-
-To see a more detailed description of the action circuit checks, see the [specification](./spec.md). See also the [action implementation](https://github.com/anoma/taiga/blob/main/src/action.rs) and the [action circuit implementation](https://github.com/anoma/taiga/blob/main/src/circuit/action_circuit.rs) for more details.
-
-To ensure full privacy, we use [blinding](./blinding.md) to hide the verifier keys.
-
-Next: [blinding](./blinding.md)
+To learn in details about the checks the Action circuit performs, check the [technical specification of Taiga](./spec.md).
