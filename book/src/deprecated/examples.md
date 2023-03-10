@@ -81,7 +81,7 @@ verify_proof::<Fq, OP, Opc>(
 ```
 
 
-#### Creationg a note
+#### Creating a note
 TODO: add a hyperlink to the existing code
 We provide an example of creation of a note from the structure we have already defined for [Application]() and [User]():
 ```rust
