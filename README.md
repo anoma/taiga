@@ -44,7 +44,7 @@ To update the state, an application (or anyone with sufficient rights)
 would spend the notes containing the old state and create notes containing 
 a new state.
 
-![img_1.png](./book/src/images/intro_UTXO.png)
+![img_1.png](./book/src/images/Intro_UTXO.png)
 
 #### Some of the nice Taiga features
 
