@@ -61,6 +61,8 @@ lookups)
 
 ### Taiga overview 
 
+If you want to learn more about how Taiga works, check out the sections below
+
 - [Applications](./book/src/app.md)
 - [Notes](./book/src/notes.md)
 - [Validity predicates](./book/src/validity-predicates.md)
@@ -71,7 +73,7 @@ lookups)
 - [Performance](./book/src/performance.md)
 
 
-* To run the Taiga book, run
+or run the Taiga book:
 ```
 cd book
 mdbook serve --open
