@@ -61,11 +61,9 @@ lookups)
 
 ### Taiga overview & specification
 
-* To access the Taiga overview, run
+* To access the [Taiga overview](./book/src/SUMMARY.md), run
 ```
 cd book
 mdbook serve --open
 ```
-
-* You can find the specification of Taiga [here](./book/src/spec.md).
 
