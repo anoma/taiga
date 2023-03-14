@@ -69,7 +69,6 @@ lookups)
   - [Intent Application](./book/src/intent.md)
   - [Examples](./book/src/exec_examples.md)
 - [Performance](./book/src/performance.md)
-- [Technical specification draft](./book/src/spec.md)
 
 
 * To run the Taiga book, run
