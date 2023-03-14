@@ -59,13 +59,23 @@ state transitions (if they want)
 * Performance benefits from using PLONK arithmetization (including 
 lookups)
 
-### Taiga overview & specification
+### Taiga overview 
 
-* To access the Taiga overview, run
+If you want to learn more about how Taiga works, check out the sections below
+
+- [Applications](./book/src/app.md)
+- [Notes](./book/src/notes.md)
+- [Validity predicates](./book/src/validity-predicates.md)
+- [The Action circuit](./book/src/action.md)
+- [Execution model](./book/src/exec.md)
+  - [Intent Application](./book/src/intent.md)
+  - [Examples](./book/src/exec_examples.md)
+- [Performance](./book/src/performance.md)
+
+
+or run the Taiga book:
 ```
 cd book
 mdbook serve --open
 ```
-
-* You can find the specification of Taiga [here](./book/src/spec.md).
 
