@@ -61,7 +61,6 @@ lookups)
 
 ### Taiga overview 
 
-- [Introduction](./book/src/intro.md)
 - [Applications](./book/src/app.md)
 - [Notes](./book/src/notes.md)
 - [Validity predicates](./book/src/validity-predicates.md)
