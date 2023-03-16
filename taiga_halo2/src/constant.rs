@@ -46,6 +46,7 @@ pub const VP_CIRCUIT_NULLIFIER_ONE_INSTANCE_IDX: usize = 0;
 pub const VP_CIRCUIT_OUTPUT_CM_ONE_INSTANCE_IDX: usize = 1;
 pub const VP_CIRCUIT_NULLIFIER_TWO_INSTANCE_IDX: usize = 2;
 pub const VP_CIRCUIT_OUTPUT_CM_TWO_INSTANCE_IDX: usize = 3;
+pub const VP_CIRCUIT_OWNED_NOTE_PUB_ID_INSTANCE_IDX: usize = 4;
 
 // TODO: After moving is_merkle_checked out of value base derivation, POSEIDON_TO_CURVE_INPUT_LEN would be 3.
 // But there is something wrong with poseidon hash gadget in Halo2(probably a padding bug). MockProver is fine. create_proof results in a Synthesis Error.

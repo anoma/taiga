@@ -142,7 +142,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
 
         // Spend note
         // Check the spend note commitment
-        let spend_note_vars = check_spend_note(
+        let spend_note_variables = check_spend_note(
             layouter.namespace(|| "check spend note"),
             config.advices,
             config.instances,
@@ -156,11 +156,10 @@ impl Circuit<pallas::Base> for ActionCircuit {
         )?;
 
         // Check the merkle tree path validity and public the root
-        let leaf = spend_note_vars.cm.extract_p().inner().clone();
         let root = merkle_poseidon_gadget(
             layouter.namespace(|| "poseidon merkle"),
             merkle_chip,
-            leaf,
+            spend_note_variables.cm_x,
             &self.auth_path,
         )?;
 
@@ -176,11 +175,11 @@ impl Circuit<pallas::Base> for ActionCircuit {
             note_commit_chip,
             config.note_config.poseidon_config,
             self.output_note.clone(),
-            spend_note_vars.nf,
+            spend_note_variables.nf,
             ACTION_OUTPUT_CM_INSTANCE_ROW_IDX,
         )?;
 
-        // TODO: add user receive address VP commitment and application VP commitment
+        // TODO: application VP commitment
 
         // TODO: add note verifiable encryption
 
@@ -189,12 +188,12 @@ impl Circuit<pallas::Base> for ActionCircuit {
             layouter.namespace(|| "net value commitment"),
             ecc_chip,
             config.hash_to_curve_config.clone(),
-            spend_note_vars.app_vk.clone(),
-            spend_note_vars.app_data.clone(),
-            spend_note_vars.value.clone(),
-            output_note_vars.app_vk.clone(),
-            output_note_vars.app_data.clone(),
-            output_note_vars.value,
+            spend_note_variables.note_variables.app_vk.clone(),
+            spend_note_variables.note_variables.app_data.clone(),
+            spend_note_variables.note_variables.value.clone(),
+            output_note_vars.note_variables.app_vk.clone(),
+            output_note_vars.note_variables.app_data.clone(),
+            output_note_vars.note_variables.value,
             self.rcv,
         )?;
         layouter.constrain_instance(
@@ -212,12 +211,15 @@ impl Circuit<pallas::Base> for ActionCircuit {
         layouter.assign_region(
             || "merkle path check",
             |mut region| {
-                spend_note_vars.is_merkle_checked.copy_advice(
-                    || "is_merkle_checked_spend",
-                    &mut region,
-                    config.advices[0],
-                    0,
-                )?;
+                spend_note_variables
+                    .note_variables
+                    .is_merkle_checked
+                    .copy_advice(
+                        || "is_merkle_checked_spend",
+                        &mut region,
+                        config.advices[0],
+                        0,
+                    )?;
                 region.assign_advice_from_instance(
                     || "anchor",
                     config.instances,

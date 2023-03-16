@@ -4,11 +4,10 @@ use crate::{
             add::{AddChip, AddConfig, AddInstructions},
             assign_free_advice,
         },
-        integrity::{OutputNoteVar, SpendNoteVar},
         note_circuit::NoteConfig,
         vp_circuit::{
-            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo,
+            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
+            ValidityPredicateConfig, ValidityPredicateInfo,
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
@@ -126,8 +125,7 @@ impl ValidityPredicateCircuit for FieldAdditionValidityPredicateCircuit {
         &self,
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
-        _spend_note_variables: &[SpendNoteVar],
-        _output_note_variables: &[OutputNoteVar],
+        _basic_variables: BasicValidityPredicateVariables,
     ) -> Result<(), Error> {
         let a = assign_free_advice(
             layouter.namespace(|| "witness a"),

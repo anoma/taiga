@@ -1,14 +1,15 @@
 use crate::{
     circuit::{
         gadgets::{add::AddChip, assign_free_advice},
-        integrity::{check_output_note, check_spend_note, OutputNoteVar, SpendNoteVar},
+        integrity::{check_output_note, check_spend_note, OutputNoteVariables, SpendNoteVariables},
         note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig},
     },
     constant::{
         NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain, NUM_NOTE,
         SETUP_PARAMS_MAP, VP_CIRCUIT_NULLIFIER_ONE_INSTANCE_IDX,
         VP_CIRCUIT_NULLIFIER_TWO_INSTANCE_IDX, VP_CIRCUIT_OUTPUT_CM_ONE_INSTANCE_IDX,
-        VP_CIRCUIT_OUTPUT_CM_TWO_INSTANCE_IDX, VP_CIRCUIT_PARAMS_SIZE,
+        VP_CIRCUIT_OUTPUT_CM_TWO_INSTANCE_IDX, VP_CIRCUIT_OWNED_NOTE_PUB_ID_INSTANCE_IDX,
+        VP_CIRCUIT_PARAMS_SIZE,
     },
     note::Note,
     proof::Proof,
@@ -17,7 +18,7 @@ use crate::{
 use dyn_clone::{clone_trait_object, DynClone};
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
-    circuit::{Layouter, Value},
+    circuit::{AssignedCell, Layouter, Value},
     plonk::{Circuit, ConstraintSystem, Error, VerifyingKey},
 };
 use pasta_curves::{pallas, vesta};
@@ -98,6 +99,12 @@ pub trait ValidityPredicateInfo: DynClone {
     fn get_instances(&self) -> Vec<pallas::Base>;
     fn get_verifying_info(&self) -> VPVerifyingInfo;
     fn get_vp_description(&self) -> ValidityPredicateVerifyingKey;
+    // The owned_note_pub_id is the spend_note_nf or the output_note_cm_x
+    // The owned_note_pub_id is the key to look up the target variables and
+    // help determine whether the owned note is the spend note or not in VP circuit.
+    fn get_owned_note_pub_id(&self) -> pallas::Base {
+        unimplemented!()
+    }
 }
 
 clone_trait_object!(ValidityPredicateInfo);
@@ -110,7 +117,7 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateInf
         &self,
         config: Self::VPConfig,
         mut layouter: impl Layouter<pallas::Base>,
-    ) -> Result<(Vec<SpendNoteVar>, Vec<OutputNoteVar>), Error> {
+    ) -> Result<BasicValidityPredicateVariables, Error> {
         let note_config = config.get_note_config();
         // Load the Sinsemilla generator lookup table used by the whole circuit.
         SinsemillaChip::<
@@ -137,7 +144,7 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateInf
         let mut spend_note_variables = vec![];
         let mut output_note_variables = vec![];
         for i in 0..NUM_NOTE {
-            let spend_note_var = check_spend_note(
+            spend_note_variables.push(check_spend_note(
                 layouter.namespace(|| "check spend note"),
                 note_config.advices,
                 note_config.instances,
@@ -148,7 +155,7 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateInf
                 add_chip.clone(),
                 spend_notes[i].clone(),
                 i * 2,
-            )?;
+            )?);
 
             // The old_nf may not be from above spend note
             let old_nf = assign_free_advice(
@@ -156,7 +163,7 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateInf
                 note_config.advices[0],
                 Value::known(output_notes[i].rho.inner()),
             )?;
-            let output_note_var = check_output_note(
+            output_note_variables.push(check_output_note(
                 layouter.namespace(|| "check output note"),
                 note_config.advices,
                 note_config.instances,
@@ -167,12 +174,26 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateInf
                 output_notes[i].clone(),
                 old_nf,
                 i * 2 + 1,
-            )?;
-            spend_note_variables.push(spend_note_var);
-            output_note_variables.push(output_note_var);
+            )?);
         }
 
-        Ok((spend_note_variables, output_note_variables))
+        // Publicize the owned_note_pub_id
+        let owned_note_pub_id = assign_free_advice(
+            layouter.namespace(|| "owned_note_pub_id"),
+            note_config.advices[0],
+            Value::known(self.get_owned_note_pub_id()),
+        )?;
+        layouter.constrain_instance(
+            owned_note_pub_id.cell(),
+            note_config.instances,
+            VP_CIRCUIT_OWNED_NOTE_PUB_ID_INSTANCE_IDX,
+        )?;
+
+        Ok(BasicValidityPredicateVariables {
+            owned_note_pub_id,
+            spend_note_variables: spend_note_variables.try_into().unwrap(),
+            output_note_variables: output_note_variables.try_into().unwrap(),
+        })
     }
 
     // VP designer need to implement the following functions.
@@ -183,11 +204,19 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateInf
         &self,
         _config: Self::VPConfig,
         mut _layouter: impl Layouter<pallas::Base>,
-        _spend_note_variables: &[SpendNoteVar],
-        _output_note_variables: &[OutputNoteVar],
+        _basic_variables: BasicValidityPredicateVariables,
     ) -> Result<(), Error> {
         Ok(())
     }
+}
+
+/// BasicValidityPredicateVariables are generally constrained in ValidityPredicateCircuit::basic_constraints
+/// and will be used in ValidityPredicateCircuit::custom_constraints
+#[derive(Debug, Clone)]
+pub struct BasicValidityPredicateVariables {
+    pub owned_note_pub_id: AssignedCell<pallas::Base, pallas::Base>,
+    pub spend_note_variables: [SpendNoteVariables; NUM_NOTE],
+    pub output_note_variables: [OutputNoteVariables; NUM_NOTE],
 }
 
 #[macro_export]
@@ -210,15 +239,14 @@ macro_rules! vp_circuit_impl {
                 config: Self::Config,
                 mut layouter: impl Layouter<pallas::Base>,
             ) -> Result<(), Error> {
-                let (spend_note_variables, output_note_variables) = self.basic_constraints(
+                let basic_variables = self.basic_constraints(
                     config.clone(),
                     layouter.namespace(|| "basic constraints"),
                 )?;
                 self.custom_constraints(
                     config,
                     layouter.namespace(|| "custom constraints"),
-                    &spend_note_variables,
-                    &output_note_variables,
+                    basic_variables,
                 )?;
                 Ok(())
             }

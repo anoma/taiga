@@ -70,19 +70,32 @@ pub fn nullifier_circuit(
         .map(|res| res.extract_p().inner().clone())
 }
 
-// Return variables in the spend note
-#[derive(Debug)]
-pub struct SpendNoteVar {
+#[derive(Debug, Clone)]
+pub struct NoteVariables {
     pub address: AssignedCell<pallas::Base, pallas::Base>,
     pub app_vk: AssignedCell<pallas::Base, pallas::Base>,
     pub app_data: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
-    pub nf: AssignedCell<pallas::Base, pallas::Base>,
-    pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
     pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
     pub app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
 }
 
+// Variables in the spend note
+#[derive(Debug, Clone)]
+pub struct SpendNoteVariables {
+    pub nf: AssignedCell<pallas::Base, pallas::Base>,
+    pub cm_x: AssignedCell<pallas::Base, pallas::Base>,
+    pub note_variables: NoteVariables,
+}
+
+// Variables in the out note
+#[derive(Debug, Clone)]
+pub struct OutputNoteVariables {
+    pub cm_x: AssignedCell<pallas::Base, pallas::Base>,
+    pub note_variables: NoteVariables,
+}
+
+// Check spend note integrity and return the spend note variables and the nullifier
 #[allow(clippy::too_many_arguments)]
 pub fn check_spend_note(
     mut layouter: impl Layouter<pallas::Base>,
@@ -101,7 +114,7 @@ pub fn check_spend_note(
     add_chip: AddChip<pallas::Base>,
     spend_note: Note,
     nf_row_idx: usize,
-) -> Result<SpendNoteVar, Error> {
+) -> Result<SpendNoteVariables, Error> {
     // Check spend note user integrity: address = Com_r(Com_r(nk, zero), app_data_dynamic)
     let (address, nk, app_data_dynamic) = {
         // Witness nk
@@ -233,28 +246,22 @@ pub fn check_spend_note(
     // Public nullifier
     layouter.constrain_instance(nf.cell(), instances, nf_row_idx)?;
 
-    Ok(SpendNoteVar {
+    let cm_x = cm.extract_p().inner().clone();
+
+    let note_variables = NoteVariables {
         address,
         app_vk,
         value,
         app_data,
-        nf,
-        cm,
         is_merkle_checked,
         app_data_dynamic,
-    })
-}
+    };
 
-// Return variables in the output note
-#[derive(Debug)]
-pub struct OutputNoteVar {
-    pub address: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_vk: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_data: AssignedCell<pallas::Base, pallas::Base>,
-    pub value: AssignedCell<pallas::Base, pallas::Base>,
-    pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
-    pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
+    Ok(SpendNoteVariables {
+        note_variables,
+        nf,
+        cm_x,
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -275,7 +282,7 @@ pub fn check_output_note(
     output_note: Note,
     old_nf: AssignedCell<pallas::Base, pallas::Base>,
     cm_row_idx: usize,
-) -> Result<OutputNoteVar, Error> {
+) -> Result<OutputNoteVariables, Error> {
     // Check output note user integrity: address = Com_r(app_data_dynamic, nk_com)
     let (address, app_data_dynamic) = {
         // Witness nk_com
@@ -367,14 +374,18 @@ pub fn check_output_note(
     let cm_x = cm.extract_p().inner().clone();
     layouter.constrain_instance(cm_x.cell(), instances, cm_row_idx)?;
 
-    Ok(OutputNoteVar {
+    let note_variables = NoteVariables {
         address,
         app_vk,
-        app_data,
         value,
-        cm,
+        app_data,
         is_merkle_checked,
         app_data_dynamic,
+    };
+
+    Ok(OutputNoteVariables {
+        note_variables,
+        cm_x,
     })
 }
 
