@@ -10,7 +10,7 @@ use halo2_proofs::{
     circuit::{floor_planner, AssignedCell, Layouter, Region, Value},
     plonk::{
         keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Constraints, Error,
-        Instance, Selector,
+        Selector,
     },
     poly::Rotation,
 };
@@ -21,7 +21,10 @@ use taiga_halo2::{
     circuit::{
         gadgets::{
             assign_free_advice,
-            target_note_variable::{get_owned_note_variable, GetOwnedNoteVariableConfig},
+            target_note_variable::{
+                get_is_spend_note_flag, get_owned_note_variable, GetIsSpendNoteFlagConfig,
+                GetOwnedNoteVariableConfig,
+            },
         },
         note_circuit::NoteConfig,
         vp_circuit::{
@@ -29,7 +32,7 @@ use taiga_halo2::{
             ValidityPredicateCircuit, ValidityPredicateConfig, ValidityPredicateInfo,
         },
     },
-    constant::{NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX},
+    constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
     proof::Proof,
     utils::poseidon_hash,
@@ -42,9 +45,6 @@ struct DealerIntentValidityPredicateCircuit {
     owned_note_pub_id: pallas::Base,
     spend_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
-    // The note that vp owned is set at spend_notes[0] or output_notes[0] by default. Make it mandatory later.
-    // is_spend_note helps locate the target note in spend_notes and output_notes.
-    is_spend_note: pallas::Base,
     encoded_puzzle: pallas::Base,
     sudoku_app_vk: pallas::Base,
     // When it's an output note, we don't need a valid solution.
@@ -55,8 +55,8 @@ struct DealerIntentValidityPredicateCircuit {
 struct IntentAppValidityPredicateConfig {
     note_conifg: NoteConfig,
     advices: [Column<Advice>; 10],
-    instances: Column<Instance>,
     get_owned_note_variable_config: GetOwnedNoteVariableConfig,
+    get_is_spend_note_flag_config: GetIsSpendNoteFlagConfig,
     dealer_intent_check_config: DealerIntentCheckConfig,
 }
 
@@ -69,7 +69,6 @@ impl ValidityPredicateConfig for IntentAppValidityPredicateConfig {
         let note_conifg = Self::configure_note(meta);
 
         let advices = note_conifg.advices;
-        let instances = note_conifg.instances;
         let get_owned_note_variable_config = GetOwnedNoteVariableConfig::configure(
             meta,
             advices[0],
@@ -78,12 +77,14 @@ impl ValidityPredicateConfig for IntentAppValidityPredicateConfig {
         let dealer_intent_check_config = DealerIntentCheckConfig::configure(
             meta, advices[0], advices[1], advices[2], advices[3], advices[4], advices[5],
         );
+        let get_is_spend_note_flag_config =
+            GetIsSpendNoteFlagConfig::configure(meta, advices[0], advices[1], advices[2]);
 
         Self {
             note_conifg,
             advices,
-            instances,
             get_owned_note_variable_config,
+            get_is_spend_note_flag_config,
             dealer_intent_check_config,
         }
     }
@@ -94,7 +95,6 @@ impl DealerIntentValidityPredicateCircuit {
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
         let spend_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let is_spend_note = pallas::Base::zero();
         let encoded_puzzle = pallas::Base::random(&mut rng);
         let sudoku_app_vk = ValidityPredicateVerifyingKey::dummy(&mut rng).get_compressed();
         output_notes[0].note_type.app_data = Self::compute_app_data(encoded_puzzle, sudoku_app_vk);
@@ -104,7 +104,6 @@ impl DealerIntentValidityPredicateCircuit {
             owned_note_pub_id,
             spend_notes,
             output_notes,
-            is_spend_note,
             encoded_puzzle,
             sudoku_app_vk,
             encoded_solution,
@@ -177,10 +176,7 @@ impl ValidityPredicateInfo for DealerIntentValidityPredicateCircuit {
     }
 
     fn get_instances(&self) -> Vec<pallas::Base> {
-        let mut instances = self.get_note_instances();
-        instances.push(self.is_spend_note);
-
-        instances
+        self.get_note_instances()
     }
 
     fn get_verifying_info(&self) -> VPVerifyingInfo {
@@ -217,24 +213,20 @@ impl ValidityPredicateCircuit for DealerIntentValidityPredicateCircuit {
         mut layouter: impl Layouter<pallas::Base>,
         basic_variables: BasicValidityPredicateVariables,
     ) -> Result<(), Error> {
-        let is_spend_note = assign_free_advice(
-            layouter.namespace(|| "witness is_spend_note"),
-            config.advices[0],
-            Value::known(self.is_spend_note),
-        )?;
-
-        // publicize is_spend_note and check it outside of circuit.
-        layouter.constrain_instance(
-            is_spend_note.cell(),
-            config.instances,
-            VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX,
+        let owned_note_pub_id = basic_variables.get_owned_note_pub_id();
+        let is_spend_note = get_is_spend_note_flag(
+            config.get_is_spend_note_flag_config,
+            layouter.namespace(|| "get is_spend_note_flag"),
+            &owned_note_pub_id,
+            &basic_variables.get_spend_note_nfs(),
+            &basic_variables.get_output_note_cms(),
         )?;
 
         // search target note and output the app_data
         let app_data = get_owned_note_variable(
             config.get_owned_note_variable_config,
             layouter.namespace(|| "get owned note app_data"),
-            &basic_variables.get_owned_note_pub_id(),
+            &owned_note_pub_id,
             &basic_variables.get_app_data_searchable_pairs(),
         )?;
 
