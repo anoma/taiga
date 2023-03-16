@@ -4,8 +4,11 @@ use crate::circuit::gadgets::{
     add::{AddChip, AddInstructions},
     assign_free_advice, assign_free_constant,
 };
-use crate::circuit::hash_to_curve::{hash_to_curve_circuit, HashToCurveConfig};
-use crate::circuit::note_circuit::{note_commitment_gadget, NoteCommitmentChip};
+use crate::circuit::{
+    hash_to_curve::{hash_to_curve_circuit, HashToCurveConfig},
+    note_circuit::{note_commitment_gadget, NoteCommitmentChip},
+    vp_circuit::{NoteVariables, OutputNoteVariables, SpendNoteVariables},
+};
 use crate::constant::{
     NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentFixedBasesFull,
     NoteCommitmentHashDomain, NullifierK, POSEIDON_TO_CURVE_INPUT_LEN,
@@ -68,31 +71,6 @@ pub fn nullifier_circuit(
 
     cm.add(layouter.namespace(|| "nf"), &hash_nk_rho_add_psi_mul_k)
         .map(|res| res.extract_p().inner().clone())
-}
-
-#[derive(Debug, Clone)]
-pub struct NoteVariables {
-    pub address: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_vk: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_data: AssignedCell<pallas::Base, pallas::Base>,
-    pub value: AssignedCell<pallas::Base, pallas::Base>,
-    pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
-}
-
-// Variables in the spend note
-#[derive(Debug, Clone)]
-pub struct SpendNoteVariables {
-    pub nf: AssignedCell<pallas::Base, pallas::Base>,
-    pub cm_x: AssignedCell<pallas::Base, pallas::Base>,
-    pub note_variables: NoteVariables,
-}
-
-// Variables in the out note
-#[derive(Debug, Clone)]
-pub struct OutputNoteVariables {
-    pub cm_x: AssignedCell<pallas::Base, pallas::Base>,
-    pub note_variables: NoteVariables,
 }
 
 // Check spend note integrity and return the spend note variables and the nullifier

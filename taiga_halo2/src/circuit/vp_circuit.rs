@@ -1,7 +1,7 @@
 use crate::{
     circuit::{
         gadgets::{add::AddChip, assign_free_advice},
-        integrity::{check_output_note, check_spend_note, OutputNoteVariables, SpendNoteVariables},
+        integrity::{check_output_note, check_spend_note},
         note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig},
     },
     constant::{
@@ -217,6 +217,193 @@ pub struct BasicValidityPredicateVariables {
     pub owned_note_pub_id: AssignedCell<pallas::Base, pallas::Base>,
     pub spend_note_variables: [SpendNoteVariables; NUM_NOTE],
     pub output_note_variables: [OutputNoteVariables; NUM_NOTE],
+}
+
+#[derive(Debug, Clone)]
+pub struct NoteVariables {
+    pub address: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_vk: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_data: AssignedCell<pallas::Base, pallas::Base>,
+    pub value: AssignedCell<pallas::Base, pallas::Base>,
+    pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
+}
+
+// Variables in the spend note
+#[derive(Debug, Clone)]
+pub struct SpendNoteVariables {
+    pub nf: AssignedCell<pallas::Base, pallas::Base>,
+    pub cm_x: AssignedCell<pallas::Base, pallas::Base>,
+    pub note_variables: NoteVariables,
+}
+
+// Variables in the out note
+#[derive(Debug, Clone)]
+pub struct OutputNoteVariables {
+    pub cm_x: AssignedCell<pallas::Base, pallas::Base>,
+    pub note_variables: NoteVariables,
+}
+
+#[derive(Debug, Clone)]
+pub struct NoteSearchableVariablePair {
+    // src_variable is the spend_note_nf or the output_note_cm_x
+    pub src_variable: AssignedCell<pallas::Base, pallas::Base>,
+    // target_variable is one of the parameter in the NoteVariables
+    pub target_variable: AssignedCell<pallas::Base, pallas::Base>,
+}
+
+impl BasicValidityPredicateVariables {
+    pub fn get_owned_note_pub_id(&self) -> AssignedCell<pallas::Base, pallas::Base> {
+        self.owned_note_pub_id.clone()
+    }
+
+    pub fn get_spend_note_nfs(&self) -> [AssignedCell<pallas::Base, pallas::Base>; NUM_NOTE] {
+        let ret: Vec<_> = self
+            .spend_note_variables
+            .iter()
+            .map(|variables| variables.nf.clone())
+            .collect();
+        ret.try_into().unwrap()
+    }
+
+    pub fn get_output_note_cms(&self) -> [AssignedCell<pallas::Base, pallas::Base>; NUM_NOTE] {
+        let ret: Vec<_> = self
+            .output_note_variables
+            .iter()
+            .map(|variables| variables.cm_x.clone())
+            .collect();
+        ret.try_into().unwrap()
+    }
+
+    pub fn get_address_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+        let mut spend_note_pairs: Vec<_> = self
+            .spend_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.nf.clone(),
+                target_variable: variables.note_variables.address.clone(),
+            })
+            .collect();
+        let output_note_pairs: Vec<_> = self
+            .output_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.cm_x.clone(),
+                target_variable: variables.note_variables.address.clone(),
+            })
+            .collect();
+        spend_note_pairs.extend(output_note_pairs);
+        spend_note_pairs.try_into().unwrap()
+    }
+
+    pub fn get_app_vk_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+        let mut spend_note_pairs: Vec<_> = self
+            .spend_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.nf.clone(),
+                target_variable: variables.note_variables.app_vk.clone(),
+            })
+            .collect();
+        let output_note_pairs: Vec<_> = self
+            .output_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.cm_x.clone(),
+                target_variable: variables.note_variables.app_vk.clone(),
+            })
+            .collect();
+        spend_note_pairs.extend(output_note_pairs);
+        spend_note_pairs.try_into().unwrap()
+    }
+
+    pub fn get_app_data_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+        let mut spend_note_pairs: Vec<_> = self
+            .spend_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.nf.clone(),
+                target_variable: variables.note_variables.app_data.clone(),
+            })
+            .collect();
+        let output_note_pairs: Vec<_> = self
+            .output_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.cm_x.clone(),
+                target_variable: variables.note_variables.app_data.clone(),
+            })
+            .collect();
+        spend_note_pairs.extend(output_note_pairs);
+        spend_note_pairs.try_into().unwrap()
+    }
+
+    pub fn get_value_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+        let mut spend_note_pairs: Vec<_> = self
+            .spend_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.nf.clone(),
+                target_variable: variables.note_variables.value.clone(),
+            })
+            .collect();
+        let output_note_pairs: Vec<_> = self
+            .output_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.cm_x.clone(),
+                target_variable: variables.note_variables.value.clone(),
+            })
+            .collect();
+        spend_note_pairs.extend(output_note_pairs);
+        spend_note_pairs.try_into().unwrap()
+    }
+
+    pub fn get_is_merkle_checked_searchable_pairs(
+        &self,
+    ) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+        let mut spend_note_pairs: Vec<_> = self
+            .spend_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.nf.clone(),
+                target_variable: variables.note_variables.is_merkle_checked.clone(),
+            })
+            .collect();
+        let output_note_pairs: Vec<_> = self
+            .output_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.cm_x.clone(),
+                target_variable: variables.note_variables.is_merkle_checked.clone(),
+            })
+            .collect();
+        spend_note_pairs.extend(output_note_pairs);
+        spend_note_pairs.try_into().unwrap()
+    }
+
+    pub fn get_app_data_dynamic_searchable_pairs(
+        &self,
+    ) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+        let mut spend_note_pairs: Vec<_> = self
+            .spend_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.nf.clone(),
+                target_variable: variables.note_variables.app_data_dynamic.clone(),
+            })
+            .collect();
+        let output_note_pairs: Vec<_> = self
+            .output_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.cm_x.clone(),
+                target_variable: variables.note_variables.app_data_dynamic.clone(),
+            })
+            .collect();
+        spend_note_pairs.extend(output_note_pairs);
+        spend_note_pairs.try_into().unwrap()
+    }
 }
 
 #[macro_export]

@@ -1,3 +1,4 @@
+use crate::circuit::vp_circuit::NoteSearchableVariablePair;
 use crate::constant::NUM_NOTE;
 use ff::Field;
 use halo2_gadgets::utilities::bool_check;
@@ -7,14 +8,6 @@ use halo2_proofs::{
     poly::Rotation,
 };
 use pasta_curves::pallas;
-
-#[derive(Debug, Clone)]
-pub struct NoteSearchableVariablePair {
-    // src_variable is the spend_note_nf or the output_note_cm_x
-    pub src_variable: AssignedCell<pallas::Base, pallas::Base>,
-    // target_variable is one of the parameter in the NoteVariables
-    pub target_variable: AssignedCell<pallas::Base, pallas::Base>,
-}
 
 // Search and get owned note variable
 fn get_owned_note_variable(
