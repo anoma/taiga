@@ -10,7 +10,7 @@ use halo2_proofs::{
 use pasta_curves::pallas;
 
 // Search and get owned note variable
-fn get_owned_note_variable(
+pub fn get_owned_note_variable(
     config: GetOwnedNoteVariableConfig,
     mut layouter: impl Layouter<pallas::Base>,
     // The owned_note_pub_id is the spend_note_nf or the output_note_cm_x
@@ -25,7 +25,7 @@ fn get_owned_note_variable(
 }
 
 // Search and get is_spend_note_flag variable
-fn get_is_spend_note_flag(
+pub fn get_is_spend_note_flag(
     config: GetIsSpendNoteFlagConfig,
     mut layouter: impl Layouter<pallas::Base>,
     // The owned_note_pub_id is the spend_note_nf or the output_note_cm_x
@@ -171,23 +171,23 @@ impl GetOwnedNoteVariableConfig {
         region: &mut Region<'_, pallas::Base>,
     ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
         // Enable `q_get_owned_note_variable` selector
-        self.q_get_owned_note_variable.enable(region, offset)?;
+        self.q_get_owned_note_variable.enable(region, offset + 1)?;
 
         // copy owned_note_pub_id, note_variable_pairs into the advice columns
         let mut ret = owned_note_pub_id.copy_advice(
             || "owned_note_pub_id",
             region,
             self.owned_note_pub_id,
-            offset,
+            offset + 1,
         )?;
         for (pair, column) in note_variable_pairs
             .iter()
             .zip(self.note_variable_pairs.into_iter())
         {
             pair.src_variable
-                .copy_advice(|| "nf or cm", region, column, offset)?;
+                .copy_advice(|| "nf or cm", region, column, offset + 1)?;
             pair.target_variable
-                .copy_advice(|| "target_variable", region, column, offset + 1)?;
+                .copy_advice(|| "target_variable", region, column, offset + 2)?;
             let inv = pair
                 .src_variable
                 .value()
@@ -201,14 +201,14 @@ impl GetOwnedNoteVariableConfig {
                             .assign_advice(
                                 || "ret",
                                 self.owned_note_pub_id,
-                                offset + 1,
+                                offset + 2,
                                 || pair.target_variable.value().copied(),
                             )
                             .unwrap();
                     }
                     inv
                 });
-            region.assign_advice(|| "inv", column, offset - 1, || inv)?;
+            region.assign_advice(|| "inv", column, offset, || inv)?;
         }
         Ok(ret)
     }

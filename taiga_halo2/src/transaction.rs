@@ -518,6 +518,7 @@ fn test_transaction_creation() {
     let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
     // Create vp circuit and fulfill the note info
     let trivial_vp_circuit = TrivialValidityPredicateCircuit {
+        owned_note_pub_id: pallas::Base::zero(),
         spend_notes: [spend_note_1.clone(), spend_note_2.clone()],
         output_notes: [output_note_1.clone(), output_note_2.clone()],
     };

@@ -93,7 +93,7 @@ pub trait ValidityPredicateInfo: DynClone {
                 let cm = output_note.commitment();
                 instances.push(cm.get_x());
             });
-
+        instances.push(self.get_owned_note_pub_id());
         instances
     }
     fn get_instances(&self) -> Vec<pallas::Base>;
@@ -102,9 +102,7 @@ pub trait ValidityPredicateInfo: DynClone {
     // The owned_note_pub_id is the spend_note_nf or the output_note_cm_x
     // The owned_note_pub_id is the key to look up the target variables and
     // help determine whether the owned note is the spend note or not in VP circuit.
-    fn get_owned_note_pub_id(&self) -> pallas::Base {
-        unimplemented!()
-    }
+    fn get_owned_note_pub_id(&self) -> pallas::Base;
 }
 
 clone_trait_object!(ValidityPredicateInfo);

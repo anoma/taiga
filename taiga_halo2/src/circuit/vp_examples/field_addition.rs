@@ -10,7 +10,7 @@ use crate::{
             ValidityPredicateConfig, ValidityPredicateInfo,
         },
     },
-    constant::{NUM_NOTE, SETUP_PARAMS_MAP},
+    constant::{NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX},
     note::Note,
     proof::Proof,
     vp_vk::ValidityPredicateVerifyingKey,
@@ -27,6 +27,7 @@ use rand::RngCore;
 // FieldAdditionValidityPredicateCircuit with a trivial constraint a + b = c.
 #[derive(Clone, Debug, Default)]
 struct FieldAdditionValidityPredicateCircuit {
+    owned_note_pub_id: pallas::Base,
     spend_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
     a: pallas::Base,
@@ -70,7 +71,9 @@ impl FieldAdditionValidityPredicateCircuit {
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let a = pallas::Base::random(&mut rng);
         let b = pallas::Base::random(&mut rng);
+        let owned_note_pub_id = pallas::Base::zero();
         Self {
+            owned_note_pub_id,
             spend_notes,
             output_notes,
             a,
@@ -115,6 +118,10 @@ impl ValidityPredicateInfo for FieldAdditionValidityPredicateCircuit {
         let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
         ValidityPredicateVerifyingKey::from_vk(vk)
     }
+
+    fn get_owned_note_pub_id(&self) -> pallas::Base {
+        self.owned_note_pub_id
+    }
 }
 
 impl ValidityPredicateCircuit for FieldAdditionValidityPredicateCircuit {
@@ -144,7 +151,11 @@ impl ValidityPredicateCircuit for FieldAdditionValidityPredicateCircuit {
         let c = add_chip.add(layouter.namespace(|| "a + b = c"), &a, &b)?;
 
         // Public c
-        layouter.constrain_instance(c.cell(), config.instances, 2 * NUM_NOTE)?;
+        layouter.constrain_instance(
+            c.cell(),
+            config.instances,
+            VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX,
+        )?;
 
         Ok(())
     }
