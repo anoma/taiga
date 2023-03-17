@@ -49,6 +49,10 @@ impl VPVerifyingInfo {
             self.instance[VP_CIRCUIT_OUTPUT_CM_TWO_INSTANCE_IDX],
         ]
     }
+
+    pub fn get_owned_note_pub_id(&self) -> pallas::Base {
+        self.instance[VP_CIRCUIT_OWNED_NOTE_PUB_ID_INSTANCE_IDX]
+    }
 }
 
 pub trait ValidityPredicateConfig {
