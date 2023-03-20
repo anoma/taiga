@@ -84,7 +84,7 @@ pub struct ActionVerifyingInfo {
 #[derive(Debug, Clone)]
 pub struct NoteVPVerifyingInfoSet {
     app_vp_verifying_info: VPVerifyingInfo,
-    app_logic_vp_verifying_info: Vec<VPVerifyingInfo>,
+    app_dynamic_vp_verifying_info: Vec<VPVerifyingInfo>,
     // TODO: add verifier proof and according public inputs.
     // When the verifier proof is added, we may need to reconsider the structure of `VPVerifyingInfo`
 }
@@ -379,11 +379,11 @@ impl ActionVerifyingInfo {
 impl NoteVPVerifyingInfoSet {
     pub fn new(
         app_vp_verifying_info: VPVerifyingInfo,
-        app_logic_vp_verifying_info: Vec<VPVerifyingInfo>,
+        app_dynamic_vp_verifying_info: Vec<VPVerifyingInfo>,
     ) -> Self {
         Self {
             app_vp_verifying_info,
-            app_logic_vp_verifying_info,
+            app_dynamic_vp_verifying_info,
         }
     }
 
@@ -393,14 +393,14 @@ impl NoteVPVerifyingInfoSet {
     ) -> Self {
         let app_vp_verifying_info = app_vp_verifying_info.get_verifying_info();
 
-        let app_logic_vp_verifying_info = app_vp_verifying_info_dynamic
+        let app_dynamic_vp_verifying_info = app_vp_verifying_info_dynamic
             .into_iter()
             .map(|verifying_info| verifying_info.get_verifying_info())
             .collect();
 
         Self {
             app_vp_verifying_info,
-            app_logic_vp_verifying_info,
+            app_dynamic_vp_verifying_info,
         }
     }
 
@@ -408,8 +408,8 @@ impl NoteVPVerifyingInfoSet {
         // Verify application vp proof
         self.app_vp_verifying_info.verify()?;
 
-        // Verify application logic vp proofs
-        for verify_info in self.app_logic_vp_verifying_info.iter() {
+        // Verify application dynamic vp proofs
+        for verify_info in self.app_dynamic_vp_verifying_info.iter() {
             verify_info.verify()?;
         }
 
@@ -420,7 +420,7 @@ impl NoteVPVerifyingInfoSet {
 
     pub fn get_nullifiers(&self) -> Vec<[pallas::Base; NUM_NOTE]> {
         let mut nfs = vec![self.app_vp_verifying_info.get_nullifiers()];
-        self.app_logic_vp_verifying_info
+        self.app_dynamic_vp_verifying_info
             .iter()
             .for_each(|vp_info| nfs.push(vp_info.get_nullifiers()));
         nfs
@@ -428,7 +428,7 @@ impl NoteVPVerifyingInfoSet {
 
     pub fn get_note_commitments(&self) -> Vec<[pallas::Base; NUM_NOTE]> {
         let mut cms = vec![self.app_vp_verifying_info.get_note_commitments()];
-        self.app_logic_vp_verifying_info
+        self.app_dynamic_vp_verifying_info
             .iter()
             .for_each(|vp_info| cms.push(vp_info.get_note_commitments()));
         cms
@@ -457,14 +457,14 @@ fn test_transaction_creation() {
     // Generate notes
     let spend_note_1 = {
         let app_data_static = pallas::Base::zero();
-        // TODO: add real application logic vps and encode them to app_data_dynamic later.
-        let app_logic_vps_vk = vec![trivail_vp_vk.clone(), trivail_vp_vk.clone()];
-        // Encode the app_logic_vps_vk into app_data_dynamic
+        // TODO: add real application dynamic vps and encode them to app_data_dynamic later.
+        let app_dynamic_vp_vk = vec![trivail_vp_vk.clone(), trivail_vp_vk.clone()];
+        // Encode the app_dynamic_vp_vk into app_data_dynamic
         // The encoding method is flexible and defined in the application vp.
-        // Use poseidon hash to encode the two logic vps here
+        // Use poseidon hash to encode the two dynamic vps here
         let app_data_dynamic = poseidon_hash(
-            app_logic_vps_vk[0].get_compressed(),
-            app_logic_vps_vk[1].get_compressed(),
+            app_dynamic_vp_vk[0].get_compressed(),
+            app_dynamic_vp_vk[1].get_compressed(),
         );
         let app_vk = trivail_vp_vk.clone();
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
@@ -487,8 +487,8 @@ fn test_transaction_creation() {
     };
     let output_note_1 = {
         let app_data_static = pallas::Base::zero();
-        // TODO: add real application logic vps and encode them to app_data_dynamic later.
-        // If the logic vp is not used, set app_data_dynamic pallas::Base::zero() by defualt.
+        // TODO: add real application dynamic vps and encode them to app_data_dynamic later.
+        // If the dynamic vp is not used, set app_data_dynamic pallas::Base::zero() by defualt.
         let app_data_dynamic = pallas::Base::zero();
         let rho = spend_note_1.get_nf().unwrap();
         let value = 5000u64;
@@ -519,17 +519,18 @@ fn test_transaction_creation() {
         output_notes: [output_note_1.clone(), output_note_2.clone()],
     };
     let app_vp_verifying_info = Box::new(trivial_vp_circuit.clone());
-    let trivial_app_logic_1: Box<dyn ValidityPredicateVerifyingInfo> =
+    let trivial_app_dynamic_vp_1: Box<dyn ValidityPredicateVerifyingInfo> =
         Box::new(trivial_vp_circuit.clone());
-    let trivial_app_logic_2 = Box::new(trivial_vp_circuit);
-    let trivial_app_vp_verifying_info_dynamic = vec![trivial_app_logic_1, trivial_app_logic_2];
+    let trivial_app_dynamic_vp_2 = Box::new(trivial_vp_circuit);
+    let trivial_app_vp_verifying_info_dynamic =
+        vec![trivial_app_dynamic_vp_1, trivial_app_dynamic_vp_2];
     let spend_note_info_1 = SpendNoteInfo::new(
         spend_note_1,
         merkle_path.clone(),
         app_vp_verifying_info.clone(),
         trivial_app_vp_verifying_info_dynamic.clone(),
     );
-    // The following notes use empty logic vps and use app_data_dynamic with pallas::Base::zero() by default.
+    // The following notes use empty dynamic vps and use app_data_dynamic with pallas::Base::zero() by default.
     let app_vp_verifying_info_dynamic = vec![];
     let spend_note_info_2 = SpendNoteInfo::new(
         spend_note_2,
