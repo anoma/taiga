@@ -161,7 +161,7 @@ mod tests {
 
         let vp_desc = ValidityPredicateVerifyingKey::from_vk(vk);
 
-        let app_data = pallas::Base::zero();
+        let app_data_static = pallas::Base::zero();
         let app_data_dynamic = pallas::Base::zero();
 
         let value: u64 = 0;
@@ -171,7 +171,7 @@ mod tests {
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
         Note::new(
             vp_desc,
-            app_data,
+            app_data_static,
             app_data_dynamic,
             value,
             nk_com,
