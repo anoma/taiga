@@ -1,6 +1,6 @@
 use crate::action::{ActionInfo, ActionInstance};
 use crate::binding_signature::*;
-use crate::circuit::vp_circuit::{VPVerifyingInfo, ValidityPredicateInfo};
+use crate::circuit::vp_circuit::{VPVerifyingInfo, ValidityPredicateVerifyingInfo};
 use crate::constant::{
     ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, NUM_NOTE,
     SETUP_PARAMS_MAP, TRANSACTION_BINDING_HASH_PERSONALIZATION,
@@ -238,8 +238,8 @@ impl PartialTransaction {
             .iter()
             .map(|spend_note| {
                 NoteVPVerifyingInfoSet::build(
-                    spend_note.get_app_vp_proving_info(),
-                    spend_note.get_app_vp_proving_info_dynamic(),
+                    spend_note.get_app_vp_verifying_info(),
+                    spend_note.get_app_vp_verifying_info_dynamic(),
                 )
             })
             .collect();
@@ -247,8 +247,8 @@ impl PartialTransaction {
             .iter()
             .map(|output_note| {
                 NoteVPVerifyingInfoSet::build(
-                    output_note.get_app_vp_proving_info(),
-                    output_note.get_app_vp_proving_info_dynamic(),
+                    output_note.get_app_vp_verifying_info(),
+                    output_note.get_app_vp_verifying_info_dynamic(),
                 )
             })
             .collect();
@@ -388,14 +388,14 @@ impl NoteVPVerifyingInfoSet {
     }
 
     pub fn build(
-        app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
-        app_vp_proving_info_dynamic: Vec<Box<dyn ValidityPredicateInfo>>,
+        app_vp_verifying_info: Box<dyn ValidityPredicateVerifyingInfo>,
+        app_vp_verifying_info_dynamic: Vec<Box<dyn ValidityPredicateVerifyingInfo>>,
     ) -> Self {
-        let app_vp_verifying_info = app_vp_proving_info.get_verifying_info();
+        let app_vp_verifying_info = app_vp_verifying_info.get_verifying_info();
 
-        let app_logic_vp_verifying_info = app_vp_proving_info_dynamic
+        let app_logic_vp_verifying_info = app_vp_verifying_info_dynamic
             .into_iter()
-            .map(|proving_info| proving_info.get_verifying_info())
+            .map(|verifying_info| verifying_info.get_verifying_info())
             .collect();
 
         Self {
@@ -452,24 +452,21 @@ fn test_transaction_creation() {
 
     // Create empty vp circuit without note info
     let trivial_vp_circuit = TrivialValidityPredicateCircuit::default();
-    let trivail_vp_description = trivial_vp_circuit.get_vp_description();
+    let trivail_vp_vk = trivial_vp_circuit.get_vp_vk();
 
     // Generate notes
     let spend_note_1 = {
         let app_data_static = pallas::Base::zero();
         // TODO: add real application logic vps and encode them to app_data_dynamic later.
-        let app_logic_vps_description = vec![
-            trivail_vp_description.clone(),
-            trivail_vp_description.clone(),
-        ];
-        // Encode the app_logic_vps_description into app_data_dynamic
+        let app_logic_vps_vk = vec![trivail_vp_vk.clone(), trivail_vp_vk.clone()];
+        // Encode the app_logic_vps_vk into app_data_dynamic
         // The encoding method is flexible and defined in the application vp.
         // Use poseidon hash to encode the two logic vps here
         let app_data_dynamic = poseidon_hash(
-            app_logic_vps_description[0].get_compressed(),
-            app_logic_vps_description[1].get_compressed(),
+            app_logic_vps_vk[0].get_compressed(),
+            app_logic_vps_vk[1].get_compressed(),
         );
-        let app_vk = trivail_vp_description.clone();
+        let app_vk = trivail_vp_vk.clone();
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
         let value = 5000u64;
         let nk_com = NullifierKeyCom::rand(&mut rng);
@@ -500,7 +497,7 @@ fn test_transaction_creation() {
         let psi = pallas::Base::random(&mut rng);
         let is_merkle_checked = true;
         Note::new(
-            trivail_vp_description,
+            trivail_vp_vk,
             app_data_static,
             app_data_dynamic,
             value,
@@ -521,33 +518,34 @@ fn test_transaction_creation() {
         spend_notes: [spend_note_1.clone(), spend_note_2.clone()],
         output_notes: [output_note_1.clone(), output_note_2.clone()],
     };
-    let app_vp_proving_info = Box::new(trivial_vp_circuit.clone());
-    let trivial_app_logic_1: Box<dyn ValidityPredicateInfo> = Box::new(trivial_vp_circuit.clone());
+    let app_vp_verifying_info = Box::new(trivial_vp_circuit.clone());
+    let trivial_app_logic_1: Box<dyn ValidityPredicateVerifyingInfo> =
+        Box::new(trivial_vp_circuit.clone());
     let trivial_app_logic_2 = Box::new(trivial_vp_circuit);
-    let trivial_app_vp_proving_info_dynamic = vec![trivial_app_logic_1, trivial_app_logic_2];
+    let trivial_app_vp_verifying_info_dynamic = vec![trivial_app_logic_1, trivial_app_logic_2];
     let spend_note_info_1 = SpendNoteInfo::new(
         spend_note_1,
         merkle_path.clone(),
-        app_vp_proving_info.clone(),
-        trivial_app_vp_proving_info_dynamic.clone(),
+        app_vp_verifying_info.clone(),
+        trivial_app_vp_verifying_info_dynamic.clone(),
     );
     // The following notes use empty logic vps and use app_data_dynamic with pallas::Base::zero() by default.
-    let app_vp_proving_info_dynamic = vec![];
+    let app_vp_verifying_info_dynamic = vec![];
     let spend_note_info_2 = SpendNoteInfo::new(
         spend_note_2,
         merkle_path,
-        app_vp_proving_info.clone(),
-        app_vp_proving_info_dynamic.clone(),
+        app_vp_verifying_info.clone(),
+        app_vp_verifying_info_dynamic.clone(),
     );
     let output_note_info_1 = OutputNoteInfo::new(
         output_note_1,
-        app_vp_proving_info.clone(),
-        app_vp_proving_info_dynamic.clone(),
+        app_vp_verifying_info.clone(),
+        app_vp_verifying_info_dynamic.clone(),
     );
     let output_note_info_2 = OutputNoteInfo::new(
         output_note_2,
-        app_vp_proving_info,
-        app_vp_proving_info_dynamic,
+        app_vp_verifying_info,
+        app_vp_verifying_info_dynamic,
     );
 
     // Create partial tx
