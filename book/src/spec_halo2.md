@@ -11,27 +11,30 @@ To be edited as design changes. Please make changes as necessary. Keep it **conc
 - $\mathbb{F}_q$ stands for the base field of $E_M$. 
 - $\mathbb{F}_r$ refers to the scalar field of $E_M$.
 
-### Side note:
-- ZCash: 
-An action circuit in Orchard is over the Vesta curve. Since an action circuit in Taiga is over $E_M$, we could say that $E_M$ is equivalent to $\mathbb{V}$ in Orchard and $q = r_\mathbb{P}$ = $q_{\mathbb{V}}$, $r = r_\mathbb{V} = q_{\mathbb{P}}$. See 5.4.9.6 Pallas and Vesta in the [ZCash docs](https://github.com/zcash/zips/blob/main/protocol/protocol.pdf).
-- Action and VP circuits: arithmetic circuit over $\mathbb{F}_r$.
-- VPBlind and Accumulator circuits: arithmetic circuit over $\mathbb{F}_q$.
+### Halo2 context
+- $E_M = \mathbb{V}$ -- Vesta curve, and 
+- $q = r_\mathbb{P}$ = $q_{\mathbb{V}}$, 
+- $r = r_\mathbb{V} = q_{\mathbb{P}}$
 
-## Proof system (Plonk / plonkup) interfaces 
+
+### Circuit curves
+- Action and VP circuits: arithmetic circuit over $\mathbb{F}_r$ (Vesta).
+- Accumulator circuit: arithmetic circuit over $\mathbb{F}_q$ (Pallas).
+
+## Proof system (Halo2) interfaces 
+
+TODO: do we need this?
 
 Main interfaces: Preprocess, Prove, Verify.
 
-- Polynomial commitment scheme for polynomials, where a commitment $Com$ is a point of an elliptic curve $E$ with scalar field $\mathbb F_r$ and base field $\mathbb{F}_q$, and $d$ is the bounded degree of any polynomial in the scheme.
+- Polynomial commitment scheme for polynomials, where a commitment $Com$ is a point of an elliptic curve $E_M$, and $d$ is the bounded degree of any polynomial in the scheme.
 - A circuit with interface `C(x; w) ⟶ 0/1` is a circuit with upto `n` fan-in 3 (or 4) addition / multiplication / lookup gates over $\mathbb{F}_r$. (Following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html), `C(x; w)` can be turned into polynomials over $\mathbb{F}_r$.)
 - __Preprocess__: `preproc(C) ⟶ desc_C`. `C` is turned into a *circuit description* which is a sequence of polynomial commitments. (polynomials are computed over $\mathbb{F}_r$ while commitments are generated over $\mathbb{F}_q$)
     - In `ark-plonk`, `desc_C` corresponds to `vd: VerifierData`.
 - __Prove__: `P(C, x, w) ⟶ π` (arithmetized over $\mathbb{F}_r$ and $\mathbb{F}_q$)
 - __Verify__: `V(desc_C, x, π) ⟶ 0/1` (arithmetized over $\mathbb{F}_r$ and $\mathbb{F}_q$)
 
-Halo 2 recursion: another proof system with $q$ and $r$ swapped.
-
 ### Potential features:
-
 #### Accumulation (of proofs / verifier circuit)
 
 Definitions from Section 4.1 of [BCMS20](https://eprint.iacr.org/2020/499.pdf), and specializing to their Definition 4.2 for Plonk verifiers.
@@ -41,7 +44,6 @@ Definitions from Section 4.1 of [BCMS20](https://eprint.iacr.org/2020/499.pdf), 
 - __Accumulation Decider__ over $\mathbb{F}_q$ ?: `AccD(acc) ⟶ 0/1`
 
 ## Abstractions
-
 ### Data types
 - Input / output of each abstract interface, e.g. `Com, Com_q`, defines a distinct type.
 - Each distinct data field defines a type, e.g. `v, data, asset_type`.
@@ -58,67 +60,63 @@ We blend commitments / hash into a single abstract interface.
 
 Commitments are binding by default (i.e. can be instantiated with hash). If we want blinding (possibly across differnt commitments), we add `rcm` explicitly.
 
-TODO: Fix the exact instantiations / implementations.
-
-Options:
-`Com_q, Com_r`: Pedersen, Sinsemilla, Poseidon, Reinforced Concrete
-`Com`: Blake2s, SHA256
-
 ### Data related to VP circuits (defined in next section)
 
 #### VP description: `desc_vp = preproc(vp)`:
-
-- a number of polynomial commitments
-- determinisitic function of `vp` circuit
-- description can be further randomized with `Blind`
-
-##### VP full description: `fulldesc_vp = desc_vp || vp_param`:
-
-TODO: Should we use `fulldesc_vp` in place of `desc_vp`?
+- vp_vk
 
 #### VP commitments: `com_vp = VPCom(desc_vp)`:
 
 - `VPCom(desc_vp; rcm_com_vp) := Com( Com_q(desc_vp), rcm_com_vp)`
 
+### Instantiations
+||||
+|-|-|-|
+|nullifier|Poseidon||
+|nk commitment|Poseidon|
+|address|Poseidon|
+|note commitment ($Com_r$)|Sincemilla|
+|VP commitment (Com)|Blake2s|
 
 ### Note
 
-A note encodes:
-* the application type,
-* the user (owner) address,
-* the value (fungible),
-* additional data (non-fungible).
 ```
-note = (user_address, app_address, v, data, ρ, ψ)
+note = (note_type, v, ρ, ψ, app_data_dynamic, is_merkle_checked, nk_com, rcm_note)
+```
+
+|Variable|Type|Description|
+|-|-|-|
+|`note_type`| ValueBase |the data used to derive note's type. Contains `app_vk` and `app_data_static`. The resulting value base is `Poseidon(app_vk, app_data_static)` is in $\mathbb{F}_r$|
+|`app_vk`|$\mathbb{F}_r$|Verifying key of the application circuit|
+|`app_data_static`|$\mathbb{F}_r$| application data used to derive note's type|
+|`app_data_dynamic`| $\mathbb{F}_r$ ||
+|`v`| `u64` ($\mathbb F_r$ element in circuit) |the quantity of fungible value|
+|`nk_com`|$\mathbb{F}_r$|`Poseidon(nk)`|
+|`ρ`| $\mathbb{F}_r$ | an old nullifier from the same Action description|
+|`ψ`| $\mathbb{F}_r$ | the prf output of `ρ` and `rcm_note`|
+|`is_merkle_checked`|bool|dummy note flag|
+|`rcm_note`| $\mathbb{F}_q$| a random commitment trapdoor|
+
+
+### Note commitment
+
+```
 cm = NoteCom(note, rcm_note)
 ```
 
-where:
-
 |Variable/Function|Type||
 |-|-|-|
-|`app_address`| $\mathbb{F}_r$ | a application type encoding `app_vp`|
-|`v`| `u64` ($\mathbb F_r$ element in circuit) | the quantity of fungible value |
-|`data`| $\mathbb{F}_r$ |non-fungible value(to be decided?)|
-|`ρ`| $\mathbb{F}_r$ | an old nullifier|
-|`rcm_note` | $\mathbb{F}_r$| a random commitment trapdoor|
-|`ψ`| $\mathbb{F}_r$ | the prf output of `ρ` and `rcm_note`|
-| `user_address`| $\mathbb F_r$ | address encoding `nk`, `send_vp`, `recv_vp`|
-| `NoteCom` | $[\mathbb F_r] \to \mathbb F_r$ | Poseidon hash with eight input elements|
+| `NoteCom` | $[\mathbb F_r] \to \mathbb F_r$ | `Sinsemilla(note)`|
+|`cm`|$\mathbb{F}_r$| Note commitment|
 
-Dummy notes: A note is dummy iff `v = 0`.
-
-Other options of `NoteCom`:
-1. `cm = hash_to_curve(note) + [rcm_note] * H` the same as Sapling or Orchard.(We are using this approach in taiga_halo2 version)
-2. `cm = [CRH(note||0)] G + [rcm] H`. Then `cm` is a point of $E_M$.
-
-For us: knowing the opening of `address` to `desc_vp_addr_send` <=> can derive `nf` for the notes owned by `address`
 
 ### Nullifier deriving key
 The nullifier deriving key is denoted `nk` and is randomly generated (by the user).
 ```
 nk = PRF_random(PERSONALIZATION_NK) mod r
 ```
+
+TODO: currently we don't derive nk at all?
 
 where:
 
