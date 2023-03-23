@@ -41,7 +41,7 @@ transactions.
 Taiga is based on the UTXO model - the application states are stored in 
 immutable objects called **notes**. 
 To update the state, an application (or anyone with sufficient rights) 
-would spend the notes containing the old state and create notes containing 
+would "spend" (verifiably invalidate) the notes containing the old state and create notes containing 
 a new state.
 
 ![img_1.png](./book/src/images/Intro_UTXO.png)
