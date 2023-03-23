@@ -2,44 +2,44 @@
 
 To be edited as design changes. Please make changes as necessary. Keep it **concise** and **precise**.
 
-## Notation
+### Instantiations
+||||
+|-|-|-|
+|nullifier PRF|Poseidon|
+|nk commitment|Poseidon|
+|address|Poseidon (f_p -> f_p)??|
+|note commitment ($Com_r$)|Sincemilla (f_p -> f_p)|
+|VP commitment (Com)|Blake2s|
 
-- $E_M$ means the main curve under which Action and VP circuits are defined.
-- $E_O$ means the outer curve. 
-- $E_I$ means the inner curve.
+## Curves
 
-- $\mathbb{F}_q$ stands for the base field of $E_M$. 
-- $\mathbb{F}_r$ refers to the scalar field of $E_M$.
+||Name|Purpose|Scalar field| Base field|Instantiation|
+|-|-|-|-|-|-|
+|$E_O$|Outer curve|Accumulator circuit|$\mathbb{F}_q$|$\mathbb{F}_p$|Pallas|
+|$E_M$|Main curve|Action and VP circuits|$\mathbb{F}_p$|$\mathbb{F}_q$|Vesta|
+|$E_I$|Inner curve|ECC gadget|$\mathbb{F}_q$|$\mathbb{F}_p$|Pallas
 
-### Halo2 context
-- $E_M = \mathbb{V}$ -- Vesta curve, and 
-- $q = r_\mathbb{P}$ = $q_{\mathbb{V}}$, 
-- $r = r_\mathbb{V} = q_{\mathbb{P}}$
-
-
-### Circuit curves
-- Action and VP circuits: arithmetic circuit over $\mathbb{F}_r$ (Vesta).
-- Accumulator circuit: arithmetic circuit over $\mathbb{F}_q$ (Pallas).
-
-## Proof system (Halo2) interfaces 
+Note: sometimes $\mathbb{F}_p$ is called $\mathbb{F}_p$
 
 TODO: do we need this?
+
+## Proof system interfaces 
 
 Main interfaces: Preprocess, Prove, Verify.
 
 - Polynomial commitment scheme for polynomials, where a commitment $Com$ is a point of an elliptic curve $E_M$, and $d$ is the bounded degree of any polynomial in the scheme.
-- A circuit with interface `C(x; w) ⟶ 0/1` is a circuit with upto `n` fan-in 3 (or 4) addition / multiplication / lookup gates over $\mathbb{F}_r$. (Following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html), `C(x; w)` can be turned into polynomials over $\mathbb{F}_r$.)
-- __Preprocess__: `preproc(C) ⟶ desc_C`. `C` is turned into a *circuit description* which is a sequence of polynomial commitments. (polynomials are computed over $\mathbb{F}_r$ while commitments are generated over $\mathbb{F}_q$)
+- A circuit with interface `C(x; w) ⟶ 0/1` is a circuit with upto `n` fan-in 3 (or 4) addition / multiplication / lookup gates over $\mathbb{F}_p$. (Following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html), `C(x; w)` can be turned into polynomials over $\mathbb{F}_p$.)
+- __Preprocess__: `preproc(C) ⟶ desc_C`. `C` is turned into a *circuit description* which is a sequence of polynomial commitments. (polynomials are computed over $\mathbb{F}_p$ while commitments are generated over $\mathbb{F}_q$)
     - In `ark-plonk`, `desc_C` corresponds to `vd: VerifierData`.
-- __Prove__: `P(C, x, w) ⟶ π` (arithmetized over $\mathbb{F}_r$ and $\mathbb{F}_q$)
-- __Verify__: `V(desc_C, x, π) ⟶ 0/1` (arithmetized over $\mathbb{F}_r$ and $\mathbb{F}_q$)
+- __Prove__: `P(C, x, w) ⟶ π` (arithmetized over $\mathbb{F}_p$ and $\mathbb{F}_q$)
+- __Verify__: `V(desc_C, x, π) ⟶ 0/1` (arithmetized over $\mathbb{F}_p$ and $\mathbb{F}_q$)
 
 ### Potential features:
 #### Accumulation (of proofs / verifier circuit)
 
 Definitions from Section 4.1 of [BCMS20](https://eprint.iacr.org/2020/499.pdf), and specializing to their Definition 4.2 for Plonk verifiers.
 
-- __Accumulation Prover__ over $\mathbb{F}_r$ and $\mathbb{F}_q$: `AccP(acc, desc_C, x, π) ⟶ (acc', aπ)` ??
+- __Accumulation Prover__ over $\mathbb{F}_p$ and $\mathbb{F}_q$: `AccP(acc, desc_C, x, π) ⟶ (acc', aπ)` ??
 - __Accumulation Verify__ over $\mathbb{F}_q$ ?: `AccV(acc, acc', aπ, desc_C, x, π) ⟶ 0/1` ??
 - __Accumulation Decider__ over $\mathbb{F}_q$ ?: `AccD(acc) ⟶ 0/1`
 
@@ -55,66 +55,45 @@ Definitions from Section 4.1 of [BCMS20](https://eprint.iacr.org/2020/499.pdf), 
 We blend commitments / hash into a single abstract interface.
 
 - `Com_q(...) ⟶ com` efficient over $\mathbb{F}_q$
-- `Com_r(...) ⟶ com` efficient over $\mathbb{F}_r$
-- `Com(...) ⟶ com` efficient over **both** $\mathbb{F}_q$ and $\mathbb{F}_r$
+- `Com_r(...) ⟶ com` efficient over $\mathbb{F}_p$
+- `Com(...) ⟶ com` efficient over **both** $\mathbb{F}_q$ and $\mathbb{F}_p$
 
 Commitments are binding by default (i.e. can be instantiated with hash). If we want blinding (possibly across differnt commitments), we add `rcm` explicitly.
 
-### Data related to VP circuits (defined in next section)
+### Data related to VP circuits:
+#### VP description: 
+`desc_vp = preproc(vp)`: generate pk, vk, CRS
 
-#### VP description: `desc_vp = preproc(vp)`:
-- vp_vk
-
+TODO: clarify if we commit to `desc_vp` or only some parts of it
 #### VP commitments: `com_vp = VPCom(desc_vp)`:
-
 - `VPCom(desc_vp; rcm_com_vp) := Com( Com_q(desc_vp), rcm_com_vp)`
-
-### Instantiations
-||||
-|-|-|-|
-|nullifier|Poseidon||
-|nk commitment|Poseidon|
-|address|Poseidon|
-|note commitment ($Com_r$)|Sincemilla|
-|VP commitment (Com)|Blake2s|
 
 ### Note
 
-```
-note = (note_type, v, ρ, ψ, app_data_dynamic, is_merkle_checked, nk_com, rcm_note)
-```
+TODO: all fields needed? maybe change formatting but stay consistent
+$note = (note\_type, v, ρ, ψ, app\_data\_dynamic, is\_merkle\_checked, nk\_com, rcm\_note)$
 
 |Variable|Type|Description|
 |-|-|-|
-|`note_type`| ValueBase |the data used to derive note's type. Contains `app_vk` and `app_data_static`. The resulting value base is `Poseidon(app_vk, app_data_static)` is in $\mathbb{F}_r$|
-|`app_vk`|$\mathbb{F}_r$|Verifying key of the application circuit|
-|`app_data_static`|$\mathbb{F}_r$| application data used to derive note's type|
-|`app_data_dynamic`| $\mathbb{F}_r$ ||
-|`v`| `u64` ($\mathbb F_r$ element in circuit) |the quantity of fungible value|
-|`nk_com`|$\mathbb{F}_r$|`Poseidon(nk)`|
-|`ρ`| $\mathbb{F}_r$ | an old nullifier from the same Action description|
-|`ψ`| $\mathbb{F}_r$ | the prf output of `ρ` and `rcm_note`|
+|`note_type`| ValueBase |the data used to derive note's type. Contains `app_vk` and `app_data_static`. The resulting value base is `Poseidon(app_vk, app_data_static)` is in $\mathbb{F}_p$|
+|`app_vk`|$\mathbb{F}_p$|Verifying key of the application circuit|
+|`app_data_static`|$\mathbb{F}_p$| application data used to derive note's type|
+|`app_data_dynamic`| $\mathbb{F}_p$ ||
+|`v`| `u64` ($\mathbb F_p$ element in circuit) |the quantity of fungible value|
+|`nk_com`|$\mathbb{F}_p$|`Poseidon(nk)`|
+|`ρ`| $\mathbb{F}_p$ | an old nullifier from the same Action description|
+|`ψ`| $\mathbb{F}_p$ | the prf output of `ρ` and `rcm_note`|
 |`is_merkle_checked`|bool|dummy note flag|
 |`rcm_note`| $\mathbb{F}_q$| a random commitment trapdoor|
 
 
 ### Note commitment
 
-```
-cm = NoteCom(note, rcm_note)
-```
-
-|Variable/Function|Type||
-|-|-|-|
-| `NoteCom` | $[\mathbb F_r] \to \mathbb F_r$ | `Sinsemilla(note)`|
-|`cm`|$\mathbb{F}_r$| Note commitment|
-
+$cm = \mathrm{NoteCom}(note, rcm\_note)$
 
 ### Nullifier deriving key
-The nullifier deriving key is denoted `nk` and is randomly generated (by the user).
-```
-nk = PRF_random(PERSONALIZATION_NK) mod r
-```
+The nullifier deriving key is denoted `nk` and is randomly generated (by the user): $nk = PRF_{random}(\mathrm{PERSONALIZATION\_NK}) \mod{r}$
+
 
 TODO: currently we don't derive nk at all?
 
@@ -126,31 +105,25 @@ where:
 | `PERSONALIZATION_NK` | string bytes | set to `"Taiga_PRF_NK"`|
 | `PRF` | outputs 64 bytes | Blake2b function |
 
-### Nullifier(taiga_halo2)
+### Nullifier
 
-Use the nullifier derivation as in Orchard:
-```
-DeriveNullifier_nk(ρ, ψ, cm) = Extract([PRF_nk(ρ) + ψ mod r]K + cm)
-```
-
-where:
+Use the nullifier derivation as in Orchard: $\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF_{nk}(ρ) + ψ \mod{r}]K + cm)$, where:
 
 |Variable/Function|Type||
 |-|-|-|
-|`nk` | $\mathbb F_r$ | the nullifier deriving key |
-|`ρ`| $\mathbb{F}_r$ | an old nullifier|
-|`ψ`| $\mathbb{F}_r$ | the prf output of `ρ` and `rcm_note`|
-|`cm` | $\mathbb F_r$ | a commitment from `NoteCom` |
-|`K`|($\mathbb F_r$, $\mathbb F_r$) | a fixed base generator of the inner curve|
-| `PRF` | $[\mathbb F_r] \to \mathbb F_r$ | Poseidon hash with two input elements (`nk` and `ρ`)|
-|`Extract` | $\mathbb F_r$ | the $x$ coordinate of a (inner curve) point|
+|`nk` | $\mathbb F_p$ | the nullifier deriving key |
+|`ρ`| $\mathbb{F}_p$ | an old nullifier|
+|`ψ`| $\mathbb{F}_p$ | $PRF_{rcm\_note}(ρ)$ -- should it be the same as in zcash?|
+|`cm` | $\mathbb F_p$ | note commitment |
+|`K`|($\mathbb F_p$, $\mathbb F_p$) | a fixed base generator of the inner curve|
+|`Extract` | $\mathbb F_p$ | the $x$ coordinate of a (inner curve) point|
 
 
 ## ZK Circuits
 
 ### Validity Predicate (VP) circuits
 
-Arithmetized over $\mathbb{F}_r$. Represented as a Plonk circuit `vp(x; w) ⟶ 0/1`.
+Arithmetized over $\mathbb{F}_p$. Represented as a Plonk circuit `vp(x; w) ⟶ 0/1`.
 
 - expects `m` notes spent and `n` notes created. `m` and `n` could be different for each vp involved in a Taiga transaction.
 
@@ -182,7 +155,7 @@ Checks that:
 
 ### Action Circuit
 
-Arithmetized over $\mathbb{F}_r$. Represented as a Plonk circuit, `ActionCircuit(x; w)`.
+Arithmetized over $\mathbb{F}_p$. Represented as a Plonk circuit, `ActionCircuit(x; w)`.
 
 Public inputs (`x`):
 - Merkle root `rt`
@@ -307,7 +280,7 @@ Why? We can verify a collection of Action and VP proofs efficiently for all proo
 
 Verification `Verify(desc, x, π)` requires both $F_p$ and $F_q$ arithmetics are needed. To make recursive proof verification more efficient, we can decompose the verifer computation into $F_p$ part and $F_q$ part.
 
-Specifically, we need to construct two circuits `V_q(desc_C, x, π, intval), V_p(intval)`, efficient over $\mathbb{F}_r$ and $\mathbb{F}_q$ respectively, such that `V(desc_C, x, π) = 1` iff `V_q(desc_C, x, π, intval) = 1` and `V_p(intval) = 1`. Note that `V_p` only take input the intermediate value.
+Specifically, we need to construct two circuits `V_q(desc_C, x, π, intval), V_p(intval)`, efficient over $\mathbb{F}_p$ and $\mathbb{F}_q$ respectively, such that `V(desc_C, x, π) = 1` iff `V_q(desc_C, x, π, intval) = 1` and `V_p(intval) = 1`. Note that `V_p` only take input the intermediate value.
 
 `intval` consists of ?? (TODO: pin-down the exact intermediate value):
 
@@ -436,8 +409,8 @@ Accumulator circuit checks:
         - Commitment opening is added to `acc'`
 
 Notes:
-- Plonk challenges $\beta, \gamma, \alpha, \mathfrak{z}, v,u \in \mathbb{F}_r$ are computed using the Poseidon hash over $\mathbb{F}_r$. 
-- Plonk challenges are rounded down to $\mathbb{F}_q$ out of circuit, and Plonk intermediate values are computed in $\mathbb{F}_q$ and cast back to $\mathbb{F}_r$ for input to AccumulatorCircuit
+- Plonk challenges $\beta, \gamma, \alpha, \mathfrak{z}, v,u \in \mathbb{F}_p$ are computed using the Poseidon hash over $\mathbb{F}_p$. 
+- Plonk challenges are rounded down to $\mathbb{F}_q$ out of circuit, and Plonk intermediate values are computed in $\mathbb{F}_q$ and cast back to $\mathbb{F}_p$ for input to AccumulatorCircuit
 - Intermediate values can be computed from the first 12 scalars - don't need to be stored on-chain
 - Net cost per Action/VP proof: 12 scalars = 384 bytes
 - Plus Accumulator circuit proof size (3-5 kB)
