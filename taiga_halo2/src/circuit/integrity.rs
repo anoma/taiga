@@ -75,7 +75,7 @@ pub fn nullifier_circuit(
 pub struct SpendNoteVar {
     pub address: AssignedCell<pallas::Base, pallas::Base>,
     pub app_vk: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_data: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_data_static: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub nf: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
@@ -159,11 +159,11 @@ pub fn check_spend_note(
         Value::known(spend_note.get_compressed_app_vk()),
     )?;
 
-    // Witness value_base_app_data
-    let app_data = assign_free_advice(
-        layouter.namespace(|| "witness value_base_app_data"),
+    // Witness app_data_static
+    let app_data_static = assign_free_advice(
+        layouter.namespace(|| "witness app_data_static"),
         advices[0],
-        Value::known(spend_note.get_value_base_app_data()),
+        Value::known(spend_note.get_app_data_static()),
     )?;
 
     // Witness value(u64)
@@ -209,7 +209,7 @@ pub fn check_spend_note(
         note_commit_chip,
         address.clone(),
         app_vk.clone(),
-        app_data.clone(),
+        app_data_static.clone(),
         rho.clone(),
         psi.clone(),
         value.clone(),
@@ -237,7 +237,7 @@ pub fn check_spend_note(
         address,
         app_vk,
         value,
-        app_data,
+        app_data_static,
         nf,
         cm,
         is_merkle_checked,
@@ -250,7 +250,7 @@ pub fn check_spend_note(
 pub struct OutputNoteVar {
     pub address: AssignedCell<pallas::Base, pallas::Base>,
     pub app_vk: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_data: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_data_static: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
     pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
@@ -312,11 +312,11 @@ pub fn check_output_note(
         Value::known(output_note.get_compressed_app_vk()),
     )?;
 
-    // Witness value_base_app_data
-    let app_data = assign_free_advice(
-        layouter.namespace(|| "witness value_base_app_data"),
+    // Witness app_data_static
+    let app_data_static = assign_free_advice(
+        layouter.namespace(|| "witness app_data_static"),
         advices[0],
-        Value::known(output_note.get_value_base_app_data()),
+        Value::known(output_note.get_app_data_static()),
     )?;
 
     // Witness value(u64)
@@ -355,7 +355,7 @@ pub fn check_output_note(
         note_commit_chip,
         address.clone(),
         app_vk.clone(),
-        app_data.clone(),
+        app_data_static.clone(),
         old_nf,
         psi,
         value.clone(),
@@ -370,7 +370,7 @@ pub fn check_output_note(
     Ok(OutputNoteVar {
         address,
         app_vk,
-        app_data,
+        app_data_static,
         value,
         cm,
         is_merkle_checked,
@@ -383,20 +383,23 @@ pub fn derive_value_base(
     hash_to_curve_config: HashToCurveConfig,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
     app_vk: AssignedCell<pallas::Base, pallas::Base>,
-    app_data: AssignedCell<pallas::Base, pallas::Base>,
+    app_data_static: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<NonIdentityPoint<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
     let point = hash_to_curve_circuit(
         layouter.namespace(|| "hash to curve"),
         hash_to_curve_config,
         ecc_chip.clone(),
-        &[app_vk.clone(), app_data.clone()],
+        &[app_vk.clone(), app_data_static.clone()],
     )?;
 
     // Assign a new `NonIdentityPoint` and constran equal to hash_to_curve point since `Point` doesn't have mul operation
     // IndentityPoint is an invalid value base and it returns an error.
-    let non_identity_point = app_vk.value().zip(app_data.value()).map(|(&vk, &data)| {
-        poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&[vk, data]).to_affine()
-    });
+    let non_identity_point = app_vk
+        .value()
+        .zip(app_data_static.value())
+        .map(|(&vk, &data)| {
+            poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&[vk, data]).to_affine()
+        });
     let non_identity_point_var = NonIdentityPoint::new(
         ecc_chip,
         layouter.namespace(|| "non-identity value base"),

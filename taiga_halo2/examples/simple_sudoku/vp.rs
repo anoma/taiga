@@ -11,7 +11,7 @@ use taiga_halo2::{
         note_circuit::NoteConfig,
         vp_circuit::{
             VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo,
+            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
@@ -78,26 +78,6 @@ impl ValidityPredicateInfo for SudokuVP {
     fn get_instances(&self) -> Vec<pallas::Base> {
         self.get_note_instances()
     }
-
-    fn get_verifying_info(&self) -> VPVerifyingInfo {
-        let mut rng = OsRng;
-        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
-        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
-        let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
-        let instance = self.get_instances();
-        let proof = Proof::create(&pk, params, self.clone(), &[&instance], &mut rng).unwrap();
-        VPVerifyingInfo {
-            vk,
-            proof,
-            instance,
-        }
-    }
-
-    fn get_vp_description(&self) -> ValidityPredicateVerifyingKey {
-        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
-        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
-        ValidityPredicateVerifyingKey::from_vk(vk)
-    }
 }
 
 impl SudokuVP {
@@ -159,9 +139,9 @@ mod tests {
 
         let mut _vp = SudokuVP::new(sudoku, input_notes, output_notes);
 
-        let vp_desc = ValidityPredicateVerifyingKey::from_vk(vk);
+        let vp_vk = ValidityPredicateVerifyingKey::from_vk(vk);
 
-        let app_data = pallas::Base::zero();
+        let app_data_static = pallas::Base::zero();
         let app_data_dynamic = pallas::Base::zero();
 
         let value: u64 = 0;
@@ -170,8 +150,8 @@ mod tests {
         let psi = pallas::Base::random(&mut rng);
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
         Note::new(
-            vp_desc,
-            app_data,
+            vp_vk,
+            app_data_static,
             app_data_dynamic,
             value,
             nk_com,

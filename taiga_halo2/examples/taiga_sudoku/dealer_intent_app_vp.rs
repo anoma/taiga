@@ -24,7 +24,7 @@ use taiga_halo2::{
         note_circuit::NoteConfig,
         vp_circuit::{
             VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo,
+            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
@@ -92,7 +92,8 @@ impl DealerIntentValidityPredicateCircuit {
         let is_spend_note = pallas::Base::zero();
         let encoded_puzzle = pallas::Base::random(&mut rng);
         let sudoku_app_vk = ValidityPredicateVerifyingKey::dummy(&mut rng).get_compressed();
-        output_notes[0].note_type.app_data = Self::compute_app_data(encoded_puzzle, sudoku_app_vk);
+        output_notes[0].note_type.app_data_static =
+            Self::compute_app_data_static(encoded_puzzle, sudoku_app_vk);
         let encoded_solution = pallas::Base::random(&mut rng);
         Self {
             spend_notes,
@@ -104,7 +105,7 @@ impl DealerIntentValidityPredicateCircuit {
         }
     }
 
-    pub fn compute_app_data(
+    pub fn compute_app_data_static(
         encoded_puzzle: pallas::Base,
         sudoku_app_vk: pallas::Base,
     ) -> pallas::Base {
@@ -120,13 +121,13 @@ impl DealerIntentValidityPredicateCircuit {
         sudoku_app_vk_in_dealer_intent_note: &AssignedCell<pallas::Base, pallas::Base>,
         puzzle_note: &OutputNoteVar,
     ) -> Result<(), Error> {
-        // puzzle_note_app_data = poseidon_hash(encoded_puzzle || encoded_solution)
+        // puzzle_note_app_data_static = poseidon_hash(encoded_puzzle || encoded_solution)
         let encoded_solution = assign_free_advice(
             layouter.namespace(|| "witness encoded_solution"),
             config.advices[0],
             Value::known(self.encoded_solution),
         )?;
-        let encoded_puzzle_note_app_data = {
+        let encoded_puzzle_note_app_data_static = {
             let poseidon_config = config.get_note_config().poseidon_config;
             let poseidon_chip = PoseidonChip::construct(poseidon_config);
             let poseidon_hasher =
@@ -136,7 +137,7 @@ impl DealerIntentValidityPredicateCircuit {
                 )?;
             let poseidon_message = [encoded_puzzle.clone(), encoded_solution];
             poseidon_hasher.hash(
-                layouter.namespace(|| "check app_data encoding"),
+                layouter.namespace(|| "check app_data_static encoding"),
                 poseidon_message,
             )?
         };
@@ -149,8 +150,8 @@ impl DealerIntentValidityPredicateCircuit {
                     &puzzle_note.value,
                     &puzzle_note.app_vk,
                     sudoku_app_vk_in_dealer_intent_note,
-                    &puzzle_note.app_data,
-                    &encoded_puzzle_note_app_data,
+                    &puzzle_note.app_data_static,
+                    &encoded_puzzle_note_app_data_static,
                     0,
                     &mut region,
                 )
@@ -175,26 +176,6 @@ impl ValidityPredicateInfo for DealerIntentValidityPredicateCircuit {
 
         instances
     }
-
-    fn get_verifying_info(&self) -> VPVerifyingInfo {
-        let mut rng = OsRng;
-        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
-        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
-        let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
-        let instance = self.get_instances();
-        let proof = Proof::create(&pk, params, self.clone(), &[&instance], &mut rng).unwrap();
-        VPVerifyingInfo {
-            vk,
-            proof,
-            instance,
-        }
-    }
-
-    fn get_vp_description(&self) -> ValidityPredicateVerifyingKey {
-        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
-        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
-        ValidityPredicateVerifyingKey::from_vk(vk)
-    }
 }
 
 impl ValidityPredicateCircuit for DealerIntentValidityPredicateCircuit {
@@ -216,21 +197,21 @@ impl ValidityPredicateCircuit for DealerIntentValidityPredicateCircuit {
         // publicize is_spend_note and check it outside of circuit.
         layouter.constrain_instance(is_spend_note.cell(), config.instances, 2 * NUM_NOTE)?;
 
-        // search target note and output the app_data
-        let app_data = layouter.assign_region(
-            || "get target app_data",
+        // search target note and output the app_data_static
+        let app_data_static = layouter.assign_region(
+            || "get target app_data_static",
             |mut region| {
                 config.get_target_variable_config.assign_region(
                     &is_spend_note,
-                    &spend_note_variables[0].app_data,
-                    &output_note_variables[0].app_data,
+                    &spend_note_variables[0].app_data_static,
+                    &output_note_variables[0].app_data_static,
                     0,
                     &mut region,
                 )
             },
         )?;
 
-        // app_data = poseidon_hash(encoded_puzzle || sudoku_app_vk)
+        // app_data_static = poseidon_hash(encoded_puzzle || sudoku_app_vk)
         let encoded_puzzle = assign_free_advice(
             layouter.namespace(|| "witness encoded_puzzle"),
             config.advices[0],
@@ -241,7 +222,7 @@ impl ValidityPredicateCircuit for DealerIntentValidityPredicateCircuit {
             config.advices[0],
             Value::known(self.sudoku_app_vk),
         )?;
-        let app_data_encode = {
+        let app_data_static_encode = {
             let poseidon_config = config.get_note_config().poseidon_config;
             let poseidon_chip = PoseidonChip::construct(poseidon_config);
             let poseidon_hasher =
@@ -251,14 +232,16 @@ impl ValidityPredicateCircuit for DealerIntentValidityPredicateCircuit {
                 )?;
             let poseidon_message = [encoded_puzzle.clone(), sudoku_app_vk.clone()];
             poseidon_hasher.hash(
-                layouter.namespace(|| "check app_data encoding"),
+                layouter.namespace(|| "check app_data_static encoding"),
                 poseidon_message,
             )?
         };
 
         layouter.assign_region(
-            || "check app_data encoding",
-            |mut region| region.constrain_equal(app_data_encode.cell(), app_data.cell()),
+            || "check app_data_static encoding",
+            |mut region| {
+                region.constrain_equal(app_data_static_encode.cell(), app_data_static.cell())
+            },
         )?;
 
         // if it is an output note, do nothing
@@ -283,8 +266,8 @@ pub struct DealerIntentCheckConfig {
     puzzle_note_value: Column<Advice>,
     sudoku_app_vk: Column<Advice>,
     sudoku_app_vk_in_dealer_intent_note: Column<Advice>,
-    puzzle_note_app_data: Column<Advice>,
-    encoded_puzzle_note_app_data: Column<Advice>,
+    puzzle_note_app_data_static: Column<Advice>,
+    encoded_puzzle_note_app_data_static: Column<Advice>,
 }
 
 impl DealerIntentCheckConfig {
@@ -295,15 +278,15 @@ impl DealerIntentCheckConfig {
         puzzle_note_value: Column<Advice>,
         sudoku_app_vk: Column<Advice>,
         sudoku_app_vk_in_dealer_intent_note: Column<Advice>,
-        puzzle_note_app_data: Column<Advice>,
-        encoded_puzzle_note_app_data: Column<Advice>,
+        puzzle_note_app_data_static: Column<Advice>,
+        encoded_puzzle_note_app_data_static: Column<Advice>,
     ) -> Self {
         meta.enable_equality(is_spend_note);
         meta.enable_equality(puzzle_note_value);
         meta.enable_equality(sudoku_app_vk);
         meta.enable_equality(sudoku_app_vk_in_dealer_intent_note);
-        meta.enable_equality(puzzle_note_app_data);
-        meta.enable_equality(encoded_puzzle_note_app_data);
+        meta.enable_equality(puzzle_note_app_data_static);
+        meta.enable_equality(encoded_puzzle_note_app_data_static);
 
         let config = Self {
             q_dealer_intent_check: meta.selector(),
@@ -311,8 +294,8 @@ impl DealerIntentCheckConfig {
             puzzle_note_value,
             sudoku_app_vk,
             sudoku_app_vk_in_dealer_intent_note,
-            puzzle_note_app_data,
-            encoded_puzzle_note_app_data,
+            puzzle_note_app_data_static,
+            encoded_puzzle_note_app_data_static,
         };
 
         config.create_gate(meta);
@@ -328,10 +311,10 @@ impl DealerIntentCheckConfig {
             let sudoku_app_vk = meta.query_advice(self.sudoku_app_vk, Rotation::cur());
             let sudoku_app_vk_in_dealer_intent_note =
                 meta.query_advice(self.sudoku_app_vk_in_dealer_intent_note, Rotation::cur());
-            let puzzle_note_app_data =
-                meta.query_advice(self.puzzle_note_app_data, Rotation::cur());
-            let encoded_puzzle_note_app_data =
-                meta.query_advice(self.encoded_puzzle_note_app_data, Rotation::cur());
+            let puzzle_note_app_data_static =
+                meta.query_advice(self.puzzle_note_app_data_static, Rotation::cur());
+            let encoded_puzzle_note_app_data_static =
+                meta.query_advice(self.encoded_puzzle_note_app_data_static, Rotation::cur());
 
             let bool_check_is_spend = bool_check(is_spend_note.clone());
 
@@ -349,8 +332,9 @@ impl DealerIntentCheckConfig {
                             * (sudoku_app_vk - sudoku_app_vk_in_dealer_intent_note),
                     ),
                     (
-                        "check puzzle note app_data encoding",
-                        is_spend_note * (puzzle_note_app_data - encoded_puzzle_note_app_data),
+                        "check puzzle note app_data_static encoding",
+                        is_spend_note
+                            * (puzzle_note_app_data_static - encoded_puzzle_note_app_data_static),
                     ),
                 ],
             )
@@ -364,8 +348,8 @@ impl DealerIntentCheckConfig {
         puzzle_note_value: &AssignedCell<pallas::Base, pallas::Base>,
         sudoku_app_vk: &AssignedCell<pallas::Base, pallas::Base>,
         sudoku_app_vk_in_dealer_intent_note: &AssignedCell<pallas::Base, pallas::Base>,
-        puzzle_note_app_data: &AssignedCell<pallas::Base, pallas::Base>,
-        encoded_puzzle_note_app_data: &AssignedCell<pallas::Base, pallas::Base>,
+        puzzle_note_app_data_static: &AssignedCell<pallas::Base, pallas::Base>,
+        encoded_puzzle_note_app_data_static: &AssignedCell<pallas::Base, pallas::Base>,
         offset: usize,
         region: &mut Region<'_, pallas::Base>,
     ) -> Result<(), Error> {
@@ -386,16 +370,16 @@ impl DealerIntentCheckConfig {
             self.sudoku_app_vk_in_dealer_intent_note,
             offset,
         )?;
-        puzzle_note_app_data.copy_advice(
-            || "puzzle_note_app_data",
+        puzzle_note_app_data_static.copy_advice(
+            || "puzzle_note_app_data_static",
             region,
-            self.puzzle_note_app_data,
+            self.puzzle_note_app_data_static,
             offset,
         )?;
-        encoded_puzzle_note_app_data.copy_advice(
-            || "encoded_puzzle_note_app_data",
+        encoded_puzzle_note_app_data_static.copy_advice(
+            || "encoded_puzzle_note_app_data_static",
             region,
-            self.encoded_puzzle_note_app_data,
+            self.encoded_puzzle_note_app_data_static,
             offset,
         )?;
 

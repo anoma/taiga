@@ -23,7 +23,7 @@ use taiga_halo2::{
         note_circuit::NoteConfig,
         vp_circuit::{
             VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo,
+            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
@@ -45,7 +45,7 @@ pub struct SudokuState {
 
 impl SudokuState {
     pub fn encode(&self) -> pallas::Base {
-        // TODO: add the rho of note to make the app_data unique.
+        // TODO: add the rho of note to make the app_data_static unique.
 
         let sudoku = self.state.concat();
         let s1 = &sudoku[..sudoku.len() / 2]; // s1 contains 40 elements
@@ -190,7 +190,7 @@ impl SudokuAppValidityPredicateCircuit {
         let encoded_init_state = SudokuState::default().encode();
         let previous_state = SudokuState::default();
         let current_state = SudokuState::default();
-        output_notes[0].note_type.app_data =
+        output_notes[0].note_type.app_data_static =
             poseidon_hash(encoded_init_state, current_state.encode());
         output_notes[0].value = 1u64;
         Self {
@@ -320,7 +320,7 @@ impl SudokuAppValidityPredicateCircuit {
         init_state: &AssignedCell<pallas::Base, pallas::Base>,
         spend_note_pre_state: &AssignedCell<pallas::Base, pallas::Base>,
         output_note_cur_state: &AssignedCell<pallas::Base, pallas::Base>,
-        spend_note_app_data_encode: &AssignedCell<pallas::Base, pallas::Base>,
+        spend_note_app_data_static_encode: &AssignedCell<pallas::Base, pallas::Base>,
         spend_note: &SpendNoteVar,
         output_note: &OutputNoteVar,
     ) -> Result<(), Error> {
@@ -330,8 +330,8 @@ impl SudokuAppValidityPredicateCircuit {
                 config.assign_region(
                     is_spend_note,
                     init_state,
-                    &spend_note.app_data,
-                    spend_note_app_data_encode,
+                    &spend_note.app_data_static,
+                    spend_note_app_data_static_encode,
                     &spend_note.app_vk,
                     &output_note.app_vk,
                     spend_note_pre_state,
@@ -475,26 +475,6 @@ impl ValidityPredicateInfo for SudokuAppValidityPredicateCircuit {
 
         instances
     }
-
-    fn get_verifying_info(&self) -> VPVerifyingInfo {
-        let mut rng = OsRng;
-        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
-        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
-        let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
-        let instance = self.get_instances();
-        let proof = Proof::create(&pk, params, self.clone(), &[&instance], &mut rng).unwrap();
-        VPVerifyingInfo {
-            vk,
-            proof,
-            instance,
-        }
-    }
-
-    fn get_vp_description(&self) -> ValidityPredicateVerifyingKey {
-        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
-        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
-        ValidityPredicateVerifyingKey::from_vk(vk)
-    }
 }
 
 impl ValidityPredicateCircuit for SudokuAppValidityPredicateCircuit {
@@ -561,13 +541,13 @@ impl ValidityPredicateCircuit for SudokuAppValidityPredicateCircuit {
             Value::known(self.current_state.encode()),
         )?;
 
-        // app_data = poseidon_hash(encoded_init_state || encoded_state)
+        // app_data_static = poseidon_hash(encoded_init_state || encoded_state)
         let encoded_init_state = assign_free_advice(
             layouter.namespace(|| "witness encoded_init_state"),
             config.advices[0],
             Value::known(self.encoded_init_state),
         )?;
-        let spend_note_app_data_encode = {
+        let spend_note_app_data_static_encode = {
             let poseidon_config = config.get_note_config().poseidon_config;
             let poseidon_chip = PoseidonChip::construct(poseidon_config);
             let poseidon_hasher =
@@ -577,11 +557,11 @@ impl ValidityPredicateCircuit for SudokuAppValidityPredicateCircuit {
                 )?;
             let poseidon_message = [encoded_init_state.clone(), encoded_previous_state.clone()];
             poseidon_hasher.hash(
-                layouter.namespace(|| "get spend note app_data encoding"),
+                layouter.namespace(|| "get spend note app_data_static encoding"),
                 poseidon_message,
             )?
         };
-        let output_note_app_data_encode = {
+        let output_note_app_data_static_encode = {
             let poseidon_config = config.get_note_config().poseidon_config;
             let poseidon_chip = PoseidonChip::construct(poseidon_config);
             let poseidon_hasher =
@@ -591,17 +571,17 @@ impl ValidityPredicateCircuit for SudokuAppValidityPredicateCircuit {
                 )?;
             let poseidon_message = [encoded_init_state.clone(), encoded_current_state.clone()];
             poseidon_hasher.hash(
-                layouter.namespace(|| "get output note app_data encoding"),
+                layouter.namespace(|| "get output note app_data_static encoding"),
                 poseidon_message,
             )?
         };
 
         layouter.assign_region(
-            || "check output note app_data encoding",
+            || "check output note app_data_static encoding",
             |mut region| {
                 region.constrain_equal(
-                    output_note_app_data_encode.cell(),
-                    output_note_variables[0].app_data.cell(),
+                    output_note_app_data_static_encode.cell(),
+                    output_note_variables[0].app_data_static.cell(),
                 )
             },
         )?;
@@ -620,7 +600,7 @@ impl ValidityPredicateCircuit for SudokuAppValidityPredicateCircuit {
             &encoded_init_state,
             &encoded_previous_state,
             &encoded_current_state,
-            &spend_note_app_data_encode,
+            &spend_note_app_data_static_encode,
             &spend_note_variables[0],
             &output_note_variables[0],
         )?;
@@ -709,10 +689,10 @@ fn test_halo2_sudoku_app_vp_circuit_update() {
                 [6, 0, 7, 4, 3, 5, 1, 9, 8],
             ],
         };
-        spend_notes[0].note_type.app_data =
+        spend_notes[0].note_type.app_data_static =
             poseidon_hash(encoded_init_state, previous_state.encode());
         spend_notes[0].value = 1u64;
-        output_notes[0].note_type.app_data =
+        output_notes[0].note_type.app_data_static =
             poseidon_hash(encoded_init_state, current_state.encode());
         output_notes[0].value = 1u64;
         output_notes[0].note_type.app_vk = spend_notes[0].note_type.app_vk.clone();
@@ -780,10 +760,10 @@ pub fn halo2_sudoku_app_vp_circuit_final() {
                 [6, 2, 7, 4, 3, 5, 1, 9, 8],
             ],
         };
-        spend_notes[0].note_type.app_data =
+        spend_notes[0].note_type.app_data_static =
             poseidon_hash(encoded_init_state, previous_state.encode());
         spend_notes[0].value = 1u64;
-        output_notes[0].note_type.app_data =
+        output_notes[0].note_type.app_data_static =
             poseidon_hash(encoded_init_state, current_state.encode());
         output_notes[0].value = 0u64;
         output_notes[0].note_type.app_vk = spend_notes[0].note_type.app_vk.clone();
