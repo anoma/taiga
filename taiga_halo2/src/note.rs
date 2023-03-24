@@ -1,5 +1,5 @@
 use crate::{
-    circuit::vp_circuit::ValidityPredicateInfo,
+    circuit::vp_circuit::ValidityPredicateVerifyingInfo,
     constant::{
         BASE_BITS_NUM, NOTE_COMMIT_DOMAIN, POSEIDON_TO_CURVE_INPUT_LEN, TAIGA_COMMITMENT_TREE_DEPTH,
     },
@@ -64,8 +64,8 @@ pub struct Note {
 pub struct ValueBase {
     /// app_vk is the verifying key of VP
     pub app_vk: ValidityPredicateVerifyingKey,
-    /// app_data is the encoded data that is defined in application vp
-    pub app_data: pallas::Base,
+    /// app_data_static is the encoded data that is defined in application vp
+    pub app_data_static: pallas::Base,
 }
 
 #[derive(Clone)]
@@ -73,22 +73,22 @@ pub struct SpendNoteInfo {
     pub note: Note,
     pub auth_path: [(pallas::Base, LR); TAIGA_COMMITMENT_TREE_DEPTH],
     pub root: pallas::Base,
-    app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
-    app_vp_proving_info_dynamic: Vec<Box<dyn ValidityPredicateInfo>>,
+    app_vp_verifying_info: Box<dyn ValidityPredicateVerifyingInfo>,
+    app_vp_verifying_info_dynamic: Vec<Box<dyn ValidityPredicateVerifyingInfo>>,
 }
 
 #[derive(Clone)]
 pub struct OutputNoteInfo {
     pub note: Note,
-    app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
-    app_vp_proving_info_dynamic: Vec<Box<dyn ValidityPredicateInfo>>,
+    app_vp_verifying_info: Box<dyn ValidityPredicateVerifyingInfo>,
+    app_vp_verifying_info_dynamic: Vec<Box<dyn ValidityPredicateVerifyingInfo>>,
 }
 
 impl Note {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         app_vk: ValidityPredicateVerifyingKey,
-        app_data: pallas::Base,
+        app_data_static: pallas::Base,
         app_data_dynamic: pallas::Base,
         value: u64,
         nk_com: NullifierKeyCom,
@@ -97,7 +97,7 @@ impl Note {
         rcm: pallas::Scalar,
         is_merkle_checked: bool,
     ) -> Self {
-        let note_type = ValueBase::new(app_vk, app_data);
+        let note_type = ValueBase::new(app_vk, app_data_static);
         Self {
             note_type,
             app_data_dynamic,
@@ -117,8 +117,8 @@ impl Note {
 
     pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
         let app_vk = ValidityPredicateVerifyingKey::dummy(&mut rng);
-        let app_data = pallas::Base::random(&mut rng);
-        let note_type = ValueBase::new(app_vk, app_data);
+        let app_data_static = pallas::Base::random(&mut rng);
+        let note_type = ValueBase::new(app_vk, app_data_static);
         let app_data_dynamic = pallas::Base::zero();
         let value: u64 = rng.gen();
         let nk_com = NullifierKeyCom::rand(&mut rng);
@@ -136,7 +136,7 @@ impl Note {
         }
     }
 
-    // cm = SinsemillaCommit^rcm(address || app_vk || app_data || rho || psi || is_merkle_checked || value)
+    // cm = SinsemillaCommit^rcm(address || app_vk || app_data_static || rho || psi || is_merkle_checked || value)
     pub fn commitment(&self) -> NoteCommitment {
         let address = self.get_address();
         let ret = NOTE_COMMIT_DOMAIN
@@ -151,7 +151,7 @@ impl Note {
                             .take(BASE_BITS_NUM),
                     )
                     .chain(
-                        self.get_value_base_app_data()
+                        self.get_app_data_static()
                             .to_le_bits()
                             .iter()
                             .by_vals()
@@ -209,8 +209,8 @@ impl Note {
         self.note_type.app_vk.get_compressed()
     }
 
-    pub fn get_value_base_app_data(&self) -> pallas::Base {
-        self.note_type.app_data
+    pub fn get_app_data_static(&self) -> pallas::Base {
+        self.note_type.app_data_static
     }
 }
 
@@ -218,12 +218,12 @@ impl ValueBase {
     pub fn new(vk: ValidityPredicateVerifyingKey, data: pallas::Base) -> Self {
         Self {
             app_vk: vk,
-            app_data: data,
+            app_data_static: data,
         }
     }
 
     pub fn derive_value_base(&self) -> pallas::Point {
-        let inputs = [self.app_vk.get_compressed(), self.app_data];
+        let inputs = [self.app_vk.get_compressed(), self.app_data_static];
         poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&inputs)
     }
 }
@@ -232,8 +232,8 @@ impl SpendNoteInfo {
     pub fn new(
         note: Note,
         merkle_path: MerklePath,
-        app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
-        app_vp_proving_info_dynamic: Vec<Box<dyn ValidityPredicateInfo>>,
+        app_vp_verifying_info: Box<dyn ValidityPredicateVerifyingInfo>,
+        app_vp_verifying_info_dynamic: Vec<Box<dyn ValidityPredicateVerifyingInfo>>,
     ) -> Self {
         let cm_node = Node::new(note.commitment().get_x());
         let root = merkle_path.root(cm_node).inner();
@@ -243,50 +243,54 @@ impl SpendNoteInfo {
             note,
             auth_path,
             root,
-            app_vp_proving_info,
-            app_vp_proving_info_dynamic,
+            app_vp_verifying_info,
+            app_vp_verifying_info_dynamic,
         }
     }
 
-    pub fn get_app_vp_proving_info(&self) -> Box<dyn ValidityPredicateInfo> {
-        self.app_vp_proving_info.clone()
+    pub fn get_app_vp_verifying_info(&self) -> Box<dyn ValidityPredicateVerifyingInfo> {
+        self.app_vp_verifying_info.clone()
     }
 
-    pub fn get_app_vp_proving_info_dynamic(&self) -> Vec<Box<dyn ValidityPredicateInfo>> {
-        self.app_vp_proving_info_dynamic.clone()
+    pub fn get_app_vp_verifying_info_dynamic(
+        &self,
+    ) -> Vec<Box<dyn ValidityPredicateVerifyingInfo>> {
+        self.app_vp_verifying_info_dynamic.clone()
     }
 }
 
 impl OutputNoteInfo {
     pub fn new(
         note: Note,
-        app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
-        app_vp_proving_info_dynamic: Vec<Box<dyn ValidityPredicateInfo>>,
+        app_vp_verifying_info: Box<dyn ValidityPredicateVerifyingInfo>,
+        app_vp_verifying_info_dynamic: Vec<Box<dyn ValidityPredicateVerifyingInfo>>,
     ) -> Self {
         Self {
             note,
-            app_vp_proving_info,
-            app_vp_proving_info_dynamic,
+            app_vp_verifying_info,
+            app_vp_verifying_info_dynamic,
         }
     }
 
     pub fn dummy<R: RngCore>(mut rng: R, nf: Nullifier) -> Self {
         use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
         let note = Note::dummy_from_rho(&mut rng, nf);
-        let app_vp_proving_info = Box::new(TrivialValidityPredicateCircuit::dummy(&mut rng));
-        let app_vp_proving_info_dynamic = vec![];
+        let app_vp_verifying_info = Box::new(TrivialValidityPredicateCircuit::dummy(&mut rng));
+        let app_vp_verifying_info_dynamic = vec![];
         Self {
             note,
-            app_vp_proving_info,
-            app_vp_proving_info_dynamic,
+            app_vp_verifying_info,
+            app_vp_verifying_info_dynamic,
         }
     }
 
-    pub fn get_app_vp_proving_info(&self) -> Box<dyn ValidityPredicateInfo> {
-        self.app_vp_proving_info.clone()
+    pub fn get_app_vp_verifying_info(&self) -> Box<dyn ValidityPredicateVerifyingInfo> {
+        self.app_vp_verifying_info.clone()
     }
 
-    pub fn get_app_vp_proving_info_dynamic(&self) -> Vec<Box<dyn ValidityPredicateInfo>> {
-        self.app_vp_proving_info_dynamic.clone()
+    pub fn get_app_vp_verifying_info_dynamic(
+        &self,
+    ) -> Vec<Box<dyn ValidityPredicateVerifyingInfo>> {
+        self.app_vp_verifying_info_dynamic.clone()
     }
 }

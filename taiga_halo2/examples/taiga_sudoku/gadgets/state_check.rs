@@ -12,8 +12,8 @@ pub struct SudokuStateCheckConfig {
     q_state_check: Selector,
     is_spend_note: Column<Advice>,
     init_state: Column<Advice>,
-    spend_note_app_data: Column<Advice>,
-    spend_note_app_data_encoding: Column<Advice>,
+    spend_note_app_data_static: Column<Advice>,
+    spend_note_app_data_static_encoding: Column<Advice>,
     spend_note_vk: Column<Advice>,
     output_note_vk: Column<Advice>,
     spend_note_pre_state: Column<Advice>,
@@ -26,8 +26,8 @@ impl SudokuStateCheckConfig {
         meta: &mut ConstraintSystem<pallas::Base>,
         is_spend_note: Column<Advice>,
         init_state: Column<Advice>,
-        spend_note_app_data: Column<Advice>,
-        spend_note_app_data_encoding: Column<Advice>,
+        spend_note_app_data_static: Column<Advice>,
+        spend_note_app_data_static_encoding: Column<Advice>,
         spend_note_vk: Column<Advice>,
         output_note_vk: Column<Advice>,
         spend_note_pre_state: Column<Advice>,
@@ -35,8 +35,8 @@ impl SudokuStateCheckConfig {
     ) -> Self {
         meta.enable_equality(is_spend_note);
         meta.enable_equality(init_state);
-        meta.enable_equality(spend_note_app_data);
-        meta.enable_equality(spend_note_app_data_encoding);
+        meta.enable_equality(spend_note_app_data_static);
+        meta.enable_equality(spend_note_app_data_static_encoding);
         meta.enable_equality(spend_note_vk);
         meta.enable_equality(output_note_vk);
         meta.enable_equality(spend_note_pre_state);
@@ -46,8 +46,8 @@ impl SudokuStateCheckConfig {
             q_state_check: meta.selector(),
             is_spend_note,
             init_state,
-            spend_note_app_data,
-            spend_note_app_data_encoding,
+            spend_note_app_data_static,
+            spend_note_app_data_static_encoding,
             spend_note_vk,
             output_note_vk,
             spend_note_pre_state,
@@ -64,9 +64,10 @@ impl SudokuStateCheckConfig {
             let q_state_check = meta.query_selector(self.q_state_check);
             let is_spend_note = meta.query_advice(self.is_spend_note, Rotation::cur());
             let init_state = meta.query_advice(self.init_state, Rotation::cur());
-            let spend_note_app_data = meta.query_advice(self.spend_note_app_data, Rotation::cur());
-            let spend_note_app_data_encoding =
-                meta.query_advice(self.spend_note_app_data_encoding, Rotation::cur());
+            let spend_note_app_data_static =
+                meta.query_advice(self.spend_note_app_data_static, Rotation::cur());
+            let spend_note_app_data_static_encoding =
+                meta.query_advice(self.spend_note_app_data_static_encoding, Rotation::cur());
             let spend_note_vk = meta.query_advice(self.spend_note_vk, Rotation::cur());
             let output_note_vk = meta.query_advice(self.output_note_vk, Rotation::cur());
 
@@ -93,9 +94,9 @@ impl SudokuStateCheckConfig {
                         is_spend_note.clone() * (spend_note_vk.clone() - output_note_vk.clone()),
                     ),
                     (
-                        "check spend_note_app_data_encoding",
+                        "check spend_note_app_data_static_encoding",
                         is_spend_note.clone()
-                            * (spend_note_app_data_encoding - spend_note_app_data),
+                            * (spend_note_app_data_static_encoding - spend_note_app_data_static),
                     ),
                     (
                         "check puzzle init",
@@ -116,8 +117,8 @@ impl SudokuStateCheckConfig {
         &self,
         is_spend_note: &AssignedCell<pallas::Base, pallas::Base>,
         init_state: &AssignedCell<pallas::Base, pallas::Base>,
-        spend_note_app_data: &AssignedCell<pallas::Base, pallas::Base>,
-        spend_note_app_data_encoding: &AssignedCell<pallas::Base, pallas::Base>,
+        spend_note_app_data_static: &AssignedCell<pallas::Base, pallas::Base>,
+        spend_note_app_data_static_encoding: &AssignedCell<pallas::Base, pallas::Base>,
         spend_note_vk: &AssignedCell<pallas::Base, pallas::Base>,
         output_note_vk: &AssignedCell<pallas::Base, pallas::Base>,
         spend_note_pre_state: &AssignedCell<pallas::Base, pallas::Base>,
@@ -130,16 +131,16 @@ impl SudokuStateCheckConfig {
 
         is_spend_note.copy_advice(|| "is_spend_notex", region, self.is_spend_note, offset)?;
         init_state.copy_advice(|| "init_state", region, self.init_state, offset)?;
-        spend_note_app_data.copy_advice(
-            || "spend_note_app_data",
+        spend_note_app_data_static.copy_advice(
+            || "spend_note_app_data_static",
             region,
-            self.spend_note_app_data,
+            self.spend_note_app_data_static,
             offset,
         )?;
-        spend_note_app_data_encoding.copy_advice(
-            || "spend_note_app_data_encoding",
+        spend_note_app_data_static_encoding.copy_advice(
+            || "spend_note_app_data_static_encoding",
             region,
-            self.spend_note_app_data_encoding,
+            self.spend_note_app_data_static_encoding,
             offset,
         )?;
         spend_note_vk.copy_advice(|| "spend_note_vk", region, self.spend_note_vk, offset)?;

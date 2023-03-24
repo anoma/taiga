@@ -7,7 +7,7 @@ use crate::{
         note_circuit::NoteConfig,
         vp_circuit::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicateInfo,
+            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX},
@@ -97,26 +97,6 @@ impl ValidityPredicateInfo for FieldAdditionValidityPredicateCircuit {
         instances.push(self.a + self.b);
 
         instances
-    }
-
-    fn get_verifying_info(&self) -> VPVerifyingInfo {
-        let mut rng = OsRng;
-        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
-        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
-        let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
-        let instance = self.get_instances();
-        let proof = Proof::create(&pk, params, self.clone(), &[&instance], &mut rng).unwrap();
-        VPVerifyingInfo {
-            vk,
-            proof,
-            instance,
-        }
-    }
-
-    fn get_vp_description(&self) -> ValidityPredicateVerifyingKey {
-        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
-        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
-        ValidityPredicateVerifyingKey::from_vk(vk)
     }
 
     fn get_owned_note_pub_id(&self) -> pallas::Base {

@@ -189,10 +189,10 @@ impl Circuit<pallas::Base> for ActionCircuit {
             ecc_chip,
             config.hash_to_curve_config.clone(),
             spend_note_variables.note_variables.app_vk.clone(),
-            spend_note_variables.note_variables.app_data.clone(),
+            spend_note_variables.note_variables.app_data_static.clone(),
             spend_note_variables.note_variables.value.clone(),
             output_note_vars.note_variables.app_vk.clone(),
-            output_note_vars.note_variables.app_data.clone(),
+            output_note_vars.note_variables.app_data_static.clone(),
             output_note_vars.note_variables.value,
             self.rcv,
         )?;

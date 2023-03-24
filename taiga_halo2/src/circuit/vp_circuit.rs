@@ -83,7 +83,7 @@ pub trait ValidityPredicateConfig {
     fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self;
 }
 
-pub trait ValidityPredicateInfo: DynClone {
+pub trait ValidityPredicateInfo {
     fn get_spend_notes(&self) -> &[Note; NUM_NOTE];
     fn get_output_notes(&self) -> &[Note; NUM_NOTE];
     fn get_note_instances(&self) -> Vec<pallas::Base> {
@@ -101,17 +101,22 @@ pub trait ValidityPredicateInfo: DynClone {
         instances
     }
     fn get_instances(&self) -> Vec<pallas::Base>;
-    fn get_verifying_info(&self) -> VPVerifyingInfo;
-    fn get_vp_description(&self) -> ValidityPredicateVerifyingKey;
     // The owned_note_pub_id is the spend_note_nf or the output_note_cm_x
     // The owned_note_pub_id is the key to look up the target variables and
     // help determine whether the owned note is the spend note or not in VP circuit.
     fn get_owned_note_pub_id(&self) -> pallas::Base;
 }
 
-clone_trait_object!(ValidityPredicateInfo);
+pub trait ValidityPredicateVerifyingInfo: DynClone {
+    fn get_verifying_info(&self) -> VPVerifyingInfo;
+    fn get_vp_vk(&self) -> ValidityPredicateVerifyingKey;
+}
 
-pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateInfo {
+clone_trait_object!(ValidityPredicateVerifyingInfo);
+
+pub trait ValidityPredicateCircuit:
+    Circuit<pallas::Base> + ValidityPredicateInfo + ValidityPredicateVerifyingInfo
+{
     type VPConfig: ValidityPredicateConfig + Clone;
     // Default implementation, constrains the notes integrity.
     // TODO: how to enforce the constraints in vp circuit?
@@ -225,7 +230,7 @@ pub struct BasicValidityPredicateVariables {
 pub struct NoteVariables {
     pub address: AssignedCell<pallas::Base, pallas::Base>,
     pub app_vk: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_data: AssignedCell<pallas::Base, pallas::Base>,
+    pub app_data_static: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
     pub app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
@@ -319,13 +324,15 @@ impl BasicValidityPredicateVariables {
         spend_note_pairs.try_into().unwrap()
     }
 
-    pub fn get_app_data_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+    pub fn get_app_data_static_searchable_pairs(
+        &self,
+    ) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
         let mut spend_note_pairs: Vec<_> = self
             .spend_note_variables
             .iter()
             .map(|variables| NoteSearchableVariablePair {
                 src_variable: variables.nf.clone(),
-                target_variable: variables.note_variables.app_data.clone(),
+                target_variable: variables.note_variables.app_data_static.clone(),
             })
             .collect();
         let output_note_pairs: Vec<_> = self
@@ -333,7 +340,7 @@ impl BasicValidityPredicateVariables {
             .iter()
             .map(|variables| NoteSearchableVariablePair {
                 src_variable: variables.cm_x.clone(),
-                target_variable: variables.note_variables.app_data.clone(),
+                target_variable: variables.note_variables.app_data_static.clone(),
             })
             .collect();
         spend_note_pairs.extend(output_note_pairs);
@@ -438,6 +445,29 @@ macro_rules! vp_circuit_impl {
                     basic_variables,
                 )?;
                 Ok(())
+            }
+        }
+
+        impl ValidityPredicateVerifyingInfo for $name {
+            fn get_verifying_info(&self) -> VPVerifyingInfo {
+                let mut rng = OsRng;
+                let params = SETUP_PARAMS_MAP.get(&12).unwrap();
+                let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
+                let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
+                let instance = self.get_instances();
+                let proof =
+                    Proof::create(&pk, params, self.clone(), &[&instance], &mut rng).unwrap();
+                VPVerifyingInfo {
+                    vk,
+                    proof,
+                    instance,
+                }
+            }
+
+            fn get_vp_vk(&self) -> ValidityPredicateVerifyingKey {
+                let params = SETUP_PARAMS_MAP.get(&12).unwrap();
+                let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
+                ValidityPredicateVerifyingKey::from_vk(vk)
             }
         }
     };
