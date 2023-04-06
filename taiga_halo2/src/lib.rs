@@ -7,6 +7,7 @@ pub mod circuit;
 pub mod constant;
 pub mod merkle_tree;
 pub mod note;
+pub mod note_encryption;
 pub mod nullifier;
 pub mod proof;
 pub mod transaction;
