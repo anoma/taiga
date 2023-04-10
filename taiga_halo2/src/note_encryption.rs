@@ -6,7 +6,7 @@ use pasta_curves::{arithmetic::FieldExt, pallas};
 
 #[derive(Debug, Clone)]
 pub struct NoteCipher {
-    cipher: Vec<pallas::Base>,
+    pub cipher: Vec<pallas::Base>,
 }
 
 #[derive(Debug, Clone)]
