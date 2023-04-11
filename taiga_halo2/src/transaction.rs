@@ -30,6 +30,8 @@ pub enum TransactionError {
     InconsistentNullifier,
     /// Output note commitment is not consistent between the action and the vp.
     InconsistentOutputNoteCommitment,
+    /// Owned note public id is not consistent between the action and the vp.
+    InconsistentOwnedNotePubID,
 }
 
 impl Display for TransactionError {
@@ -45,6 +47,9 @@ impl Display for TransactionError {
             InconsistentOutputNoteCommitment => f.write_str(
                 "Output note commitment is not consistent between the action and the vp",
             ),
+            InconsistentOwnedNotePubID => {
+                f.write_str("Owned note public id is not consistent between the action and the vp")
+            }
         }
     }
 }
@@ -323,11 +328,27 @@ impl PartialTransaction {
         let action_nfs = self.get_nullifiers();
         for vp_info in self.spends.iter() {
             for nfs in vp_info.get_nullifiers().iter() {
+                // Check the vp actually uses the spend notes from action circuits.
                 if !((action_nfs[0].inner() == nfs[0] && action_nfs[1].inner() == nfs[1])
                     || (action_nfs[0].inner() == nfs[1] && action_nfs[1].inner() == nfs[0]))
                 {
                     return Err(TransactionError::InconsistentNullifier);
                 }
+            }
+        }
+
+        for (vp_info, action_nf) in self.spends.iter().zip(action_nfs.iter()) {
+            // Check the app vp and the sub vps use the same owned_note_id in one note
+            let owned_note_id = vp_info.app_vp_verifying_info.get_owned_note_pub_id();
+            for logic_vp_verifying_info in vp_info.app_dynamic_vp_verifying_info.iter() {
+                if owned_note_id != logic_vp_verifying_info.get_owned_note_pub_id() {
+                    return Err(TransactionError::InconsistentOwnedNotePubID);
+                }
+            }
+
+            // Check the owned_note_id that vp uses is consistent with the nf from the action circuit
+            if owned_note_id != action_nf.inner() {
+                return Err(TransactionError::InconsistentOwnedNotePubID);
             }
         }
         Ok(())
@@ -337,11 +358,27 @@ impl PartialTransaction {
         let action_cms = self.get_output_cms();
         for vp_info in self.outputs.iter() {
             for cms in vp_info.get_note_commitments().iter() {
+                // Check the vp actually uses the output notes from action circuits.
                 if !((action_cms[0].get_x() == cms[0] && action_cms[1].get_x() == cms[1])
                     && (action_cms[0].get_x() == cms[1] && action_cms[1].get_x() == cms[0]))
                 {
                     return Err(TransactionError::InconsistentOutputNoteCommitment);
                 }
+            }
+        }
+
+        for (vp_info, action_cm) in self.outputs.iter().zip(action_cms.iter()) {
+            // Check that the app vp and the sub vps use the same owned_note_id in one note
+            let owned_note_id = vp_info.app_vp_verifying_info.get_owned_note_pub_id();
+            for logic_vp_verifying_info in vp_info.app_dynamic_vp_verifying_info.iter() {
+                if owned_note_id != logic_vp_verifying_info.get_owned_note_pub_id() {
+                    return Err(TransactionError::InconsistentOwnedNotePubID);
+                }
+            }
+
+            // Check the owned_note_id that vp uses is consistent with the cm from the action circuit
+            if owned_note_id != action_cm.get_x() {
+                return Err(TransactionError::InconsistentOwnedNotePubID);
             }
         }
         Ok(())
@@ -514,38 +551,46 @@ fn test_transaction_creation() {
     // Generate note info
     let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
     // Create vp circuit and fulfill the note info
-    let trivial_vp_circuit = TrivialValidityPredicateCircuit {
+    let mut trivial_vp_circuit = TrivialValidityPredicateCircuit {
+        owned_note_pub_id: spend_note_1.get_nf().unwrap().inner(),
         spend_notes: [spend_note_1.clone(), spend_note_2.clone()],
         output_notes: [output_note_1.clone(), output_note_2.clone()],
     };
-    let app_vp_verifying_info = Box::new(trivial_vp_circuit.clone());
-    let trivial_app_dynamic_vp_1: Box<dyn ValidityPredicateVerifyingInfo> =
+    let spend_app_vp_verifying_info_1 = Box::new(trivial_vp_circuit.clone());
+    let trivial_app_logic_1: Box<dyn ValidityPredicateVerifyingInfo> =
         Box::new(trivial_vp_circuit.clone());
-    let trivial_app_dynamic_vp_2 = Box::new(trivial_vp_circuit);
-    let trivial_app_vp_verifying_info_dynamic =
-        vec![trivial_app_dynamic_vp_1, trivial_app_dynamic_vp_2];
+    let trivial_app_logic_2 = Box::new(trivial_vp_circuit.clone());
+    let trivial_app_vp_verifying_info_dynamic = vec![trivial_app_logic_1, trivial_app_logic_2];
     let spend_note_info_1 = SpendNoteInfo::new(
         spend_note_1,
         merkle_path.clone(),
-        app_vp_verifying_info.clone(),
+        spend_app_vp_verifying_info_1,
         trivial_app_vp_verifying_info_dynamic.clone(),
     );
-    // The following notes use empty dynamic vps and use app_data_dynamic with pallas::Base::zero() by default.
+    // The following notes use empty logic vps and use app_data_dynamic with pallas::Base::zero() by default.
+    trivial_vp_circuit.owned_note_pub_id = spend_note_2.get_nf().unwrap().inner();
+    let spend_app_vp_verifying_info_2 = Box::new(trivial_vp_circuit.clone());
     let app_vp_verifying_info_dynamic = vec![];
     let spend_note_info_2 = SpendNoteInfo::new(
         spend_note_2,
         merkle_path,
-        app_vp_verifying_info.clone(),
+        spend_app_vp_verifying_info_2,
         app_vp_verifying_info_dynamic.clone(),
     );
+
+    trivial_vp_circuit.owned_note_pub_id = output_note_1.commitment().get_x();
+    let output_app_vp_verifying_info_1 = Box::new(trivial_vp_circuit.clone());
     let output_note_info_1 = OutputNoteInfo::new(
         output_note_1,
-        app_vp_verifying_info.clone(),
+        output_app_vp_verifying_info_1,
         app_vp_verifying_info_dynamic.clone(),
     );
+
+    trivial_vp_circuit.owned_note_pub_id = output_note_2.commitment().get_x();
+    let output_app_vp_verifying_info_2 = Box::new(trivial_vp_circuit);
     let output_note_info_2 = OutputNoteInfo::new(
         output_note_2,
-        app_vp_verifying_info,
+        output_app_vp_verifying_info_2,
         app_vp_verifying_info_dynamic,
     );
 

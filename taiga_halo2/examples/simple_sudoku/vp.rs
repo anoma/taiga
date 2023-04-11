@@ -7,11 +7,10 @@ use pasta_curves::pallas;
 extern crate taiga_halo2;
 use taiga_halo2::{
     circuit::{
-        integrity::{OutputNoteVar, SpendNoteVar},
         note_circuit::NoteConfig,
         vp_circuit::{
-            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
+            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
+            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
@@ -59,8 +58,7 @@ impl ValidityPredicateCircuit for SudokuVP {
         &self,
         config: Self::VPConfig,
         layouter: impl Layouter<pallas::Base>,
-        _spend_note_variables: &[SpendNoteVar],
-        _output_note_variables: &[OutputNoteVar],
+        _basic_variables: BasicValidityPredicateVariables,
     ) -> Result<(), plonk::Error> {
         self.sudoku.synthesize(config.sudoku_config, layouter)
     }
@@ -77,6 +75,10 @@ impl ValidityPredicateInfo for SudokuVP {
 
     fn get_instances(&self) -> Vec<pallas::Base> {
         self.get_note_instances()
+    }
+
+    fn get_owned_note_pub_id(&self) -> pallas::Base {
+        pallas::Base::zero()
     }
 }
 
