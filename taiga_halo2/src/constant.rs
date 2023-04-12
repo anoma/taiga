@@ -46,6 +46,8 @@ pub const VP_CIRCUIT_NULLIFIER_ONE_INSTANCE_IDX: usize = 0;
 pub const VP_CIRCUIT_OUTPUT_CM_ONE_INSTANCE_IDX: usize = 1;
 pub const VP_CIRCUIT_NULLIFIER_TWO_INSTANCE_IDX: usize = 2;
 pub const VP_CIRCUIT_OUTPUT_CM_TWO_INSTANCE_IDX: usize = 3;
+pub const VP_CIRCUIT_OWNED_NOTE_PUB_ID_INSTANCE_IDX: usize = 4;
+pub const VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX: usize = 5;
 
 // Poseidon parameters
 pub const POSEIDON_RATE: usize = 2;

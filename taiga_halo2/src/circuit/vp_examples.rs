@@ -25,6 +25,7 @@ mod field_addition;
 // TrivialValidityPredicateCircuit with empty custom constraints.
 #[derive(Clone, Debug, Default)]
 pub struct TrivialValidityPredicateCircuit {
+    pub owned_note_pub_id: pallas::Base,
     pub spend_notes: [Note; NUM_NOTE],
     pub output_notes: [Note; NUM_NOTE],
 }
@@ -47,9 +48,11 @@ impl ValidityPredicateConfig for DummyValidityPredicateConfig {
 
 impl TrivialValidityPredicateCircuit {
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
+        let owned_note_pub_id = pallas::Base::zero();
         let spend_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         Self {
+            owned_note_pub_id,
             spend_notes,
             output_notes,
         }
@@ -67,6 +70,10 @@ impl ValidityPredicateInfo for TrivialValidityPredicateCircuit {
 
     fn get_instances(&self) -> Vec<pallas::Base> {
         self.get_note_instances()
+    }
+
+    fn get_owned_note_pub_id(&self) -> pallas::Base {
+        self.owned_note_pub_id
     }
 }
 
