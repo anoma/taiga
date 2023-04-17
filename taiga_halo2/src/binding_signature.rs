@@ -1,6 +1,6 @@
 use crate::constant::NOTE_COMMITMENT_R_GENERATOR;
-use ff::PrimeField;
-use group::{cofactor::CofactorCurveAffine, GroupEncoding};
+use pasta_curves::group::{ff::PrimeField, GroupEncoding};
+use pasta_curves::group::cofactor::CofactorCurveAffine;
 use pasta_curves::pallas;
 use rand::{CryptoRng, RngCore};
 use reddsa::{private, Error, SigType, Signature, SigningKey, VerificationKey};

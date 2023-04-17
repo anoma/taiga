@@ -7,11 +7,11 @@ edition = "2021"
 rand = "0.8.4"
 lazy_static = "1"
 blake2b_simd = "1"
-pasta_curves = "0.4"
+pasta_curves = "0.5.1"
 ff = "0.12"
 group = "0.12"
-halo2_gadgets = {version = "0.2", features = ["test-dependencies"]}
-halo2_proofs = {version="0.2", features = ["dev-graph"]}
+halo2_gadgets = {version = "0.3", features = ["test-dependencies"]}
+halo2_proofs = {version="0.3", features = ["dev-graph"]}
 bitvec = "1"
 subtle = { version = "2.3", default-features = false }
 dyn-clone = "1.0"

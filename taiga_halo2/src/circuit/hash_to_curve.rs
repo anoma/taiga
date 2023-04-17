@@ -247,7 +247,7 @@ impl HashToCurveConfig {
 
 #[test]
 fn test_hash_to_curve_circuit() {
-    use group::Curve;
+    use pasta_curves::group::Curve;
     use halo2_gadgets::{
         ecc::chip::EccConfig, utilities::lookup_range_check::LookupRangeCheckConfig,
     };

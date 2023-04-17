@@ -1,6 +1,5 @@
 use crate::circuit::action_circuit::ActionCircuit;
 use crate::utils::to_field_elements;
-use group::Curve;
 use halo2_gadgets::{
     ecc::{
         chip::{
@@ -16,7 +15,7 @@ use halo2_proofs::{
     poly::commitment::Params,
 };
 use lazy_static::lazy_static;
-use pasta_curves::{pallas, vesta};
+use pasta_curves::{pallas, vesta, group::Curve};
 use std::collections::HashMap;
 
 /// SWU hash-to-curve personalization for the note commitment generator
@@ -3139,8 +3138,9 @@ impl FixedPoint<pallas::Affine> for Short {
 #[ignore]
 #[test]
 fn r_u_z_generate() {
-    use ff::PrimeField;
     use halo2_gadgets::ecc::chip::constants::find_zs_and_us;
+    use pasta_curves::group::ff::PrimeField;
+
     let r_zs_and_us: Vec<(u64, [pallas::Base; H])> =
         find_zs_and_us(*NOTE_COMMITMENT_R_GENERATOR, NUM_WINDOWS).unwrap();
     println!("pub const R_U: [[[u8; 32]; H]; NUM_WINDOWS] = [");

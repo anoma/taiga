@@ -1,8 +1,7 @@
-use ff::Field;
-
 use halo2_proofs::{
     circuit::{AssignedCell, Layouter, Value},
     plonk::{Advice, Assigned, Column, Error, Instance},
+    arithmetic
 };
 
 pub mod add;
@@ -11,7 +10,7 @@ pub mod sub;
 pub mod target_note_variable;
 pub mod triple_mul;
 
-pub fn assign_free_advice<F: Field, V: Copy>(
+pub fn assign_free_advice<F: arithmetic::Field, V: Copy>(
     mut layouter: impl Layouter<F>,
     column: Column<Advice>,
     value: Value<V>,
@@ -25,7 +24,7 @@ where
     )
 }
 
-pub fn assign_free_instance<F: Field>(
+pub fn assign_free_instance<F: arithmetic::Field>(
     mut layouter: impl Layouter<F>,
     instance: Column<Instance>,
     row: usize,
@@ -39,7 +38,7 @@ pub fn assign_free_instance<F: Field>(
     )
 }
 
-pub fn assign_free_constant<F: Field, V: Copy>(
+pub fn assign_free_constant<F: arithmetic::Field, V: Copy>(
     mut layouter: impl Layouter<F>,
     column: Column<Advice>,
     value: V,

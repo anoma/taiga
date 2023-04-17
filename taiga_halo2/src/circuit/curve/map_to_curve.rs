@@ -124,12 +124,12 @@ impl IsoMapConfig {
 fn test_map_to_curve_circuit() {
     use crate::circuit::curve::iso_map::MapToCurveConfig;
     use crate::circuit::gadgets::assign_free_advice;
-    use ff::Field;
 
     use halo2_proofs::{
         circuit::{Layouter, SimpleFloorPlanner, Value},
         dev::MockProver,
         plonk::{Advice, Circuit, Column, ConstraintSystem, Error},
+        arithmetic::Field,
     };
 
     #[derive(Default)]

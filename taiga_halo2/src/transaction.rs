@@ -11,10 +11,8 @@ use crate::proof::Proof;
 use crate::value_commitment::ValueCommitment;
 use blake2b_simd::Params as Blake2bParams;
 use core::fmt;
-use ff::PrimeField;
-use group::Group;
-use halo2_proofs::plonk::Error;
-use pasta_curves::pallas;
+use halo2_proofs::{plonk::Error};
+use pasta_curves::{pallas, group::{ff::PrimeField, Group}};
 use rand::{CryptoRng, RngCore};
 use std::fmt::Display;
 
@@ -482,7 +480,7 @@ fn test_transaction_creation() {
         nullifier::{Nullifier, NullifierKeyCom},
         utils::poseidon_hash,
     };
-    use ff::Field;
+    use halo2_proofs::arithmetic::Field;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;

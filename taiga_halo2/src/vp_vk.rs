@@ -1,7 +1,6 @@
 use blake2b_simd::Params as Blake2bParams;
-use ff::{Field, PrimeField};
-use halo2_proofs::plonk::VerifyingKey;
-use pasta_curves::{arithmetic::FieldExt, pallas, vesta};
+use halo2_proofs::{plonk::VerifyingKey, arithmetic::Field};
+use pasta_curves::{pallas, vesta, group::ff::PrimeField};
 use rand::RngCore;
 use std::hash::Hash;
 

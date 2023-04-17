@@ -15,7 +15,7 @@ use crate::constant::{
 };
 use crate::note::Note;
 use crate::utils::poseidon_to_curve;
-use group::Curve;
+use pasta_curves::group::Curve;
 use halo2_gadgets::{
     ecc::{
         chip::EccChip, FixedPoint, FixedPointBaseField, NonIdentityPoint, Point, ScalarFixed,
@@ -497,8 +497,6 @@ fn test_halo2_nullifier_circuit() {
     };
     use crate::note::NoteCommitment;
     use crate::nullifier::{Nullifier, NullifierDerivingKey};
-    use ff::Field;
-    use group::Curve;
     use halo2_gadgets::{
         ecc::chip::EccConfig,
         poseidon::{
@@ -511,6 +509,7 @@ fn test_halo2_nullifier_circuit() {
         circuit::{Layouter, SimpleFloorPlanner, Value},
         dev::MockProver,
         plonk::{Advice, Circuit, Column, ConstraintSystem, Error},
+        arithmetic::Field
     };
     use rand::rngs::OsRng;
 

@@ -1,11 +1,10 @@
-use ff::Field;
-use group::Curve;
+use pasta_curves::group::Curve;
 use halo2_gadgets::ecc::{
     chip::{EccChip, EccPoint},
     Point,
 };
 use halo2_proofs::{
-    arithmetic::{CurveAffine, CurveExt},
+    arithmetic::{CurveAffine, CurveExt, Field},
     circuit::{AssignedCell, Region, Value},
     plonk::{Advice, Assigned, Column, ConstraintSystem, Constraints, Error, Expression, Selector},
     poly::Rotation,

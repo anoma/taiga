@@ -1,12 +1,13 @@
-use ff::{Field, PrimeField};
 use halo2_gadgets::utilities::{bool_check, ternary};
 use halo2_proofs::{
-    arithmetic::{CurveExt, SqrtRatio},
+    arithmetic::CurveExt,
     circuit::{AssignedCell, Region},
     plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Expression, Selector},
     poly::Rotation,
 };
 use pasta_curves::pallas;
+use halo2_proofs::arithmetic::Field;
+use pasta_curves::group::ff::PrimeField;
 use subtle::{ConditionallySelectable, ConstantTimeEq};
 
 use super::JacobianCoordinates;
@@ -155,7 +156,7 @@ impl MapToCurveConfig {
             let div3_is_zero = one.clone() - div3.clone() * beta.clone();
             let poly2 = div3.clone() * div3_is_zero.clone();
             let a = beta.clone() * num_gx1.clone();
-            let root_of_unity = Expression::Constant(pallas::Base::root_of_unity());
+            let root_of_unity = Expression::Constant(pallas::Base::ROOT_OF_UNITY);
             let b = a.clone() * root_of_unity;
             let num_gx1_is_zero = one.clone() - num_gx1.clone() * gamma.clone();
             let poly3 = num_gx1.clone() * num_gx1_is_zero.clone();
@@ -278,7 +279,7 @@ impl MapToCurveConfig {
                 .unwrap_or(pallas::Base::zero())
         });
         region.assign_advice(|| "delta", self.delta, offset, || delta)?;
-        let b = a.map(|a| a * pallas::Base::root_of_unity());
+        let b = a.map(|a| a * pallas::Base::ROOT_OF_UNITY);
         let sqrt_b = b.map(|b| b.sqrt().unwrap_or(pallas::Base::zero()));
         region.assign_advice(|| "sqrt_b", self.y, offset + 1, || sqrt_b)?;
         let epsilon = b.zip(sqrt_b).map(|(b, sqrt_b)| {
