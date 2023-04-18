@@ -1,14 +1,14 @@
 use halo2_proofs::{
+    arithmetic::Field,
     circuit::{AssignedCell, Chip, Layouter, Region},
     plonk::{Advice, Column, ConstraintSystem, Error, Selector},
     poly::Rotation,
 };
-use pasta_curves::arithmetic::FieldExt;
 
 use std::marker::PhantomData;
 
 /// An instruction set for multiplying two circuit words (field elements).
-pub trait MulInstructions<F: FieldExt>: Chip<F> {
+pub trait MulInstructions<F: Field>: Chip<F> {
     /// Constraints `a * b` and returns the multiplication.
     fn mul(
         &self,
@@ -25,12 +25,12 @@ pub struct MulConfig {
 }
 
 /// A chip implementing a single multiplication constraint `c = a * b` on a single row.
-pub struct MulChip<F: FieldExt> {
+pub struct MulChip<F: Field> {
     config: MulConfig,
     _marker: PhantomData<F>,
 }
 
-impl<F: FieldExt> Chip<F> for MulChip<F> {
+impl<F: Field> Chip<F> for MulChip<F> {
     type Config = MulConfig;
     type Loaded = ();
 
@@ -43,7 +43,7 @@ impl<F: FieldExt> Chip<F> for MulChip<F> {
     }
 }
 
-impl<F: FieldExt> MulChip<F> {
+impl<F: Field> MulChip<F> {
     pub fn configure(meta: &mut ConstraintSystem<F>, advice: [Column<Advice>; 2]) -> MulConfig {
         let s_mul = meta.selector();
         meta.create_gate("Field element multiplication: c = a * b", |meta| {
@@ -66,7 +66,7 @@ impl<F: FieldExt> MulChip<F> {
     }
 }
 
-impl<F: FieldExt> MulInstructions<F> for MulChip<F> {
+impl<F: Field> MulInstructions<F> for MulChip<F> {
     fn mul(
         &self,
         mut layouter: impl Layouter<F>,

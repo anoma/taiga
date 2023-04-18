@@ -15,8 +15,8 @@ use crate::{
     proof::Proof,
     vp_vk::ValidityPredicateVerifyingKey,
 };
-use ff::Field;
 use halo2_proofs::{
+    arithmetic::Field,
     circuit::{floor_planner, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
 };

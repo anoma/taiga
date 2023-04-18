@@ -4,7 +4,6 @@ use halo2_gadgets::poseidon::{
     Pow5Chip as PoseidonChip,
 };
 use halo2_proofs::{
-    arithmetic::FieldExt,
     circuit::{floor_planner, AssignedCell, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error},
 };

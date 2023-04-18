@@ -6,7 +6,7 @@ use crate::{
     nullifier::Nullifier,
     value_commitment::ValueCommitment,
 };
-use ff::Field;
+use halo2_proofs::arithmetic::Field;
 use pasta_curves::pallas;
 use rand::RngCore;
 

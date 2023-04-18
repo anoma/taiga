@@ -1,14 +1,14 @@
 use halo2_proofs::{
+    arithmetic::Field,
     circuit::{AssignedCell, Chip, Layouter, Region},
     plonk::{Advice, Column, ConstraintSystem, Error, Selector},
     poly::Rotation,
 };
-use pasta_curves::arithmetic::FieldExt;
 
 use std::marker::PhantomData;
 
 #[derive(Clone, Debug)]
-pub struct SubChip<F: FieldExt> {
+pub struct SubChip<F: Field> {
     config: SubConfig,
     _marker: PhantomData<F>,
 }
@@ -19,7 +19,7 @@ pub struct SubConfig {
     s_sub: Selector,
 }
 
-impl<F: FieldExt> Chip<F> for SubChip<F> {
+impl<F: Field> Chip<F> for SubChip<F> {
     type Config = SubConfig;
     type Loaded = ();
 
@@ -32,7 +32,7 @@ impl<F: FieldExt> Chip<F> for SubChip<F> {
     }
 }
 
-impl<F: FieldExt> SubChip<F> {
+impl<F: Field> SubChip<F> {
     pub fn construct(
         config: <Self as Chip<F>>::Config,
         _loaded: <Self as Chip<F>>::Loaded,
@@ -63,7 +63,7 @@ impl<F: FieldExt> SubChip<F> {
     }
 }
 
-pub trait SubInstructions<F: FieldExt>: Chip<F> {
+pub trait SubInstructions<F: Field>: Chip<F> {
     /// Returns `c = a - b`.
     fn sub(
         &self,
@@ -73,7 +73,7 @@ pub trait SubInstructions<F: FieldExt>: Chip<F> {
     ) -> Result<AssignedCell<F, F>, Error>;
 }
 
-impl<F: FieldExt> SubInstructions<F> for SubChip<F> {
+impl<F: Field> SubInstructions<F> for SubChip<F> {
     fn sub(
         &self,
         mut layouter: impl Layouter<F>,

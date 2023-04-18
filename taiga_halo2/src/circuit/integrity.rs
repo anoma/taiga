@@ -15,7 +15,6 @@ use crate::constant::{
 };
 use crate::note::Note;
 use crate::utils::poseidon_to_curve;
-use group::Curve;
 use halo2_gadgets::{
     ecc::{
         chip::EccChip, FixedPoint, FixedPointBaseField, NonIdentityPoint, Point, ScalarFixed,
@@ -31,6 +30,7 @@ use halo2_proofs::{
     circuit::{AssignedCell, Layouter, Value},
     plonk::{Advice, Column, Error, Instance},
 };
+use pasta_curves::group::Curve;
 use pasta_curves::pallas;
 
 // cm is a point
@@ -497,8 +497,6 @@ fn test_halo2_nullifier_circuit() {
     };
     use crate::note::NoteCommitment;
     use crate::nullifier::{Nullifier, NullifierDerivingKey};
-    use ff::Field;
-    use group::Curve;
     use halo2_gadgets::{
         ecc::chip::EccConfig,
         poseidon::{
@@ -508,6 +506,7 @@ fn test_halo2_nullifier_circuit() {
         utilities::lookup_range_check::LookupRangeCheckConfig,
     };
     use halo2_proofs::{
+        arithmetic::Field,
         circuit::{Layouter, SimpleFloorPlanner, Value},
         dev::MockProver,
         plonk::{Advice, Circuit, Column, ConstraintSystem, Error},

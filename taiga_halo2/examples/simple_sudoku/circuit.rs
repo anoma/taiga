@@ -1,6 +1,5 @@
 use ff::PrimeField;
 use halo2_proofs::{
-    arithmetic::FieldExt,
     circuit::{floor_planner, AssignedCell, Layouter, Value},
     plonk::{self, Advice, Column, Instance as InstanceColumn},
 };
