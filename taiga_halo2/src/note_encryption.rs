@@ -1,8 +1,9 @@
 use crate::constant::{POSEIDON_RATE, POSEIDON_WIDTH};
+use ff::PrimeField;
 use group::Curve;
 use halo2_gadgets::poseidon::primitives as poseidon;
 use halo2_proofs::arithmetic::CurveAffine;
-use pasta_curves::{arithmetic::FieldExt, pallas};
+use pasta_curves::pallas;
 
 #[derive(Debug, Clone)]
 pub struct NoteCipher {

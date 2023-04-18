@@ -22,7 +22,7 @@ use crate::{
     utils::{mod_r_p, poseidon_hash},
     vp_vk::ValidityPredicateVerifyingKey,
 };
-use ff::Field;
+use ff::{Field, PrimeField};
 use group::Group;
 use group::{cofactor::CofactorCurveAffine, Curve};
 use halo2_gadgets::{
@@ -37,7 +37,7 @@ use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
 };
-use pasta_curves::{arithmetic::FieldExt, pallas};
+use pasta_curves::pallas;
 use rand::rngs::OsRng;
 use rand::RngCore;
 

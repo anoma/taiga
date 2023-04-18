@@ -3,6 +3,7 @@ use crate::circuit::gadgets::{
     assign_free_constant,
 };
 use crate::constant::{NoteCommitmentFixedBases, NullifierK, POSEIDON_RATE, POSEIDON_WIDTH};
+use ff::PrimeField;
 use halo2_gadgets::{
     ecc::{chip::EccChip, FixedPointBaseField, NonIdentityPoint, Point, ScalarVar},
     poseidon::{
@@ -15,7 +16,7 @@ use halo2_proofs::{
     circuit::{AssignedCell, Layouter},
     plonk::{Advice, Column, Error},
 };
-use pasta_curves::{arithmetic::FieldExt, pallas};
+use pasta_curves::pallas;
 
 pub struct NoteEncryptionResult {
     pub cipher: Vec<AssignedCell<pallas::Base, pallas::Base>>,
