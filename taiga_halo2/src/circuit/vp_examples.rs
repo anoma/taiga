@@ -21,6 +21,7 @@ use rand::rngs::OsRng;
 use rand::RngCore;
 
 mod field_addition;
+mod note_encryption_example;
 
 // TrivialValidityPredicateCircuit with empty custom constraints.
 #[derive(Clone, Debug, Default)]
