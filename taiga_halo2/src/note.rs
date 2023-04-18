@@ -9,9 +9,12 @@ use crate::{
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use bitvec::{array::BitArray, order::Lsb0};
-use halo2_proofs::arithmetic::Field;
 use core::iter;
-use pasta_curves::{pallas, group::{GroupEncoding, Group, ff::PrimeFieldBits}};
+use halo2_proofs::arithmetic::Field;
+use pasta_curves::{
+    group::{ff::PrimeFieldBits, Group, GroupEncoding},
+    pallas,
+};
 use rand::{Rng, RngCore};
 
 /// A commitment to a note.

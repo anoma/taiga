@@ -1,6 +1,9 @@
 use blake2b_simd::Params as Blake2bParams;
-use halo2_proofs::{plonk::VerifyingKey, arithmetic::Field};
-use pasta_curves::{pallas, vesta, group::ff::PrimeField};
+use halo2_proofs::{arithmetic::Field, plonk::VerifyingKey};
+use pasta_curves::{
+    group::ff::{FromUniformBytes, PrimeField},
+    pallas, vesta,
+};
 use rand::RngCore;
 use std::hash::Hash;
 
@@ -38,7 +41,7 @@ impl ValidityPredicateVerifyingKey {
                 hasher.update(s.as_bytes());
 
                 // Hash in final Blake2bState
-                pallas::Base::from_bytes_wide(hasher.finalize().as_array())
+                pallas::Base::from_uniform_bytes(hasher.finalize().as_array())
             }
             ValidityPredicateVerifyingKey::Compressed(v) => *v,
         }

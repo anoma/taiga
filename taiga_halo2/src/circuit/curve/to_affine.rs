@@ -1,4 +1,3 @@
-use pasta_curves::group::Curve;
 use halo2_gadgets::ecc::{
     chip::{EccChip, EccPoint},
     Point,
@@ -9,6 +8,7 @@ use halo2_proofs::{
     plonk::{Advice, Assigned, Column, ConstraintSystem, Constraints, Error, Expression, Selector},
     poly::Rotation,
 };
+use pasta_curves::group::Curve;
 
 use crate::constant::NoteCommitmentFixedBases;
 use pasta_curves::pallas;

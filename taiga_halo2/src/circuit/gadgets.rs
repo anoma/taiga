@@ -1,7 +1,7 @@
 use halo2_proofs::{
+    arithmetic,
     circuit::{AssignedCell, Layouter, Value},
     plonk::{Advice, Assigned, Column, Error, Instance},
-    arithmetic
 };
 
 pub mod add;

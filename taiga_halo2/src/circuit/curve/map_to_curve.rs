@@ -129,7 +129,6 @@ fn test_map_to_curve_circuit() {
         circuit::{Layouter, SimpleFloorPlanner, Value},
         dev::MockProver,
         plonk::{Advice, Circuit, Column, ConstraintSystem, Error},
-        arithmetic::Field,
     };
 
     #[derive(Default)]
@@ -174,7 +173,7 @@ fn test_map_to_curve_circuit() {
             let u = assign_free_advice(
                 layouter.namespace(|| "u"),
                 config.1[0],
-                Value::known(Field::zero()),
+                Value::known(pallas::Base::zero()),
             )?;
             let ret = layouter.assign_region(
                 || "map_to_curve",

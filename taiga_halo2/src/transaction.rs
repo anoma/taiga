@@ -11,8 +11,11 @@ use crate::proof::Proof;
 use crate::value_commitment::ValueCommitment;
 use blake2b_simd::Params as Blake2bParams;
 use core::fmt;
-use halo2_proofs::{plonk::Error};
-use pasta_curves::{pallas, group::{ff::PrimeField, Group}};
+use halo2_proofs::plonk::Error;
+use pasta_curves::{
+    group::{ff::PrimeField, Group},
+    pallas,
+};
 use rand::{CryptoRng, RngCore};
 use std::fmt::Display;
 

@@ -1,7 +1,11 @@
 use crate::constant::{POSEIDON_TO_FIELD_U_0_POSTFIX, POSEIDON_TO_FIELD_U_1_POSTFIX};
 use halo2_gadgets::poseidon::primitives as poseidon;
 use halo2_proofs::arithmetic::CurveAffine;
-use pasta_curves::{arithmetic::CurveExt, hashtocurve, pallas, group::{Curve, ff::PrimeField}};
+use pasta_curves::{
+    arithmetic::CurveExt,
+    group::{ff::PrimeField, Curve},
+    hashtocurve, pallas,
+};
 
 /// Converts from pallas::Base to pallas::Scalar (aka $x \pmod{r_\mathbb{P}}$).
 ///

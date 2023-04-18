@@ -1,8 +1,8 @@
 use halo2_proofs::{
+    arithmetic::Field,
     circuit::{AssignedCell, Chip, Layouter, Region},
     plonk::{Advice, Column, ConstraintSystem, Error, Selector},
     poly::Rotation,
-    arithmetic::Field
 };
 
 use std::marker::PhantomData;

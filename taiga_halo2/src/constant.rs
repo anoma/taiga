@@ -15,7 +15,7 @@ use halo2_proofs::{
     poly::commitment::Params,
 };
 use lazy_static::lazy_static;
-use pasta_curves::{pallas, vesta, group::Curve};
+use pasta_curves::{group::Curve, pallas, vesta};
 use std::collections::HashMap;
 
 /// SWU hash-to-curve personalization for the note commitment generator

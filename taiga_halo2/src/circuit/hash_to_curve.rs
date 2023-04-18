@@ -247,11 +247,11 @@ impl HashToCurveConfig {
 
 #[test]
 fn test_hash_to_curve_circuit() {
-    use pasta_curves::group::Curve;
     use halo2_gadgets::{
         ecc::chip::EccConfig, utilities::lookup_range_check::LookupRangeCheckConfig,
     };
     use halo2_proofs::{circuit::Value, dev::MockProver};
+    use pasta_curves::group::Curve;
 
     use crate::circuit::gadgets::assign_free_advice;
     use crate::utils::poseidon_to_curve;

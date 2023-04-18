@@ -1,13 +1,13 @@
 use halo2_gadgets::utilities::{bool_check, ternary};
+use halo2_proofs::arithmetic::Field;
 use halo2_proofs::{
     arithmetic::CurveExt,
     circuit::{AssignedCell, Region},
     plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Expression, Selector},
     poly::Rotation,
 };
-use pasta_curves::pallas;
-use halo2_proofs::arithmetic::Field;
 use pasta_curves::group::ff::PrimeField;
+use pasta_curves::pallas;
 use subtle::{ConditionallySelectable, ConstantTimeEq};
 
 use super::JacobianCoordinates;

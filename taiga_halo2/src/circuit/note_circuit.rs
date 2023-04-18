@@ -15,8 +15,8 @@ use halo2_proofs::{
     plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Instance, Selector},
     poly::Rotation,
 };
-use pasta_curves::pallas;
 use pasta_curves::group::ff::PrimeField;
+use pasta_curves::pallas;
 
 type NoteCommitPiece = MessagePiece<
     pallas::Affine,
@@ -718,7 +718,6 @@ fn test_halo2_note_commitment_circuit() {
         nullifier::{Nullifier, NullifierKeyCom},
         vp_vk::ValidityPredicateVerifyingKey,
     };
-    use pasta_curves::group::Curve;
     use halo2_gadgets::{
         ecc::{
             chip::{EccChip, EccConfig},
@@ -728,11 +727,12 @@ fn test_halo2_note_commitment_circuit() {
         utilities::lookup_range_check::LookupRangeCheckConfig,
     };
     use halo2_proofs::{
+        arithmetic::Field,
         circuit::{Layouter, SimpleFloorPlanner, Value},
         dev::MockProver,
         plonk::{Circuit, ConstraintSystem, Error},
-        arithmetic::Field
     };
+    use pasta_curves::group::Curve;
     use rand::{rngs::OsRng, RngCore};
 
     #[derive(Default)]

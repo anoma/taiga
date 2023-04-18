@@ -2,9 +2,9 @@ use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
     plonk::{self, Advice, Column, Instance as InstanceColumn},
 };
+use pasta_curves::arithmetic::CurveAffine;
 use pasta_curves::group::Curve;
 use pasta_curves::group::Group;
-use pasta_curves::arithmetic::CurveAffine;
 use pasta_curves::pallas;
 
 use crate::{
@@ -334,7 +334,7 @@ mod tests {
         plonk::{self},
         poly::commitment::Params,
     };
-    use pasta_curves::{pallas, group::Curve};
+    use pasta_curves::{group::Curve, pallas};
     use std::time::Instant;
 
     use std::{
