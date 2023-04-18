@@ -1,15 +1,15 @@
 use halo2_proofs::{
+    arithmetic::Field,
     circuit::{AssignedCell, Chip, Layouter, Region},
     plonk::{Advice, Column, ConstraintSystem, Error, Selector},
     poly::Rotation,
 };
-use pasta_curves::arithmetic::FieldExt;
 
 use std::marker::PhantomData;
 
 // AddChip copy from halo2 example two-chip
 #[derive(Clone, Debug)]
-pub struct AddChip<F: FieldExt> {
+pub struct AddChip<F: Field> {
     config: AddConfig,
     _marker: PhantomData<F>,
 }
@@ -20,7 +20,7 @@ pub struct AddConfig {
     s_add: Selector,
 }
 
-impl<F: FieldExt> Chip<F> for AddChip<F> {
+impl<F: Field> Chip<F> for AddChip<F> {
     type Config = AddConfig;
     type Loaded = ();
 
@@ -33,7 +33,7 @@ impl<F: FieldExt> Chip<F> for AddChip<F> {
     }
 }
 
-impl<F: FieldExt> AddChip<F> {
+impl<F: Field> AddChip<F> {
     pub fn construct(
         config: <Self as Chip<F>>::Config,
         _loaded: <Self as Chip<F>>::Loaded,
@@ -64,7 +64,7 @@ impl<F: FieldExt> AddChip<F> {
     }
 }
 
-pub trait AddInstructions<F: FieldExt>: Chip<F> {
+pub trait AddInstructions<F: Field>: Chip<F> {
     /// Returns `c = a + b`.
     fn add(
         &self,
@@ -74,7 +74,7 @@ pub trait AddInstructions<F: FieldExt>: Chip<F> {
     ) -> Result<AssignedCell<F, F>, Error>;
 }
 
-impl<F: FieldExt> AddInstructions<F> for AddChip<F> {
+impl<F: Field> AddInstructions<F> for AddChip<F> {
     fn add(
         &self,
         mut layouter: impl Layouter<F>,

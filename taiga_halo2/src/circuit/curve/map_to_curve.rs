@@ -124,7 +124,6 @@ impl IsoMapConfig {
 fn test_map_to_curve_circuit() {
     use crate::circuit::curve::iso_map::MapToCurveConfig;
     use crate::circuit::gadgets::assign_free_advice;
-    use ff::Field;
 
     use halo2_proofs::{
         circuit::{Layouter, SimpleFloorPlanner, Value},
@@ -174,7 +173,7 @@ fn test_map_to_curve_circuit() {
             let u = assign_free_advice(
                 layouter.namespace(|| "u"),
                 config.1[0],
-                Value::known(Field::zero()),
+                Value::known(pallas::Base::zero()),
             )?;
             let ret = layouter.assign_region(
                 || "map_to_curve",

@@ -1,9 +1,10 @@
-use group::Curve;
 use halo2_proofs::{
-    arithmetic::CurveAffine,
     circuit::{floor_planner, Layouter, Value},
     plonk::{self, Advice, Column, Instance as InstanceColumn},
 };
+use pasta_curves::arithmetic::CurveAffine;
+use pasta_curves::group::Curve;
+use pasta_curves::group::Group;
 use pasta_curves::pallas;
 
 use crate::{
@@ -31,7 +32,6 @@ use halo2_gadgets::{
     utilities::lookup_range_check::LookupRangeCheckConfig,
 };
 
-use group::Group;
 #[derive(Clone, Debug)]
 pub struct SchnorrConfig {
     primary: Column<InstanceColumn>,
@@ -319,8 +319,6 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
 
 #[cfg(test)]
 mod tests {
-
-    use group::Curve;
     use halo2_proofs::{arithmetic::CurveAffine, dev::MockProver};
 
     use rand::{rngs::OsRng, RngCore};
@@ -336,7 +334,7 @@ mod tests {
         plonk::{self},
         poly::commitment::Params,
     };
-    use pasta_curves::pallas;
+    use pasta_curves::{group::Curve, pallas};
     use std::time::Instant;
 
     use std::{

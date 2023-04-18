@@ -1,8 +1,8 @@
 use crate::circuit::vp_circuit::NoteSearchableVariablePair;
 use crate::constant::NUM_NOTE;
-use ff::Field;
 use halo2_gadgets::utilities::bool_check;
 use halo2_proofs::{
+    arithmetic::Field,
     circuit::{AssignedCell, Layouter, Region},
     plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Expression, Selector},
     poly::Rotation,

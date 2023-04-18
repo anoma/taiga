@@ -2,7 +2,7 @@
 //!
 use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
 use crate::utils::poseidon_hash;
-use ff::Field;
+use halo2_proofs::arithmetic::Field;
 use pasta_curves::pallas;
 use rand::{Rng, RngCore};
 

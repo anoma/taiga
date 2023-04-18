@@ -1,7 +1,8 @@
 use crate::constant::NOTE_COMMITMENT_R_GENERATOR;
 use crate::note::Note;
-use group::{cofactor::CofactorCurveAffine, Curve, Group, GroupEncoding};
 use halo2_proofs::arithmetic::CurveAffine;
+use pasta_curves::group::cofactor::CofactorCurveAffine;
+use pasta_curves::group::{Curve, Group, GroupEncoding};
 use pasta_curves::pallas;
 
 #[derive(Copy, Clone, Debug)]
