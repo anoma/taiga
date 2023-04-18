@@ -2,46 +2,37 @@
 
 To be edited as design changes. Please make changes as necessary. Keep it **concise** and **precise**.
 
-### Instantiations
-||||
+## Proving system
+### Polynomial commitment scheme $Com$
+- $d$ is the bounded degree of any polynomial in the scheme
+- polynomials are defined over the scalar field of $E_M$ ($\mathbb{F}_p$)
+- commitments are points on $E_M$ ($\mathbb{F}_q$)
+
+### Circuit
+- `C(x; w) ⟶ 0/1`
+- upto `n` fan-in 3 (or 4) addition / multiplication / lookup gates over $\mathbb{F}_p$
+- Following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html), `C(x; w)` can be turned into polynomials over $\mathbb{F}_p$
+
+### Proving system interfaces
+
+||Interface|Description|
 |-|-|-|
-|nullifier PRF|Poseidon|
-|nk commitment|Poseidon|
-|address|Poseidon (f_p -> f_p)??|
-|note commitment ($Com_r$)|Sincemilla (f_p -> f_p)|
-|VP commitment (Com)|Blake2s|
+|__Preprocess__|`preproc(C) ⟶ desc_C`|`C` is turned into a *circuit description* which is a sequence of polynomial commitments|
+|__Prove__|`P(C, x, w) ⟶ π`|arithmetized over $\mathbb{F}_p$ and $\mathbb{F}_q$|
+|__Verify__|`V(desc_C, x, π) ⟶ 0/1`|arithmetized over $\mathbb{F}_p$ and $\mathbb{F}_q$|
 
-## Curves
 
-||Name|Purpose|Scalar field| Base field|Instantiation|
-|-|-|-|-|-|-|
-|$E_O$|Outer curve|Accumulator circuit|$\mathbb{F}_q$|$\mathbb{F}_p$|Pallas|
-|$E_M$|Main curve|Action and VP circuits|$\mathbb{F}_p$|$\mathbb{F}_q$|Vesta|
-|$E_I$|Inner curve|ECC gadget|$\mathbb{F}_q$|$\mathbb{F}_p$|Pallas
-
-Note: sometimes $\mathbb{F}_p$ is called $\mathbb{F}_p$
-
-TODO: do we need this?
-
-## Proof system interfaces 
-
-Main interfaces: Preprocess, Prove, Verify.
-
-- Polynomial commitment scheme for polynomials, where a commitment $Com$ is a point of an elliptic curve $E_M$, and $d$ is the bounded degree of any polynomial in the scheme.
-- A circuit with interface `C(x; w) ⟶ 0/1` is a circuit with upto `n` fan-in 3 (or 4) addition / multiplication / lookup gates over $\mathbb{F}_p$. (Following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html), `C(x; w)` can be turned into polynomials over $\mathbb{F}_p$.)
-- __Preprocess__: `preproc(C) ⟶ desc_C`. `C` is turned into a *circuit description* which is a sequence of polynomial commitments. (polynomials are computed over $\mathbb{F}_p$ while commitments are generated over $\mathbb{F}_q$)
-    - In `ark-plonk`, `desc_C` corresponds to `vd: VerifierData`.
-- __Prove__: `P(C, x, w) ⟶ π` (arithmetized over $\mathbb{F}_p$ and $\mathbb{F}_q$)
-- __Verify__: `V(desc_C, x, π) ⟶ 0/1` (arithmetized over $\mathbb{F}_p$ and $\mathbb{F}_q$)
-
-### Potential features:
+### Potential features
 #### Accumulation (of proofs / verifier circuit)
 
 Definitions from Section 4.1 of [BCMS20](https://eprint.iacr.org/2020/499.pdf), and specializing to their Definition 4.2 for Plonk verifiers.
 
-- __Accumulation Prover__ over $\mathbb{F}_p$ and $\mathbb{F}_q$: `AccP(acc, desc_C, x, π) ⟶ (acc', aπ)` ??
-- __Accumulation Verify__ over $\mathbb{F}_q$ ?: `AccV(acc, acc', aπ, desc_C, x, π) ⟶ 0/1` ??
-- __Accumulation Decider__ over $\mathbb{F}_q$ ?: `AccD(acc) ⟶ 0/1`
+||Interface|Description|
+|-|-|-|
+|__Accumulation Prover__|`AccP(acc, desc_C, x, π) ⟶ (acc', aπ)` ??|over $\mathbb{F}_p$ and $\mathbb{F}_q$|
+|__Accumulation Verifier__|`AccV(acc, acc', aπ, desc_C, x, π) ⟶ 0/1` ??|over $\mathbb{F}_q$ ?|
+|__Accumulation Decider__|`AccD(acc) ⟶ 0/1`|over $\mathbb{F}_q$ ?|
+
 
 ## Abstractions
 ### Data types
@@ -50,17 +41,20 @@ Definitions from Section 4.1 of [BCMS20](https://eprint.iacr.org/2020/499.pdf), 
 - Data types are linked via interface definition and usage as required, e.g. `v` is of the same type as the first input to `Com_v`.
 - All data types have **fixed length**.
 
-### Commitments / Hash
+### Commitments
 
-We blend commitments / hash into a single abstract interface.
+We blend commitments into a single abstract interface.
 
-- `Com_q(...) ⟶ com` efficient over $\mathbb{F}_q$
-- `Com_r(...) ⟶ com` efficient over $\mathbb{F}_p$
-- `Com(...) ⟶ com` efficient over **both** $\mathbb{F}_q$ and $\mathbb{F}_p$
+|Commitment|Efficient over|Description|
+|-|-|-|
+|`Com_q(...) ⟶ com`|$\mathbb{F}_q$||
+|`Com_r(...) ⟶ com`|$\mathbb{F}_p$||
+|`Com(...) ⟶ com`|**both** $\mathbb{F}_q$ and $\mathbb{F}_p$||
 
-Commitments are binding by default (i.e. can be instantiated with hash). If we want blinding (possibly across differnt commitments), we add `rcm` explicitly.
+#### Binding & hiding
+Commitments are binding by default (i.e. can be instantiated with hash). If we want hiding (possibly across differnt commitments), we add `rcm` explicitly.
 
-### Data related to VP circuits:
+### Validity predicates
 #### VP description: 
 `desc_vp = preproc(vp)`: generate pk, vk, CRS
 
@@ -123,7 +117,7 @@ Use the nullifier derivation as in Orchard: $\mathrm{DeriveNullifier}_{nk}(ρ, �
 
 ### Validity Predicate (VP) circuits
 
-Arithmetized over $\mathbb{F}_p$. Represented as a Plonk circuit `vp(x; w) ⟶ 0/1`.
+Arithmetized over $\mathbb{F}_p$. Represented as a Halo2 circuit `vp(x; w) ⟶ 0/1`.
 
 - expects `m` notes spent and `n` notes created. `m` and `n` could be different for each vp involved in a Taiga transaction.
 
@@ -135,27 +129,21 @@ Public inputs (`x`):
     - e.g. encode `rk` to support Sapling/Orchard-type auth. But if we make this choice, then a signature verfication needs to be done on every `rk`.
 - spent note nullifiers, `nf_1, …, nf_m`
 - created note commitments, `cm_1, …, cm_n`
-- for receiving vp: `ce_1, …, ce_n`
+- note encryptions (for receiving vp): `ce_1, …, ce_n`
 
 Private inputs (`w`):
 - spent notes, `old_note_1, …, old_note_m`
 - created notes, `new_note_1, …, new_note_n`
+- custom private inputs
 
 Checks that:
 1. Encrypted note integrity: for each `i ∈ {1, …, n}`, `ce_i = NoteEnc(new_note_i)`
 2. ...
 
-#### First VPs to implement:
-- Accept / Reject all
-- ZCash Sapling / Orchard authorization
-    - Option 1: Check signature, given as private input, in VP circuit
-    - Option 2: VP circuit rerandomize verification key to `rk`, which is encoded in `vp_memo`
-
-
 
 ### Action Circuit
 
-Arithmetized over $\mathbb{F}_p$. Represented as a Plonk circuit, `ActionCircuit(x; w)`.
+Arithmetized over $\mathbb{F}_p$. Represented as a Halo2 circuit, `ActionCircuit(x; w)`.
 
 Public inputs (`x`):
 - Merkle root `rt`
@@ -214,6 +202,25 @@ Action circuit checks:
 
 Changes and justifications: 
 - No more `asset_generator`, `cv`, `cdata`, as they are already committed to in `nf` and `cm`.
+
+## Concrete stuff
+### Instantiations
+
+||||
+|-|-|-|
+|nullifier PRF|Poseidon|
+|nk commitment|Poseidon|
+|address|Poseidon (f_p -> f_p)??|
+|note commitment ($Com_r$)|Sincemilla (f_p -> f_p)|
+|VP commitment (Com)|Blake2s|
+|VE|ECIES + Poseidon|
+
+### Curves
+||Name|Purpose|Scalar field| Base field|Instantiation|
+|-|-|-|-|-|-|
+|$E_O$|Outer curve|Accumulation circuit|$\mathbb{F}_q$|$\mathbb{F}_p$|Pallas|
+|$E_M$|Main curve|Action and VP circuits|$\mathbb{F}_p$|$\mathbb{F}_q$|Vesta|
+|$E_I$|Inner curve|ECC gadget|$\mathbb{F}_q$|$\mathbb{F}_p$|Pallas
 
 ## Taiga Application
 
