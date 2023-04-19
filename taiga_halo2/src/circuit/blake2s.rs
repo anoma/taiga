@@ -1,5 +1,6 @@
+use ff::PrimeField;
 use halo2_proofs::{
-    arithmetic::FieldExt,
+    arithmetic::Field,
     circuit::{AssignedCell, Chip, Layouter, Region},
     plonk::{Advice, Any, Column, ConstraintSystem, Error, Expression, Selector},
 };
@@ -26,7 +27,7 @@ const SIGMA: [[u8; 16]; 10] = [
 ];
 
 #[derive(Clone, Debug)]
-pub struct Blake2sChip<F: FieldExt> {
+pub struct Blake2sChip<F: Field> {
     config: Blake2sConfig,
     _marker: PhantomData<F>,
 }
@@ -56,7 +57,7 @@ pub struct Blake2sConfig {
     message_schedule: Selector,
 }
 
-impl<F: FieldExt> Chip<F> for Blake2sChip<F> {
+impl<F: Field> Chip<F> for Blake2sChip<F> {
     type Config = Blake2sConfig;
     type Loaded = ();
 
@@ -69,7 +70,7 @@ impl<F: FieldExt> Chip<F> for Blake2sChip<F> {
     }
 }
 
-impl<F: FieldExt> Blake2sChip<F> {
+impl<F: Field> Blake2sChip<F> {
     pub fn construct(config: Blake2sConfig, _loaded: <Self as Chip<F>>::Loaded) -> Self {
         Self {
             config,
@@ -89,21 +90,13 @@ impl<F: FieldExt> Blake2sChip<F> {
             .value()
             .zip(y.value())
             .map(|(x_val, y_val)| x_val + y_val - x_val * y_val);
-        let result_cell = region.assign_advice(
-            || "xor",
-            config.v[offset % 4],
-            offset,
-            || result_val,
-        )?;
+        let result_cell =
+            region.assign_advice(|| "xor", config.v[offset % 4], offset, || result_val)?;
 
         region.constrain_equal(x.cell(), result_cell.cell())?;
         region.constrain_equal(y.cell(), result_cell.cell())?;
 
-        Ok(AssignedCell {
-            cell: result_cell.cell(),
-            value: result_val,
-            _marker: PhantomData,
-        })
+        Ok(result_cell)
     }
 
     fn add(
@@ -115,85 +108,114 @@ impl<F: FieldExt> Blake2sChip<F> {
         offset: usize,
     ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
         let result_val = x.value().zip(y.value()).map(|(x_val, y_val)| x_val + y_val);
-        let result_cell = region.assign_advice(
-            || "add",
-            config.v[offset % 4],
-            offset,
-            || result_val,
-        )?;
+        let result_cell =
+            region.assign_advice(|| "add", config.v[offset % 4], offset, || result_val)?;
 
         region.constrain_equal(x.cell(), result_cell.cell())?;
         region.constrain_equal(y.cell(), result_cell.cell())?;
 
-        Ok(AssignedCell {
-            cell: result_cell.cell(),
-            value: result_val,
-            _marker: PhantomData,
-        })
+        Ok(result_cell)
+    }
+
+    fn rotate(
+        &self,
+        cell: &AssignedCell<pallas::Base, pallas::Base>,
+        region: &mut Region<'_, pallas::Base>,
+        config: &Blake2sConfig,
+        rotation: i32,
+        offset: usize,
+    ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
+        let rotated_value = cell.value().map(|v| {
+            let pow_2: pallas::Base =
+                pallas::Base::from(1u64 << (rotation as u64 % pallas::Base::NUM_BITS as u64));
+            (v * pow_2) // % pallas::Base::MODULUS
+        });
+        let rotated_cell = region.assign_advice(
+            || format!("rotate {}", rotation),
+            config.v[offset % 4],
+            offset,
+            || rotated_value,
+        )?;
+
+        // Enforce the rotation constraint
+        region.constrain_equal(cell.cell(), rotated_cell.cell())?;
+
+        Ok(rotated_cell)
+    }
+
+    fn shift_right(
+        &self,
+        cell: &AssignedCell<pallas::Base, pallas::Base>,
+        region: &mut Region<'_, pallas::Base>,
+        config: &Blake2sConfig,
+        shift: u32,
+        offset: usize,
+    ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
+        let divisor = pallas::Base::from(1u64 << shift);
+
+        let shifted_value = cell
+            .value()
+            .map(|v| *v * divisor.invert().unwrap_or(pallas::Base::zero()));
+        let shifted_cell = region.assign_advice(
+            || format!("shift right {}", shift),
+            config.v[offset % 4],
+            offset,
+            || shifted_value,
+        )?;
+
+        // Enforce the shift constraint
+        region.constrain_equal(cell.cell(), shifted_cell.cell())?;
+
+        Ok(shifted_cell)
     }
 
     fn g(
         &self,
         layouter: &mut impl Layouter<pallas::Base>,
         state: [AssignedCell<pallas::Base, pallas::Base>; 8],
-        message: [AssignedCell<pallas::Base, pallas::Base>; 4],
+        message: [AssignedCell<pallas::Base, pallas::Base>; 2],
         round: usize,
     ) -> Result<[AssignedCell<pallas::Base, pallas::Base>; 8], Error> {
         // Implement the G function
-        let (idx_a, idx_b, idx_c, idx_d) = (0, 1, 2, 3);
-        let (mut a, mut b, mut c, mut d) = (state[idx_a], state[idx_b], state[idx_c], state[idx_d]);
-
-        // First mixing stage
         layouter.assign_region(
-            || "G function first mixing stage",
+            || "G function",
             |mut region| {
-                a = self.add(&a, &b, &mut region, &self.config, 0)?;
-                d = self.xor(&d, &c, &mut region, &self.config, 0)?;
-                // .rotate(
-                //     &mut region,
-                //     &self.config,
-                //     -16,
-                // )?;
-                c = self.add(&c, &d, &mut region, &self.config, 1)?;
-                b = self.xor(&b, &a, &mut region, &self.config, 1)?;
-                // .rotate(
-                //     &mut region,
-                //     &self.config,
-                //     -12,
-                // )?;
+                // First mixing stage
+                let a = self.add(&state[0], &state[4], &mut region, &self.config, round % 4)?;
+                let a = self.add(&a, &message[0], &mut region, &self.config, round % 4)?;
 
-                Ok(())
+                let d = self.xor(&state[3], &a, &mut region, &self.config, round % 4)?;
+                let d = self.rotate(&d, &mut region, &self.config, -16, round % 4)?;
+
+                let c = self.add(&state[2], &d, &mut region, &self.config, round % 4)?;
+
+                let b = self.xor(&state[1], &c, &mut region, &self.config, round % 4)?;
+                let b = self.rotate(&b, &mut region, &self.config, -12, round % 4)?;
+
+                // Second mixing stage
+                let a = self.add(&a, &b, &mut region, &self.config, round % 4)?;
+                let a = self.add(&a, &message[1], &mut region, &self.config, round % 4)?;
+
+                let d = self.xor(&d, &a, &mut region, &self.config, round % 4)?;
+                let d = self.rotate(&d, &mut region, &self.config, -8, round % 4)?;
+
+                let c = self.add(&c, &d, &mut region, &self.config, round % 4)?;
+
+                let b = self.xor(&b, &c, &mut region, &self.config, round % 4)?;
+                let b = self.rotate(&b, &mut region, &self.config, -7, round % 4)?;
+
+                Ok([
+                    a,
+                    b,
+                    c,
+                    d,
+                    state[4].clone(),
+                    state[5].clone(),
+                    state[6].clone(),
+                    state[7].clone(),
+                ])
             },
-        )?;
-
-        // Second mixing stage
-        layouter.assign_region(
-            || "G function second mixing stage",
-            |mut region| {
-                let message_idx = SIGMA[round][2 * idx_a] as usize;
-                a = self.add(&a, &message[message_idx], &mut region, &self.config, 2)?;
-                a = self.add(&a, &b, &mut region, &self.config, 2)?;
-                d = self.xor(&d, &c, &mut region, &self.config, 2)?;
-                // .rotate(
-                //     &mut region,
-                //     &self.config,
-                //     -8,
-                // )?;
-                c = self.add(&c, &d, &mut region, &self.config, 3)?;
-                b = self.xor(&b, &a, &mut region, &self.config, 3)?;
-                // .rotate(
-                //     &mut region,
-                //     &self.config,
-                //     -7,
-                // )?;
-
-                Ok(())
-            },
-        )?;
-
-        let new_state = [a, b, c, d, state[4], state[5], state[6], state[7]];
-
-        Ok(new_state)
+        )
     }
 
     fn message_schedule(
@@ -202,137 +224,280 @@ impl<F: FieldExt> Blake2sChip<F> {
         message_block: [AssignedCell<pallas::Base, pallas::Base>; 16],
     ) -> Result<[AssignedCell<pallas::Base, pallas::Base>; 16], Error> {
         // Implement the message schedule
-    let mut message_schedule = [AssignedCell::default(); 16];
+        let mut message_schedule = Vec::with_capacity(64);
 
-    // Copy the first 16 words of the message block into the message schedule
-    for i in 0..16 {
-        message_schedule[i] = message_block[i];
-    }
+        // Copy the first 16 words of the message block into the message schedule
+        for i in 0..16 {
+            message_schedule.push(message_block[i].clone());
+        }
 
-    // Compute the remaining 48 words of the message schedule
-    layouter.assign_region(
-        || "message schedule",
-        |mut region| {
-            for i in 16..64 {
-                let s0 = message_schedule[i - 15]
-                    .clone()
-                    .rotate(&mut region, &self.config, -7)?
-                    .xor(&mut region, &self.config, &message_schedule[i - 15].rotate(&mut region, &self.config, -18)?)?
-                    .xor(&mut region, &self.config, &message_schedule[i - 15].shift_right(&mut region, &self.config, 3)?)?;
+        // Compute the remaining 48 words of the message schedule
+        layouter.assign_region(
+            || "message schedule",
+            |mut region| {
+                for i in 16..64 {
+                    let s0 = self.xor(
+                        &self.rotate(
+                            &message_schedule[i - 15],
+                            &mut region,
+                            &self.config,
+                            -7,
+                            i % 4,
+                        )?,
+                        &self.rotate(
+                            &message_schedule[i - 15],
+                            &mut region,
+                            &self.config,
+                            -18,
+                            i % 4,
+                        )?,
+                        &mut region,
+                        &self.config,
+                        i % 4,
+                    )?;
+                    let s0 = self.xor(
+                        &s0,
+                        &self.shift_right(
+                            &message_schedule[i - 15],
+                            &mut region,
+                            &self.config,
+                            3,
+                            i % 4,
+                        )?,
+                        &mut region,
+                        &self.config,
+                        i % 4,
+                    )?;
 
-                    let s1 = message_schedule[i - 2]
-                    .clone()
-                    .rotate(&mut region, &self.config, -17)?
-                    .xor(&mut region, &self.config, &message_schedule[i - 2].rotate(&mut region, &self.config, -19)?)?
-                    .xor(&mut region, &self.config, &message_schedule[i - 2].shift_right(&mut region, &self.config, 10)?)?;
+                    let s1 = self.xor(
+                        &self.rotate(
+                            &message_schedule[i - 2],
+                            &mut region,
+                            &self.config,
+                            -17,
+                            i % 4,
+                        )?,
+                        &self.rotate(
+                            &message_schedule[i - 2],
+                            &mut region,
+                            &self.config,
+                            -19,
+                            i % 4,
+                        )?,
+                        &mut region,
+                        &self.config,
+                        i % 4,
+                    )?;
+                    let s1 = self.xor(
+                        &s1,
+                        &self.shift_right(
+                            &message_schedule[i - 2],
+                            &mut region,
+                            &self.config,
+                            10,
+                            i % 4,
+                        )?,
+                        &mut region,
+                        &self.config,
+                        i % 4,
+                    )?;
 
-                let sum = self.add(&message_schedule[i - 16], &s0, &mut region, &self.config, i % 4)?;
-                let new_word = self.add(&sum, &message_schedule[i - 7], &mut region, &self.config, i % 4)?;
-                let new_word = self.add(&new_word, &s1, &mut region, &self.config, i % 4)?;
+                    let sum = self.add(
+                        &message_schedule[i - 16],
+                        &s0,
+                        &mut region,
+                        &self.config,
+                        i % 4,
+                    )?;
+                    let new_word = self.add(
+                        &sum,
+                        &message_schedule[i - 7],
+                        &mut region,
+                        &self.config,
+                        i % 4,
+                    )?;
+                    let new_word = self.add(&new_word, &s1, &mut region, &self.config, i % 4)?;
 
-                message_schedule[i] = new_word;
-            }
+                    message_schedule.push(new_word);
+                }
 
-            Ok(())
-        },
-    )?;
+                Ok(())
+            },
+        )?;
 
-    Ok(message_schedule)
+        // Create an array with the first 16 words of the updated message schedule
+        Ok([
+            message_schedule[0].clone(),
+            message_schedule[1].clone(),
+            message_schedule[2].clone(),
+            message_schedule[3].clone(),
+            message_schedule[4].clone(),
+            message_schedule[5].clone(),
+            message_schedule[6].clone(),
+            message_schedule[7].clone(),
+            message_schedule[8].clone(),
+            message_schedule[9].clone(),
+            message_schedule[10].clone(),
+            message_schedule[11].clone(),
+            message_schedule[12].clone(),
+            message_schedule[13].clone(),
+            message_schedule[14].clone(),
+            message_schedule[15].clone(),
+        ])
     }
 
     fn compression_function(
         &self,
         layouter: &mut impl Layouter<pallas::Base>,
-        initial_state: [AssignedCell<pallas::Base, pallas::Base>; 8],
-        message_blocks: &[[AssignedCell<pallas::Base, pallas::Base>; 16]],
+        state: [AssignedCell<pallas::Base, pallas::Base>; 8],
+        message_block: [AssignedCell<pallas::Base, pallas::Base>; 16],
     ) -> Result<[AssignedCell<pallas::Base, pallas::Base>; 8], Error> {
-        let mut state = initial_state;
+        // 1. Compute the message schedule
+        let message_schedule = self.message_schedule(layouter, message_block)?;
 
-        for (round_idx, message_block) in message_blocks.iter().enumerate() {
-            // 1. Apply the message schedule
-            let scheduled_message = self.message_schedule(layouter, *message_block)?;
+        // 2. Perform the 10 rounds of the Blake2s compression function
+        let mut current_state = state.clone();
+        for round in 0..10 {
+            for g_index in 0..8 {
+                let idx = SIGMA[round][2 * g_index];
+                let idx1 = SIGMA[round][2 * g_index + 1];
 
-            // 2. Execute the G function for each column
-            for col_idx in 0..4 {
-                let input_state = [
-                    state[col_idx * 2],
-                    state[col_idx * 2 + 1],
-                    state[(col_idx * 2 + 2) % 8],
-                    state[(col_idx * 2 + 3) % 8],
-                ];
-
-                state = self.g(layouter, input_state, scheduled_message, round_idx)?;
-            }
-            // 3. Finalize the state
-            let mut final_state = [AssignedCell::default(); 8];
-            for i in 0..8 {
-                layouter.assign_region(
-                    || "Finalize state",
-                    |mut region| {
-                        let row_offset = 0;
-
-                        let lc_initial_state = region.assign_advice(
-                            || format!("LC initial_state[{}]", i),
-                            self.config.v[i % 4],
-                            row_offset,
-                            || initial_state[i].value(),
-                        )?;
-
-                        let lc_state = region.assign_advice(
-                            || format!("LC state[{}]", i),
-                            self.config.v[(i + 1) % 4],
-                            row_offset,
-                            || state[i].value(),
-                        )?;
-
-                        region.constrain_equal(initial_state[i].cell(), lc_initial_state.cell())?;
-                        region.constrain_equal(state[i].cell(), lc_state.cell())?;
-
-                        let final_val = Expression::from(lc_initial_state)
-                            + Expression::from(lc_state.value())
-                            - (Expression::from(initial_state[i].value())
-                                * Expression::from(state[i].value()));
-
-                        let final_cell = region.assign_advice(
-                            || format!("final_state[{}]", i),
-                            self.config.v[(i + 2) % 4],
-                            row_offset,
-                            || {
-                                final_val.evaluate(
-                                    &|_| pallas::Base::zero(),
-                                    &|_| pallas::Base::zero(),
-                                    &|_| pallas::Base::zero(),
-                                    &|query| {
-                                        if let Some(value) =
-                                            region.get_assigned_value(query.column, query.at)
-                                        {
-                                            value
-                                        } else {
-                                            pallas::Base::zero()
-                                        }
-                                    },
-                                    &|_| pallas::Base::zero(),
-                                    &|value| -value,
-                                    &|a, b| a + b,
-                                    &|a, b| a * b,
-                                    &|a, _| a,
-                                )
-                            },
-                        )?;
-
-                        final_state[i] = AssignedCell {
-                            cell: final_cell,
-                            value: region.get_assigned_value(final_cell),
-                        };
-
-                        Ok(())
-                    },
+                current_state = self.g(
+                    layouter,
+                    current_state,
+                    [
+                        message_schedule[idx as usize].clone(),
+                        message_schedule[idx1 as usize].clone(),
+                    ],
+                    round,
                 )?;
             }
-
-            Ok(final_state)
         }
+
+        // 3. Finalize the state
+        let final_state = layouter.assign_region(
+            || "Finalize state",
+            |mut region| {
+                let mut final_state = Vec::with_capacity(8);
+                for i in 0..8 {
+                    final_state.push(self.add(
+                        &state[i],
+                        &current_state[i],
+                        &mut region,
+                        &self.config,
+                        i % 4,
+                    )?);
+                }
+                Ok([
+                    final_state[0].clone(),
+                    final_state[1].clone(),
+                    final_state[2].clone(),
+                    final_state[3].clone(),
+                    final_state[4].clone(),
+                    final_state[5].clone(),
+                    final_state[6].clone(),
+                    final_state[7].clone(),
+                ])
+            },
+        )?;
+
+        Ok(final_state)
     }
+
+    //     fn compression_function(
+    //         &self,
+    //         layouter: &mut impl Layouter<pallas::Base>,
+    //         initial_state: [AssignedCell<pallas::Base, pallas::Base>; 8],
+    //         message_blocks: &[[AssignedCell<pallas::Base, pallas::Base>; 16]],
+    //     ) -> Result<[AssignedCell<pallas::Base, pallas::Base>; 8], Error> {
+    //         let mut state = initial_state;
+
+    //         for (round_idx, message_block) in message_blocks.iter().enumerate() {
+    //             // 1. Apply the message schedule
+    //             let scheduled_message = self.message_schedule(layouter, *message_block)?;
+
+    //             // 2. Execute the G function for each column
+    //             for col_idx in 0..4 {
+    //                 let input_state = [
+    //                     state[col_idx * 2],
+    //                     state[col_idx * 2 + 1],
+    //                     state[(col_idx * 2 + 2) % 8],
+    //                     state[(col_idx * 2 + 3) % 8],
+    //                 ];
+
+    //                 state = self.g(layouter, input_state, scheduled_message, round_idx)?;
+    //             }
+    //             // 3. Finalize the state
+    //             let mut final_state = [];
+    //             for i in 0..8 {
+    //                 layouter.assign_region(
+    //                     || "Finalize state",
+    //                     |mut region| {
+    //                         let row_offset = 0;
+
+    //                         let lc_initial_state = region.assign_advice(
+    //                             || format!("LC initial_state[{}]", i),
+    //                             self.config.v[i % 4],
+    //                             row_offset,
+    //                             || initial_state[i].value(),
+    //                         )?;
+
+    //                         let lc_state = region.assign_advice(
+    //                             || format!("LC state[{}]", i),
+    //                             self.config.v[(i + 1) % 4],
+    //                             row_offset,
+    //                             || state[i].value(),
+    //                         )?;
+
+    //                         region.constrain_equal(initial_state[i].cell(), lc_initial_state.cell())?;
+    //                         region.constrain_equal(state[i].cell(), lc_state.cell())?;
+
+    //                         let final_val = Expression::from(lc_initial_state)
+    //                             + Expression::from(lc_state.value())
+    //                             - (Expression::from(initial_state[i].value())
+    //                                 * Expression::from(state[i].value()));
+
+    //                         let final_cell = region.assign_advice(
+    //                             || format!("final_state[{}]", i),
+    //                             self.config.v[(i + 2) % 4],
+    //                             row_offset,
+    //                             || {
+    //                                 final_val.evaluate(
+    //                                     &|_| pallas::Base::zero(),
+    //                                     &|_| pallas::Base::zero(),
+    //                                     &|_| pallas::Base::zero(),
+    //                                     &|query| {
+    //                                         if let Some(value) =
+    //                                             region.get_assigned_value(query.column, query.at)
+    //                                         {
+    //                                             value
+    //                                         } else {
+    //                                             pallas::Base::zero()
+    //                                         }
+    //                                     },
+    //                                     &|_| pallas::Base::zero(),
+    //                                     &|value| -value,
+    //                                     &|a, b| a + b,
+    //                                     &|a, b| a * b,
+    //                                     &|a, _| a,
+    //                                 )
+    //                             },
+    //                         )?;
+
+    //                         final_state[i] = AssignedCell {
+    //                             cell: final_cell,
+    //                             value: region.get_assigned_value(final_cell),
+    //                             _marker: Default::default()
+    //                         };
+
+    //                         Ok(())
+    //                     },
+    //                 )?;
+    //             }
+
+    //             Ok(final_state)
+    //         }
+    //     }
 }
 // const BLOCK_SIZE: usize = 64; // block size in bytes
 // const ROUND_COUNT: usize = 10; // number of rounds
