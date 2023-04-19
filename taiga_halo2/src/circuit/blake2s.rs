@@ -202,6 +202,42 @@ impl<F: FieldExt> Blake2sChip<F> {
         message_block: [AssignedCell<pallas::Base, pallas::Base>; 16],
     ) -> Result<[AssignedCell<pallas::Base, pallas::Base>; 16], Error> {
         // Implement the message schedule
+    let mut message_schedule = [AssignedCell::default(); 16];
+
+    // Copy the first 16 words of the message block into the message schedule
+    for i in 0..16 {
+        message_schedule[i] = message_block[i];
+    }
+
+    // Compute the remaining 48 words of the message schedule
+    layouter.assign_region(
+        || "message schedule",
+        |mut region| {
+            for i in 16..64 {
+                let s0 = message_schedule[i - 15]
+                    .clone()
+                    .rotate(&mut region, &self.config, -7)?
+                    .xor(&mut region, &self.config, &message_schedule[i - 15].rotate(&mut region, &self.config, -18)?)?
+                    .xor(&mut region, &self.config, &message_schedule[i - 15].shift_right(&mut region, &self.config, 3)?)?;
+
+                    let s1 = message_schedule[i - 2]
+                    .clone()
+                    .rotate(&mut region, &self.config, -17)?
+                    .xor(&mut region, &self.config, &message_schedule[i - 2].rotate(&mut region, &self.config, -19)?)?
+                    .xor(&mut region, &self.config, &message_schedule[i - 2].shift_right(&mut region, &self.config, 10)?)?;
+
+                let sum = self.add(&message_schedule[i - 16], &s0, &mut region, &self.config, i % 4)?;
+                let new_word = self.add(&sum, &message_schedule[i - 7], &mut region, &self.config, i % 4)?;
+                let new_word = self.add(&new_word, &s1, &mut region, &self.config, i % 4)?;
+
+                message_schedule[i] = new_word;
+            }
+
+            Ok(())
+        },
+    )?;
+
+    Ok(message_schedule)
     }
 
     fn compression_function(

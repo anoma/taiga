@@ -5,6 +5,7 @@ src = "src"
 title = "Taiga Design Overview"
 
 [output.html]
+[output.pdf]
 
 [output.html.playground]
 copyable = false
