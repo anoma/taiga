@@ -361,7 +361,7 @@ impl PartialTransaction {
             for cms in vp_info.get_note_commitments().iter() {
                 // Check the vp actually uses the output notes from action circuits.
                 if !((action_cms[0].get_x() == cms[0] && action_cms[1].get_x() == cms[1])
-                    && (action_cms[0].get_x() == cms[1] && action_cms[1].get_x() == cms[0]))
+                    || (action_cms[0].get_x() == cms[1] && action_cms[1].get_x() == cms[0]))
                 {
                     return Err(TransactionError::InconsistentOutputNoteCommitment);
                 }
@@ -488,23 +488,23 @@ fn test_transaction_creation() {
 
     let mut rng = OsRng;
 
-    // Create empty vp circuit without note info
+    // Create empty VP circuit without note info
     let trivial_vp_circuit = TrivialValidityPredicateCircuit::default();
-    let trivail_vp_vk = trivial_vp_circuit.get_vp_vk();
+    let trivial_vp_vk = trivial_vp_circuit.get_vp_vk();
 
     // Generate notes
     let spend_note_1 = {
         let app_data_static = pallas::Base::zero();
-        // TODO: add real application dynamic vps and encode them to app_data_dynamic later.
-        let app_dynamic_vp_vk = vec![trivail_vp_vk.clone(), trivail_vp_vk.clone()];
+        // TODO: add real application dynamic VPs and encode them to app_data_dynamic later.
+        let app_dynamic_vp_vk = vec![trivial_vp_vk.clone(), trivial_vp_vk.clone()];
         // Encode the app_dynamic_vp_vk into app_data_dynamic
         // The encoding method is flexible and defined in the application vp.
-        // Use poseidon hash to encode the two dynamic vps here
+        // Use poseidon hash to encode the two dynamic VPs here
         let app_data_dynamic = poseidon_hash(
             app_dynamic_vp_vk[0].get_compressed(),
             app_dynamic_vp_vk[1].get_compressed(),
         );
-        let app_vk = trivail_vp_vk.clone();
+        let app_vk = trivial_vp_vk.clone();
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
         let value = 5000u64;
         let nk_com = NullifierKeyCom::rand(&mut rng);
@@ -525,8 +525,8 @@ fn test_transaction_creation() {
     };
     let output_note_1 = {
         let app_data_static = pallas::Base::zero();
-        // TODO: add real application dynamic vps and encode them to app_data_dynamic later.
-        // If the dynamic vp is not used, set app_data_dynamic pallas::Base::zero() by defualt.
+        // TODO: add real application dynamic VPs and encode them to app_data_dynamic later.
+        // If the dynamic VP is not used, set app_data_dynamic pallas::Base::zero() by default.
         let app_data_dynamic = pallas::Base::zero();
         let rho = spend_note_1.get_nf().unwrap();
         let value = 5000u64;
@@ -535,7 +535,7 @@ fn test_transaction_creation() {
         let psi = pallas::Base::random(&mut rng);
         let is_merkle_checked = true;
         Note::new(
-            trivail_vp_vk,
+            trivial_vp_vk.clone(),
             app_data_static,
             app_data_dynamic,
             value,
@@ -546,12 +546,54 @@ fn test_transaction_creation() {
             is_merkle_checked,
         )
     };
-    let spend_note_2 = spend_note_1.clone();
-    let output_note_2 = output_note_1.clone();
+
+    let spend_note_2 = {
+        let app_data_static = pallas::Base::one();
+        let app_data_dynamic = pallas::Base::zero();
+        let app_vk = trivial_vp_vk.clone();
+        let rho = Nullifier::new(pallas::Base::random(&mut rng));
+        let value = 10u64;
+        let nk_com = NullifierKeyCom::rand(&mut rng);
+        let rcm = pallas::Scalar::random(&mut rng);
+        let psi = pallas::Base::random(&mut rng);
+        let is_merkle_checked = true;
+        Note::new(
+            app_vk,
+            app_data_static,
+            app_data_dynamic,
+            value,
+            nk_com,
+            rho,
+            psi,
+            rcm,
+            is_merkle_checked,
+        )
+    };
+    let output_note_2 = {
+        let app_data_static = pallas::Base::one();
+        let app_data_dynamic = pallas::Base::zero();
+        let rho = spend_note_2.get_nf().unwrap();
+        let value = 10u64;
+        let nk_com = NullifierKeyCom::rand(&mut rng);
+        let rcm = pallas::Scalar::random(&mut rng);
+        let psi = pallas::Base::random(&mut rng);
+        let is_merkle_checked = true;
+        Note::new(
+            trivial_vp_vk,
+            app_data_static,
+            app_data_dynamic,
+            value,
+            nk_com,
+            rho,
+            psi,
+            rcm,
+            is_merkle_checked,
+        )
+    };
 
     // Generate note info
     let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-    // Create vp circuit and fulfill the note info
+    // Create vp circuit and fill the note info
     let mut trivial_vp_circuit = TrivialValidityPredicateCircuit {
         owned_note_pub_id: spend_note_1.get_nf().unwrap().inner(),
         spend_notes: [spend_note_1.clone(), spend_note_2.clone()],
