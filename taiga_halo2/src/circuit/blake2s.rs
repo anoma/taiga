@@ -1,6 +1,6 @@
 use halo2_proofs::{
     arithmetic::FieldExt,
-    circuit::{AssignedCell, Layouter, Chip, Region},
+    circuit::{AssignedCell, Chip, Layouter, Region},
     plonk::{Advice, Any, Column, ConstraintSystem, Error, Expression, Selector},
 };
 use pasta_curves::pallas;
@@ -85,12 +85,15 @@ impl<F: FieldExt> Blake2sChip<F> {
         config: &Blake2sConfig,
         offset: usize,
     ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
-        let result_val = x.value().zip(y.value()).map(|(x_val, y_val)| x_val + y_val - x_val * y_val);
+        let result_val = x
+            .value()
+            .zip(y.value())
+            .map(|(x_val, y_val)| x_val + y_val - x_val * y_val);
         let result_cell = region.assign_advice(
             || "xor",
             config.v[offset % 4],
             offset,
-            || result_val.ok_or(Error::Synthesis),
+            || result_val,
         )?;
 
         region.constrain_equal(x.cell(), result_cell.cell())?;
@@ -99,7 +102,7 @@ impl<F: FieldExt> Blake2sChip<F> {
         Ok(AssignedCell {
             cell: result_cell.cell(),
             value: result_val,
-            _marker: PhantomData
+            _marker: PhantomData,
         })
     }
 
@@ -116,16 +119,16 @@ impl<F: FieldExt> Blake2sChip<F> {
             || "add",
             config.v[offset % 4],
             offset,
-            || result_val.ok_or(Error::Synthesis),
+            || result_val,
         )?;
 
-        region.constrain_equal(x.cell(), result_cell)?;
-        region.constrain_equal(y.cell(), result_cell)?;
+        region.constrain_equal(x.cell(), result_cell.cell())?;
+        region.constrain_equal(y.cell(), result_cell.cell())?;
 
         Ok(AssignedCell {
-            cell: result_cell,
+            cell: result_cell.cell(),
             value: result_val,
-            _marker: PhantomData
+            _marker: PhantomData,
         })
     }
 
@@ -144,14 +147,20 @@ impl<F: FieldExt> Blake2sChip<F> {
         layouter.assign_region(
             || "G function first mixing stage",
             |mut region| {
-                // a = a.add(&mut region, &self.config, &b)?;
-                // d = d
-                //     .xor(&mut region, &self.config, &c)?
-                //     .rotate(&mut region, &self.config, -16)?;
-                // c = c.add(&mut region, &self.config, &d)?;
-                // b = b
-                //     .xor(&mut region, &self.config, &a)?
-                //     .rotate(&mut region, &self.config, -12)?;
+                a = self.add(&a, &b, &mut region, &self.config, 0)?;
+                d = self.xor(&d, &c, &mut region, &self.config, 0)?;
+                // .rotate(
+                //     &mut region,
+                //     &self.config,
+                //     -16,
+                // )?;
+                c = self.add(&c, &d, &mut region, &self.config, 1)?;
+                b = self.xor(&b, &a, &mut region, &self.config, 1)?;
+                // .rotate(
+                //     &mut region,
+                //     &self.config,
+                //     -12,
+                // )?;
 
                 Ok(())
             },
@@ -161,16 +170,22 @@ impl<F: FieldExt> Blake2sChip<F> {
         layouter.assign_region(
             || "G function second mixing stage",
             |mut region| {
-                // let message_idx = SIGMA[round][2 * idx_a] as usize;
-                // a = a.add(&mut region, &self.config, &message[message_idx])?;
-                // a = a.add(&mut region, &self.config, &b)?;
-                // d = d
-                //     .xor(&mut region, &self.config, &c)?
-                //     .rotate(&mut region, &self.config, -8)?;
-                // c = c.add(&mut region, &self.config, &d)?;
-                // b = b
-                //     .xor(&mut region, &self.config, &a)?
-                //     .rotate(&mut region, &self.config, -7)?;
+                let message_idx = SIGMA[round][2 * idx_a] as usize;
+                a = self.add(&a, &message[message_idx], &mut region, &self.config, 2)?;
+                a = self.add(&a, &b, &mut region, &self.config, 2)?;
+                d = self.xor(&d, &c, &mut region, &self.config, 2)?;
+                // .rotate(
+                //     &mut region,
+                //     &self.config,
+                //     -8,
+                // )?;
+                c = self.add(&c, &d, &mut region, &self.config, 3)?;
+                b = self.xor(&b, &a, &mut region, &self.config, 3)?;
+                // .rotate(
+                //     &mut region,
+                //     &self.config,
+                //     -7,
+                // )?;
 
                 Ok(())
             },
