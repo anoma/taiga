@@ -1,8 +1,8 @@
 use ff::PrimeField;
 use halo2_proofs::{
     arithmetic::Field,
-    circuit::{AssignedCell, Chip, Layouter, Region},
-    plonk::{Advice, Any, Column, ConstraintSystem, Error, Expression, Selector},
+    circuit::{AssignedCell, Chip, Layouter, Region, floor_planner},
+    plonk::{Advice, Any, Column, ConstraintSystem, Error, Expression, Selector, Circuit, Fixed}, poly::Rotation,
 };
 use pasta_curves::pallas;
 use std::{convert::TryInto, marker::PhantomData};
@@ -34,27 +34,96 @@ pub struct Blake2sChip<F: Field> {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Blake2sConfig {
-    // Message block columns
-    message: [Column<Advice>; 4],
+    pub v: [Column<Advice>; 4], // Advice columns used for the state and message block
+    pub u: Column<Fixed>,       // Fixed column used for constants and other fixed values
+    pub s_add: Selector,    
+    pub s_xor: Selector,    
+    pub s_rotate: Selector,    
+    pub s_shift_right: Selector,    
+}
+// pub struct Blake2sConfig {
+//     // Message block columns
+//     message: [Column<Advice>; 4],
 
-    // Internal state columns
-    v: [Column<Advice>; 4],
+//     // Internal state columns
+//     v: [Column<Advice>; 4],
 
-    // Working value columns
-    t: [Column<Advice>; 2],
+//     // Working value columns
+//     t: [Column<Advice>; 2],
 
-    // Constant columns
-    constants: Column<Advice>,
+//     // Constant columns
+//     constants: Column<Advice>,
 
-    // Permutation columns
-    sigma: Column<Advice>,
+//     // Permutation columns
+//     sigma: Column<Advice>,
 
-    // Selector columns for the S-box
-    sbox: [Selector; 16],
+//     // Selector columns for the S-box
+//     sbox: [Selector; 16],
 
-    // Selector columns for controlling the message schedule and compression function
-    round: Selector,
-    message_schedule: Selector,
+//     // Selector columns for controlling the message schedule and compression function
+//     round: Selector,
+//     message_schedule: Selector,
+// }
+
+impl Blake2sConfig {
+    pub fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Blake2sConfig {
+        let v0 = meta.advice_column();
+        let v1 = meta.advice_column();
+        let v2 = meta.advice_column();
+        let v3 = meta.advice_column();
+
+        let u = meta.fixed_column();
+        let s_add = meta.selector();
+        let s_xor = meta.selector();
+        let s_rotate = meta.selector();
+        let s_shift_right = meta.selector();
+
+        // Define our addition gate!
+        meta.create_gate("add", |meta| {
+            let lhs = meta.query_advice(v0, Rotation::cur());
+            let rhs = meta.query_advice(v1, Rotation::cur());
+            let out = meta.query_advice(v2, Rotation::cur());
+            let s_add = meta.query_selector(s_add);
+
+            vec![s_add * (lhs + rhs - out)]
+        });
+
+        meta.create_gate("xor", |meta| {
+            let lhs = meta.query_advice(v0, Rotation::cur());
+            let rhs = meta.query_advice(v1, Rotation::cur());
+            let out = meta.query_advice(v2, Rotation::cur());
+            let s_xor = meta.query_selector(s_xor);
+
+            vec![s_xor * (lhs.clone() + rhs.clone() - lhs * rhs - out)]
+        });
+
+        meta.create_gate("Shift right", |meta| {
+            let lhs = meta.query_advice(v0, Rotation::cur());
+            let shift = meta.query_fixed(u);
+            let out = meta.query_advice(v1, Rotation::cur());
+            let s_shift_right = meta.query_selector(s_shift_right);
+
+            vec![s_shift_right * (lhs * shift - out)]
+        });
+
+        meta.create_gate("Rotation", |meta| {
+            let lhs = meta.query_advice(v0, Rotation::cur());
+            let rotation = meta.query_fixed(u);
+            let out = meta.query_advice(v1, Rotation::cur());
+            let s_rotate = meta.query_selector(s_rotate);
+
+            vec![s_rotate * (lhs * rotation - out)]
+        });
+
+        Blake2sConfig {
+            v: [v0, v1, v2, v3],
+            u,
+            s_add,
+            s_xor,
+            s_rotate,
+            s_shift_right,
+        }
+    }
 }
 
 impl<F: Field> Chip<F> for Blake2sChip<F> {
@@ -71,7 +140,7 @@ impl<F: Field> Chip<F> for Blake2sChip<F> {
 }
 
 impl<F: Field> Blake2sChip<F> {
-    pub fn construct(config: Blake2sConfig, _loaded: <Self as Chip<F>>::Loaded) -> Self {
+    pub fn construct(config: Blake2sConfig) -> Self {
         Self {
             config,
             _marker: PhantomData,
@@ -403,130 +472,69 @@ impl<F: Field> Blake2sChip<F> {
 
         Ok(final_state)
     }
-
-    //     fn compression_function(
-    //         &self,
-    //         layouter: &mut impl Layouter<pallas::Base>,
-    //         initial_state: [AssignedCell<pallas::Base, pallas::Base>; 8],
-    //         message_blocks: &[[AssignedCell<pallas::Base, pallas::Base>; 16]],
-    //     ) -> Result<[AssignedCell<pallas::Base, pallas::Base>; 8], Error> {
-    //         let mut state = initial_state;
-
-    //         for (round_idx, message_block) in message_blocks.iter().enumerate() {
-    //             // 1. Apply the message schedule
-    //             let scheduled_message = self.message_schedule(layouter, *message_block)?;
-
-    //             // 2. Execute the G function for each column
-    //             for col_idx in 0..4 {
-    //                 let input_state = [
-    //                     state[col_idx * 2],
-    //                     state[col_idx * 2 + 1],
-    //                     state[(col_idx * 2 + 2) % 8],
-    //                     state[(col_idx * 2 + 3) % 8],
-    //                 ];
-
-    //                 state = self.g(layouter, input_state, scheduled_message, round_idx)?;
-    //             }
-    //             // 3. Finalize the state
-    //             let mut final_state = [];
-    //             for i in 0..8 {
-    //                 layouter.assign_region(
-    //                     || "Finalize state",
-    //                     |mut region| {
-    //                         let row_offset = 0;
-
-    //                         let lc_initial_state = region.assign_advice(
-    //                             || format!("LC initial_state[{}]", i),
-    //                             self.config.v[i % 4],
-    //                             row_offset,
-    //                             || initial_state[i].value(),
-    //                         )?;
-
-    //                         let lc_state = region.assign_advice(
-    //                             || format!("LC state[{}]", i),
-    //                             self.config.v[(i + 1) % 4],
-    //                             row_offset,
-    //                             || state[i].value(),
-    //                         )?;
-
-    //                         region.constrain_equal(initial_state[i].cell(), lc_initial_state.cell())?;
-    //                         region.constrain_equal(state[i].cell(), lc_state.cell())?;
-
-    //                         let final_val = Expression::from(lc_initial_state)
-    //                             + Expression::from(lc_state.value())
-    //                             - (Expression::from(initial_state[i].value())
-    //                                 * Expression::from(state[i].value()));
-
-    //                         let final_cell = region.assign_advice(
-    //                             || format!("final_state[{}]", i),
-    //                             self.config.v[(i + 2) % 4],
-    //                             row_offset,
-    //                             || {
-    //                                 final_val.evaluate(
-    //                                     &|_| pallas::Base::zero(),
-    //                                     &|_| pallas::Base::zero(),
-    //                                     &|_| pallas::Base::zero(),
-    //                                     &|query| {
-    //                                         if let Some(value) =
-    //                                             region.get_assigned_value(query.column, query.at)
-    //                                         {
-    //                                             value
-    //                                         } else {
-    //                                             pallas::Base::zero()
-    //                                         }
-    //                                     },
-    //                                     &|_| pallas::Base::zero(),
-    //                                     &|value| -value,
-    //                                     &|a, b| a + b,
-    //                                     &|a, b| a * b,
-    //                                     &|a, _| a,
-    //                                 )
-    //                             },
-    //                         )?;
-
-    //                         final_state[i] = AssignedCell {
-    //                             cell: final_cell,
-    //                             value: region.get_assigned_value(final_cell),
-    //                             _marker: Default::default()
-    //                         };
-
-    //                         Ok(())
-    //                     },
-    //                 )?;
-    //             }
-
-    //             Ok(final_state)
-    //         }
-    //     }
 }
-// const BLOCK_SIZE: usize = 64; // block size in bytes
-// const ROUND_COUNT: usize = 10; // number of rounds
 
-// pub(crate) struct Blake2sCircuit {
-//     message: [u8; BLOCK_SIZE],
-// }
+#[derive(Clone, Debug, Default)]
+pub struct TestCircuit {
+    pub message: Vec<u8>,
+    pub expected_hash: [u8; 32],
+}
 
-// pub(crate) struct Blake2sConfig {
-//     message_column: Column<Advice>,
-//     state_columns: [Column<Advice>; 8],
-//     round_constants: Column<Fixed>,
-//     sbox_selector: Selector,
-// }
+impl Circuit<pallas::Base> for TestCircuit {
+    type Config = Blake2sConfig;
+    type FloorPlanner = floor_planner::V1;
 
-// impl Circuit<Fp> for Blake2sCircuit {
-//     fn configure(meta: &mut ConstraintSystem<Fp>) -> Self::Config {
-//         // Define columns and selectors
-//         // ... (implementation depends on the design of the circuit)
+    fn without_witnesses(&self) -> Self {
+                Self::default()
+            }
+    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self::Config {
+        Blake2sConfig::configure(meta)
+    }
 
-//         // Define constraints
-//         // ... (implementation depends on the design of the circuit)
-//     }
+    fn synthesize(
+        &self,
+        config: Self::Config,
+        mut layouter: impl Layouter<pallas::Base>,
+    ) -> Result<(), Error> {
+        // Instantiate the Blake2sChip
+        let blake2s_chip = Blake2sChip::<pallas::Base>::construct(config);
 
-//     fn synthesize(
-//         &self,
-//         cs: &mut impl plonk::Assignment<Fp>,
-//         config: Self::Config,
-//     ) -> Result<(), Error> {
-//         // Load the message into the circuit
-//     }
-// }
+        // TODO: Convert self.message to AssignedCells
+        // TODO: Synthesize the circuit with the Blake2sChip
+        // TODO: Check the result against self.expected_hash
+
+        Ok(())
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use halo2_proofs::{
+        dev::MockProver,
+    };
+
+    #[test]
+    fn test_blake2s() {
+        // Test cases: (message, expected_hash)
+        let test_cases = vec![
+            // Add more test cases here
+        ];
+
+        for (message, expected_hash) in test_cases {
+            let circuit = TestCircuit {
+                message,
+                expected_hash,
+            };
+
+            // Use a small degree for the test
+            let k = 6;
+            let prover = MockProver::<pallas::Base>::run(k, &circuit, vec![]).unwrap();
+
+            // Check if the proof is valid
+            let result = prover.verify();
+            assert!(result.is_ok(), "Failed for message: {:?}", message);
+        }
+    }
+}
+
+
