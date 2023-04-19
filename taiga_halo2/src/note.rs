@@ -10,9 +10,11 @@ use crate::{
 };
 use bitvec::{array::BitArray, order::Lsb0};
 use core::iter;
-use ff::{Field, PrimeFieldBits};
-use group::{Group, GroupEncoding};
-use pasta_curves::pallas;
+use halo2_proofs::arithmetic::Field;
+use pasta_curves::{
+    group::{ff::PrimeFieldBits, Group, GroupEncoding},
+    pallas,
+};
 use rand::{Rng, RngCore};
 
 /// A commitment to a note.
