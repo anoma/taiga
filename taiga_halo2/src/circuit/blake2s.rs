@@ -42,29 +42,6 @@ pub struct Blake2sConfig {
     pub s_rotate: Selector,
     pub s_shift_right: Selector,
 }
-// pub struct Blake2sConfig {
-//     // Message block columns
-//     message: [Column<Advice>; 4],
-
-//     // Internal state columns
-//     v: [Column<Advice>; 4],
-
-//     // Working value columns
-//     t: [Column<Advice>; 2],
-
-//     // Constant columns
-//     constants: Column<Advice>,
-
-//     // Permutation columns
-//     sigma: Column<Advice>,
-
-//     // Selector columns for the S-box
-//     sbox: [Selector; 16],
-
-//     // Selector columns for controlling the message schedule and compression function
-//     round: Selector,
-//     message_schedule: Selector,
-// }
 
 impl Blake2sConfig {
     pub fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Blake2sConfig {
