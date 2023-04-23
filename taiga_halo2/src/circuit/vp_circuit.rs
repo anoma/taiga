@@ -22,6 +22,8 @@ use halo2_proofs::{
     plonk::{Circuit, ConstraintSystem, Error, VerifyingKey},
 };
 use pasta_curves::{pallas, vesta};
+use std::path::PathBuf;
+use vamp_ir::halo2_synth::Halo2Module;
 
 #[derive(Debug, Clone)]
 pub struct VPVerifyingInfo {
@@ -471,4 +473,54 @@ macro_rules! vp_circuit_impl {
             }
         }
     };
+}
+
+#[derive(Debug, Clone)]
+pub struct VampIRValidityPredicateCircuit {
+    pub circuit: Halo2Module<pallas::Base>,
+    pub instances: Vec<pallas::Base>,
+}
+
+impl VampIRValidityPredicateCircuit {
+    pub fn from_file(vamp_ir_file: &PathBuf) -> Self {
+        let mut circuit_file = File::open(circuit).expect("unable to load circuit file");
+        let HaloCircuitData { params, circuit } = HaloCircuitData::read(&mut circuit_file).unwrap();
+
+        // TODO: Set instances. Vampir Team should explain how to get the instances.
+        Self {
+            circuit,
+            instances: vec![],
+        }
+    }
+}
+
+impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
+    fn get_verifying_info(&self) -> VPVerifyingInfo {
+        // TODO: The following code is form Vampir. `prompt_inputs` is private function, we can not call it here.
+        // // Prompt for program inputs
+        // let var_assignments_ints = prompt_inputs(&circuit.module);
+        // let mut var_assignments = HashMap::new();
+        // for (k, v) in var_assignments_ints {
+        //     var_assignments.insert(k, halo_synth::make_constant(v));
+        // }
+        // // Populate variable definitions
+        // circuit.populate_variables(var_assignments);
+
+        let mut rng = OsRng;
+        let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
+        let vk = keygen_vk(params, self.circuit).expect("keygen_vk should not fail");
+        let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
+        let proof = Proof::create(&pk, params, self.clone(), &[&self.instances], &mut rng).unwrap();
+        VPVerifyingInfo {
+            vk,
+            proof,
+            instance: self.instances,
+        }
+    }
+
+    fn get_vp_vk(&self) -> ValidityPredicateVerifyingKey {
+        let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
+        let vk = keygen_vk(params, self.circuit).expect("keygen_vk should not fail");
+        ValidityPredicateVerifyingKey::from_vk(vk)
+    }
 }
