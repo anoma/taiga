@@ -4,7 +4,14 @@ To be edited as design changes. Please make changes as necessary. Keep it **conc
 
 ## 1. Proving system
 
+We use Halo2/IPA with Pasta curves developed by Zcash to instantiate our proving system.
+
 ### 1.1 Elliptic curves
+||Name|Scalar field| Base field|Purpose|Instantiation|
+|-|-|-|-|-|-|
+|$E_I$|Inner curve|$\mathbb{F}_q$|$\mathbb{F}_p$|ECC gadget| Pallas
+|$E_M$|Main curve|$\mathbb{F}_p$|$\mathbb{F}_q$|Action and VP circuits| Vesta|
+|$E_O$|Outer curve|$\mathbb{F}_q$|$\mathbb{F}_p$|Accumulation circuit| Pallas|
 
 ### 1.2 Polynomial commitment scheme $Com$
 - $d$ is the bounded degree of any polynomial in the scheme
@@ -18,13 +25,11 @@ To be edited as design changes. Please make changes as necessary. Keep it **conc
 - Following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html), `C(x; w)` can be turned into polynomials over $\mathbb{F}_p$
 
 ### 1.4 Proving system interfaces
-
 ||Interface|Description|
 |-|-|-|
 |__Preprocess__|`preproc(C) ⟶ desc_C`|`C` is turned into a *circuit description* which is a sequence of polynomial commitments|
 |__Prove__|`P(C, x, w) ⟶ π`|arithmetized over $\mathbb{F}_p$ and $\mathbb{F}_q$|
 |__Verify__|`V(desc_C, x, π) ⟶ 0/1`|arithmetized over $\mathbb{F}_p$ and $\mathbb{F}_q$|
-
 
 ### 1.5 Potential features
 #### Accumulation (of proofs / verifier circuit)
@@ -219,13 +224,6 @@ Changes and justifications:
 |note commitment ($Com_r$)|Sincemilla (f_p -> f_p)|
 |VP commitment (Com)|Blake2s|
 |VE|DH + Poseidon|
-
-### Curves
-||Name|Purpose|Scalar field| Base field|Instantiation|
-|-|-|-|-|-|-|
-|$E_O$|Outer curve|Accumulation circuit|$\mathbb{F}_q$|$\mathbb{F}_p$|Pallas|
-|$E_M$|Main curve|Action and VP circuits|$\mathbb{F}_p$|$\mathbb{F}_q$|Vesta|
-|$E_I$|Inner curve|ECC gadget|$\mathbb{F}_q$|$\mathbb{F}_p$|Pallas
 
 ## Taiga Application
 
