@@ -49,6 +49,8 @@ const R2: u32 = 12;
 const R3: u32 = 8;
 const R4: u32 = 7;
 
+const ROUNDS: usize = 10;
+
 // ---------------
 
 #[derive(Clone, Debug)]
@@ -199,10 +201,11 @@ impl<F: Field> Blake2sChip<F> {
         let rotated_value = cell.value().map(|v| {
             let num_bits = pallas::Base::NUM_BITS;
             let k_mod_num_bits = rotation % num_bits;
-            
+
             // Compute the right rotation factor
-            let rotation_factor = pallas::Base::from(2).pow_vartime(&[(num_bits - k_mod_num_bits) as u64]);
-            
+            let rotation_factor =
+                pallas::Base::from(2).pow_vartime(&[(num_bits - k_mod_num_bits) as u64]);
+
             v * rotation_factor
         });
         let rotated_cell = region.assign_advice(
@@ -322,141 +325,13 @@ impl<F: Field> Blake2sChip<F> {
         )
     }
 
-    fn message_schedule(
-        &self,
-        layouter: &mut impl Layouter<pallas::Base>,
-        message_block: [AssignedCell<pallas::Base, pallas::Base>; 16],
-    ) -> Result<[AssignedCell<pallas::Base, pallas::Base>; 16], Error> {
-        // Implement the message schedule
-        let mut message_schedule = Vec::with_capacity(64);
-
-        // Copy the first 16 words of the message block into the message schedule
-        for i in 0..16 {
-            message_schedule.push(message_block[i].clone());
-        }
-
-        // Compute the remaining 48 words of the message schedule
-        // layouter.assign_region(
-        //     || "message schedule",
-        //     |mut region| {
-        //         for i in 16..64 {
-        //             let s0 = self.xor(
-        //                 &self.rotate(
-        //                     &message_schedule[i - 15],
-        //                     &mut region,
-        //                     &self.config,
-        //                     -7,
-        //                     i % 4,
-        //                 )?,
-        //                 &self.rotate(
-        //                     &message_schedule[i - 15],
-        //                     &mut region,
-        //                     &self.config,
-        //                     -18,
-        //                     i % 4,
-        //                 )?,
-        //                 &mut region,
-        //                 &self.config,
-        //                 i % 4,
-        //             )?;
-        //             let s0 = self.xor(
-        //                 &s0,
-        //                 &self.shift_right(
-        //                     &message_schedule[i - 15],
-        //                     &mut region,
-        //                     &self.config,
-        //                     3,
-        //                     i % 4,
-        //                 )?,
-        //                 &mut region,
-        //                 &self.config,
-        //                 i % 4,
-        //             )?;
-
-        //             let s1 = self.xor(
-        //                 &self.rotate(
-        //                     &message_schedule[i - 2],
-        //                     &mut region,
-        //                     &self.config,
-        //                     -17,
-        //                     i % 4,
-        //                 )?,
-        //                 &self.rotate(
-        //                     &message_schedule[i - 2],
-        //                     &mut region,
-        //                     &self.config,
-        //                     -19,
-        //                     i % 4,
-        //                 )?,
-        //                 &mut region,
-        //                 &self.config,
-        //                 i % 4,
-        //             )?;
-        //             let s1 = self.xor(
-        //                 &s1,
-        //                 &self.shift_right(
-        //                     &message_schedule[i - 2],
-        //                     &mut region,
-        //                     &self.config,
-        //                     10,
-        //                     i % 4,
-        //                 )?,
-        //                 &mut region,
-        //                 &self.config,
-        //                 i % 4,
-        //             )?;
-
-        //             let sum = self.add(
-        //                 &message_schedule[i - 16],
-        //                 &s0,
-        //                 &mut region,
-        //                 &self.config,
-        //                 i % 4,
-        //             )?;
-        //             let new_word = self.add(
-        //                 &sum,
-        //                 &message_schedule[i - 7],
-        //                 &mut region,
-        //                 &self.config,
-        //                 i % 4,
-        //             )?;
-        //             let new_word = self.add(&new_word, &s1, &mut region, &self.config, i % 4)?;
-
-        //             message_schedule.push(new_word);
-        //         }
-
-        //         Ok(())
-        //     },
-        // )?;
-
-        // Create an array with the first 16 words of the updated message schedule
-        Ok([
-            message_schedule[0].clone(),
-            message_schedule[1].clone(),
-            message_schedule[2].clone(),
-            message_schedule[3].clone(),
-            message_schedule[4].clone(),
-            message_schedule[5].clone(),
-            message_schedule[6].clone(),
-            message_schedule[7].clone(),
-            message_schedule[8].clone(),
-            message_schedule[9].clone(),
-            message_schedule[10].clone(),
-            message_schedule[11].clone(),
-            message_schedule[12].clone(),
-            message_schedule[13].clone(),
-            message_schedule[14].clone(),
-            message_schedule[15].clone(),
-        ])
-    }
-
     // Compression function F takes as an argument the state vector "h",
     // message block vector "m" (last block is padded with zeros to full
     // block size, if required), 2w-bit offset counter "t", and final block
     // indicator flag "f".  Local vector v[0..15] is used in processing.  F
     // returns a new state vector.  The number of rounds, "r", is 12 for
     // BLAKE2b and 10 for BLAKE2s.  Rounds are numbered from 0 to r - 1.
- 
+
     //     FUNCTION F( h[0..7], m[0..15], t, f )
     //     |
     //     |      // Initialize local work vector v[0..15]
@@ -500,30 +375,60 @@ impl<F: Field> Blake2sChip<F> {
         layouter: &mut impl Layouter<pallas::Base>,
         state: [AssignedCell<pallas::Base, pallas::Base>; 8],
         message_block: [AssignedCell<pallas::Base, pallas::Base>; 16],
-        counter: u64,
-        flag: bool
+        // counter: u64,
+        // flag: bool,
     ) -> Result<[AssignedCell<pallas::Base, pallas::Base>; 8], Error> {
-        let mut v = [pallas::Base::zero(); 16]; 
+        let mut v_vec: Vec<AssignedCell<pallas::Base, pallas::Base>> = Vec::with_capacity(16);
 
-        v[0..8].copy_from_slice(&state[0..8]);    // Copy first half from state h
-        v[8..16].copy_from_slice(&IV[0..8]);  // Copy second half from IV
+        for i in 0..8 {
+            v_vec.push(state[i].clone()); // Copy first half from state h
+        }
+        let mut iv_cells: Vec<AssignedCell<pallas::Base, pallas::Base>> = Vec::with_capacity(8);
 
-        // 1. Compute the message schedule
-        let message_schedule = self.message_schedule(layouter, message_block)?;
+        layouter.assign_region(
+            || "IV Cells",
+            |mut region| {
+                for i in 0..8 {
+                    let c = region.assign_advice_from_constant(
+                        || "iv",
+                        self.config.v[i % 4],
+                        0,
+                        pallas::Base::from(IV[i] as u64),
+                    )?;
+                    iv_cells.push(c);
+                }
+                Ok(())
+            },
+        )?;
+
+        for i in 0..8 {
+            v_vec.push(iv_cells[i].clone()); // Copy second half from IV
+        }
+
+        // Convert the Vec to a fixed-size array
+        let mut v: [AssignedCell<pallas::Base, pallas::Base>; 16] =
+            v_vec.try_into().expect("Vec length mismatch");
+
+        // TODO
+        //     |      v[12] := v[12] ^ (t mod 2**w)   // Low word of the offset.
+        //     |      v[13] := v[13] ^ (t >> w)       // High word.
+        //     |
+        //     |      IF f = TRUE THEN                // last block flag?
+        //     |      |   v[14] := v[14] ^ 0xFF..FF   // Invert all bits.
+        //     |      END IF.
 
         // 2. Perform the 10 rounds of the Blake2s compression function
-        let mut current_state = state.clone();
-        for round in 0..10 {
-            for g_index in 0..8 {
+        for round in 0..ROUNDS {
+            for g_index in 0..16 {
                 let idx = SIGMA[round][2 * g_index];
                 let idx1 = SIGMA[round][2 * g_index + 1];
 
-                current_state = self.g(
+                v = self.g(
                     layouter,
-                    current_state,
+                    v,
                     [
-                        message_schedule[idx as usize].clone(),
-                        message_schedule[idx1 as usize].clone(),
+                        message_block[idx as usize].clone(),
+                        message_block[idx1 as usize].clone(),
                     ],
                     round,
                 )?;
@@ -536,29 +441,78 @@ impl<F: Field> Blake2sChip<F> {
             |mut region| {
                 let mut final_state = Vec::with_capacity(8);
                 for i in 0..8 {
-                    final_state.push(self.add(
-                        &state[i],
-                        &current_state[i],
-                        &mut region,
-                        &self.config,
-                        i % 4,
-                    )?);
+                    let a = self.xor(&state[i], &v[i], &mut region, self.config(), i % 4)?;
+                    let b = self.xor(&a, &v[i + 8], &mut region, self.config(), i % 4)?;
+
+                    final_state.push(b);
                 }
-                Ok([
-                    final_state[0].clone(),
-                    final_state[1].clone(),
-                    final_state[2].clone(),
-                    final_state[3].clone(),
-                    final_state[4].clone(),
-                    final_state[5].clone(),
-                    final_state[6].clone(),
-                    final_state[7].clone(),
-                ])
+                Ok(final_state.try_into().unwrap())
             },
         )?;
 
         Ok(final_state)
     }
+
+    // Key and data input are split and padded into "dd" message blocks
+    // d[0..dd-1], each consisting of 16 words (or "bb" bytes).
+
+    // If a secret key is used (kk > 0), it is padded with zero bytes and
+    // set as d[0].  Otherwise, d[0] is the first data block.  The final
+    // data block d[dd-1] is also padded with zero to "bb" bytes (16 words).
+
+    // The number of blocks is therefore dd = ceil(kk / bb) + ceil(ll / bb).
+    // However, in the special case of an unkeyed empty message (kk = 0 and
+    // ll = 0), we still set dd = 1 and d[0] consists of all zeros.
+
+    // The following procedure processes the padded data blocks into an
+    // "nn"-byte final hash value.
+    // FUNCTION BLAKE2( d[0..dd-1], ll, kk, nn )
+    //     |
+    //     |     h[0..7] := IV[0..7]          // Initialization Vector.
+    //     |
+    //     |     // Parameter block p[0]
+    //     |     h[0] := h[0] ^ 0x01010000 ^ (kk << 8) ^ nn
+    //     |
+    //     |     // Process padded key and data blocks
+    //     |     IF dd > 1 THEN
+    //     |     |       FOR i = 0 TO dd - 2 DO
+    //     |     |       |       h := F( h, d[i], (i + 1) * bb, FALSE )
+    //     |     |       END FOR.
+    //     |     END IF.
+    //     |
+    //     |     // Final block.
+    //     |     IF kk = 0 THEN
+    //     |     |       h := F( h, d[dd - 1], ll, TRUE )
+    //     |     ELSE
+    //     |     |       h := F( h, d[dd - 1], ll + bb, TRUE )
+    //     |     END IF.
+    //     |
+    //     |     RETURN first "nn" bytes from little-endian word array h[].
+    //     |
+    //     END FUNCTION.
+    // fn blake2s(
+    //     message_block: [pallas::Base; 16],
+    //     input_bytes: u64,
+    //     key_bytes: u32,
+    //     hash_bytes: u32,
+    // ) {
+    //     let state: Vec<AssignedCell<pallas::Base, pallas::Base>> = layouter.assign_region(
+    //         || "assign state",
+    //         |mut region| {
+    //             let mut state_cells = Vec::new();
+    //             for (idx, value) in IV.iter().enumerate() {
+    //                 let cell = region.assign_advice_from_constant(
+    //                     || "state",
+    //                     self.config.v[idx % 4],
+    //                     0,
+    //                     *value,
+    //                 )?;
+    //                 state_cells.push(cell);
+    //             }
+    //             Ok(state_cells)
+    //         },
+    //     )?;
+    // }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -622,7 +576,7 @@ impl Circuit<pallas::Base> for TestCircuit {
             },
         )?;
 
-        let state: [AssignedCell<pallas::Base, pallas::Base>; 16] = state.try_into().unwrap();
+        let state: [AssignedCell<pallas::Base, pallas::Base>; 8] = state.try_into().unwrap();
         let message_block: [AssignedCell<pallas::Base, pallas::Base>; 16] =
             message_block.try_into().unwrap();
 
@@ -659,7 +613,11 @@ mod tests {
     #[test]
     fn test_blake2s() {
         // Define the initial state and message block for the Blake2s hash operation.
-        let state: [pallas::Base; 16] = (0..16).map(pallas::Base::from).collect().try_into().unwrap();
+        let state: [pallas::Base; 16] = (0..16)
+            .map(pallas::Base::from)
+            .collect()
+            .try_into()
+            .unwrap();
 
         // Input message: "hello world"
         let message_block: [u8; 16] = [
