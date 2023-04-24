@@ -2,18 +2,22 @@
 
 To be edited as design changes. Please make changes as necessary. Keep it **concise** and **precise**.
 
-## Proving system
-### Polynomial commitment scheme $Com$
-- $d$ is the bounded degree of any polynomial in the scheme
-- polynomials are defined over the scalar field of $E_M$ ($\mathbb{F}_p$)
-- commitments are points on $E_M$ ($\mathbb{F}_q$)
+## 1. Proving system
 
-### Circuit
+### 1.1 Elliptic curves
+
+### 1.2 Polynomial commitment scheme $Com$
+- $d$ is the bounded degree of any polynomial in the scheme
+- polynomials are defined over the scalar field of the curve $E_M$ ($\mathbb{F}_p$)
+- commitments are points on $E_M$ ($\mathbb{F}_q$)
+- $Com(..): \mathbb{F}_p \rarr \mathbb{F}_q$
+
+### 1.3 Circuit
 - `C(x; w) ⟶ 0/1`
 - upto `n` fan-in 3 (or 4) addition / multiplication / lookup gates over $\mathbb{F}_p$
 - Following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html), `C(x; w)` can be turned into polynomials over $\mathbb{F}_p$
 
-### Proving system interfaces
+### 1.4 Proving system interfaces
 
 ||Interface|Description|
 |-|-|-|
@@ -22,7 +26,7 @@ To be edited as design changes. Please make changes as necessary. Keep it **conc
 |__Verify__|`V(desc_C, x, π) ⟶ 0/1`|arithmetized over $\mathbb{F}_p$ and $\mathbb{F}_q$|
 
 
-### Potential features
+### 1.5 Potential features
 #### Accumulation (of proofs / verifier circuit)
 
 Definitions from Section 4.1 of [BCMS20](https://eprint.iacr.org/2020/499.pdf), and specializing to their Definition 4.2 for Plonk verifiers.
@@ -34,14 +38,14 @@ Definitions from Section 4.1 of [BCMS20](https://eprint.iacr.org/2020/499.pdf), 
 |__Accumulation Decider__|`AccD(acc) ⟶ 0/1`|over $\mathbb{F}_q$ ?|
 
 
-## Abstractions
-### Data types
+## 2. Abstractions
+### 2.1 Data types
 - Input / output of each abstract interface, e.g. `Com, Com_q`, defines a distinct type.
 - Each distinct data field defines a type, e.g. `v, data, asset_type`.
 - Data types are linked via interface definition and usage as required, e.g. `v` is of the same type as the first input to `Com_v`.
 - All data types have **fixed length**.
 
-### Commitments
+### 2.2 Commitments
 
 We blend commitments into a single abstract interface.
 
@@ -51,69 +55,70 @@ We blend commitments into a single abstract interface.
 |`Com_r(...) ⟶ com`|$\mathbb{F}_p$||
 |`Com(...) ⟶ com`|**both** $\mathbb{F}_q$ and $\mathbb{F}_p$||
 
-#### Binding & hiding
+#### 2.3 Binding & hiding
 Commitments are binding by default (i.e. can be instantiated with hash). If we want hiding (possibly across differnt commitments), we add `rcm` explicitly.
 
-### Validity predicates
-#### VP description: 
-`desc_vp = preproc(vp)`: generate pk, vk, CRS
+### 2.4 Validity predicates
+|Name||Description|
+|-|-|-|
+|VP description|`desc_vp = preproc(vp)`|generate pk, vk, CRS|
+|VP commitment|`VPCom(desc_vp; rcm_com_vp) := Com( Com_q(desc_vp), rcm_com_vp)`||
 
-TODO: clarify if we commit to `desc_vp` or only some parts of it
-#### VP commitments: `com_vp = VPCom(desc_vp)`:
-- `VPCom(desc_vp; rcm_com_vp) := Com( Com_q(desc_vp), rcm_com_vp)`
-
-### Note
-
-TODO: all fields needed? maybe change formatting but stay consistent
-$note = (note\_type, v, ρ, ψ, app\_data\_dynamic, is\_merkle\_checked, nk\_com, rcm\_note)$
-
+### 2.5 Note
+#### 2.5.1 Note fields
 |Variable|Type|Description|
 |-|-|-|
-|`note_type`| ValueBase |the data used to derive note's type. Contains `app_vk` and `app_data_static`. The resulting value base is `Poseidon(app_vk, app_data_static)` is in $\mathbb{F}_p$|
-|`app_vk`|$\mathbb{F}_p$|Verifying key of the application circuit|
-|`app_data_static`|$\mathbb{F}_p$| application data used to derive note's type|
-|`app_data_dynamic`| $\mathbb{F}_p$ ||
-|`v`| `u64` ($\mathbb F_p$ element in circuit) |the quantity of fungible value|
+|`note_type`| Pallas point ($\mathbb{F}_p$, $\mathbb{F}_p$) | Value base. `note_type = poseidon_to_curve(Poseidon(app_vk, app_data_static))`|
+|`app_data_dynamic`| $\mathbb{F}_p$ |Commitment to the note's dynamic data|
+|`v`| `u64` ($\mathbb F_p$ element in circuit) |The quantity of fungible value|
 |`nk_com`|$\mathbb{F}_p$|`Poseidon(nk)`|
 |`ρ`| $\mathbb{F}_p$ | an old nullifier from the same Action description|
 |`ψ`| $\mathbb{F}_p$ | the prf output of `ρ` and `rcm_note`|
 |`is_merkle_checked`|bool|dummy note flag|
 |`rcm_note`| $\mathbb{F}_q$| a random commitment trapdoor|
 
+#### 2.5.2 Value base
+TODO: clarify the type of app_vk
 
-### Note commitment
-
-$cm = \mathrm{NoteCom}(note, rcm\_note)$
-
-### Nullifier deriving key
-The nullifier deriving key is denoted `nk` and is randomly generated (by the user): $nk = PRF_{random}(\mathrm{PERSONALIZATION\_NK}) \mod{r}$
-
-
-TODO: currently we don't derive nk at all?
-
-where:
-
-|Variable/Function|Type||
+|Variable|Type|Description|
 |-|-|-|
-|`random`| 32 bytes | random value |
-| `PERSONALIZATION_NK` | string bytes | set to `"Taiga_PRF_NK"`|
-| `PRF` | outputs 64 bytes | Blake2b function |
+|`app_vk`|$\mathbb{F}_p$|Verifying key of the application circuit|
+|`app_data_static`|$\mathbb{F}_p$| application data used to derive note's type|
 
-### Nullifier
+#### 2.5.3 Note commitment
 
-Use the nullifier derivation as in Orchard: $\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF_{nk}(ρ) + ψ \mod{r}]K + cm)$, where:
-
-|Variable/Function|Type||
+|Name|Type|Description|
 |-|-|-|
-|`nk` | $\mathbb F_p$ | the nullifier deriving key |
+|`cm` | Pallas point ($\mathbb F_p$, $\mathbb F_p$)|$cm = \mathrm{NoteCom}(note, rcm\_note)$|
+
+TODO: same as Orchard?
+
+### 2.6 Nullifier deriving key `nk`
+
+Note: not implemented (yet?)
+
+|Name|Type|Description|
+|-|-|-|
+|$nk = PRF_{random}(\mathrm{PERSONALIZATION\_NK}) \mod{q}$|$\mathbb{F}_q$|`nk` is randomly generated (by the user)|
+|random||random value|
+|PERSONALIZATION_NK| string| set to `"Taiga_PRF_NK"`||
+
+### 2.7 Nullifier
+
+Use the nullifier derivation as in Orchard: $\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF_{nk}(ρ) + ψ \mod{q}]K + cm)$
+
+|Name|Type|Description|
+|-|-|-|
+|`nf`|$\mathbb F_p$|$nf = \mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm)$
+|`nk` | $\mathbb F_p$ | the nullifier deriving key|
 |`ρ`| $\mathbb{F}_p$ | an old nullifier|
 |`ψ`| $\mathbb{F}_p$ | $PRF_{rcm\_note}(ρ)$ -- should it be the same as in zcash?|
-|`cm` | $\mathbb F_p$ | note commitment |
-|`K`|($\mathbb F_p$, $\mathbb F_p$) | a fixed base generator of the inner curve|
+|`cm` | Pallas point($\mathbb F_p$, $\mathbb F_p$) | note commitment |
+|`K`|Pallas point($\mathbb F_p$, $\mathbb F_p$)| a fixed base generator of the inner curve|
 |`Extract` | $\mathbb F_p$ | the $x$ coordinate of a (inner curve) point|
 
 
-## ZK Circuits
+## 3. ZK Circuits
 
 ### Validity Predicate (VP) circuits
 
@@ -205,15 +210,15 @@ Changes and justifications:
 
 ## Concrete stuff
 ### Instantiations
-
 ||||
 |-|-|-|
 |nullifier PRF|Poseidon|
 |nk commitment|Poseidon|
+|nk PRF|Blake2s|
 |address|Poseidon (f_p -> f_p)??|
 |note commitment ($Com_r$)|Sincemilla (f_p -> f_p)|
 |VP commitment (Com)|Blake2s|
-|VE|ECIES + Poseidon|
+|VE|DH + Poseidon|
 
 ### Curves
 ||Name|Purpose|Scalar field| Base field|Instantiation|
