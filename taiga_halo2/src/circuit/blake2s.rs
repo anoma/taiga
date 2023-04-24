@@ -8,7 +8,23 @@ use halo2_proofs::{
 use pasta_curves::pallas;
 use std::{convert::TryInto, marker::PhantomData};
 
-// Blake2s constants
+//               | BLAKE2s          |
+// --------------+------------------+
+//  Bits in word | w = 32           |
+//  Rounds in F  | r = 10           |
+//  Block bytes  | bb = 64          |
+//  Hash bytes   | 1 <= nn <= 32    |
+//  Key bytes    | 0 <= kk <= 32    |
+//  Input bytes  | 0 <= ll < 2**64  |
+// --------------+------------------+
+//  G Rotation   | (R1, R2, R3, R4) |
+//   constants = | (16, 12,  8,  7) |
+// --------------+------------------+
+
+// BLAKE2 CONSTANTS
+// ----------------
+
+// Initialisation Vector (IV)
 const IV: [u32; 8] = [
     0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A, 0x510E527F, 0x9B05688C, 0x1F83D9AB, 0x5BE0CD19,
 ];
@@ -26,6 +42,14 @@ const SIGMA: [[u8; 16]; 10] = [
     [6, 15, 14, 9, 11, 3, 0, 8, 12, 2, 13, 7, 1, 4, 10, 5],
     [10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0],
 ];
+
+// G Rotation constants
+const R1: u32 = 16;
+const R2: u32 = 12;
+const R3: u32 = 8;
+const R4: u32 = 7;
+
+// ---------------
 
 #[derive(Clone, Debug)]
 pub struct Blake2sChip<F: Field> {
@@ -45,10 +69,12 @@ pub struct Blake2sConfig {
 
 impl Blake2sConfig {
     pub fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Blake2sConfig {
-        let v0 = meta.advice_column();
-        let v1 = meta.advice_column();
-        let v2 = meta.advice_column();
-        let v3 = meta.advice_column();
+        let advices = [
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+            meta.advice_column(),
+        ];
 
         let u = meta.fixed_column();
         let s_add = meta.selector();
@@ -56,45 +82,48 @@ impl Blake2sConfig {
         let s_rotate = meta.selector();
         let s_shift_right = meta.selector();
 
-        // Define our addition gate!
+        // Define our addition gate
         meta.create_gate("add", |meta| {
-            let lhs = meta.query_advice(v0, Rotation::cur());
-            let rhs = meta.query_advice(v1, Rotation::cur());
-            let out = meta.query_advice(v2, Rotation::cur());
+            let lhs = meta.query_advice(advices[0], Rotation::cur());
+            let rhs = meta.query_advice(advices[1], Rotation::cur());
+            let out = meta.query_advice(advices[2], Rotation::cur());
             let s_add = meta.query_selector(s_add);
 
             vec![s_add * (lhs + rhs - out)]
         });
 
+        // Define our xor gate
         meta.create_gate("xor", |meta| {
-            let lhs = meta.query_advice(v0, Rotation::cur());
-            let rhs = meta.query_advice(v1, Rotation::cur());
-            let out = meta.query_advice(v2, Rotation::cur());
+            let lhs = meta.query_advice(advices[0], Rotation::cur());
+            let rhs = meta.query_advice(advices[1], Rotation::cur());
+            let out = meta.query_advice(advices[2], Rotation::cur());
             let s_xor = meta.query_selector(s_xor);
 
             vec![s_xor * (lhs.clone() + rhs.clone() - lhs * rhs - out)]
         });
 
+        // Define our shift right gate
         meta.create_gate("Shift right", |meta| {
-            let lhs = meta.query_advice(v0, Rotation::cur());
+            let lhs = meta.query_advice(advices[0], Rotation::cur());
             let shift = meta.query_fixed(u);
-            let out = meta.query_advice(v1, Rotation::cur());
+            let out = meta.query_advice(advices[1], Rotation::cur());
             let s_shift_right = meta.query_selector(s_shift_right);
 
             vec![s_shift_right * (lhs * shift - out)]
         });
 
+        // Define our rotation gate
         meta.create_gate("Rotation", |meta| {
-            let lhs = meta.query_advice(v0, Rotation::cur());
+            let lhs = meta.query_advice(advices[0], Rotation::cur());
             let rotation = meta.query_fixed(u);
-            let out = meta.query_advice(v1, Rotation::cur());
+            let out = meta.query_advice(advices[1], Rotation::cur());
             let s_rotate = meta.query_selector(s_rotate);
 
             vec![s_rotate * (lhs * rotation - out)]
         });
 
         Blake2sConfig {
-            v: [v0, v1, v2, v3],
+            v: advices,
             u,
             s_add,
             s_xor,
@@ -140,12 +169,10 @@ impl<F: Field> Blake2sChip<F> {
         let result_cell =
             region.assign_advice(|| "xor", config.v[offset % 4], offset, || result_val)?;
 
-        region.constrain_equal(x.cell(), result_cell.cell())?;
-        region.constrain_equal(y.cell(), result_cell.cell())?;
-
         Ok(result_cell)
     }
 
+    // TODO: Add mod 2^32
     fn add(
         &self,
         x: &AssignedCell<pallas::Base, pallas::Base>,
@@ -158,24 +185,25 @@ impl<F: Field> Blake2sChip<F> {
         let result_cell =
             region.assign_advice(|| "add", config.v[offset % 4], offset, || result_val)?;
 
-        region.constrain_equal(x.cell(), result_cell.cell())?;
-        region.constrain_equal(y.cell(), result_cell.cell())?;
-
         Ok(result_cell)
     }
 
-    fn rotate(
+    fn rotate_right(
         &self,
         cell: &AssignedCell<pallas::Base, pallas::Base>,
         region: &mut Region<'_, pallas::Base>,
         config: &Blake2sConfig,
-        rotation: i32,
+        rotation: u32,
         offset: usize,
     ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
         let rotated_value = cell.value().map(|v| {
-            let pow_2: pallas::Base =
-                pallas::Base::from(1u64 << (rotation as u64 % pallas::Base::NUM_BITS as u64));
-            (v * pow_2) // % pallas::Base::MODULUS
+            let num_bits = pallas::Base::NUM_BITS;
+            let k_mod_num_bits = rotation % num_bits;
+            
+            // Compute the right rotation factor
+            let rotation_factor = pallas::Base::from(2).pow_vartime(&[(num_bits - k_mod_num_bits) as u64]);
+            
+            v * rotation_factor
         });
         let rotated_cell = region.assign_advice(
             || format!("rotate {}", rotation),
@@ -183,9 +211,6 @@ impl<F: Field> Blake2sChip<F> {
             offset,
             || rotated_value,
         )?;
-
-        // Enforce the rotation constraint
-        region.constrain_equal(cell.cell(), rotated_cell.cell())?;
 
         Ok(rotated_cell)
     }
@@ -216,50 +241,82 @@ impl<F: Field> Blake2sChip<F> {
         Ok(shifted_cell)
     }
 
+    // The G primitive function mixes two input words, "x" and "y", into
+    // four words indexed by "a", "b", "c", and "d" in the working vector
+    // v[0..15].  The full modified vector is returned.  The rotation
+    // constants
+    // FUNCTION G( v[0..15], a, b, c, d, x, y )
+    // |
+    // |   v[a] := (v[a] + v[b] + x) mod 2**w
+    // |   v[d] := (v[d] ^ v[a]) >>> R1
+    // |   v[c] := (v[c] + v[d])     mod 2**w
+    // |   v[b] := (v[b] ^ v[c]) >>> R2
+    // |   v[a] := (v[a] + v[b] + y) mod 2**w
+    // |   v[d] := (v[d] ^ v[a]) >>> R3
+    // |   v[c] := (v[c] + v[d])     mod 2**w
+    // |   v[b] := (v[b] ^ v[c]) >>> R4
+    // |
+    // |   RETURN v[0..15]
+    // |
+    // END FUNCTION.
     fn g(
         &self,
         layouter: &mut impl Layouter<pallas::Base>,
-        state: [AssignedCell<pallas::Base, pallas::Base>; 8],
+        state: [AssignedCell<pallas::Base, pallas::Base>; 16],
         message: [AssignedCell<pallas::Base, pallas::Base>; 2],
         round: usize,
-    ) -> Result<[AssignedCell<pallas::Base, pallas::Base>; 8], Error> {
-        // Implement the G function
+    ) -> Result<[AssignedCell<pallas::Base, pallas::Base>; 16], Error> {
         layouter.assign_region(
             || "G function",
             |mut region| {
+                let x = &message[0];
+                let y = &message[1];
+                let va = &state[0];
+                let vb = &state[1];
+                let vc = &state[2];
+                let vd = &state[3];
+
                 // First mixing stage
-                let a = self.add(&state[0], &state[4], &mut region, &self.config, round % 4)?;
-                let a = self.add(&a, &message[0], &mut region, &self.config, round % 4)?;
+                let va = self.add(va, vb, &mut region, &self.config, round % 4)?;
+                let va = self.add(&va, &x, &mut region, &self.config, round % 4)?;
 
-                let d = self.xor(&state[3], &a, &mut region, &self.config, round % 4)?;
-                let d = self.rotate(&d, &mut region, &self.config, -16, round % 4)?;
+                let vd = self.xor(vd, &va, &mut region, &self.config, round % 4)?;
+                let vd = self.rotate_right(&vd, &mut region, &self.config, R1, round % 4)?;
 
-                let c = self.add(&state[2], &d, &mut region, &self.config, round % 4)?;
+                let vc = self.add(vc, &vd, &mut region, &self.config, round % 4)?;
 
-                let b = self.xor(&state[1], &c, &mut region, &self.config, round % 4)?;
-                let b = self.rotate(&b, &mut region, &self.config, -12, round % 4)?;
+                let vb = self.xor(&vb, &vc, &mut region, &self.config, round % 4)?;
+                let vb = self.rotate_right(&vb, &mut region, &self.config, R2, round % 4)?;
 
                 // Second mixing stage
-                let a = self.add(&a, &b, &mut region, &self.config, round % 4)?;
-                let a = self.add(&a, &message[1], &mut region, &self.config, round % 4)?;
+                let va = self.add(&va, &vb, &mut region, &self.config, round % 4)?;
+                let va = self.add(&va, &y, &mut region, &self.config, round % 4)?;
 
-                let d = self.xor(&d, &a, &mut region, &self.config, round % 4)?;
-                let d = self.rotate(&d, &mut region, &self.config, -8, round % 4)?;
+                let vd = self.xor(&vd, &va, &mut region, &self.config, round % 4)?;
+                let vd = self.rotate_right(&vd, &mut region, &self.config, R3, round % 4)?;
 
-                let c = self.add(&c, &d, &mut region, &self.config, round % 4)?;
+                let vc = self.add(&vc, &vd, &mut region, &self.config, round % 4)?;
 
-                let b = self.xor(&b, &c, &mut region, &self.config, round % 4)?;
-                let b = self.rotate(&b, &mut region, &self.config, -7, round % 4)?;
+                let vb = self.xor(&vb, &vc, &mut region, &self.config, round % 4)?;
+                let vb = self.rotate_right(&vb, &mut region, &self.config, R4, round % 4)?;
 
                 Ok([
-                    a,
-                    b,
-                    c,
-                    d,
+                    va,
+                    vb,
+                    vc,
+                    vd,
                     state[4].clone(),
                     state[5].clone(),
                     state[6].clone(),
                     state[7].clone(),
+                    state[8].clone(),
+                    state[9].clone(),
+                    state[10].clone(),
+                    state[11].clone(),
+                    state[12].clone(),
+                    state[13].clone(),
+                    state[14].clone(),
+                    state[15].clone(),
                 ])
             },
         )
@@ -279,98 +336,98 @@ impl<F: Field> Blake2sChip<F> {
         }
 
         // Compute the remaining 48 words of the message schedule
-        layouter.assign_region(
-            || "message schedule",
-            |mut region| {
-                for i in 16..64 {
-                    let s0 = self.xor(
-                        &self.rotate(
-                            &message_schedule[i - 15],
-                            &mut region,
-                            &self.config,
-                            -7,
-                            i % 4,
-                        )?,
-                        &self.rotate(
-                            &message_schedule[i - 15],
-                            &mut region,
-                            &self.config,
-                            -18,
-                            i % 4,
-                        )?,
-                        &mut region,
-                        &self.config,
-                        i % 4,
-                    )?;
-                    let s0 = self.xor(
-                        &s0,
-                        &self.shift_right(
-                            &message_schedule[i - 15],
-                            &mut region,
-                            &self.config,
-                            3,
-                            i % 4,
-                        )?,
-                        &mut region,
-                        &self.config,
-                        i % 4,
-                    )?;
+        // layouter.assign_region(
+        //     || "message schedule",
+        //     |mut region| {
+        //         for i in 16..64 {
+        //             let s0 = self.xor(
+        //                 &self.rotate(
+        //                     &message_schedule[i - 15],
+        //                     &mut region,
+        //                     &self.config,
+        //                     -7,
+        //                     i % 4,
+        //                 )?,
+        //                 &self.rotate(
+        //                     &message_schedule[i - 15],
+        //                     &mut region,
+        //                     &self.config,
+        //                     -18,
+        //                     i % 4,
+        //                 )?,
+        //                 &mut region,
+        //                 &self.config,
+        //                 i % 4,
+        //             )?;
+        //             let s0 = self.xor(
+        //                 &s0,
+        //                 &self.shift_right(
+        //                     &message_schedule[i - 15],
+        //                     &mut region,
+        //                     &self.config,
+        //                     3,
+        //                     i % 4,
+        //                 )?,
+        //                 &mut region,
+        //                 &self.config,
+        //                 i % 4,
+        //             )?;
 
-                    let s1 = self.xor(
-                        &self.rotate(
-                            &message_schedule[i - 2],
-                            &mut region,
-                            &self.config,
-                            -17,
-                            i % 4,
-                        )?,
-                        &self.rotate(
-                            &message_schedule[i - 2],
-                            &mut region,
-                            &self.config,
-                            -19,
-                            i % 4,
-                        )?,
-                        &mut region,
-                        &self.config,
-                        i % 4,
-                    )?;
-                    let s1 = self.xor(
-                        &s1,
-                        &self.shift_right(
-                            &message_schedule[i - 2],
-                            &mut region,
-                            &self.config,
-                            10,
-                            i % 4,
-                        )?,
-                        &mut region,
-                        &self.config,
-                        i % 4,
-                    )?;
+        //             let s1 = self.xor(
+        //                 &self.rotate(
+        //                     &message_schedule[i - 2],
+        //                     &mut region,
+        //                     &self.config,
+        //                     -17,
+        //                     i % 4,
+        //                 )?,
+        //                 &self.rotate(
+        //                     &message_schedule[i - 2],
+        //                     &mut region,
+        //                     &self.config,
+        //                     -19,
+        //                     i % 4,
+        //                 )?,
+        //                 &mut region,
+        //                 &self.config,
+        //                 i % 4,
+        //             )?;
+        //             let s1 = self.xor(
+        //                 &s1,
+        //                 &self.shift_right(
+        //                     &message_schedule[i - 2],
+        //                     &mut region,
+        //                     &self.config,
+        //                     10,
+        //                     i % 4,
+        //                 )?,
+        //                 &mut region,
+        //                 &self.config,
+        //                 i % 4,
+        //             )?;
 
-                    let sum = self.add(
-                        &message_schedule[i - 16],
-                        &s0,
-                        &mut region,
-                        &self.config,
-                        i % 4,
-                    )?;
-                    let new_word = self.add(
-                        &sum,
-                        &message_schedule[i - 7],
-                        &mut region,
-                        &self.config,
-                        i % 4,
-                    )?;
-                    let new_word = self.add(&new_word, &s1, &mut region, &self.config, i % 4)?;
+        //             let sum = self.add(
+        //                 &message_schedule[i - 16],
+        //                 &s0,
+        //                 &mut region,
+        //                 &self.config,
+        //                 i % 4,
+        //             )?;
+        //             let new_word = self.add(
+        //                 &sum,
+        //                 &message_schedule[i - 7],
+        //                 &mut region,
+        //                 &self.config,
+        //                 i % 4,
+        //             )?;
+        //             let new_word = self.add(&new_word, &s1, &mut region, &self.config, i % 4)?;
 
-                    message_schedule.push(new_word);
-                }
+        //             message_schedule.push(new_word);
+        //         }
 
-                Ok(())
-            },
-        )?;
+        //         Ok(())
+        //     },
+        // )?;
 
         // Create an array with the first 16 words of the updated message schedule
         Ok([
@@ -393,12 +450,64 @@ impl<F: Field> Blake2sChip<F> {
         ])
     }
 
+    // Compression function F takes as an argument the state vector "h",
+    // message block vector "m" (last block is padded with zeros to full
+    // block size, if required), 2w-bit offset counter "t", and final block
+    // indicator flag "f".  Local vector v[0..15] is used in processing.  F
+    // returns a new state vector.  The number of rounds, "r", is 12 for
+    // BLAKE2b and 10 for BLAKE2s.  Rounds are numbered from 0 to r - 1.
+ 
+    //     FUNCTION F( h[0..7], m[0..15], t, f )
+    //     |
+    //     |      // Initialize local work vector v[0..15]
+    //     |      v[0..7] := h[0..7]              // First half from state.
+    //     |      v[8..15] := IV[0..7]            // Second half from IV.
+    //     |
+    //     |      v[12] := v[12] ^ (t mod 2**w)   // Low word of the offset.
+    //     |      v[13] := v[13] ^ (t >> w)       // High word.
+    //     |
+    //     |      IF f = TRUE THEN                // last block flag?
+    //     |      |   v[14] := v[14] ^ 0xFF..FF   // Invert all bits.
+    //     |      END IF.
+    //     |
+    //     |      // Cryptographic mixing
+    //     |      FOR i = 0 TO r - 1 DO           // Ten or twelve rounds.
+    //     |      |
+    //     |      |   // Message word selection permutation for this round.
+    //     |      |   s[0..15] := SIGMA[i mod 10][0..15]
+    //     |      |
+    //     |      |   v := G( v, 0, 4,  8, 12, m[s[ 0]], m[s[ 1]] )
+    //     |      |   v := G( v, 1, 5,  9, 13, m[s[ 2]], m[s[ 3]] )
+    //     |      |   v := G( v, 2, 6, 10, 14, m[s[ 4]], m[s[ 5]] )
+    //     |      |   v := G( v, 3, 7, 11, 15, m[s[ 6]], m[s[ 7]] )
+    //     |      |
+    //     |      |   v := G( v, 0, 5, 10, 15, m[s[ 8]], m[s[ 9]] )
+    //     |      |   v := G( v, 1, 6, 11, 12, m[s[10]], m[s[11]] )
+    //     |      |   v := G( v, 2, 7,  8, 13, m[s[12]], m[s[13]] )
+    //     |      |   v := G( v, 3, 4,  9, 14, m[s[14]], m[s[15]] )
+    //     |      |
+    //     |      END FOR
+    //     |
+    //     |      FOR i = 0 TO 7 DO               // XOR the two halves.
+    //     |      |   h[i] := h[i] ^ v[i] ^ v[i + 8]
+    //     |      END FOR.
+    //     |
+    //     |      RETURN h[0..7]                  // New state.
+    //     |
+    //     END FUNCTION.
     fn compression_function(
         &self,
         layouter: &mut impl Layouter<pallas::Base>,
         state: [AssignedCell<pallas::Base, pallas::Base>; 8],
         message_block: [AssignedCell<pallas::Base, pallas::Base>; 16],
+        counter: u64,
+        flag: bool
     ) -> Result<[AssignedCell<pallas::Base, pallas::Base>; 8], Error> {
+        let mut v = [pallas::Base::zero(); 16]; 
+
+        v[0..8].copy_from_slice(&state[0..8]);    // Copy first half from state h
+        v[8..16].copy_from_slice(&IV[0..8]);  // Copy second half from IV
+
         // 1. Compute the message schedule
         let message_schedule = self.message_schedule(layouter, message_block)?;
 
@@ -454,7 +563,7 @@ impl<F: Field> Blake2sChip<F> {
 
 #[derive(Clone, Debug, Default)]
 pub struct TestCircuit {
-    pub state: [pallas::Base; 8],
+    pub state: [pallas::Base; 16],
     pub message_block: [pallas::Base; 16],
     pub expected_output: [pallas::Base; 8],
 }
@@ -513,7 +622,7 @@ impl Circuit<pallas::Base> for TestCircuit {
             },
         )?;
 
-        let state: [AssignedCell<pallas::Base, pallas::Base>; 8] = state.try_into().unwrap();
+        let state: [AssignedCell<pallas::Base, pallas::Base>; 16] = state.try_into().unwrap();
         let message_block: [AssignedCell<pallas::Base, pallas::Base>; 16] =
             message_block.try_into().unwrap();
 
@@ -550,16 +659,8 @@ mod tests {
     #[test]
     fn test_blake2s() {
         // Define the initial state and message block for the Blake2s hash operation.
-        let state = [
-            pallas::Base::from(0),
-            pallas::Base::from(1),
-            pallas::Base::from(2),
-            pallas::Base::from(3),
-            pallas::Base::from(4),
-            pallas::Base::from(5),
-            pallas::Base::from(6),
-            pallas::Base::from(7),
-        ];
+        let state: [pallas::Base; 16] = (0..16).map(pallas::Base::from).collect().try_into().unwrap();
+
         // Input message: "hello world"
         let message_block: [u8; 16] = [
             0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x77, 0x6f, 0x72, 0x6c, 0x64, 0x00, 0x00, 0x00,
