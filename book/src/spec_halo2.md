@@ -87,7 +87,7 @@ TODO: clarify the type of app_vk
 
 |Variable|Type|Description|
 |-|-|-|
-|`app_vk`|$\mathbb{F}_p$|Verifying key of the application circuit|
+|`app_vk`|?|Verifying key of the application circuit|
 |`app_data_static`|$\mathbb{F}_p$| application data used to derive note's type|
 
 #### 2.5.3 Note commitment
@@ -127,34 +127,39 @@ Use the nullifier derivation as in Orchard: $\mathrm{DeriveNullifier}_{nk}(ρ, �
 
 ### Validity Predicate (VP) circuits
 
-Arithmetized over $\mathbb{F}_p$. Represented as a Halo2 circuit `vp(x; w) ⟶ 0/1`.
+- Arithmetized over $\mathbb{F}_p$.
+- Represented as a Halo2 circuit `VP(x; w) ⟶ 0/1`.
+- Expects `m` notes spent and `n` notes created. `m` and `n` could be different for each VP involved in a Taiga transaction.
 
-- expects `m` notes spent and `n` notes created. `m` and `n` could be different for each vp involved in a Taiga transaction.
-
+#### Inputs
 Public inputs (`x`):
-- vp parameter: `vp_param` 
-    - a public parameter to `vp`, i.e. immutable data, so that user can customize a global `vp` for example.
-- vp public output: `vp_memo` 
-    - a public "output" of vp can encode arbitrary data.
-    - e.g. encode `rk` to support Sapling/Orchard-type auth. But if we make this choice, then a signature verfication needs to be done on every `rk`.
-- spent note nullifiers, `nf_1, …, nf_m`
-- created note commitments, `cm_1, …, cm_n`
-- note encryptions (for receiving vp): `ce_1, …, ce_n`
+
+- `nf_1, …, nf_m` - spent note nullifiers
+- `cm_1, …, cm_n` - created note commitments
+- `ce_1, …, ce_n` - created note encryptions
 
 Private inputs (`w`):
-- spent notes, `old_note_1, …, old_note_m`
-- created notes, `new_note_1, …, new_note_n`
+- `old_note_1, …, old_note_m` - spent notes
+- `new_note_1, …, new_note_n` - created notes
 - custom private inputs
 
-Checks that:
+#### Checks
+Each VP must perform some standard checks to make sure the note binding is correct:
 1. Encrypted note integrity: for each `i ∈ {1, …, n}`, `ce_i = NoteEnc(new_note_i)`
-2. ...
+2. Spent note nullifier integrity: for each `i ∈ {1, …, m}`, `nf_i = DeriveNullifier_nk(ρ, ψ, cm)`
+3. Output note commitment integrity: for each `i ∈ {1, …, n}`, `cm_i = NoteCommit(note, rcm_note)`
 
+TODO: explain why we need these checks
+TODO: Do we need to check the encryption in a VP, Action circuit, or both?
+
+All other constraints enforced by VP circuits are custom.
 
 ### Action Circuit
 
-Arithmetized over $\mathbb{F}_p$. Represented as a Halo2 circuit, `ActionCircuit(x; w)`.
+- Arithmetized over $\mathbb{F}_p$.
+- Represented as a Halo2 circuit, `ActionCircuit(x; w)`.
 
+#### Inputs
 Public inputs (`x`):
 - Merkle root `rt`
 - Spent note nullifier `nf`, which commits to note application type, value, and data
@@ -188,7 +193,7 @@ Private inputs (`w`):
         - `Com_q(desc_vp_app)`, 
         - `rcm_com_vp_app`
 
-Action circuit checks:
+#### Checks
 - For spent note `note = (address, app, v, data, ρ, ψ, rcm_note)`:
     - Note is a valid note in `rt`
         - Same as Orchard, there is a path in Merkle tree with root `rt` to a note commitment `cm` that opens to `note`
