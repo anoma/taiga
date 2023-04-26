@@ -19,11 +19,15 @@ use dyn_clone::{clone_trait_object, DynClone};
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
     circuit::{AssignedCell, Layouter, Value},
-    plonk::{Circuit, ConstraintSystem, Error, VerifyingKey},
+    plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error, VerifyingKey},
 };
 use pasta_curves::{pallas, vesta};
+use rand::rngs::OsRng;
+use std::collections::HashMap;
+use std::fs::File;
 use std::path::PathBuf;
-use vamp_ir::halo2_synth::Halo2Module;
+use vamp_ir::halo2::synth::{make_constant, Halo2Module};
+use vamp_ir::util::read_inputs_from_file;
 
 #[derive(Debug, Clone)]
 pub struct VPVerifyingInfo {
@@ -482,11 +486,23 @@ pub struct VampIRValidityPredicateCircuit {
 }
 
 impl VampIRValidityPredicateCircuit {
-    pub fn from_file(vamp_ir_file: &PathBuf) -> Self {
-        let mut circuit_file = File::open(circuit).expect("unable to load circuit file");
-        let HaloCircuitData { params, circuit } = HaloCircuitData::read(&mut circuit_file).unwrap();
+    pub fn from_file(vamp_ir_circuit_file: &PathBuf, inputs_file: &PathBuf) -> Self {
+        let mut circuit_file =
+            File::open(vamp_ir_circuit_file).expect("unable to load circuit file");
+        let mut circuit =
+            bincode::decode_from_std_read(&mut circuit_file, bincode::config::standard())
+                .expect("unable to load circuit file");
+        // let HaloCircuitData { params, circuit } = HaloCircuitData::read(&mut circuit_file).unwrap();
+        let var_assignments_ints = read_inputs_from_file(&circuit.module, inputs_file);
+        let mut var_assignments = HashMap::new();
+        for (k, v) in var_assignments_ints {
+            var_assignments.insert(k, make_constant(v));
+        }
 
-        // TODO: Set instances. Vampir Team should explain how to get the instances.
+        // Populate variable definitions
+        circuit.populate_variables(var_assignments);
+
+        // TODO: Set instances. Ask Vampir Team how to get the instances.
         Self {
             circuit,
             instances: vec![],
@@ -496,21 +512,18 @@ impl VampIRValidityPredicateCircuit {
 
 impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
     fn get_verifying_info(&self) -> VPVerifyingInfo {
-        // TODO: The following code is form Vampir. `prompt_inputs` is private function, we can not call it here.
-        // // Prompt for program inputs
-        // let var_assignments_ints = prompt_inputs(&circuit.module);
-        // let mut var_assignments = HashMap::new();
-        // for (k, v) in var_assignments_ints {
-        //     var_assignments.insert(k, halo_synth::make_constant(v));
-        // }
-        // // Populate variable definitions
-        // circuit.populate_variables(var_assignments);
-
         let mut rng = OsRng;
         let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
-        let vk = keygen_vk(params, self.circuit).expect("keygen_vk should not fail");
-        let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
-        let proof = Proof::create(&pk, params, self.clone(), &[&self.instances], &mut rng).unwrap();
+        let vk = keygen_vk(params, &self.circuit).expect("keygen_vk should not fail");
+        let pk = keygen_pk(params, vk.clone(), &self.circuit).expect("keygen_pk should not fail");
+        let proof = Proof::create(
+            &pk,
+            params,
+            self.circuit.clone(),
+            &[&self.instances],
+            &mut rng,
+        )
+        .unwrap();
         VPVerifyingInfo {
             vk,
             proof,
@@ -520,7 +533,7 @@ impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
 
     fn get_vp_vk(&self) -> ValidityPredicateVerifyingKey {
         let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
-        let vk = keygen_vk(params, self.circuit).expect("keygen_vk should not fail");
+        let vk = keygen_vk(params, &self.circuit).expect("keygen_vk should not fail");
         ValidityPredicateVerifyingKey::from_vk(vk)
     }
 }
