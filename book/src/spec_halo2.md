@@ -129,94 +129,73 @@ Use the nullifier derivation as in Orchard: $\mathrm{DeriveNullifier}_{nk}(ρ, �
 
 - Arithmetized over $\mathbb{F}_p$.
 - Represented as a Halo2 circuit `VP(x; w) ⟶ 0/1`.
-- Expects `m` notes spent and `n` notes created. `m` and `n` could be different for each VP involved in a Taiga transaction.
+- Expects `m` notes input and `n` notes created. `m` and `n` could be different for each VP involved in a Taiga transaction.
 
 #### Inputs
 Public inputs (`x`):
 
-- `nf_1, …, nf_m` - spent note nullifiers
+- `nf_1, …, nf_m` - input note nullifiers
 - `cm_1, …, cm_n` - created note commitments
-- `ce_1, …, ce_n` - created note encryptions
 
 Private inputs (`w`):
-- `old_note_1, …, old_note_m` - spent notes
+- `old_note_1, …, old_note_m` - input notes
 - `new_note_1, …, new_note_n` - created notes
 - custom private inputs
 
 #### Checks
 Each VP must perform some standard checks to make sure the note binding is correct:
-1. Encrypted note integrity: for each `i ∈ {1, …, n}`, `ce_i = NoteEnc(new_note_i)`
-2. Spent note nullifier integrity: for each `i ∈ {1, …, m}`, `nf_i = DeriveNullifier_nk(ρ, ψ, cm)`
+2. input note nullifier integrity: for each `i ∈ {1, …, m}`, `nf_i = DeriveNullifier_nk(ρ, ψ, cm)`
 3. Output note commitment integrity: for each `i ∈ {1, …, n}`, `cm_i = NoteCommit(note, rcm_note)`
 
 TODO: explain why we need these checks
-TODO: Do we need to check the encryption in a VP, Action circuit, or both?
 
 All other constraints enforced by VP circuits are custom.
+
+Note: encrypted note integrity is checked in the action circuit (doesn't have to be here?)
 
 ### Action Circuit
 
 - Arithmetized over $\mathbb{F}_p$.
-- Represented as a Halo2 circuit, `ActionCircuit(x; w)`.
+- Represented as a Halo2 circuit `ActionCircuit(x; w)`.
 
 #### Inputs
 Public inputs (`x`):
-- Merkle root `rt`
-- Spent note nullifier `nf`, which commits to note application type, value, and data
-    - User VP commitment: `com_vp_addr_send` (commiting to `desc_vp_addr_send`)
-    - Application VP commitment: `com_vp_app`
+- `rt` - the root of the commitment Merkle tree
+- `ce` - encrypted output note
+- input note related:
+    - `nf` - input note nullifier; commits to note application type, value, and data
+    - `com_vp_app` - application VP commitment
     - `EnableSpend`
-- Output note commitment `cm`
-    - User VP commitment: `com_vp_addr_recv` (commiting to `desc_vp_addr_recv`)
-    - Application VP commitment: `com_vp_app`
+- output note related:
+    - `cm` - output note commitment
+    - `com_vp_app` - application VP commitment
     - `EnableOutput`
 
-
 Private inputs (`w`):
-- opening of spent note
-    - `note = (address, app, v, data, rho, psi, rcm)`
-    - `com_vp_addr` of spent note:
-        - `Com_q(desc_vp_addr_send)`, 
-        - `nk`, 
-        - `Com_q(desc_vp_addr_recv)`, 
-        - `rcm_com_vp_addr`
-    - `com_vp_app` of spent note:
+- input note related:
+    - `note = (note_type, app_data_dynamic, v, nk_com, ρ, ψ, is_merkle_checked, rcm_note)`
+    - `com_vp_app` opening of the input note:
         - `Com_q(desc_vp_app)`, 
         - `rcm_com_vp_app` 
-- opening of created note
-    - `note = (address, app, v, data, rho, psi, rcm)`
-    - `com_vp_addr` of output note:
-        - `Com_r(Com_q(desc_vp_address_send)||nk)`,
-        -  `Com_q(desc_vp_address_recv)`, 
-        -  `rcm_com_vp_addr`
-    - `com_vp_app` of output note:
+- output note related:
+    - `note = (note_type, app_data_dynamic, v, nk_com, ρ, ψ, is_merkle_checked, rcm_note)`
+    - `com_vp_app` opening of the output note:
         - `Com_q(desc_vp_app)`, 
         - `rcm_com_vp_app`
 
 #### Checks
-- For spent note `note = (address, app, v, data, ρ, ψ, rcm_note)`:
-    - Note is a valid note in `rt`
-        - Same as Orchard, there is a path in Merkle tree with root `rt` to a note commitment `cm` that opens to `note`
-    - `address` and `com_vp_addr` opens to the same `desc_vp_addr`
-        - Note User integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv))`
-        - Address VP integrity for input note: `com_vp_addr = Com(Com_q(desc_vp_addr_send), rcm_com_vp_addr)`
-        - Nullifier integrity(input note only): `nf = DeriveNullier_nk(note)`.
-    - `app` and `com_vp_app` opens to the same `desc_app_vp`
-        - Application (type) integrity: `app = Com_r(Com_q(desc_vp_app))`
-        - Application VP integrity: `com_vp_app = Com(Com_q(desc_vp_app), rcm_com_vp_app)`
-- For output note `note = (address, app, v, data, ρ, ψ, rcm_note)`:
-    - `address` and `com_vp_addr` opens to the same `desc_vp_addr`
-        - Note User integrity: `address = Com_r(Com_r(Com_q(desc_vp_addr_send)||nk) || Com_q(desc_vp_addr_recv))`
-        - Address VP integrity for output note: `com_vp_addr = Com(Com_q(desc_vp_addr_recv), rcm_com_vp_addr)`
-        - Commitment integrity(output note only): `cm = NoteCom(note, rcm_note)`
-    - `app` and `com_vp_app` opens to the same `desc_vp_app`
-        - Application (type) integrity: `app = Com_r(Com_q(desc_vp_app))`
-        - Application VP integrity: `com_vp = Com(Com_q(desc_vp_app), rcm_com_vp_app)`
+- For input note:
+    - Note is a valid note in `rt`: same as in Orchard, there is a path in Merkle tree with root `rt` to a note commitment `cm` that opens to `note`
+    - Nullifier integrity: `nf = DeriveNullier_nk(note)`.
+    - Application VP integrity: `com_vp_app = Com(Com_q(desc_vp_app), rcm_com_vp_app)`
+- For output note:
+    - Commitment integrity(output note only): `cm = NoteCom(note, rcm_note)`
+    - Application VP integrity: `com_vp = Com(Com_q(desc_vp_app), rcm_com_vp_app)`
+    - Encryption check: `ce = NoteEnc(note)`
 
-+ checks of `EnableSpend` and `EnableOutput` flags?
+TODO: cv check
 
-Changes and justifications: 
-- No more `asset_generator`, `cv`, `cdata`, as they are already committed to in `nf` and `cm`.
+TODO: checks of `EnableSpend` and `EnableOutput` flags?
 
 ## Concrete stuff
 ### Instantiations
@@ -240,7 +219,7 @@ For each epoch the state consists of:
 - Merkle tree, $MT$, of note commitments with root `rt`
     - Supporting add: $MT.add(cm, ce)$
     - Only `cm` is hashed in derivation of `rt`, note encryption `ce` is simply stored alongside `cm`
-- Set of spent note nullifiers, $NF$
+- Set of input note nullifiers, $NF$
     - Supporting add: $NF.add(nf)$
     - Supports memership checks
     
@@ -248,7 +227,7 @@ The state should make past `rt` accessible as well (TODO: can be simplify this?)
 
 ### Taiga Transaction `tx`
 
-A Taiga transaction `tx` contains k actions, upto k spent notes, and upto k created notes:
+A Taiga transaction `tx` contains k actions, upto k input notes, and upto k created notes:
 - Each $i$-th action specfies:
     - `ActionCircuit` proof `π_action_i`
     - public input `(rt_i, nf_i, enableSpend, cm_i, enableOutput)`, resulting in overall list of `NF_tx` and `CM_tx`:
@@ -314,7 +293,7 @@ Specifically, we need to construct two circuits `V_q(desc_C, x, π, intval), V_p
 
 ### Transaction w/ recursive proof
 
-A (recursive) Taiga transaction `tx` contains k actions, upto k spent notes, and upto k created notes:
+A (recursive) Taiga transaction `tx` contains k actions, upto k input notes, and upto k created notes:
 - Each $i$-th action specfies:
     - public input `(rt_i, nf_i, enableSpend, cm_i, enableOutput)`, resulting in overall list of `NF_tx` and `CM_tx`:
         - If `enableSpend = 1`, then `nf_i` is added to `NF_tx`
@@ -359,7 +338,7 @@ Cicuit checks that:
 Additional checks outside of $TxValidity_p$:
 - `V_q(intval) = 1` for all `intval` for vp and action
 - Each `rt_i` is a valid Merkle root for current or previous epoch
-- No `nf_i` are spent
+- No `nf_i` are input
     
 ### Accumulator circuit
 
@@ -373,7 +352,7 @@ $AccumulatorCircuit_1$
 Public inputs (`x`):
 - list of 2(m + n) `com_vp`
 - Action and VP public inputs
-    - spent note nullifiers, `nf_1, ..., nf_m`
+    - input note nullifiers, `nf_1, ..., nf_m`
     - created note commitments, `cm_1, ..., cm_n`
     - created note encryptions, `ce_1, ..., ce_n`
 - For each proof being accumulated:
@@ -445,7 +424,7 @@ Collections of actions and one big accumulator proof.
 
 A Taiga transaction consist of:
 - list of 2(m + n) `com_vp`
-- spent note nullifiers, `nf_1, ..., nf_m`
+- input note nullifiers, `nf_1, ..., nf_m`
 - created note commitments, `cm_1, ..., cm_n`
 - created note encryptions, `ce_1, ..., ce_n`
 - $\beta, \gamma, \alpha, \mathfrak{z}, v,u, \bar{a}, \bar{b}, \bar{c}, \bar{s}_{\sigma1}, \bar{s}_{\sigma2}, \bar{z}_{\omega}$ for each accumulated proof
