@@ -1,9 +1,8 @@
 use crate::action::{ActionInfo, ActionInstance};
-use crate::binding_signature::*;
 use crate::circuit::vp_circuit::{VPVerifyingInfo, ValidityPredicateVerifyingInfo};
 use crate::constant::{
     ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, NUM_NOTE,
-    SETUP_PARAMS_MAP, TRANSACTION_BINDING_HASH_PERSONALIZATION,
+    SETUP_PARAMS_MAP,
 };
 use crate::error::TransactionError;
 use crate::executable::Executable;
@@ -11,31 +10,9 @@ use crate::note::{NoteCommitment, OutputNoteInfo, SpendNoteInfo};
 use crate::nullifier::Nullifier;
 use crate::proof::Proof;
 use crate::value_commitment::ValueCommitment;
-use blake2b_simd::Params as Blake2bParams;
 use halo2_proofs::plonk::Error;
-use pasta_curves::{
-    group::{ff::PrimeField, Group},
-    pallas,
-};
+use pasta_curves::pallas;
 use rand::RngCore;
-
-#[derive(Debug, Clone)]
-pub struct ShieldedPartialTxBundle {
-    partial_txs: Vec<ShieldedPartialTransaction>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ShieldedResult {
-    anchors: Vec<pallas::Base>,
-    nullifiers: Vec<Nullifier>,
-    output_cms: Vec<NoteCommitment>,
-}
-
-#[derive(Debug, Clone)]
-pub enum InProgressBindingSignature {
-    Authorized(BindingSignature),
-    Unauthorized(BindingSigningKey),
-}
 
 #[derive(Debug, Clone)]
 pub struct ShieldedPartialTransaction {
@@ -56,99 +33,6 @@ pub struct NoteVPVerifyingInfoSet {
     app_dynamic_vp_verifying_info: Vec<VPVerifyingInfo>,
     // TODO: add verifier proof and according public inputs.
     // When the verifier proof is added, we may need to reconsider the structure of `VPVerifyingInfo`
-}
-
-impl ShieldedPartialTxBundle {
-    pub fn new() -> Self {
-        Self {
-            partial_txs: vec![],
-        }
-    }
-
-    pub fn build(partial_txs: Vec<ShieldedPartialTransaction>) -> Self {
-        Self { partial_txs }
-    }
-
-    pub fn add_partial_tx(&mut self, ptx: ShieldedPartialTransaction) {
-        self.partial_txs.push(ptx);
-    }
-
-    #[allow(clippy::type_complexity)]
-    pub fn execute(&self) -> Result<ShieldedResult, TransactionError> {
-        for partial_tx in self.partial_txs.iter() {
-            partial_tx.execute()?;
-        }
-
-        // Return Nullifiers to check double-spent, NoteCommitments to store, anchors to check the root-existence
-        Ok(ShieldedResult {
-            nullifiers: self.get_nullifiers(),
-            output_cms: self.get_output_cms(),
-            anchors: self.get_anchors(),
-        })
-    }
-
-    pub fn get_value_commitments(&self) -> Vec<ValueCommitment> {
-        self.partial_txs
-            .iter()
-            .flat_map(|ptx| ptx.get_value_commitments())
-            .collect()
-    }
-
-    pub fn digest(&self) -> [u8; 32] {
-        let mut h = Blake2bParams::new()
-            .hash_length(32)
-            .personal(TRANSACTION_BINDING_HASH_PERSONALIZATION)
-            .to_state();
-        self.get_nullifiers().iter().for_each(|nf| {
-            h.update(&nf.to_bytes());
-        });
-        self.get_output_cms().iter().for_each(|cm| {
-            h.update(&cm.to_bytes());
-        });
-        self.get_value_commitments().iter().for_each(|vc| {
-            h.update(&vc.to_bytes());
-        });
-        self.get_anchors().iter().for_each(|anchor| {
-            h.update(&anchor.to_repr());
-        });
-        h.finalize().as_bytes().try_into().unwrap()
-    }
-
-    fn get_nullifiers(&self) -> Vec<Nullifier> {
-        self.partial_txs
-            .iter()
-            .flat_map(|ptx| ptx.get_nullifiers())
-            .collect()
-    }
-
-    fn get_output_cms(&self) -> Vec<NoteCommitment> {
-        self.partial_txs
-            .iter()
-            .flat_map(|ptx| ptx.get_output_cms())
-            .collect()
-    }
-
-    fn get_anchors(&self) -> Vec<pallas::Base> {
-        self.partial_txs
-            .iter()
-            .flat_map(|ptx| ptx.get_anchors())
-            .collect()
-    }
-
-    fn get_binding_vk(&self) -> BindingVerificationKey {
-        let vk = self
-            .get_value_commitments()
-            .iter()
-            .fold(pallas::Point::identity(), |acc, cv| acc + cv.inner());
-
-        BindingVerificationKey::from(vk)
-    }
-}
-
-impl Default for ShieldedPartialTxBundle {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl ShieldedPartialTransaction {
@@ -410,7 +294,7 @@ pub mod testing {
         merkle_tree::MerklePath,
         note::{Note, OutputNoteInfo, SpendNoteInfo},
         nullifier::{Nullifier, NullifierKeyCom},
-        shielded_ptx::{ShieldedPartialTransaction, ShieldedPartialTxBundle},
+        shielded_ptx::ShieldedPartialTransaction,
         utils::poseidon_hash,
     };
     use halo2_proofs::arithmetic::Field;
@@ -575,18 +459,5 @@ pub mod testing {
             [output_note_info_1, output_note_info_2],
             &mut rng,
         )
-    }
-
-    pub fn create_shielded_ptx_bundle(
-        num: usize,
-    ) -> (ShieldedPartialTxBundle, Vec<pallas::Scalar>) {
-        let mut bundle = ShieldedPartialTxBundle::new();
-        let mut r_vec = vec![];
-        [0..num].iter().for_each(|_| {
-            let (ptx, r) = create_shielded_ptx();
-            bundle.add_partial_tx(ptx);
-            r_vec.push(r);
-        });
-        (bundle, r_vec)
     }
 }

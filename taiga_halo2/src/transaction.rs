@@ -1,10 +1,17 @@
 use crate::binding_signature::{BindingSignature, BindingSigningKey, BindingVerificationKey};
 use crate::constant::TRANSACTION_BINDING_HASH_PERSONALIZATION;
 use crate::error::TransactionError;
-use crate::shielded_ptx::{ShieldedPartialTxBundle, ShieldedResult};
-use crate::transparent_ptx::{TransparentPartialTxBundle, TransparentResult};
+use crate::executable::Executable;
+use crate::note::NoteCommitment;
+use crate::nullifier::Nullifier;
+use crate::shielded_ptx::ShieldedPartialTransaction;
+use crate::transparent_ptx::{OutputResource, TransparentPartialTransaction};
+use crate::value_commitment::ValueCommitment;
 use blake2b_simd::Params as Blake2bParams;
-use pasta_curves::{group::Group, pallas};
+use pasta_curves::{
+    group::{ff::PrimeField, Group},
+    pallas,
+};
 use rand::{CryptoRng, RngCore};
 
 #[derive(Debug, Clone)]
@@ -20,6 +27,29 @@ pub struct Transaction {
 pub enum InProgressBindingSignature {
     Authorized(BindingSignature),
     Unauthorized(BindingSigningKey),
+}
+
+#[derive(Debug, Clone)]
+pub struct ShieldedPartialTxBundle {
+    partial_txs: Vec<ShieldedPartialTransaction>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ShieldedResult {
+    anchors: Vec<pallas::Base>,
+    nullifiers: Vec<Nullifier>,
+    output_cms: Vec<NoteCommitment>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TransparentPartialTxBundle {
+    partial_txs: Vec<TransparentPartialTransaction>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TransparentResult {
+    pub nullifiers: Vec<Nullifier>,
+    pub outputs: Vec<OutputResource>,
 }
 
 impl Transaction {
@@ -130,9 +160,142 @@ impl Transaction {
     }
 }
 
+impl ShieldedPartialTxBundle {
+    pub fn new() -> Self {
+        Self {
+            partial_txs: vec![],
+        }
+    }
+
+    pub fn build(partial_txs: Vec<ShieldedPartialTransaction>) -> Self {
+        Self { partial_txs }
+    }
+
+    pub fn add_partial_tx(&mut self, ptx: ShieldedPartialTransaction) {
+        self.partial_txs.push(ptx);
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn execute(&self) -> Result<ShieldedResult, TransactionError> {
+        for partial_tx in self.partial_txs.iter() {
+            partial_tx.execute()?;
+        }
+
+        // Return Nullifiers to check double-spent, NoteCommitments to store, anchors to check the root-existence
+        Ok(ShieldedResult {
+            nullifiers: self.get_nullifiers(),
+            output_cms: self.get_output_cms(),
+            anchors: self.get_anchors(),
+        })
+    }
+
+    pub fn get_value_commitments(&self) -> Vec<ValueCommitment> {
+        self.partial_txs
+            .iter()
+            .flat_map(|ptx| ptx.get_value_commitments())
+            .collect()
+    }
+
+    pub fn digest(&self) -> [u8; 32] {
+        let mut h = Blake2bParams::new()
+            .hash_length(32)
+            .personal(TRANSACTION_BINDING_HASH_PERSONALIZATION)
+            .to_state();
+        self.get_nullifiers().iter().for_each(|nf| {
+            h.update(&nf.to_bytes());
+        });
+        self.get_output_cms().iter().for_each(|cm| {
+            h.update(&cm.to_bytes());
+        });
+        self.get_value_commitments().iter().for_each(|vc| {
+            h.update(&vc.to_bytes());
+        });
+        self.get_anchors().iter().for_each(|anchor| {
+            h.update(&anchor.to_repr());
+        });
+        h.finalize().as_bytes().try_into().unwrap()
+    }
+
+    fn get_nullifiers(&self) -> Vec<Nullifier> {
+        self.partial_txs
+            .iter()
+            .flat_map(|ptx| ptx.get_nullifiers())
+            .collect()
+    }
+
+    fn get_output_cms(&self) -> Vec<NoteCommitment> {
+        self.partial_txs
+            .iter()
+            .flat_map(|ptx| ptx.get_output_cms())
+            .collect()
+    }
+
+    fn get_anchors(&self) -> Vec<pallas::Base> {
+        self.partial_txs
+            .iter()
+            .flat_map(|ptx| ptx.get_anchors())
+            .collect()
+    }
+
+    fn get_binding_vk(&self) -> BindingVerificationKey {
+        let vk = self
+            .get_value_commitments()
+            .iter()
+            .fold(pallas::Point::identity(), |acc, cv| acc + cv.inner());
+
+        BindingVerificationKey::from(vk)
+    }
+}
+
+impl Default for ShieldedPartialTxBundle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TransparentPartialTxBundle {
+    pub fn execute(&self) -> Result<TransparentResult, TransactionError> {
+        for partial_tx in self.partial_txs.iter() {
+            partial_tx.execute()?;
+        }
+
+        Ok(TransparentResult {
+            nullifiers: vec![],
+            outputs: vec![],
+        })
+    }
+
+    pub fn get_value_commitments(&self) -> Vec<ValueCommitment> {
+        unimplemented!()
+    }
+
+    pub fn digest(&self) -> [u8; 32] {
+        unimplemented!()
+    }
+}
+
+pub mod testing {
+    use crate::shielded_ptx::testing::create_shielded_ptx;
+    use crate::transaction::ShieldedPartialTxBundle;
+    use pasta_curves::pallas;
+
+    pub fn create_shielded_ptx_bundle(
+        num: usize,
+    ) -> (ShieldedPartialTxBundle, Vec<pallas::Scalar>) {
+        let mut bundle = ShieldedPartialTxBundle::new();
+        let mut r_vec = vec![];
+        [0..num].iter().for_each(|_| {
+            let (ptx, r) = create_shielded_ptx();
+            bundle.add_partial_tx(ptx);
+            r_vec.push(r);
+        });
+        (bundle, r_vec)
+    }
+}
+
 #[test]
 fn test_halo2_transaction() {
-    use crate::shielded_ptx::testing::create_shielded_ptx_bundle;
+    use crate::transaction::testing::create_shielded_ptx_bundle;
     use rand::rngs::OsRng;
 
     let rng = OsRng;
