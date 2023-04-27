@@ -46,6 +46,7 @@ pub struct TransparentPartialTxBundle {
     partial_txs: Vec<TransparentPartialTransaction>,
 }
 
+// TODO: add other outputs if needed.
 #[derive(Debug, Clone)]
 pub struct TransparentResult {
     pub nullifiers: Vec<Nullifier>,
@@ -149,11 +150,34 @@ impl Transaction {
             .personal(TRANSACTION_BINDING_HASH_PERSONALIZATION)
             .to_state();
         if let Some(bundle) = self.shielded_bundle() {
-            h.update(&bundle.digest());
+            bundle.get_nullifiers().iter().for_each(|nf| {
+                h.update(&nf.to_bytes());
+            });
+            bundle.get_output_cms().iter().for_each(|cm| {
+                h.update(&cm.to_bytes());
+            });
+            bundle.get_value_commitments().iter().for_each(|vc| {
+                h.update(&vc.to_bytes());
+            });
+            bundle.get_anchors().iter().for_each(|anchor| {
+                h.update(&anchor.to_repr());
+            });
         }
 
+        // TODO: the transparent digest may be not reasonable, fix it once the transparent execution is nailed down.
         if let Some(bundle) = self.transparent_bundle() {
-            h.update(&bundle.digest());
+            bundle.get_nullifiers().iter().for_each(|nf| {
+                h.update(&nf.to_bytes());
+            });
+            bundle.get_output_cms().iter().for_each(|cm| {
+                h.update(&cm.to_bytes());
+            });
+            bundle.get_value_commitments().iter().for_each(|vc| {
+                h.update(&vc.to_bytes());
+            });
+            bundle.get_anchors().iter().for_each(|anchor| {
+                h.update(&anchor.to_repr());
+            });
         }
 
         h.finalize().as_bytes().try_into().unwrap()
@@ -196,41 +220,21 @@ impl ShieldedPartialTxBundle {
             .collect()
     }
 
-    pub fn digest(&self) -> [u8; 32] {
-        let mut h = Blake2bParams::new()
-            .hash_length(32)
-            .personal(TRANSACTION_BINDING_HASH_PERSONALIZATION)
-            .to_state();
-        self.get_nullifiers().iter().for_each(|nf| {
-            h.update(&nf.to_bytes());
-        });
-        self.get_output_cms().iter().for_each(|cm| {
-            h.update(&cm.to_bytes());
-        });
-        self.get_value_commitments().iter().for_each(|vc| {
-            h.update(&vc.to_bytes());
-        });
-        self.get_anchors().iter().for_each(|anchor| {
-            h.update(&anchor.to_repr());
-        });
-        h.finalize().as_bytes().try_into().unwrap()
-    }
-
-    fn get_nullifiers(&self) -> Vec<Nullifier> {
+    pub fn get_nullifiers(&self) -> Vec<Nullifier> {
         self.partial_txs
             .iter()
             .flat_map(|ptx| ptx.get_nullifiers())
             .collect()
     }
 
-    fn get_output_cms(&self) -> Vec<NoteCommitment> {
+    pub fn get_output_cms(&self) -> Vec<NoteCommitment> {
         self.partial_txs
             .iter()
             .flat_map(|ptx| ptx.get_output_cms())
             .collect()
     }
 
-    fn get_anchors(&self) -> Vec<pallas::Base> {
+    pub fn get_anchors(&self) -> Vec<pallas::Base> {
         self.partial_txs
             .iter()
             .flat_map(|ptx| ptx.get_anchors())
@@ -269,8 +273,25 @@ impl TransparentPartialTxBundle {
         unimplemented!()
     }
 
-    pub fn digest(&self) -> [u8; 32] {
-        unimplemented!()
+    pub fn get_nullifiers(&self) -> Vec<Nullifier> {
+        self.partial_txs
+            .iter()
+            .flat_map(|ptx| ptx.get_nullifiers())
+            .collect()
+    }
+
+    pub fn get_output_cms(&self) -> Vec<NoteCommitment> {
+        self.partial_txs
+            .iter()
+            .flat_map(|ptx| ptx.get_output_cms())
+            .collect()
+    }
+
+    pub fn get_anchors(&self) -> Vec<pallas::Base> {
+        self.partial_txs
+            .iter()
+            .flat_map(|ptx| ptx.get_anchors())
+            .collect()
     }
 }
 
