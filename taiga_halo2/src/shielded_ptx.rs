@@ -16,14 +16,11 @@ use pasta_curves::{
     group::{ff::PrimeField, Group},
     pallas,
 };
-use rand::{CryptoRng, RngCore};
+use rand::RngCore;
 
 #[derive(Debug, Clone)]
 pub struct ShieldedPartialTxBundle {
     partial_txs: Vec<ShieldedPartialTransaction>,
-    // binding signature to check balance
-    // TODO: if the shielded and transparent mixing is allowed, the binding signature might be moved in Transaction.
-    signature: InProgressBindingSignature,
 }
 
 #[derive(Debug, Clone)]
@@ -63,15 +60,9 @@ pub struct NoteVPVerifyingInfoSet {
 impl ShieldedPartialTxBundle {
     pub fn build(
         partial_txs: Vec<ShieldedPartialTransaction>,
-        rcv_vec: Vec<pallas::Scalar>,
     ) -> Self {
-        let sk = rcv_vec
-            .iter()
-            .fold(pallas::Scalar::zero(), |acc, rcv| acc + rcv);
-        let signature = InProgressBindingSignature::Unauthorized(BindingSigningKey::from(sk));
         Self {
             partial_txs,
-            signature,
         }
     }
 
@@ -79,23 +70,10 @@ impl ShieldedPartialTxBundle {
         self.partial_txs.push(ptx);
     }
 
-    pub fn binding_sign<R: RngCore + CryptoRng>(&mut self, rng: R) {
-        if let InProgressBindingSignature::Unauthorized(sk) = self.signature.clone() {
-            let vk = self.get_binding_vk();
-            assert_eq!(vk, sk.get_vk(), "The notes value is unbalanced");
-            let sig_hash = self.digest();
-            let signature = sk.sign(rng, &sig_hash);
-            self.signature = InProgressBindingSignature::Authorized(signature);
-        }
-    }
-
     #[allow(clippy::type_complexity)]
     pub fn execute(&self) -> Result<ShieldedResult, TransactionError> {
         // Verify proofs
         self.verify_proofs()?;
-
-        // Verify binding signature
-        self.verify_binding_sig()?;
 
         // Return Nullifiers to check double-spent, NoteCommitments to store, anchors to check the root-existence
         Ok(ShieldedResult {
@@ -105,7 +83,7 @@ impl ShieldedPartialTxBundle {
         })
     }
 
-    fn digest(&self) -> [u8; 32] {
+    pub fn digest(&self) -> [u8; 32] {
         let mut h = Blake2bParams::new()
             .hash_length(32)
             .personal(TRANSACTION_BINDING_HASH_PERSONALIZATION)
@@ -139,7 +117,7 @@ impl ShieldedPartialTxBundle {
             .collect()
     }
 
-    fn get_value_commitments(&self) -> Vec<ValueCommitment> {
+    pub fn get_value_commitments(&self) -> Vec<ValueCommitment> {
         self.partial_txs
             .iter()
             .flat_map(|ptx| ptx.get_value_commitments())
@@ -170,20 +148,6 @@ impl ShieldedPartialTxBundle {
             partial_tx.check_nullifiers()?;
             // output note commitment check
             partial_tx.check_note_commitments()?;
-        }
-
-        Ok(())
-    }
-
-    fn verify_binding_sig(&self) -> Result<(), TransactionError> {
-        let binding_vk = self.get_binding_vk();
-        let sig_hash = self.digest();
-        if let InProgressBindingSignature::Authorized(sig) = self.signature.clone() {
-            binding_vk
-                .verify(&sig_hash, &sig)
-                .map_err(|_| TransactionError::InvalidBindingSignature)?;
-        } else {
-            return Err(TransactionError::MissingBindingSignatures);
         }
 
         Ok(())
@@ -594,14 +558,13 @@ fn test_shielded_ptx_bundle() {
     );
 
     // Create shielded partial tx
-    let (ptx, rcv) = ShieldedPartialTransaction::build(
+    let (ptx, _rcv) = ShieldedPartialTransaction::build(
         [spend_note_info_1, spend_note_info_2],
         [output_note_info_1, output_note_info_2],
         &mut rng,
     );
 
     // Create shielded partial tx bundle
-    let mut shielded_tx_bundle = ShieldedPartialTxBundle::build(vec![ptx], vec![rcv]);
-    shielded_tx_bundle.binding_sign(rng);
+    let shielded_tx_bundle = ShieldedPartialTxBundle::build(vec![ptx]);
     shielded_tx_bundle.execute().unwrap();
 }

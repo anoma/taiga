@@ -1,4 +1,5 @@
 use crate::error::TransactionError;
+use crate::value_commitment::ValueCommitment;
 
 #[derive(Debug, Clone)]
 pub struct TransparentPartialTxBundle {
@@ -31,6 +32,14 @@ impl TransparentPartialTxBundle {
             nullifiers: vec![],
             outputs: vec![],
         })
+    }
+
+    pub fn get_value_commitments(&self) -> Vec<ValueCommitment> {
+        unimplemented!()
+    }
+
+    pub fn digest(&self) -> [u8; 32] {
+        unimplemented!()
     }
 }
 

@@ -1,22 +1,57 @@
+use crate::binding_signature::{BindingSignature, BindingSigningKey, BindingVerificationKey};
+use crate::constant::TRANSACTION_BINDING_HASH_PERSONALIZATION;
 use crate::error::TransactionError;
 use crate::shielded_ptx::{ShieldedPartialTxBundle, ShieldedResult};
 use crate::transparent_ptx::{TransparentPartialTxBundle, TransparentResult};
+use blake2b_simd::Params as Blake2bParams;
+use pasta_curves::{
+    group::Group,
+    pallas,
+};
+use rand::{CryptoRng, RngCore};
 
 #[derive(Debug, Clone)]
 pub struct Transaction {
     // TODO: Other parameters to be added.
     shielded_ptx_bundle: Option<ShieldedPartialTxBundle>,
     transparent_ptx_bundle: Option<TransparentPartialTxBundle>,
+    // binding signature to check balance
+    signature: InProgressBindingSignature,
+}
+
+#[derive(Debug, Clone)]
+pub enum InProgressBindingSignature {
+    Authorized(BindingSignature),
+    Unauthorized(BindingSigningKey),
 }
 
 impl Transaction {
     pub fn new(
         shielded_ptx_bundle: Option<ShieldedPartialTxBundle>,
         transparent_ptx_bundle: Option<TransparentPartialTxBundle>,
+        // random from value commitment
+        rcv_vec: Vec<pallas::Scalar>,
     ) -> Self {
+        assert!(shielded_ptx_bundle.is_none() && transparent_ptx_bundle.is_none());
+        assert!(rcv_vec.is_empty());
+        let sk = rcv_vec
+            .iter()
+            .fold(pallas::Scalar::zero(), |acc, rcv| acc + rcv);
+        let signature = InProgressBindingSignature::Unauthorized(BindingSigningKey::from(sk));
         Self {
             shielded_ptx_bundle,
             transparent_ptx_bundle,
+            signature,
+        }
+    }
+
+    pub fn binding_sign<R: RngCore + CryptoRng>(&mut self, rng: R) {
+        if let InProgressBindingSignature::Unauthorized(sk) = &self.signature {
+            let vk = self.get_binding_vk();
+            assert_eq!(vk, sk.get_vk(), "The notes value is unbalanced");
+            let sig_hash = self.digest();
+            let signature = sk.sign(rng, &sig_hash);
+            self.signature = InProgressBindingSignature::Authorized(signature);
         }
     }
 
@@ -42,8 +77,58 @@ impl Transaction {
             None => None,
         };
 
-        // TODO: if the shielded and transparent mixing is allowed, check the balance.
+        // check balance
+        self.verify_binding_sig()?;
 
         Ok((shielded_result, transparent_result))
+    }
+
+    fn verify_binding_sig(&self) -> Result<(), TransactionError> {
+        let binding_vk = self.get_binding_vk();
+        let sig_hash = self.digest();
+        if let InProgressBindingSignature::Authorized(sig) = &self.signature {
+            binding_vk
+                .verify(&sig_hash, sig)
+                .map_err(|_| TransactionError::InvalidBindingSignature)?;
+        } else {
+            return Err(TransactionError::MissingBindingSignatures);
+        }
+
+        Ok(())
+    }
+
+    fn get_binding_vk(&self) -> BindingVerificationKey {
+        let mut vk = pallas::Point::identity();
+        if let Some(bundle) = self.shielded_bundle() {
+            vk = bundle
+                .get_value_commitments()
+                .iter()
+                .fold(vk, |acc, cv| acc + cv.inner());
+        }
+
+        if let Some(bundle) = self.transparent_bundle() {
+            vk = bundle
+                .get_value_commitments()
+                .iter()
+                .fold(vk, |acc, cv| acc + cv.inner());
+        }
+
+        BindingVerificationKey::from(vk)
+    }
+
+    fn digest(&self) -> [u8; 32] {
+        let mut h = Blake2bParams::new()
+            .hash_length(32)
+            .personal(TRANSACTION_BINDING_HASH_PERSONALIZATION)
+            .to_state();
+        if let Some(bundle) = self.shielded_bundle() {
+            h.update(&bundle.digest());
+        }
+
+        if let Some(bundle) = self.transparent_bundle() {
+            h.update(&bundle.digest());
+        }
+
+        h.finalize().as_bytes().try_into().unwrap()
     }
 }
