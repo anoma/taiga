@@ -4,10 +4,7 @@ use crate::error::TransactionError;
 use crate::shielded_ptx::{ShieldedPartialTxBundle, ShieldedResult};
 use crate::transparent_ptx::{TransparentPartialTxBundle, TransparentResult};
 use blake2b_simd::Params as Blake2bParams;
-use pasta_curves::{
-    group::Group,
-    pallas,
-};
+use pasta_curves::{group::Group, pallas};
 use rand::{CryptoRng, RngCore};
 
 #[derive(Debug, Clone)]
@@ -32,8 +29,8 @@ impl Transaction {
         // random from value commitment
         rcv_vec: Vec<pallas::Scalar>,
     ) -> Self {
-        assert!(shielded_ptx_bundle.is_none() && transparent_ptx_bundle.is_none());
-        assert!(rcv_vec.is_empty());
+        assert!(shielded_ptx_bundle.is_some() || transparent_ptx_bundle.is_some());
+        assert!(!rcv_vec.is_empty());
         let sk = rcv_vec
             .iter()
             .fold(pallas::Scalar::zero(), |acc, rcv| acc + rcv);
@@ -131,4 +128,20 @@ impl Transaction {
 
         h.finalize().as_bytes().try_into().unwrap()
     }
+}
+
+#[test]
+fn test_halo2_transaction() {
+    use crate::shielded_ptx::testing::create_shielded_ptx_bundle;
+    use rand::rngs::OsRng;
+
+    let rng = OsRng;
+
+    // Create shielded partial tx bundle
+    let (shielded_tx_bundle, r_vec) = create_shielded_ptx_bundle(2);
+    // TODO: add transparent_ptx_bundle test
+    let transparent_ptx_bundle = None;
+    let mut tx = Transaction::new(Some(shielded_tx_bundle), transparent_ptx_bundle, r_vec);
+    tx.binding_sign(rng);
+    tx.execute().unwrap();
 }
