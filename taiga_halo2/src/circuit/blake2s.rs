@@ -62,7 +62,8 @@ pub struct Blake2sChip<F: Field> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Blake2sConfig {
     pub v: [Column<Advice>; 4], // Advice columns used for the state and message block
-    pub u: Column<Fixed>,       // Fixed column used for constants and other fixed values
+    pub u: Column<Fixed>,       
+    pub w: Column<Fixed>,       
     pub s_add: Selector,
     pub s_xor: Selector,
     pub s_rotate: Selector,
@@ -79,6 +80,7 @@ impl Blake2sConfig {
         ];
 
         let u = meta.fixed_column();
+        let w = meta.fixed_column();
         let s_add = meta.selector();
         let s_xor = meta.selector();
         let s_rotate = meta.selector();
@@ -117,7 +119,7 @@ impl Blake2sConfig {
         // Define our rotation gate
         meta.create_gate("Rotation", |meta| {
             let lhs = meta.query_advice(advices[0], Rotation::cur());
-            let rotation = meta.query_fixed(u);
+            let rotation = meta.query_fixed(w);
             let out = meta.query_advice(advices[1], Rotation::cur());
             let s_rotate = meta.query_selector(s_rotate);
 
@@ -127,6 +129,7 @@ impl Blake2sConfig {
         Blake2sConfig {
             v: advices,
             u,
+            w,
             s_add,
             s_xor,
             s_rotate,
@@ -237,9 +240,6 @@ impl<F: Field> Blake2sChip<F> {
             offset,
             || shifted_value,
         )?;
-
-        // Enforce the shift constraint
-        region.constrain_equal(cell.cell(), shifted_cell.cell())?;
 
         Ok(shifted_cell)
     }
@@ -370,7 +370,7 @@ impl<F: Field> Blake2sChip<F> {
     //     |      RETURN h[0..7]                  // New state.
     //     |
     //     END FUNCTION.
-    fn compression_function(
+    fn f(
         &self,
         layouter: &mut impl Layouter<pallas::Base>,
         state: [AssignedCell<pallas::Base, pallas::Base>; 8],
@@ -419,7 +419,7 @@ impl<F: Field> Blake2sChip<F> {
 
         // 2. Perform the 10 rounds of the Blake2s compression function
         for round in 0..ROUNDS {
-            for g_index in 0..16 {
+            for g_index in 0..8 {
                 let idx = SIGMA[round][2 * g_index];
                 let idx1 = SIGMA[round][2 * g_index + 1];
 
@@ -490,34 +490,68 @@ impl<F: Field> Blake2sChip<F> {
     //     |     RETURN first "nn" bytes from little-endian word array h[].
     //     |
     //     END FUNCTION.
-    // fn blake2s(
-    //     message_block: [pallas::Base; 16],
-    //     input_bytes: u64,
-    //     key_bytes: u32,
-    //     hash_bytes: u32,
-    // ) {
-    //     let state: Vec<AssignedCell<pallas::Base, pallas::Base>> = layouter.assign_region(
-    //         || "assign state",
-    //         |mut region| {
-    //             let mut state_cells = Vec::new();
-    //             for (idx, value) in IV.iter().enumerate() {
-    //                 let cell = region.assign_advice_from_constant(
-    //                     || "state",
-    //                     self.config.v[idx % 4],
-    //                     0,
-    //                     *value,
-    //                 )?;
-    //                 state_cells.push(cell);
-    //             }
-    //             Ok(state_cells)
-    //         },
-    //     )?;
-    // }
+    fn blake2s(
+        &self,
+        layouter: &mut impl Layouter<pallas::Base>,
+        message: [pallas::Base; 16], // TODO: Message blocks
+        // input_bytes: u64, // 0 <= ll < 2**64 
+        // key_bytes: u32, // 1 <= kk <= 32 
+        // hash_bytes: u32, // 1 <= nn <= 32 
+        // dd: u32 // dd = ceil(kk / bb) + ceil(ll / bb)
+    ) -> Result<[AssignedCell<pallas::Base, pallas::Base>; 8], Error> {
+        // Initialization Vector.
+        let mut state: [AssignedCell<pallas::Base, pallas::Base>; 8] = layouter.assign_region(
+            || "assign state",
+            |mut region| {
+                let mut state_cells = Vec::new();
+                for (idx, value) in IV.iter().enumerate() {
+                    let cell = region.assign_advice_from_constant(
+                        || "state",
+                        self.config.v[idx % 4],
+                        0,
+                        pallas::Base::from(*value as u64),
+                    )?;
+                    state_cells.push(cell);
+                }
+                Ok(state_cells)
+            },
+        )?.try_into().unwrap();
+
+        let message_block: [AssignedCell<pallas::Base, pallas::Base>; 16] = layouter.assign_region(
+            || "assign message block",
+            |mut region| {
+                let mut message_cells = Vec::new();
+                for (idx, value) in message.iter().enumerate() {
+                    let cell = region.assign_advice_from_constant(
+                        || "message",
+                        self.config.v[idx % 4],
+                        0,
+                        *value,
+                    )?;
+                    message_cells.push(cell);
+                }
+                Ok(message_cells)
+            },
+        )?.try_into().unwrap();
+    
+        // Parameter block p[0]
+        // TODO     h[0] := h[0] ^ 0x01010000 ^ (kk << 8) ^ nn
+
+        // TODO: Process padded key and data blocks
+        // |     IF dd > 1 THEN
+        // |     |       FOR i = 0 TO dd - 2 DO
+        // |     |       |       h := F( h, d[i], (i + 1) * bb, FALSE )
+        // |     |       END FOR.
+        // |     END IF.
+        // |
+
+        state = self.f(layouter, state, message_block)?;
+        Ok(state)
+    }
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct TestCircuit {
-    pub state: [pallas::Base; 16],
     pub message_block: [pallas::Base; 16],
     pub expected_output: [pallas::Base; 8],
 }
@@ -541,48 +575,8 @@ impl Circuit<pallas::Base> for TestCircuit {
         // Instantiate the Blake2sChip
         let blake2s_chip = Blake2sChip::<pallas::Base>::construct(config);
 
-        // Assign the initial state and message block
-        let state: Vec<AssignedCell<pallas::Base, pallas::Base>> = layouter.assign_region(
-            || "assign state",
-            |mut region| {
-                let mut state_cells = Vec::new();
-                for (idx, value) in self.state.iter().enumerate() {
-                    let cell = region.assign_advice_from_constant(
-                        || "state",
-                        config.v[idx % 4],
-                        0,
-                        *value,
-                    )?;
-                    state_cells.push(cell);
-                }
-                Ok(state_cells)
-            },
-        )?;
-
-        let message_block: Vec<AssignedCell<pallas::Base, pallas::Base>> = layouter.assign_region(
-            || "assign message block",
-            |mut region| {
-                let mut message_cells = Vec::new();
-                for (idx, value) in self.message_block.iter().enumerate() {
-                    let cell = region.assign_advice_from_constant(
-                        || "message",
-                        config.v[idx % 4],
-                        0,
-                        *value,
-                    )?;
-                    message_cells.push(cell);
-                }
-                Ok(message_cells)
-            },
-        )?;
-
-        let state: [AssignedCell<pallas::Base, pallas::Base>; 8] = state.try_into().unwrap();
-        let message_block: [AssignedCell<pallas::Base, pallas::Base>; 16] =
-            message_block.try_into().unwrap();
-
-        // Compress the message block
         let output_state =
-            blake2s_chip.compression_function(&mut layouter, state, message_block)?;
+            blake2s_chip.blake2s(&mut layouter, self.message_block)?;
 
         // TODO: Compare the output state to the expected output
 
@@ -612,13 +606,6 @@ mod tests {
 
     #[test]
     fn test_blake2s() {
-        // Define the initial state and message block for the Blake2s hash operation.
-        let state: [pallas::Base; 16] = (0..16)
-            .map(pallas::Base::from)
-            .collect()
-            .try_into()
-            .unwrap();
-
         // Input message: "hello world"
         let message_block: [u8; 16] = [
             0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x77, 0x6f, 0x72, 0x6c, 0x64, 0x00, 0x00, 0x00,
@@ -645,17 +632,16 @@ mod tests {
 
         // Create an instance of the TestCircuit struct with the provided initial state and message block values.
         let circuit = TestCircuit {
-            state,
             message_block,
             expected_output,
         };
 
         // Set the number of rows for the circuit.
-        let n = 12;
+        let n = 14;
 
         // Create a mock prover for the circuit.
         let mut prover = MockProver::<pallas::Base>::run(n, &circuit, vec![]).unwrap();
-
+        prover.assert_satisfied();
         // Verify the proof.
         let result = prover.verify();
 
