@@ -63,7 +63,6 @@ pub struct Blake2sChip<F: Field> {
 pub struct Blake2sConfig {
     pub v: [Column<Advice>; 4], // Advice columns used for the state and message block
     pub u: Column<Fixed>,       
-    pub w: Column<Fixed>,       
     pub s_add: Selector,
     pub s_xor: Selector,
     pub s_rotate: Selector,
@@ -80,7 +79,6 @@ impl Blake2sConfig {
         ];
 
         let u = meta.fixed_column();
-        let w = meta.fixed_column();
         let s_add = meta.selector();
         let s_xor = meta.selector();
         let s_rotate = meta.selector();
@@ -119,7 +117,7 @@ impl Blake2sConfig {
         // Define our rotation gate
         meta.create_gate("Rotation", |meta| {
             let lhs = meta.query_advice(advices[0], Rotation::cur());
-            let rotation = meta.query_fixed(w);
+            let rotation = meta.query_fixed(u);
             let out = meta.query_advice(advices[1], Rotation::cur());
             let s_rotate = meta.query_selector(s_rotate);
 
@@ -129,7 +127,6 @@ impl Blake2sConfig {
         Blake2sConfig {
             v: advices,
             u,
-            w,
             s_add,
             s_xor,
             s_rotate,
@@ -637,15 +634,11 @@ mod tests {
         };
 
         // Set the number of rows for the circuit.
-        let n = 14;
+        let n = 12;
 
         // Create a mock prover for the circuit.
         let mut prover = MockProver::<pallas::Base>::run(n, &circuit, vec![]).unwrap();
         prover.assert_satisfied();
-        // Verify the proof.
-        let result = prover.verify();
 
-        // Check if the proof is valid.
-        assert!(result.is_ok(), "proof is invalid: {:?}", result.err());
     }
 }
