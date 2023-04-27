@@ -61,7 +61,7 @@ pub struct Blake2sChip<F: Field> {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Blake2sConfig {
-    pub v: [Column<Advice>; 4], // Advice columns used for the state and message block
+    pub v: [Column<Advice>; 4],
     pub u: Column<Fixed>,       
     pub s_add: Selector,
     pub s_xor: Selector,
@@ -78,7 +78,12 @@ impl Blake2sConfig {
             meta.advice_column(),
         ];
 
+        for advice in advices.iter() {
+            meta.enable_equality(*advice);
+        }
+
         let u = meta.fixed_column();
+        meta.enable_constant(u);
         let s_add = meta.selector();
         let s_xor = meta.selector();
         let s_rotate = meta.selector();
@@ -169,7 +174,7 @@ impl<F: Field> Blake2sChip<F> {
             .zip(y.value())
             .map(|(x_val, y_val)| x_val + y_val - x_val * y_val);
         let result_cell =
-            region.assign_advice(|| "xor", config.v[offset % 4], offset, || result_val)?;
+            region.assign_advice(|| "xor", config.v[offset], offset, || result_val)?;
 
         Ok(result_cell)
     }
@@ -185,7 +190,7 @@ impl<F: Field> Blake2sChip<F> {
     ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
         let result_val = x.value().zip(y.value()).map(|(x_val, y_val)| x_val + y_val);
         let result_cell =
-            region.assign_advice(|| "add", config.v[offset % 4], offset, || result_val)?;
+            region.assign_advice(|| "add", config.v[offset], offset, || result_val)?;
 
         Ok(result_cell)
     }
@@ -210,7 +215,7 @@ impl<F: Field> Blake2sChip<F> {
         });
         let rotated_cell = region.assign_advice(
             || format!("rotate {}", rotation),
-            config.v[offset % 4],
+            config.v[offset],
             offset,
             || rotated_value,
         )?;
@@ -233,7 +238,7 @@ impl<F: Field> Blake2sChip<F> {
             .map(|v| *v * divisor.invert().unwrap_or(pallas::Base::zero()));
         let shifted_cell = region.assign_advice(
             || format!("shift right {}", shift),
-            config.v[offset % 4],
+            config.v[offset],
             offset,
             || shifted_value,
         )?;
