@@ -1,5 +1,8 @@
-use crate::error::TransactionError;
-use crate::value_commitment::ValueCommitment;
+use crate::{
+    error::TransactionError, executable::Executable, note::NoteCommitment, nullifier::Nullifier,
+    value_commitment::ValueCommitment,
+};
+use pasta_curves::pallas;
 
 #[derive(Debug, Clone)]
 pub struct TransparentPartialTxBundle {
@@ -27,7 +30,10 @@ pub struct TransparentPartialTransaction {
 
 impl TransparentPartialTxBundle {
     pub fn execute(&self) -> Result<TransparentResult, TransactionError> {
-        // TODO: figure out how transparent ptx executes
+        for partial_tx in self.partial_txs.iter() {
+            partial_tx.execute()?;
+        }
+
         Ok(TransparentResult {
             nullifiers: vec![],
             outputs: vec![],
@@ -39,6 +45,29 @@ impl TransparentPartialTxBundle {
     }
 
     pub fn digest(&self) -> [u8; 32] {
+        unimplemented!()
+    }
+}
+
+impl Executable for TransparentPartialTransaction {
+    fn execute(&self) -> Result<(), TransactionError> {
+        // TODO: figure out how transparent ptx executes
+        unimplemented!()
+    }
+
+    fn get_nullifiers(&self) -> Vec<Nullifier> {
+        unimplemented!()
+    }
+
+    fn get_output_cms(&self) -> Vec<NoteCommitment> {
+        unimplemented!()
+    }
+
+    fn get_value_commitments(&self) -> Vec<ValueCommitment> {
+        unimplemented!()
+    }
+
+    fn get_anchors(&self) -> Vec<pallas::Base> {
         unimplemented!()
     }
 }

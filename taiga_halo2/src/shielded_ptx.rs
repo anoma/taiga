@@ -6,6 +6,7 @@ use crate::constant::{
     SETUP_PARAMS_MAP, TRANSACTION_BINDING_HASH_PERSONALIZATION,
 };
 use crate::error::TransactionError;
+use crate::executable::Executable;
 use crate::note::{NoteCommitment, OutputNoteInfo, SpendNoteInfo};
 use crate::nullifier::Nullifier;
 use crate::proof::Proof;
@@ -74,8 +75,9 @@ impl ShieldedPartialTxBundle {
 
     #[allow(clippy::type_complexity)]
     pub fn execute(&self) -> Result<ShieldedResult, TransactionError> {
-        // Verify proofs
-        self.verify_proofs()?;
+        for partial_tx in self.partial_txs.iter() {
+            partial_tx.execute()?;
+        }
 
         // Return Nullifiers to check double-spent, NoteCommitments to store, anchors to check the root-existence
         Ok(ShieldedResult {
@@ -83,6 +85,13 @@ impl ShieldedPartialTxBundle {
             output_cms: self.get_output_cms(),
             anchors: self.get_anchors(),
         })
+    }
+
+    pub fn get_value_commitments(&self) -> Vec<ValueCommitment> {
+        self.partial_txs
+            .iter()
+            .flat_map(|ptx| ptx.get_value_commitments())
+            .collect()
     }
 
     pub fn digest(&self) -> [u8; 32] {
@@ -119,13 +128,6 @@ impl ShieldedPartialTxBundle {
             .collect()
     }
 
-    pub fn get_value_commitments(&self) -> Vec<ValueCommitment> {
-        self.partial_txs
-            .iter()
-            .flat_map(|ptx| ptx.get_value_commitments())
-            .collect()
-    }
-
     fn get_anchors(&self) -> Vec<pallas::Base> {
         self.partial_txs
             .iter()
@@ -140,19 +142,6 @@ impl ShieldedPartialTxBundle {
             .fold(pallas::Point::identity(), |acc, cv| acc + cv.inner());
 
         BindingVerificationKey::from(vk)
-    }
-
-    fn verify_proofs(&self) -> Result<(), TransactionError> {
-        for partial_tx in self.partial_txs.iter() {
-            // verify proof
-            partial_tx.verify()?;
-            // nullifier check
-            partial_tx.check_nullifiers()?;
-            // output note commitment check
-            partial_tx.check_note_commitments()?;
-        }
-
-        Ok(())
     }
 }
 
@@ -207,7 +196,8 @@ impl ShieldedPartialTransaction {
         )
     }
 
-    pub fn verify(&self) -> Result<(), Error> {
+    // verify zk proof
+    fn verify_proof(&self) -> Result<(), Error> {
         // Verify action proofs
         for verifying_info in self.actions.iter() {
             verifying_info.verify()?;
@@ -225,35 +215,8 @@ impl ShieldedPartialTransaction {
         Ok(())
     }
 
-    pub fn get_nullifiers(&self) -> Vec<Nullifier> {
-        self.actions
-            .iter()
-            .map(|action| action.action_instance.nf)
-            .collect()
-    }
-
-    pub fn get_output_cms(&self) -> Vec<NoteCommitment> {
-        self.actions
-            .iter()
-            .map(|action| action.action_instance.cm)
-            .collect()
-    }
-
-    pub fn get_value_commitments(&self) -> Vec<ValueCommitment> {
-        self.actions
-            .iter()
-            .map(|action| action.action_instance.cv_net)
-            .collect()
-    }
-
-    pub fn get_anchors(&self) -> Vec<pallas::Base> {
-        self.actions
-            .iter()
-            .map(|action| action.action_instance.anchor)
-            .collect()
-    }
-
-    pub fn check_nullifiers(&self) -> Result<(), TransactionError> {
+    // check the nullifiers are from action proofs
+    fn check_nullifiers(&self) -> Result<(), TransactionError> {
         let action_nfs = self.get_nullifiers();
         for vp_info in self.spends.iter() {
             for nfs in vp_info.get_nullifiers().iter() {
@@ -283,7 +246,8 @@ impl ShieldedPartialTransaction {
         Ok(())
     }
 
-    pub fn check_note_commitments(&self) -> Result<(), TransactionError> {
+    // check the output cms are from action proofs
+    fn check_note_commitments(&self) -> Result<(), TransactionError> {
         let action_cms = self.get_output_cms();
         for vp_info in self.outputs.iter() {
             for cms in vp_info.get_note_commitments().iter() {
@@ -311,6 +275,43 @@ impl ShieldedPartialTransaction {
             }
         }
         Ok(())
+    }
+}
+
+impl Executable for ShieldedPartialTransaction {
+    fn execute(&self) -> Result<(), TransactionError> {
+        self.verify_proof()?;
+        self.check_nullifiers()?;
+        self.check_note_commitments()?;
+        Ok(())
+    }
+
+    fn get_nullifiers(&self) -> Vec<Nullifier> {
+        self.actions
+            .iter()
+            .map(|action| action.action_instance.nf)
+            .collect()
+    }
+
+    fn get_output_cms(&self) -> Vec<NoteCommitment> {
+        self.actions
+            .iter()
+            .map(|action| action.action_instance.cm)
+            .collect()
+    }
+
+    fn get_value_commitments(&self) -> Vec<ValueCommitment> {
+        self.actions
+            .iter()
+            .map(|action| action.action_instance.cv_net)
+            .collect()
+    }
+
+    fn get_anchors(&self) -> Vec<pallas::Base> {
+        self.actions
+            .iter()
+            .map(|action| action.action_instance.anchor)
+            .collect()
     }
 }
 

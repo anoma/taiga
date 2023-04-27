@@ -6,6 +6,7 @@ pub mod binding_signature;
 pub mod circuit;
 pub mod constant;
 pub mod error;
+mod executable;
 pub mod merkle_tree;
 pub mod note;
 pub mod note_encryption;
