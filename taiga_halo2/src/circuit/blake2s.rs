@@ -30,7 +30,7 @@ const IV: [u32; 8] = [
 ];
 
 // The SIGMA constant in Blake2s is a 10x16 array that defines the message permutations in the algorithm. Each of the 10 rows corresponds to a round of the hashing process, and each of the 16 elements in the row determines the message block order.
-const SIGMA: [[u8; 16]; 10] = [
+const SIGMA: [[usize; 16]; 10] = [
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
     [14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3],
     [11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4],
@@ -62,7 +62,7 @@ pub struct Blake2sChip<F: Field> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Blake2sConfig {
     pub v: [Column<Advice>; 4],
-    pub u: Column<Fixed>,       
+    pub u: Column<Fixed>,
     pub s_add: Selector,
     pub s_xor: Selector,
     pub s_rotate: Selector,
@@ -270,16 +270,20 @@ impl<F: Field> Blake2sChip<F> {
         state: [AssignedCell<pallas::Base, pallas::Base>; 16],
         message: [AssignedCell<pallas::Base, pallas::Base>; 2],
         round: usize,
+        a: usize,
+        b: usize,
+        c: usize,
+        d: usize,
     ) -> Result<[AssignedCell<pallas::Base, pallas::Base>; 16], Error> {
         layouter.assign_region(
             || "G function",
             |mut region| {
                 let x = &message[0];
                 let y = &message[1];
-                let va = &state[0];
-                let vb = &state[1];
-                let vc = &state[2];
-                let vd = &state[3];
+                let va = &state[a];
+                let vb = &state[b];
+                let vc = &state[c];
+                let vd = &state[d];
 
                 // First mixing stage
                 let va = self.add(va, vb, &mut region, &self.config, round % 4)?;
@@ -421,20 +425,66 @@ impl<F: Field> Blake2sChip<F> {
 
         // 2. Perform the 10 rounds of the Blake2s compression function
         for round in 0..ROUNDS {
-            for g_index in 0..8 {
-                let idx = SIGMA[round][2 * g_index];
-                let idx1 = SIGMA[round][2 * g_index + 1];
-
+            let s = SIGMA[round];
+            for i in 0..4 {
                 v = self.g(
                     layouter,
                     v,
                     [
-                        message_block[idx as usize].clone(),
-                        message_block[idx1 as usize].clone(),
+                        message_block[s[2 * i]].clone(),
+                        message_block[s[2 * i + 1]].clone(),
                     ],
                     round,
+                    i,
+                    i + 4,
+                    i + 8,
+                    i + 12,
                 )?;
             }
+            //  v := G( v, 0, 5, 10, 15, m[s[ 8]], m[s[ 9]] )
+            v = self.g(
+                layouter,
+                v,
+                [message_block[s[8]].clone(), message_block[s[9]].clone()],
+                round,
+                0,
+                5,
+                10,
+                15,
+            )?;
+            // v := G( v, 1, 6, 11, 12, m[s[10]], m[s[11]] )
+            v = self.g(
+                layouter,
+                v,
+                [message_block[s[10]].clone(), message_block[s[11]].clone()],
+                round,
+                1,
+                6,
+                11,
+                12,
+            )?;
+            // v := G( v, 2, 7,  8, 13, m[s[12]], m[s[13]] )
+            v = self.g(
+                layouter,
+                v,
+                [message_block[s[12]].clone(), message_block[s[13]].clone()],
+                round,
+                2,
+                7,
+                8,
+                13,
+            )?;
+            // v := G( v, 3, 4,  9, 14, m[s[14]], m[s[15]] )
+            v = self.g(
+                layouter,
+                v,
+                [message_block[s[10]].clone(), message_block[s[9]].clone()],
+                round,
+                3,
+                4,
+                9,
+                14,
+            )?;
         }
 
         // 3. Finalize the state
@@ -496,46 +546,52 @@ impl<F: Field> Blake2sChip<F> {
         &self,
         layouter: &mut impl Layouter<pallas::Base>,
         message: [pallas::Base; 16], // TODO: Message blocks
-        // input_bytes: u64, // 0 <= ll < 2**64 
-        // key_bytes: u32, // 1 <= kk <= 32 
-        // hash_bytes: u32, // 1 <= nn <= 32 
-        // dd: u32 // dd = ceil(kk / bb) + ceil(ll / bb)
+                                     // input_bytes: u64, // 0 <= ll < 2**64
+                                     // key_bytes: u32, // 1 <= kk <= 32
+                                     // hash_bytes: u32, // 1 <= nn <= 32
+                                     // dd: u32 // dd = ceil(kk / bb) + ceil(ll / bb)
     ) -> Result<[AssignedCell<pallas::Base, pallas::Base>; 8], Error> {
         // Initialization Vector.
-        let mut state: [AssignedCell<pallas::Base, pallas::Base>; 8] = layouter.assign_region(
-            || "assign state",
-            |mut region| {
-                let mut state_cells = Vec::new();
-                for (idx, value) in IV.iter().enumerate() {
-                    let cell = region.assign_advice_from_constant(
-                        || "state",
-                        self.config.v[idx % 4],
-                        0,
-                        pallas::Base::from(*value as u64),
-                    )?;
-                    state_cells.push(cell);
-                }
-                Ok(state_cells)
-            },
-        )?.try_into().unwrap();
+        let mut state: [AssignedCell<pallas::Base, pallas::Base>; 8] = layouter
+            .assign_region(
+                || "assign state",
+                |mut region| {
+                    let mut state_cells = Vec::new();
+                    for (idx, value) in IV.iter().enumerate() {
+                        let cell = region.assign_advice_from_constant(
+                            || "state",
+                            self.config.v[idx % 4],
+                            0,
+                            pallas::Base::from(*value as u64),
+                        )?;
+                        state_cells.push(cell);
+                    }
+                    Ok(state_cells)
+                },
+            )?
+            .try_into()
+            .unwrap();
 
-        let message_block: [AssignedCell<pallas::Base, pallas::Base>; 16] = layouter.assign_region(
-            || "assign message block",
-            |mut region| {
-                let mut message_cells = Vec::new();
-                for (idx, value) in message.iter().enumerate() {
-                    let cell = region.assign_advice_from_constant(
-                        || "message",
-                        self.config.v[idx % 4],
-                        0,
-                        *value,
-                    )?;
-                    message_cells.push(cell);
-                }
-                Ok(message_cells)
-            },
-        )?.try_into().unwrap();
-    
+        let message_block: [AssignedCell<pallas::Base, pallas::Base>; 16] = layouter
+            .assign_region(
+                || "assign message block",
+                |mut region| {
+                    let mut message_cells = Vec::new();
+                    for (idx, value) in message.iter().enumerate() {
+                        let cell = region.assign_advice_from_constant(
+                            || "message",
+                            self.config.v[idx % 4],
+                            0,
+                            *value,
+                        )?;
+                        message_cells.push(cell);
+                    }
+                    Ok(message_cells)
+                },
+            )?
+            .try_into()
+            .unwrap();
+
         // Parameter block p[0]
         // TODO     h[0] := h[0] ^ 0x01010000 ^ (kk << 8) ^ nn
 
@@ -577,8 +633,7 @@ impl Circuit<pallas::Base> for TestCircuit {
         // Instantiate the Blake2sChip
         let blake2s_chip = Blake2sChip::<pallas::Base>::construct(config);
 
-        let output_state =
-            blake2s_chip.blake2s(&mut layouter, self.message_block)?;
+        let output_state = blake2s_chip.blake2s(&mut layouter, self.message_block)?;
 
         // TODO: Compare the output state to the expected output
 
@@ -644,6 +699,5 @@ mod tests {
         // Create a mock prover for the circuit.
         let mut prover = MockProver::<pallas::Base>::run(n, &circuit, vec![]).unwrap();
         prover.assert_satisfied();
-
     }
 }
