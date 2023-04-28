@@ -161,6 +161,7 @@ impl<F: Field> Blake2sChip<F> {
         }
     }
 
+    // TODO: Use lookups - see sha256 implementation as reference
     fn xor(
         &self,
         x: &AssignedCell<pallas::Base, pallas::Base>,
@@ -179,8 +180,7 @@ impl<F: Field> Blake2sChip<F> {
         Ok(result_cell)
     }
 
-    // TODO: Add mod 2^32
-    fn add(
+    fn add_mod_u32(
         &self,
         x: &AssignedCell<pallas::Base, pallas::Base>,
         y: &AssignedCell<pallas::Base, pallas::Base>,
@@ -188,7 +188,17 @@ impl<F: Field> Blake2sChip<F> {
         config: &Blake2sConfig,
         offset: usize,
     ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
-        let result_val = x.value().zip(y.value()).map(|(x_val, y_val)| x_val + y_val);
+        let result_val = x.value().zip(y.value()).map(|(x_val, y_val)| {
+            // Convert the Pallas base field element into bytes
+            let x_bytes = x_val.to_repr();
+            let x_u32 = u32::from_le_bytes([x_bytes[0], x_bytes[1], x_bytes[2], x_bytes[3]]);
+            let y_bytes = y_val.to_repr();
+            let y_u32 = u32::from_le_bytes([y_bytes[0], y_bytes[1], y_bytes[2], y_bytes[3]]);
+            pallas::Base::from((x_u32 + y_u32) as u64)
+        });
+
+        // Take the first 4 bytes to create a u32 integer (considering endianness)
+
         let result_cell =
             region.assign_advice(|| "add", config.v[offset], offset, || result_val)?;
 
@@ -286,25 +296,25 @@ impl<F: Field> Blake2sChip<F> {
                 let vd = &state[d];
 
                 // First mixing stage
-                let va = self.add(va, vb, &mut region, &self.config, round % 4)?;
-                let va = self.add(&va, &x, &mut region, &self.config, round % 4)?;
+                let va = self.add_mod_u32(va, vb, &mut region, &self.config, round % 4)?;
+                let va = self.add_mod_u32(&va, &x, &mut region, &self.config, round % 4)?;
 
                 let vd = self.xor(vd, &va, &mut region, &self.config, round % 4)?;
                 let vd = self.rotate_right(&vd, &mut region, &self.config, R1, round % 4)?;
 
-                let vc = self.add(vc, &vd, &mut region, &self.config, round % 4)?;
+                let vc = self.add_mod_u32(vc, &vd, &mut region, &self.config, round % 4)?;
 
                 let vb = self.xor(&vb, &vc, &mut region, &self.config, round % 4)?;
                 let vb = self.rotate_right(&vb, &mut region, &self.config, R2, round % 4)?;
 
                 // Second mixing stage
-                let va = self.add(&va, &vb, &mut region, &self.config, round % 4)?;
-                let va = self.add(&va, &y, &mut region, &self.config, round % 4)?;
+                let va = self.add_mod_u32(&va, &vb, &mut region, &self.config, round % 4)?;
+                let va = self.add_mod_u32(&va, &y, &mut region, &self.config, round % 4)?;
 
                 let vd = self.xor(&vd, &va, &mut region, &self.config, round % 4)?;
                 let vd = self.rotate_right(&vd, &mut region, &self.config, R3, round % 4)?;
 
-                let vc = self.add(&vc, &vd, &mut region, &self.config, round % 4)?;
+                let vc = self.add_mod_u32(&vc, &vd, &mut region, &self.config, round % 4)?;
 
                 let vb = self.xor(&vb, &vc, &mut region, &self.config, round % 4)?;
                 let vb = self.rotate_right(&vb, &mut region, &self.config, R4, round % 4)?;
