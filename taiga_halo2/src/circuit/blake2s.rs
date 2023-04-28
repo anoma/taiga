@@ -106,7 +106,7 @@ impl Blake2sConfig {
             let out = meta.query_advice(advices[2], Rotation::cur());
             let s_xor = meta.query_selector(s_xor);
 
-            vec![s_xor * (lhs.clone() + rhs.clone() - lhs * rhs - out)]
+            vec![s_xor * (lhs.clone() * rhs.clone() + rhs * out.clone() - out)]
         });
 
         // Define our shift right gate
