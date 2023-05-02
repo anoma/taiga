@@ -83,20 +83,18 @@ Commitments are binding by default (i.e. can be instantiated with hash). If we w
 |`rcm_note`| $\mathbb{F}_q$| a random commitment trapdoor|
 
 #### 2.5.2 Value base
-TODO: clarify the type of app_vk
-
 |Variable|Type|Description|
 |-|-|-|
-|`app_vk`|?|Verifying key of the application circuit|
+|`app_vk`|$\mathbb{F}_p$ (compressed)|Verifying key of the application circuit. Compressed into a Pallas point|
 |`app_data_static`|$\mathbb{F}_p$| application data used to derive note's type|
 
 #### 2.5.3 Note commitment
 
 |Name|Type|Description|
 |-|-|-|
-|`cm` | Pallas point ($\mathbb F_p$, $\mathbb F_p$)|$cm = \mathrm{NoteCom}(note, rcm\_note)$|
+|`cm` | Pallas point ($\mathbb F_p$, $\mathbb F_p$)|$cm = \mathrm{NoteCom}(note, rcm\_note)$. `NoteCom`|
 
-TODO: same as Orchard?
+TODO: which fields to commit to?
 
 ### 2.6 Nullifier deriving key `nk`
 
@@ -143,15 +141,15 @@ Private inputs (`w`):
 - custom private inputs
 
 #### Checks
-Each VP must perform some standard checks to make sure the note binding is correct:
+As opening of the notes are private parameters, to make sure that notes that the VP received indeed the ones that correspond to the public parameters, VP must check:
 2. input note nullifier integrity: for each `i ∈ {1, …, m}`, `nf_i = DeriveNullifier_nk(ρ, ψ, cm)`
 3. Output note commitment integrity: for each `i ∈ {1, …, n}`, `cm_i = NoteCommit(note, rcm_note)`
-
-TODO: explain why we need these checks
 
 All other constraints enforced by VP circuits are custom.
 
 Note: encrypted note integrity is checked in the action circuit (doesn't have to be here?)
+
+
 
 ### Action Circuit
 
@@ -190,22 +188,23 @@ Private inputs (`w`):
     - Commitment integrity(output note only): `cm = NoteCom(note, rcm_note)`
     - Application VP integrity: `com_vp = Com(Com_q(desc_vp_app), rcm_com_vp_app)`
     - Encryption check: `ce = NoteEnc(note)`
-
-TODO: to avoid the situation when the user spends note that isn't checked in the merkle tree, trying to output a valid note, the VP should take this into account? Check that the note isn't dummy
-TODO: cv check
-TODO: add conditional `is_merkle_checked` checks
+- Value commitment integrity: `cv = ValueCommit(v_in - v_out, rcv)` 
 
 ## Instantiations
-|Function|Description|Instantiation|
+|Function|Instantiation|Description|
 |-|-|-|
-|nullifier PRF||Poseidon|
-|nk commitment||Poseidon|
-|nk PRF||Blake2s|
-|address||Poseidon (f_p -> f_p)??|
-|note commitment ($Com_r$)||Sincemilla (f_p -> f_p)|
-|VP commitment (Com)||Blake2s|
-|VE||DH + Poseidon|
-|hash to curve|||
+|nullifier PRF|Poseidon|$\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF_{nk}(ρ) + ψ \mod{q}]K + cm)$|
+|nk commitment|Poseidon|`Com(nk) = `; used to protect `nk` stored in a note
+|nk PRF|Blake2s|`nk = PRF_r(...)`
+|address|Poseidon (f_p -> f_p)??|
+|`NoteCommit`|[Sincemilla](https://zcash.github.io/halo2/design/gadgets/sinsemilla.html)|
+|VP commitment (Com)|Blake2s|Efficient over both $\mathrm{F}_p$ and $\mathrm{F}_q$ 
+|VE|DH + Poseidon|
+|hash to curve||
+|Value base derivation||
+|Value commit||
+
+TODO: update the table
 
 ## Taiga Application
     
@@ -225,7 +224,9 @@ A Taiga transaction contains:
     - `π_action` - `ActionCircuit` proof
     - `(rt, nf, cm, com_vp_input, com_vp_output, ce)` - `ActionCircuit` public input 
 
-TODO: Add partial transactions. Can we not have partial transactions in a Taiga tx?
+TODO: Add partial transactions
+
+A balanced set of Taiga partial transactions counts as a valid output of Taiga that can be sent further to the mempool or whatnot
 
 #### Validity of `tx`
 A transaction `tx` is valid if:
