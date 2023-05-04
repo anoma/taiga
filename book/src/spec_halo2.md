@@ -203,8 +203,6 @@ Private inputs (`w`):
 |`ValueCommit`|Pedersen-like|`cv = (v_i * VB_i - v_o * VB_o) + r[R]`, `VB_x` - value base of a note
 |VE|DH + Poseidon| `ek = DH(recv.pk, sender.sk)`, `ce = Poseidon(note, ek)`
 
-TODO: add valuecommit section
-
 ## Taiga Application
     
 For each epoch the state consists of:
@@ -219,21 +217,40 @@ The state should make past `rt` accessible as well
 
 ### Taiga `tx`
 A Taiga transaction contains:
-- `k` actions, each of which contains one input and one output note. Actions include:
-    - `π_action` - `ActionCircuit` proof
-    - `(rt, nf, cm, com_vp_input, com_vp_output, ce)` - `ActionCircuit` public input 
+- a set of `k` partial transactions: `[ptx_1, .., ptx_k]`
+- a binding signature
 
-TODO: Add partial transactions
+### Taiga `ptx`
 
-A balanced set of Taiga partial transactions counts as a valid output of Taiga that can be sent further to the mempool or whatnot
+Each Taiga `ptx` contains 2 input and 2 output notes. Each of the notes requires at least one VP to be satisfied, resulting in at most 4 VP proofs per `ptx`. If the same VP controls 2+ notes in a `ptx`, the VP is called just once per `ptx`, reducing the total amount of non-dummy proofs. 
+
+Note: it is possible that a VP requires checks of other VPs in order to be satisfied. In that case, the total amount of VPs checked could be more than 4, but we can count such check as a single check.
+
+Note: For security reasons, it might make sense to require a minimal amount of proofs attached to be 4 and attach dummy proofs if needed.
+
+Each Taiga ptx contains:
+- `2` actions:
+    - `π_action` - proof of the action
+    - `(rt, nf, cm, com_vp_input, com_vp_output, ce)` - public input
+- for each input note:
+    - `π_VP` proof
+    - VP public input
+    - VP vk
+    - `extra_VP_vk` (if the "main" VP requires additional VPs to be checked) 
+- for each output note:
+    - `π_VP` proof
+    - VP public input
+    - VP vk
+    - `extra_VP_vk` (if the "main" VP requires additional VPs to be checked)
 
 #### Validity of `tx`
 A transaction `tx` is valid if:
 1. For each $i$-th action:
     - [if `is_merkle_checked = true`] `rt_i` is a valid Merkle root from current or past epoch.
-    - `Verify(desc_ActionCircuit, ActionPublicInput, π_action_i) = True`
+    - `Verify(ActionVK, ActionPublicInput, π_action_i) = True`
 2. For each VP:
-    - `Verify'(desc_VP, com_vp, π_vp) = True`
+    - `Verify'(VP_VK, VPPublicInput, π_VP) = True`
+3. Balance check: the binding signature is valid
     
 #### Processing of `tx`
 A valid Taiga transaction `tx` induces a state change as follows:
