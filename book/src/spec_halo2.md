@@ -134,6 +134,8 @@ Public inputs (`x`):
 
 - `nf_1, …, nf_m` - input note nullifiers
 - `cm_1, …, cm_n` - created note commitments
+- `ce_1, …, ce_n` - encrypted output notes
+
 
 Private inputs (`w`):
 - `old_note_1, …, old_note_m` - input notes
@@ -142,14 +144,14 @@ Private inputs (`w`):
 
 #### Checks
 As opening of the notes are private parameters, to make sure that notes that the VP received indeed the ones that correspond to the public parameters, VP must check:
-2. input note nullifier integrity: for each `i ∈ {1, …, m}`, `nf_i = DeriveNullifier_nk(ρ, ψ, cm)`
-3. Output note commitment integrity: for each `i ∈ {1, …, n}`, `cm_i = NoteCommit(note, rcm_note)`
+
+1. input note nullifier integrity: for each `i ∈ {1, …, m}`, `nf_i = DeriveNullifier_nk(ρ, ψ, cm)`
+2. Output note commitment integrity: for each `i ∈ {1, …, n}`, `cm_i = NoteCommit(note, rcm_note)`
+3. Encrypted note integrity: for each `i ∈ {1, …, n}`, `ce_i = Encrypt(note, ek)`
+
+Note: encryption can be customized per application. Some applications might encrypt more fields, others - less. It does leak some information
 
 All other constraints enforced by VP circuits are custom.
-
-Note: encrypted note integrity is checked in the action circuit (doesn't have to be here?)
-
-
 
 ### Action Circuit
 
@@ -159,7 +161,6 @@ Note: encrypted note integrity is checked in the action circuit (doesn't have to
 #### Inputs
 Public inputs (`x`):
 - `rt` - the root of the commitment Merkle tree
-- `ce` - encrypted output note
 - input note related:
     - `nf` - input note nullifier; commits to note application type, value, and data
     - `com_vp_app` - application VP commitment
@@ -187,7 +188,6 @@ Private inputs (`w`):
 - For output note:
     - Commitment integrity(output note only): `cm = NoteCom(note, rcm_note)`
     - Application VP integrity: `com_vp = Com(Com_q(desc_vp_app), rcm_com_vp_app)`
-    - Encryption check: `ce = NoteEnc(note)`
 - Value commitment integrity: `cv = ValueCommit(v_in - v_out, rcv)` 
 
 ## Instantiations
