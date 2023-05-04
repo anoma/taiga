@@ -193,18 +193,17 @@ Private inputs (`w`):
 ## Instantiations
 |Function|Instantiation|Description|
 |-|-|-|
-|nullifier PRF|Poseidon|$\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF_{nk}(ρ) + ψ \mod{q}]K + cm)$|
-|nk commitment|Poseidon|`Com(nk) = `; used to protect `nk` stored in a note
-|nk PRF|Blake2s|`nk = PRF_r(...)`
-|address|Poseidon (f_p -> f_p)??|
+|Nullifier PRF|Poseidon|$\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF_{nk}(ρ) + ψ \mod{q}]K + cm)$|
+|`nk` commitment|Poseidon|`Com(nk) = Poseidon(nk, user_derived_key)`; used to protect `nk` stored in a note. `user_derived_key` is currently not used
+|`nk` PRF|Blake2s|`nk = PRF_r(...)`| Used to derive `nk`
+|address|Poseidon| `address = Poseidon(app_data_dynamic, nk_com)`; compresses the data fields that contain some ownership information
 |`NoteCommit`|[Sincemilla](https://zcash.github.io/halo2/design/gadgets/sinsemilla.html)|
-|VP commitment (Com)|Blake2s|Efficient over both $\mathrm{F}_p$ and $\mathrm{F}_q$ 
-|VE|DH + Poseidon|
-|hash to curve||
-|Value base derivation||
-|Value commit||
+|`VPCommit`|Blake2s|Efficient over both $\mathrm{F}_p$ and $\mathrm{F}_q$
+|Value base derivation|Poseidon|`value_base = hash_to_curve(Poseidon(app_vk, app_data_static))`; compresses the fields related to the resource type
+|`ValueCommit`|Pedersen-like|`cv = (v_i * VB_i - v_o * VB_o) + r[R]`, `VB_x` - value base of a note
+|VE|DH + Poseidon| `ek = DH(recv.pk, sender.sk)`, `ce = Poseidon(note, ek)`
 
-TODO: update the table
+TODO: add valuecommit section
 
 ## Taiga Application
     
