@@ -1,6 +1,4 @@
-# Taiga Spec Working Draft
-
-To be edited as design changes. Please make changes as necessary. Keep it **concise** and **precise**.
+# Taiga Spec
 
 ## 1. Proving system
 
@@ -21,27 +19,17 @@ We use Halo2/IPA with Pasta curves developed by Zcash to instantiate our proving
 
 ### 1.3 Circuit
 - `C(x; w) ⟶ 0/1`
-- upto `n` fan-in 3 (or 4) addition / multiplication / lookup gates over $\mathbb{F}_p$
+- upto `n` fan-in 3 (or 4) gates over $\mathbb{F}_p$
 - Following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html), `C(x; w)` can be turned into polynomials over $\mathbb{F}_p$
 
 ### 1.4 Proving system interfaces
 ||Interface|Description|
 |-|-|-|
-|__Preprocess__|`preproc(C) ⟶ desc_C`|`C` is turned into a *circuit description* which is a sequence of polynomial commitments|
+|__Preprocess__|`preproc(C) ⟶ desc_C`|`C` is turned into a *circuit description*|
 |__Prove__|`P(C, x, w) ⟶ π`|arithmetized over $\mathbb{F}_p$ and $\mathbb{F}_q$|
 |__Verify__|`V(desc_C, x, π) ⟶ 0/1`|arithmetized over $\mathbb{F}_p$ and $\mathbb{F}_q$|
 
-### 1.5 Potential features
-#### Accumulation (of proofs / verifier circuit)
-
-Definitions from Section 4.1 of [BCMS20](https://eprint.iacr.org/2020/499.pdf), and specializing to their Definition 4.2 for Plonk verifiers.
-
-||Interface|Description|
-|-|-|-|
-|__Accumulation Prover__|`AccP(acc, desc_C, x, π) ⟶ (acc', aπ)` ??|over $\mathbb{F}_p$ and $\mathbb{F}_q$|
-|__Accumulation Verifier__|`AccV(acc, acc', aπ, desc_C, x, π) ⟶ 0/1` ??|over $\mathbb{F}_q$ ?|
-|__Accumulation Decider__|`AccD(acc) ⟶ 0/1`|over $\mathbb{F}_q$ ?|
-
+A circuit description is all data the verifier needs to verify a proof. It includes the verifier key, but not only that.
 
 ## 2. Abstractions
 ### 2.1 Data types
@@ -57,20 +45,20 @@ We blend commitments into a single abstract interface.
 |Commitment|Efficient over|Description|
 |-|-|-|
 |`Com_q(...) ⟶ com`|$\mathbb{F}_q$||
-|`Com_r(...) ⟶ com`|$\mathbb{F}_p$||
-|`Com(...) ⟶ com`|**both** $\mathbb{F}_q$ and $\mathbb{F}_p$||
+|`Com_p(...) ⟶ com`|$\mathbb{F}_p$||
+|`Com(...) ⟶ com`|**both** $\mathbb{F}_q$ and $\mathbb{F}_p$|For the commitments that need to be opened in circuits over both fields (Accumulation + Action/VP)|
 
-#### 2.3 Binding & hiding
+### Binding & hiding
 Commitments are binding by default (i.e. can be instantiated with hash). If we want hiding (possibly across differnt commitments), we add `rcm` explicitly.
 
-### 2.4 Validity predicates
+### 2.3 Validity predicates
 |Name||Description|
 |-|-|-|
 |VP description|`desc_vp = preproc(vp)`|generate pk, vk, CRS|
 |VP commitment|`VPCom(desc_vp; rcm_com_vp) := Com( Com_q(desc_vp), rcm_com_vp)`||
 
-### 2.5 Note
-#### 2.5.1 Note fields
+### 2.4 Note
+#### 2.4.1 Note fields
 |Variable|Type|Description|
 |-|-|-|
 |`note_type`| Pallas point ($\mathbb{F}_p$, $\mathbb{F}_p$) | Value base. `note_type = poseidon_to_curve(Poseidon(app_vk, app_data_static))`|
@@ -82,21 +70,21 @@ Commitments are binding by default (i.e. can be instantiated with hash). If we w
 |`is_merkle_checked`|bool|dummy note flag|
 |`rcm_note`| $\mathbb{F}_q$| a random commitment trapdoor|
 
-#### 2.5.2 Value base
+#### 2.4.2 Value base
 |Variable|Type|Description|
 |-|-|-|
 |`app_vk`|$\mathbb{F}_p$ (compressed)|Verifying key of the application circuit. Compressed into a Pallas point|
 |`app_data_static`|$\mathbb{F}_p$| application data used to derive note's type|
 
-#### 2.5.3 Note commitment
+#### 2.4.3 Note commitment
 
 |Name|Type|Description|
 |-|-|-|
-|`cm` | Pallas point ($\mathbb F_p$, $\mathbb F_p$)|$cm = \mathrm{NoteCom}(note, rcm\_note)$. `NoteCom`|
+|`cm` | Pallas point ($\mathbb F_p$, $\mathbb F_p$)|$cm = \mathrm{NoteCom}(note, rcm\_note)$|
 
 TODO: which fields to commit to?
 
-### 2.6 Nullifier deriving key `nk`
+### 2.5 Nullifier deriving key `nk`
 
 Note: not implemented (yet?)
 
@@ -106,7 +94,7 @@ Note: not implemented (yet?)
 |random||random value|
 |PERSONALIZATION_NK| string| set to `"Taiga_PRF_NK"`||
 
-### 2.7 Nullifier
+### 2.6 Nullifier
 
 Use the nullifier derivation as in Orchard: $\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF_{nk}(ρ) + ψ \mod{q}]K + cm)$
 
@@ -188,6 +176,7 @@ Private inputs (`w`):
 - For output note:
     - Commitment integrity(output note only): `cm = NoteCom(note, rcm_note)`
     - Application VP integrity: `com_vp = Com(Com_q(desc_vp_app), rcm_com_vp_app)`
+    - Value base integrity: TBD (similarly to the MASP, we only check vb for output notes)
 - Value commitment integrity: `cv = ValueCommit(v_in - v_out, rcv)` 
 
 ## Instantiations
@@ -235,21 +224,21 @@ Each Taiga ptx contains:
 - for each input note:
     - `π_VP` proof
     - VP public input
-    - VP vk
+    - desc_VP
     - `extra_VP_vk` (if the "main" VP requires additional VPs to be checked) 
 - for each output note:
     - `π_VP` proof
     - VP public input
-    - VP vk
-    - `extra_VP_vk` (if the "main" VP requires additional VPs to be checked)
+    - desc_VP
+    - `extra_desc_VP` (if the "main" VP requires additional VPs to be checked)
 
 #### Validity of `tx`
 A transaction `tx` is valid if:
 1. For each $i$-th action:
     - [if `is_merkle_checked = true`] `rt_i` is a valid Merkle root from current or past epoch.
-    - `Verify(ActionVK, ActionPublicInput, π_action_i) = True`
+    - `Verify(desc_Action, ActionPublicInput, π_action_i) = True`
 2. For each VP:
-    - `Verify'(VP_VK, VPPublicInput, π_VP) = True`
+    - `Verify'(desc_VP, VPPublicInput, π_VP) = True`
 3. Balance check: the binding signature is valid
     
 #### Processing of `tx`
