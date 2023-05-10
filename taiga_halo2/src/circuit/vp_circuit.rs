@@ -510,7 +510,7 @@ impl VampIRValidityPredicateCircuit {
         // Populate variable definitions
         circuit.populate_variables(var_assignments);
 
-        // TODO: Set instances. Ask Vampir Team how to get the instances.
+        // TODO: export and handle the instances
         Self {
             params,
             circuit,
@@ -526,14 +526,8 @@ impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
         let vk = keygen_vk(&self.params, &self.circuit).expect("keygen_vk should not fail");
         let pk =
             keygen_pk(&self.params, vk.clone(), &self.circuit).expect("keygen_pk should not fail");
-        let proof = Proof::create(
-            &pk,
-            &self.params,
-            self.circuit.clone(),
-            &[&self.instances],
-            &mut rng,
-        )
-        .unwrap();
+        // TODO: export and handle the instances
+        let proof = Proof::create(&pk, &self.params, self.circuit.clone(), &[], &mut rng).unwrap();
         VPVerifyingInfo {
             vk,
             proof,
@@ -565,4 +559,23 @@ impl HaloCircuitData {
             bincode::decode_from_std_read(&mut reader, bincode::config::standard())?;
         Ok(Self { params, circuit })
     }
+}
+
+#[test]
+fn test_create_vp_from_vamp_ir_circuit() {
+    let vamp_ir_circuit_file = PathBuf::from("./src/circuit/vamp_ir_circuits/pyth.halo2");
+    let inputs_file = PathBuf::from("./src/circuit/vamp_ir_circuits/pyth.inputs");
+    let vp_circuit =
+        VampIRValidityPredicateCircuit::from_vamp_ir_circuit(&vamp_ir_circuit_file, &inputs_file);
+
+    // generate proof and instance
+    let vp_info = vp_circuit.get_verifying_info();
+
+    // verify the proof
+    // TODO: use the vp_info.verify() instead. vp_info.verify() doesn't work now because it uses the fixed VP_CIRCUIT_PARAMS_SIZE params.
+    // TODO: export and handle the instances
+    vp_info
+        .proof
+        .verify(&vp_info.vk, &vp_circuit.params, &[])
+        .unwrap();
 }
