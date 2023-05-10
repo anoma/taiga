@@ -2,12 +2,12 @@
 
 ## 1. Proving system
 
-We use Halo2/IPA with Pasta curves developed by Zcash to instantiate our proving system.
+We use Halo2/IPA with [Pasta curves](https://github.com/zcash/pasta) developed by Zcash to instantiate our proving system.
 
 ### 1.1 Elliptic curves
 ||Name|Scalar field| Base field|Purpose|Instantiation|
 |-|-|-|-|-|-|
-|$E_I$|Inner curve|$\mathbb{F}_q$|$\mathbb{F}_p$|ECC gadget| Pallas
+|$E_I$|Inner curve|$\mathbb{F}_q$|$\mathbb{F}_p$|ECC gadget| [Pallas](https://github.com/zcash/pasta#pallasvesta-supporting-evidence)
 |$E_M$|Main curve|$\mathbb{F}_p$|$\mathbb{F}_q$|Action and VP circuits| Vesta|
 |$E_O$|Outer curve|$\mathbb{F}_q$|$\mathbb{F}_p$|Accumulation circuit| Pallas|
 
@@ -32,33 +32,14 @@ We use Halo2/IPA with Pasta curves developed by Zcash to instantiate our proving
 A circuit description is all data the verifier needs to verify a proof. It includes the verifier key, but not only that.
 
 ## 2. Abstractions
-### 2.1 Data types
-- Input / output of each abstract interface, e.g. `Com, Com_q`, defines a distinct type.
-- Each distinct data field defines a type, e.g. `v, data, asset_type`.
-- Data types are linked via interface definition and usage as required, e.g. `v` is of the same type as the first input to `Com_v`.
-- All data types have **fixed length**.
-
-### 2.2 Commitments
-
-We blend commitments into a single abstract interface.
-
-|Commitment|Efficient over|Description|
-|-|-|-|
-|`Com_q(...) ⟶ com`|$\mathbb{F}_q$||
-|`Com_p(...) ⟶ com`|$\mathbb{F}_p$||
-|`Com(...) ⟶ com`|**both** $\mathbb{F}_q$ and $\mathbb{F}_p$|For the commitments that need to be opened in circuits over both fields (Accumulation + Action/VP)|
-
-### Binding & hiding
-Commitments are binding by default (i.e. can be instantiated with hash). If we want hiding (possibly across differnt commitments), we add `rcm` explicitly.
-
-### 2.3 Validity predicates
+### 2.1 Validity predicates
 |Name||Description|
 |-|-|-|
 |VP description|`desc_vp = preproc(vp)`|generate pk, vk, CRS|
-|VP commitment|`VPCom(desc_vp; rcm_com_vp) := Com( Com_q(desc_vp), rcm_com_vp)`||
+|VP commitment|`VPCommit(vp, rcm_vp) = Com( Com_q(desc_vp), rcm_vp)`|⚠️ the exact formula for VPCommit is yet to be defined|
 
-### 2.4 Note
-#### 2.4.1 Note fields
+### 2.2 Note
+#### 2.2.1 Note fields
 |Variable|Type|Description|
 |-|-|-|
 |`note_type`| Pallas point ($\mathbb{F}_p$, $\mathbb{F}_p$) | Value base. `note_type = poseidon_to_curve(Poseidon(app_vk, app_data_static))`|
@@ -70,13 +51,13 @@ Commitments are binding by default (i.e. can be instantiated with hash). If we w
 |`is_merkle_checked`|bool|dummy note flag|
 |`rcm_note`| $\mathbb{F}_q$| a random commitment trapdoor|
 
-#### 2.4.2 Value base
+#### 2.2.2 Value base
 |Variable|Type|Description|
 |-|-|-|
 |`app_vk`|$\mathbb{F}_p$ (compressed)|Verifying key of the application circuit. Compressed into a Pallas point|
 |`app_data_static`|$\mathbb{F}_p$| application data used to derive note's type|
 
-#### 2.4.3 Note commitment
+#### 2.2.3 Note commitment
 
 |Name|Type|Description|
 |-|-|-|
@@ -84,7 +65,7 @@ Commitments are binding by default (i.e. can be instantiated with hash). If we w
 
 TODO: which fields to commit to?
 
-### 2.5 Nullifier deriving key `nk`
+### 2.3 Nullifier deriving key `nk`
 
 Note: not implemented (yet?)
 
@@ -94,7 +75,7 @@ Note: not implemented (yet?)
 |random||random value|
 |PERSONALIZATION_NK| string| set to `"Taiga_PRF_NK"`||
 
-### 2.6 Nullifier
+### 2.4 Nullifier
 
 Use the nullifier derivation as in Orchard: $\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF_{nk}(ρ) + ψ \mod{q}]K + cm)$
 
@@ -159,38 +140,34 @@ Public inputs (`x`):
 Private inputs (`w`):
 - input note related:
     - `note = (note_type, app_data_dynamic, v, nk_com, ρ, ψ, is_merkle_checked, rcm_note)`
-    - `com_vp_app` opening of the input note:
-        - `Com_q(desc_vp_app)`, 
-        - `rcm_com_vp_app` 
+    - `com_vp` opening of the input note
 - output note related:
     - `note = (note_type, app_data_dynamic, v, nk_com, ρ, ψ, is_merkle_checked, rcm_note)`
-    - `com_vp_app` opening of the output note:
-        - `Com_q(desc_vp_app)`, 
-        - `rcm_com_vp_app`
+    - `com_vp` opening of the output note
 
 #### Checks
 - For input note:
     - If `is_merkle_checked = true`, check that the note is a valid note in `rt`: there is a path in Merkle tree with root `rt` to a note commitment `cm` that opens to `note`
     - Nullifier integrity: `nf = DeriveNullier_nk(note)`.
-    - Application VP integrity: `com_vp_app = Com(Com_q(desc_vp_app), rcm_com_vp_app)`
+    - Application VP integrity: `com_vp = VPCommit(vp, rcm_vp)`
 - For output note:
     - Commitment integrity(output note only): `cm = NoteCom(note, rcm_note)`
-    - Application VP integrity: `com_vp = Com(Com_q(desc_vp_app), rcm_com_vp_app)`
+    - Application VP integrity: `com_vp = VPCommit(vp, rcm_vp)`
     - Value base integrity: TBD (similarly to the MASP, we only check vb for output notes)
 - Value commitment integrity: `cv = ValueCommit(v_in - v_out, rcv)` 
 
 ## Instantiations
-|Function|Instantiation|Description|
-|-|-|-|
-|Nullifier PRF|Poseidon|$\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF_{nk}(ρ) + ψ \mod{q}]K + cm)$|
-|`nk` commitment|Poseidon|`Com(nk) = Poseidon(nk, user_derived_key)`; used to protect `nk` stored in a note. `user_derived_key` is currently not used
-|`nk` PRF|Blake2s|`nk = PRF_r(...)`| Used to derive `nk`
-|address|Poseidon| `address = Poseidon(app_data_dynamic, nk_com)`; compresses the data fields that contain some ownership information
-|`NoteCommit`|[Sincemilla](https://zcash.github.io/halo2/design/gadgets/sinsemilla.html)|
-|`VPCommit`|Blake2s|Efficient over both $\mathrm{F}_p$ and $\mathrm{F}_q$
-|Value base derivation|Poseidon|`value_base = hash_to_curve(Poseidon(app_vk, app_data_static))`; compresses the fields related to the resource type
-|`ValueCommit`|Pedersen-like|`cv = (v_i * VB_i - v_o * VB_o) + r[R]`, `VB_x` - value base of a note
-|VE|DH + Poseidon| `ek = DH(recv.pk, sender.sk)`, `ce = Poseidon(note, ek)`
+|Function|Instantiation|Domain/Range|Description|
+|-|-|-|-|
+|Nullifier PRF|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF_{nk}(ρ) + ψ \mod{q}]K + cm)$|
+|`nk` commitment|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|`Com(nk) = Poseidon(nk, user_derived_key)`; used to protect `nk` stored in a note. `user_derived_key` is currently not used
+|`nk` PRF|Blake2s|$\mathrm{F}_p \rightarrow \mathrm{F}_?$|`nk = PRF_r(...)`| Used to derive `nk`
+|address|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$| `address = Poseidon(app_data_dynamic, nk_com)`; compresses the data fields that contain some ownership information
+|`NoteCommit`|[Sincemilla](https://zcash.github.io/halo2/design/gadgets/sinsemilla.html)|$\mathrm{F}_p \rightarrow \mathrm{F}_?$|
+|`VPCommit`|Blake2s|-|Efficient over both $\mathrm{F}_p$ and $\mathrm{F}_q$
+|Value base derivation|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|`value_base = hash_to_curve(Poseidon(app_vk, app_data_static))`; compresses the fields related to the resource type
+|`ValueCommit`|Pedersen-like|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|`cv = (v_i * VB_i - v_o * VB_o) + r[R]`, `VB_x` - value base of a note
+|VE|DH + Poseidon|$\mathrm{F}_? \rightarrow \mathrm{F}_?$| `ek = DH(recv.pk, sender.sk)`, `ce = Poseidon(note, ek)`
 
 ## Taiga Application
     
