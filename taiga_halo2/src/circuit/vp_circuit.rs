@@ -15,11 +15,13 @@ use crate::{
     proof::Proof,
     vp_vk::ValidityPredicateVerifyingKey,
 };
+use bincode::error::DecodeError;
 use dyn_clone::{clone_trait_object, DynClone};
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
     circuit::{AssignedCell, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error, VerifyingKey},
+    poly::commitment::Params,
 };
 use pasta_curves::{pallas, vesta};
 use rand::rngs::OsRng;
@@ -481,18 +483,24 @@ macro_rules! vp_circuit_impl {
 
 #[derive(Clone)]
 pub struct VampIRValidityPredicateCircuit {
+    // TODO: vamp_ir doesn't support to set the params size manually, add the params here temporarily.
+    // remove the params once we can set it as VP_CIRCUIT_PARAMS_SIZE in vamp_ir.
+    pub params: Params<vesta::Affine>,
     pub circuit: Halo2Module<pallas::Base>,
     pub instances: Vec<pallas::Base>,
 }
 
 impl VampIRValidityPredicateCircuit {
-    pub fn from_file(vamp_ir_circuit_file: &PathBuf, inputs_file: &PathBuf) -> Self {
+    pub fn from_vamp_ir_circuit(vamp_ir_circuit_file: &PathBuf, inputs_file: &PathBuf) -> Self {
         let mut circuit_file =
             File::open(vamp_ir_circuit_file).expect("unable to load circuit file");
-        let mut circuit: Halo2Module<pallas::Base> =
-            bincode::decode_from_std_read(&mut circuit_file, bincode::config::standard())
-                .expect("unable to load circuit file");
-        // let HaloCircuitData { params, mut circuit } = HaloCircuitData::read(&mut circuit_file).unwrap();
+        // let mut circuit: Halo2Module<pallas::Base> =
+        //     bincode::decode_from_std_read(&mut circuit_file, bincode::config::standard())
+        //         .expect("unable to load circuit file");
+        let HaloCircuitData {
+            params,
+            mut circuit,
+        } = HaloCircuitData::read(&mut circuit_file).unwrap();
         let var_assignments_ints = read_inputs_from_file(&circuit.module, inputs_file);
         let mut var_assignments = HashMap::new();
         for (k, v) in var_assignments_ints {
@@ -504,6 +512,7 @@ impl VampIRValidityPredicateCircuit {
 
         // TODO: Set instances. Ask Vampir Team how to get the instances.
         Self {
+            params,
             circuit,
             instances: vec![],
         }
@@ -513,12 +522,13 @@ impl VampIRValidityPredicateCircuit {
 impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
     fn get_verifying_info(&self) -> VPVerifyingInfo {
         let mut rng = OsRng;
-        let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
-        let vk = keygen_vk(params, &self.circuit).expect("keygen_vk should not fail");
-        let pk = keygen_pk(params, vk.clone(), &self.circuit).expect("keygen_pk should not fail");
+        // let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
+        let vk = keygen_vk(&self.params, &self.circuit).expect("keygen_vk should not fail");
+        let pk =
+            keygen_pk(&self.params, vk.clone(), &self.circuit).expect("keygen_pk should not fail");
         let proof = Proof::create(
             &pk,
-            params,
+            &self.params,
             self.circuit.clone(),
             &[&self.instances],
             &mut rng,
@@ -532,8 +542,27 @@ impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
     }
 
     fn get_vp_vk(&self) -> ValidityPredicateVerifyingKey {
-        let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
-        let vk = keygen_vk(params, &self.circuit).expect("keygen_vk should not fail");
+        // let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
+        let vk = keygen_vk(&self.params, &self.circuit).expect("keygen_vk should not fail");
         ValidityPredicateVerifyingKey::from_vk(vk)
+    }
+}
+
+// TODO: We won't need the HaloCircuitData when we can import the circuit from vamp_ir.
+struct HaloCircuitData {
+    params: Params<vesta::Affine>,
+    circuit: Halo2Module<pallas::Base>,
+}
+
+impl HaloCircuitData {
+    fn read<R>(mut reader: R) -> Result<Self, DecodeError>
+    where
+        R: std::io::Read,
+    {
+        let params = Params::<vesta::Affine>::read(&mut reader)
+            .map_err(|x| DecodeError::OtherString(x.to_string()))?;
+        let circuit: Halo2Module<pallas::Base> =
+            bincode::decode_from_std_read(&mut reader, bincode::config::standard())?;
+        Ok(Self { params, circuit })
     }
 }
