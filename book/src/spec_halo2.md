@@ -1,45 +1,31 @@
 # Taiga Spec
 
+⚠️ Instantiations and exact formulas are not stable ⚠ ️
+
 ## 1. Proving system
 
 We use Halo2/IPA with [Pasta curves](https://github.com/zcash/pasta) developed by Zcash to instantiate our proving system.
 
-### 1.1 Elliptic curves
+### 1.1 Circuits
+Let `C(x; w) ⟶ 0/1` be a circuit with up to `n` gates. The circuit is represented as polynomials over the chosen curve's scalar field, following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html). Commitments are generated over the curve's base field.
+
+### 1.2 Elliptic curves
 ||Name|Scalar field| Base field|Purpose|Instantiation|
 |-|-|-|-|-|-|
 |$E_I$|Inner curve|$\mathbb{F}_q$|$\mathbb{F}_p$|ECC gadget| [Pallas](https://github.com/zcash/pasta#pallasvesta-supporting-evidence)
 |$E_M$|Main curve|$\mathbb{F}_p$|$\mathbb{F}_q$|Action and VP circuits| Vesta|
 |$E_O$|Outer curve|$\mathbb{F}_q$|$\mathbb{F}_p$|Accumulation circuit| Pallas|
 
-### 1.2 Polynomial commitment scheme $Com$
-- $d$ is the bounded degree of any polynomial in the scheme
-- polynomials are defined over the scalar field of the curve $E_M$ ($\mathbb{F}_p$)
-- commitments are points on $E_M$ ($\mathbb{F}_q$)
-- $Com(..): \mathbb{F}_p \rarr \mathbb{F}_q$
-
-### 1.3 Circuit
-- `C(x; w) ⟶ 0/1`
-- upto `n` fan-in 3 (or 4) gates over $\mathbb{F}_p$
-- Following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html), `C(x; w)` can be turned into polynomials over $\mathbb{F}_p$
-
-### 1.4 Proving system interfaces
+### 1.3 Proving system interfaces
 ||Interface|Description|
 |-|-|-|
-|__Preprocess__|`preproc(C) ⟶ desc_C`|`C` is turned into a *circuit description*|
+|__Preprocess__|`preproc(C) ⟶ desc_C`|`C` is turned into a *circuit description*, which is all data the verifier needs to verify a proof. It includes the verifier key, but not only that.|
 |__Prove__|`P(C, x, w) ⟶ π`|arithmetized over $\mathbb{F}_p$ and $\mathbb{F}_q$|
 |__Verify__|`V(desc_C, x, π) ⟶ 0/1`|arithmetized over $\mathbb{F}_p$ and $\mathbb{F}_q$|
 
-A circuit description is all data the verifier needs to verify a proof. It includes the verifier key, but not only that.
 
-## 2. Abstractions
-### 2.1 Validity predicates
-|Name||Description|
-|-|-|-|
-|VP description|`desc_vp = preproc(vp)`|generate pk, vk, CRS|
-|VP commitment|`VPCommit(vp, rcm_vp) = Com( Com_q(desc_vp), rcm_vp)`|⚠️ the exact formula for VPCommit is yet to be defined|
-
-### 2.2 Note
-#### 2.2.1 Note fields
+## 2. Notes
+#### 2.1 Note structure
 |Variable|Type|Description|
 |-|-|-|
 |`note_type`| Pallas point ($\mathbb{F}_p$, $\mathbb{F}_p$) | Value base. `note_type = poseidon_to_curve(Poseidon(app_vk, app_data_static))`|
@@ -51,13 +37,14 @@ A circuit description is all data the verifier needs to verify a proof. It inclu
 |`is_merkle_checked`|bool|dummy note flag|
 |`rcm_note`| $\mathbb{F}_q$| a random commitment trapdoor|
 
-#### 2.2.2 Value base
+#### 2.2 Value base
+
 |Variable|Type|Description|
 |-|-|-|
 |`app_vk`|$\mathbb{F}_p$ (compressed)|Verifying key of the application circuit. Compressed into a Pallas point|
 |`app_data_static`|$\mathbb{F}_p$| application data used to derive note's type|
 
-#### 2.2.3 Note commitment
+#### 2.3 Note commitment
 
 |Name|Type|Description|
 |-|-|-|
@@ -65,8 +52,7 @@ A circuit description is all data the verifier needs to verify a proof. It inclu
 
 TODO: which fields to commit to?
 
-### 2.3 Nullifier deriving key `nk`
-
+### 2.4 Nullifier deriving key `nk`
 Note: not implemented (yet?)
 
 |Name|Type|Description|
@@ -75,7 +61,7 @@ Note: not implemented (yet?)
 |random||random value|
 |PERSONALIZATION_NK| string| set to `"Taiga_PRF_NK"`||
 
-### 2.4 Nullifier
+### 2.5 Nullifier
 
 Use the nullifier derivation as in Orchard: $\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF_{nk}(ρ) + ψ \mod{q}]K + cm)$
 
@@ -87,12 +73,15 @@ Use the nullifier derivation as in Orchard: $\mathrm{DeriveNullifier}_{nk}(ρ, �
 |`ψ`| $\mathbb{F}_p$ | $PRF_{rcm\_note}(ρ)$ -- should it be the same as in zcash?|
 |`cm` | Pallas point($\mathbb F_p$, $\mathbb F_p$) | note commitment |
 |`K`|Pallas point($\mathbb F_p$, $\mathbb F_p$)| a fixed base generator of the inner curve|
-|`Extract` | $\mathbb F_p$ | the $x$ coordinate of a (inner curve) point|
+|`Extract` | $(\mathbb F_p$, $\mathbb F_p) \rightarrow \mathbb F_p$ | the $x$ coordinate of a (inner curve) point|
 
 
 ## 3. ZK Circuits
 
 ### Validity Predicate (VP) circuits
+- Validity predicate is a custom circuit 
+- `VPCommit(vp, rcm_vp) = Com( Com_q(desc_vp), rcm_vp)`
+TBD
 
 - Arithmetized over $\mathbb{F}_p$.
 - Represented as a Halo2 circuit `VP(x; w) ⟶ 0/1`.
@@ -161,7 +150,7 @@ Private inputs (`w`):
 |-|-|-|-|
 |Nullifier PRF|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF_{nk}(ρ) + ψ \mod{q}]K + cm)$|
 |`nk` commitment|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|`Com(nk) = Poseidon(nk, user_derived_key)`; used to protect `nk` stored in a note. `user_derived_key` is currently not used
-|`nk` PRF|Blake2s|$\mathrm{F}_p \rightarrow \mathrm{F}_?$|`nk = PRF_r(...)`| Used to derive `nk`
+|`nk` PRF|Blake2s|$\mathrm{F}_p \rightarrow \mathrm{F}_?$|`nk = PRF(nk, r)`| Used to derive `nk`; currently not implemented
 |address|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$| `address = Poseidon(app_data_dynamic, nk_com)`; compresses the data fields that contain some ownership information
 |`NoteCommit`|[Sincemilla](https://zcash.github.io/halo2/design/gadgets/sinsemilla.html)|$\mathrm{F}_p \rightarrow \mathrm{F}_?$|
 |`VPCommit`|Blake2s|-|Efficient over both $\mathrm{F}_p$ and $\mathrm{F}_q$
@@ -169,7 +158,7 @@ Private inputs (`w`):
 |`ValueCommit`|Pedersen-like|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|`cv = (v_i * VB_i - v_o * VB_o) + r[R]`, `VB_x` - value base of a note
 |VE|DH + Poseidon|$\mathrm{F}_? \rightarrow \mathrm{F}_?$| `ek = DH(recv.pk, sender.sk)`, `ce = Poseidon(note, ek)`
 
-## Taiga Application
+## The Taiga Application
     
 For each epoch the state consists of:
 - Merkle tree, $MT$, of note commitments with root `rt`
