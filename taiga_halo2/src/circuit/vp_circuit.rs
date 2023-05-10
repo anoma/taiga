@@ -479,7 +479,7 @@ macro_rules! vp_circuit_impl {
     };
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct VampIRValidityPredicateCircuit {
     pub circuit: Halo2Module<pallas::Base>,
     pub instances: Vec<pallas::Base>,
@@ -489,10 +489,10 @@ impl VampIRValidityPredicateCircuit {
     pub fn from_file(vamp_ir_circuit_file: &PathBuf, inputs_file: &PathBuf) -> Self {
         let mut circuit_file =
             File::open(vamp_ir_circuit_file).expect("unable to load circuit file");
-        let mut circuit =
+        let mut circuit: Halo2Module<pallas::Base> =
             bincode::decode_from_std_read(&mut circuit_file, bincode::config::standard())
                 .expect("unable to load circuit file");
-        // let HaloCircuitData { params, circuit } = HaloCircuitData::read(&mut circuit_file).unwrap();
+        // let HaloCircuitData { params, mut circuit } = HaloCircuitData::read(&mut circuit_file).unwrap();
         let var_assignments_ints = read_inputs_from_file(&circuit.module, inputs_file);
         let mut var_assignments = HashMap::new();
         for (k, v) in var_assignments_ints {
@@ -527,7 +527,7 @@ impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
         VPVerifyingInfo {
             vk,
             proof,
-            instance: self.instances,
+            instance: self.instances.clone(),
         }
     }
 
