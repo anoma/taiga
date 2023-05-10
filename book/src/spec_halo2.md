@@ -7,7 +7,7 @@
 We use Halo2/IPA with [Pasta curves](https://github.com/zcash/pasta) developed by Zcash to instantiate our proving system.
 
 ### 1.1 Circuits
-Let `C(x; w) ⟶ 0/1` be a circuit with up to `n` gates. The circuit is represented as polynomials over the chosen curve's scalar field, following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html). Commitments are generated over the curve's base field.
+Let `C(x; w) ⟶ 0/1` be a circuit with up to `n` gates. The circuit is represented as polynomials over the chosen curve's **scalar field**, following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html). Commitments are generated over the curve's **base field**.
 
 ### 1.2 Elliptic curves
 ||Name|Scalar field| Base field|Purpose|Instantiation|
@@ -25,45 +25,41 @@ Let `C(x; w) ⟶ 0/1` be a circuit with up to `n` gates. The circuit is represen
 
 
 ## 2. Notes
-#### 2.1 Note structure
-|Variable|Type|Description|
-|-|-|-|
-|`note_type`| Pallas point ($\mathbb{F}_p$, $\mathbb{F}_p$) | Value base. `note_type = poseidon_to_curve(Poseidon(app_vk, app_data_static))`|
-|`app_data_dynamic`| $\mathbb{F}_p$ |Commitment to the note's dynamic data|
-|`v`| `u64` ($\mathbb F_p$ element in circuit) |The quantity of fungible value|
-|`nk_com`|$\mathbb{F}_p$|`Poseidon(nk)`|
-|`ρ`| $\mathbb{F}_p$ | an old nullifier from the same Action description|
-|`ψ`| $\mathbb{F}_p$ | the prf output of `ρ` and `rcm_note`|
-|`is_merkle_checked`|bool|dummy note flag|
-|`rcm_note`| $\mathbb{F}_q$| a random commitment trapdoor|
+Note is an immutable particle of the application state.
 
-#### 2.2 Value base
+### 2.1 Note structure
+|Variable|Description|
+|-|-|
+|`note_type`|Elements used to derive the value base. `value_base = poseidon_to_curve(Poseidon(app_vk, app_data_static))`|
+|`app_data_dynamic`|Commitment to the note's extra data|
+|`v`|The quantity of fungible value (u64)|
+|`nk_com`|`Poseidon(nk)`; commitment to the nullifier key that will be used to derive the note's nullifier|
+|`ρ`| an old nullifier from the same Action description|
+|`ψ`| the prf output of `ρ` and `rcm_note`|
+|`is_merkle_checked`|dummy note flag|
+|`rcm_note`| a random commitment trapdoor|
 
-|Variable|Type|Description|
-|-|-|-|
-|`app_vk`|$\mathbb{F}_p$ (compressed)|Verifying key of the application circuit. Compressed into a Pallas point|
-|`app_data_static`|$\mathbb{F}_p$| application data used to derive note's type|
+#### 2.1.1 Value base
 
-#### 2.3 Note commitment
+Value base is used to distinguish note types. Notes with different value bases belong to different note types. The value base of the note is derived from two fields: `app_vk` and `app_data_static`.
+
+|Variable|Description|
+|-|-|
+|`app_vk`|Verifying key of the VP circuit|
+|`app_data_static`|Application data that influences note's fungibility. Notes with the same `app_vk` but different `app_data_static` are not fungible|
+
+Value base is used to derive value commitment for the action.
+
+### 2.3 Note commitment
+
+Note commitments are stored in a global commitment tree. The global commitment tree contains commitments to all of the notes ever existed. Adding a note's commitment to the commitment tree announces the creation of the note. The notes are never removed from the tree. Instead, notes are invalidated by revealing their nullifiers.
 
 |Name|Type|Description|
 |-|-|-|
 |`cm` | Pallas point ($\mathbb F_p$, $\mathbb F_p$)|$cm = \mathrm{NoteCom}(note, rcm\_note)$|
 
-TODO: which fields to commit to?
-
-### 2.4 Nullifier deriving key `nk`
-Note: not implemented (yet?)
-
-|Name|Type|Description|
-|-|-|-|
-|$nk = PRF_{random}(\mathrm{PERSONALIZATION\_NK}) \mod{q}$|$\mathbb{F}_q$|`nk` is randomly generated (by the user)|
-|random||random value|
-|PERSONALIZATION_NK| string| set to `"Taiga_PRF_NK"`||
-
 ### 2.5 Nullifier
-
-Use the nullifier derivation as in Orchard: $\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF_{nk}(ρ) + ψ \mod{q}]K + cm)$
+Note nullifiers are stored in a global nullifier set. Adding a note's nullifier to the set invalidates the note. We use the same nullifier derivation algorithm as in Orchard: $\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF_{nk}(ρ) + ψ \mod{q}]K + cm)$.
 
 |Name|Type|Description|
 |-|-|-|
@@ -75,10 +71,17 @@ Use the nullifier derivation as in Orchard: $\mathrm{DeriveNullifier}_{nk}(ρ, �
 |`K`|Pallas point($\mathbb F_p$, $\mathbb F_p$)| a fixed base generator of the inner curve|
 |`Extract` | $(\mathbb F_p$, $\mathbb F_p) \rightarrow \mathbb F_p$ | the $x$ coordinate of a (inner curve) point|
 
+#### 2.5.1 Nullifier deriving key `nk`
 
-## 3. ZK Circuits
+The nullifier key for the note is derived when the note is created and is only known to the note's owner (or anyone the owner reveals the key to). Knowledge of the note's nullifier key is necessary (but not sufficient) to create the note's nullifier and invalidate the note.
 
-### Validity Predicate (VP) circuits
+⚠️ Not implemented
+
+$nk = PRF_{r}(\mathrm{PERSONALIZATION\_NK}) \mod{q}$, where `PERSONALIZATION_NK = "Taiga_PRF_NK"` and `r` is a random value.
+
+
+## 3. Circuits
+### 3.1 Validity Predicate (VP) circuits
 - Validity predicate is a custom circuit 
 - `VPCommit(vp, rcm_vp) = Com( Com_q(desc_vp), rcm_vp)`
 TBD
@@ -88,8 +91,8 @@ TBD
 - Expects `m` notes input and `n` notes created. `m` and `n` could be different for each VP involved in a Taiga transaction.
 
 #### Inputs
-Public inputs (`x`):
 
+Public inputs (`x`):
 - `nf_1, …, nf_m` - input note nullifiers
 - `cm_1, …, cm_n` - created note commitments
 - `ce_1, …, ce_n` - encrypted output notes
@@ -111,7 +114,7 @@ Note: encryption can be customized per application. Some applications might encr
 
 All other constraints enforced by VP circuits are custom.
 
-### Action Circuit
+### 3.2 Action Circuit
 
 - Arithmetized over $\mathbb{F}_p$.
 - Represented as a Halo2 circuit `ActionCircuit(x; w)`.
