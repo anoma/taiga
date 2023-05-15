@@ -1,6 +1,6 @@
 # Taiga Spec
 
-⚠️ Instantiations and exact formulas are not stable ⚠ ️
+⚠️ Instantiations and the exact formulas are not stable ⚠ ️
 
 ## 1. Proving system
 
@@ -20,9 +20,10 @@ Let `C(x; w) ⟶ 0/1` be a circuit with up to `n` gates. The circuit is represen
 ||Interface|Description|
 |-|-|-|
 |__Preprocess__|`preproc(C) ⟶ desc_C`|`C` is turned into a *circuit description*, which is all data the verifier needs to verify a proof. It includes the verifier key, but not only that.|
-|__Prove__|`P(C, x, w) ⟶ π`|arithmetized over $\mathbb{F}_p$ and $\mathbb{F}_q$|
-|__Verify__|`V(desc_C, x, π) ⟶ 0/1`|arithmetized over $\mathbb{F}_p$ and $\mathbb{F}_q$|
+|__Prove__|`P(C, x, w) ⟶ π`|arithmetized over both $\mathbb{F}_p$ and $\mathbb{F}_q$|
+|__Verify__|`V(desc_C, x, π) ⟶ 0/1`|arithmetized over both $\mathbb{F}_p$ and $\mathbb{F}_q$|
 
+Does it apply to the action circuit?
 
 ## 2. Notes
 Note is an immutable particle of the application state.
@@ -30,7 +31,7 @@ Note is an immutable particle of the application state.
 ### 2.1 Note structure
 |Variable|Description|
 |-|-|
-|`note_type`|Elements used to derive the value base. `value_base = poseidon_to_curve(Poseidon(app_vk, app_data_static))`|
+|`value_base`|`value_base = hash_to_curve(Poseidon(app_vk, app_data_static))`|
 |`app_data_dynamic`|Commitment to the note's extra data|
 |`v`|The quantity of fungible value (u64)|
 |`nk_com`|`Poseidon(nk)`; commitment to the nullifier key that will be used to derive the note's nullifier|
@@ -39,7 +40,19 @@ Note is an immutable particle of the application state.
 |`is_merkle_checked`|dummy note flag|
 |`rcm_note`| a random commitment trapdoor|
 
-#### 2.1.1 Value base
+#### 2.1.1 Application-related fields
+
+Each note has three fields with application data.
+
+|Variable|Description|
+|-|-|
+|`app_vk`| Contains the application's main VP verifier key. Used to identify the application the note belongs to|
+|`app_data_static`|Contains the application data that affects fungibility of the note. Along with the verifier key, it is used to derive note's value base|
+|`app_data_dynamic`|Contains the application data that doesn't affect the fungibility of the note|
+
+TODO: add examples of static and dynamic data
+
+#### 2.1.2 Value base
 
 Value base is used to distinguish note types. Notes with different value bases belong to different note types. The value base of the note is derived from two fields: `app_vk` and `app_data_static`.
 
@@ -48,7 +61,17 @@ Value base is used to distinguish note types. Notes with different value bases b
 |`app_vk`|Verifying key of the VP circuit|
 |`app_data_static`|Application data that influences note's fungibility. Notes with the same `app_vk` but different `app_data_static` are not fungible|
 
-Value base is used to derive value commitment for the action.
+##### 2.1.2.1 Value commitment
+
+Used to ensure balance across the notes in an Action.
+
+One-type value commitment computation (orchard, p. 93, homomorphic pedersen commitment):
+
+$[v^{old} - v^{new}]VB + [rcv]R$
+
+Multiple types value commitment computation:
+
+$cv = [v^{old}]VB^{old} - [v^{new}]VB^{new} + [rcv]R$
 
 ### 2.3 Note commitment
 
@@ -85,6 +108,7 @@ $nk = PRF_{r}(\mathrm{PERSONALIZATION\_NK}) \mod{q}$, where `PERSONALIZATION_NK 
 - Validity predicate is a custom circuit 
 - `VPCommit(vp, rcm_vp) = Com( Com_q(desc_vp), rcm_vp)`
 TBD
+
 
 - Arithmetized over $\mathbb{F}_p$.
 - Represented as a Halo2 circuit `VP(x; w) ⟶ 0/1`.
