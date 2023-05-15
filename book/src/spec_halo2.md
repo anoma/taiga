@@ -104,62 +104,29 @@ $nk = PRF_{r}(\mathrm{PERSONALIZATION\_NK}) \mod{q}$, where `PERSONALIZATION_NK 
 
 
 ## 3. Circuits
-### 3.1 Validity Predicate (VP) circuits
-- Validity predicate is a custom circuit 
-- `VPCommit(vp, rcm_vp) = Com( Com_q(desc_vp), rcm_vp)`
-TBD
+### 3.1 The ction Circuit
 
+The action circuit `ActionCircuit(x; w)` checks that the Taiga rules are being followed by a proposed transaction. The check is performed per partial transaction. The circuit is arithmetized over $\mathbb{F}_p$. 
 
-- Arithmetized over $\mathbb{F}_p$.
-- Represented as a Halo2 circuit `VP(x; w) ⟶ 0/1`.
-- Expects `m` notes input and `n` notes created. `m` and `n` could be different for each VP involved in a Taiga transaction.
+Note: the action circuit doesn't contain all of the checks required. If the check can be done outside of the circuit without revealing any sensitive information, it is performed outside the circuit.
 
-#### Inputs
-
-Public inputs (`x`):
-- `nf_1, …, nf_m` - input note nullifiers
-- `cm_1, …, cm_n` - created note commitments
-- `ce_1, …, ce_n` - encrypted output notes
-
-
-Private inputs (`w`):
-- `old_note_1, …, old_note_m` - input notes
-- `new_note_1, …, new_note_n` - created notes
-- custom private inputs
-
-#### Checks
-As opening of the notes are private parameters, to make sure that notes that the VP received indeed the ones that correspond to the public parameters, VP must check:
-
-1. input note nullifier integrity: for each `i ∈ {1, …, m}`, `nf_i = DeriveNullifier_nk(ρ, ψ, cm)`
-2. Output note commitment integrity: for each `i ∈ {1, …, n}`, `cm_i = NoteCommit(note, rcm_note)`
-3. Encrypted note integrity: for each `i ∈ {1, …, n}`, `ce_i = Encrypt(note, ek)`
-
-Note: encryption can be customized per application. Some applications might encrypt more fields, others - less. It does leak some information
-
-All other constraints enforced by VP circuits are custom.
-
-### 3.2 Action Circuit
-
-- Arithmetized over $\mathbb{F}_p$.
-- Represented as a Halo2 circuit `ActionCircuit(x; w)`.
+The Action circuit performs checks over `n` inputs and `n` output notes. Currently, `n = 2`. 
 
 #### Inputs
 Public inputs (`x`):
-- `rt` - the root of the commitment Merkle tree
-- input note related:
-    - `nf` - input note nullifier; commits to note application type, value, and data
-    - `com_vp_app` - application VP commitment
-- output note related:
-    - `cm` - output note commitment
-    - `com_vp_app` - application VP commitment
+1. `rt` - the root of the commitment Merkle tree
+2. `nf` - input note nullifier; commits to note application type, value, and data
+3. `com_vp_in` - input note's application VP commitment
+4. `cm` - output note commitment
+5. `com_vp_out` - output note's application VP commitment
 
 Private inputs (`w`):
-- input note related:
-    - `note = (note_type, app_data_dynamic, v, nk_com, ρ, ψ, is_merkle_checked, rcm_note)`
-    - `com_vp` opening of the input note
-- output note related:
-    - `note = (note_type, app_data_dynamic, v, nk_com, ρ, ψ, is_merkle_checked, rcm_note)`
-    - `com_vp` opening of the output note
+1. `in_note = (value_base, v, nk_com, ρ, ψ, is_merkle_checked, rcm_note)` - input note opening 
+2. `(com(vp_vk), rcm_vp_vk)` - opening of `com_vp_in`
+3. `out_note = (value_base, v, nk_com, ρ, ψ, is_merkle_checked, rcm_note)` - output note opening
+4. `(com(vp_vk), rcm_vp_vk)` - opening of `com_vp_out`
+
+Note: opening of a parameter is every field used to derive the parameter
 
 #### Checks
 - For input note:
@@ -172,18 +139,53 @@ Private inputs (`w`):
     - Value base integrity: TBD (similarly to the MASP, we only check vb for output notes)
 - Value commitment integrity: `cv = ValueCommit(v_in - v_out, rcv)` 
 
+### 3.1 Validity Predicate (VP) circuits
+
+Validity predicate is a circuit derived per application. It contains the application's logic. Validity predicates take `n` input and `n` output notes, are represented as Halo2 circuits `VP(x; w) ⟶ 0/1` and arithmetized over $\mathbb{F}_p$.
+
+- `VPCommit(vp, rcm_vp) = Com( Com_q(desc_vp), rcm_vp)`
+
+ToDO: add reasoning for complex commitment list
+TODO: add how vps check that the note belongs to them
+
+#### Inputs
+
+Public inputs (`x`):
+- `nf_1, …, nf_n` - input note nullifiers
+- `cm_1, …, cm_n` - output note commitments
+- `ce_1, …, ce_n` - encrypted output notes
+
+Private inputs (`w`):
+- `old_note_1, …, old_note_m` - input notes
+- `new_note_1, …, new_note_n` - output notes
+- custom private inputs
+
+#### Checks
+As opening of the notes are private parameters, to make sure that notes that the VP received indeed the ones that correspond to the public parameters, VP must check:
+
+1. input note nullifier integrity: for each `i ∈ {1, …, m}`, `nf_i = DeriveNullifier_nk(ρ, ψ, cm)`
+2. Output note commitment integrity: for each `i ∈ {1, …, n}`, `cm_i = NoteCommit(note, rcm_note)`
+3. Encrypted note integrity: for each `i ∈ {1, …, n}`, `ce_i = Encrypt(note, ek)`
+
+Note: encryption can be customized per application. Some applications might encrypt more fields, others - less. It does leak some information
+
+Note: to determine whether a note belongs to the application or not, Taiga marks the note commitments (for output notes) or nullifiers (for input notes) of the notes.
+
+All other constraints enforced by VP circuits are custom.
+
+
 ## Instantiations
 |Function|Instantiation|Domain/Range|Description|
 |-|-|-|-|
 |Nullifier PRF|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF_{nk}(ρ) + ψ \mod{q}]K + cm)$|
 |`nk` commitment|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|`Com(nk) = Poseidon(nk, user_derived_key)`; used to protect `nk` stored in a note. `user_derived_key` is currently not used
-|`nk` PRF|Blake2s|$\mathrm{F}_p \rightarrow \mathrm{F}_?$|`nk = PRF(nk, r)`| Used to derive `nk`; currently not implemented
+|`nk` PRF|Blake2s|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|`nk = PRF(nk, r)`| Used to derive `nk`; currently not implemented
 |address|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$| `address = Poseidon(app_data_dynamic, nk_com)`; compresses the data fields that contain some ownership information
-|`NoteCommit`|[Sincemilla](https://zcash.github.io/halo2/design/gadgets/sinsemilla.html)|$\mathrm{F}_p \rightarrow \mathrm{F}_?$|
+|`NoteCommit`|[Sincemilla](https://zcash.github.io/halo2/design/gadgets/sinsemilla.html)|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|
 |`VPCommit`|Blake2s|-|Efficient over both $\mathrm{F}_p$ and $\mathrm{F}_q$
 |Value base derivation|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|`value_base = hash_to_curve(Poseidon(app_vk, app_data_static))`; compresses the fields related to the resource type
 |`ValueCommit`|Pedersen-like|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|`cv = (v_i * VB_i - v_o * VB_o) + r[R]`, `VB_x` - value base of a note
-|VE|DH + Poseidon|$\mathrm{F}_? \rightarrow \mathrm{F}_?$| `ek = DH(recv.pk, sender.sk)`, `ce = Poseidon(note, ek)`
+|VE|DH + Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$| `ek = DH(recv.pk, sender.sk)`, `ce = Poseidon(note, ek)`
 
 ## The Taiga Application
     
