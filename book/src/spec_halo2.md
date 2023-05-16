@@ -20,8 +20,8 @@ Let `C(x; w) ⟶ 0/1` be a circuit with up to `n` gates. The circuit is represen
 ||Interface|Description|
 |-|-|-|
 |__Preprocess__|`preproc(C) ⟶ desc_C`|`C` is turned into a *circuit description*, which is all data the verifier needs to verify a proof. It includes the verifier key, but not only that.|
-|__Prove__|`P(C, x, w) ⟶ π`|arithmetized over both $\mathbb{F}_p$ and $\mathbb{F}_q$|
-|__Verify__|`V(desc_C, x, π) ⟶ 0/1`|arithmetized over both $\mathbb{F}_p$ and $\mathbb{F}_q$|
+|__Prove__|`P(C, x, w) ⟶ π`||
+|__Verify__|`V(desc_C, x, π) ⟶ 0/1`||
 
 Does it apply to the action circuit?
 
@@ -52,7 +52,7 @@ Each note has three fields with application data.
 
 TODO: add examples of static and dynamic data
 
-#### 2.1.2 Value base
+#### Value base
 
 Value base is used to distinguish note types. Notes with different value bases belong to different note types. The value base of the note is derived from two fields: `app_vk` and `app_data_static`.
 
@@ -61,7 +61,9 @@ Value base is used to distinguish note types. Notes with different value bases b
 |`app_vk`|Verifying key of the VP circuit|
 |`app_data_static`|Application data that influences note's fungibility. Notes with the same `app_vk` but different `app_data_static` are not fungible|
 
-##### 2.1.2.1 Value commitment
+`value_base = PRF_vb(app_vk, app_data_static)`
+
+#### Value commitment
 
 Used to ensure balance across the notes in an Action.
 
@@ -102,6 +104,22 @@ The nullifier key for the note is derived when the note is created and is only k
 
 $nk = PRF_{r}(\mathrm{PERSONALIZATION\_NK}) \mod{q}$, where `PERSONALIZATION_NK = "Taiga_PRF_NK"` and `r` is a random value.
 
+### 2.6 Verifiable encryption
+
+Encryption is used for in-band distribution of notes. Encrypted notes are stored on the blockchain, the receiver can scan the blockhcain trying to decrypt the notes and this way to find the notes that were sent to them.
+
+We want the encryption to be verifiable to make sure the receiver of the notes can decrypt them. In other systems like Zcash it doesn't make sense to send the wrong notes to the receiver (essentially burning them), but in Taiga as the notes are created not by the sender but an intermediate party (solver) 
+
+Add: motivation
+
+We use the combination of DH key exchange with Poseidon symmetric encryption.
+```
+sk = DH(pk_recv, sk_send)
+ce = Poseidon(sk, note)
+```
+
+Not all of the note fields require encryption (e.g. note commitment), and the encrypted fields may vary depending on the application.
+
 
 ## 3. Circuits
 ### 3.1 The ction Circuit
@@ -136,7 +154,7 @@ Note: opening of a parameter is every field used to derive the parameter
 - For output note:
     - Commitment integrity(output note only): `cm = NoteCom(note, rcm_note)`
     - Application VP integrity: `com_vp = VPCommit(vp, rcm_vp)`
-    - Value base integrity: TBD (similarly to the MASP, we only check vb for output notes)
+    - Value base integrity: `vb = PRF_vb(app_vk, app_data_static)`
 - Value commitment integrity: `cv = ValueCommit(v_in - v_out, rcv)` 
 
 ### 3.1 Validity Predicate (VP) circuits
@@ -174,75 +192,93 @@ Note: to determine whether a note belongs to the application or not, Taiga marks
 All other constraints enforced by VP circuits are custom.
 
 
-## Instantiations
+## 4. Circuit Accumulation
+TBD: Halo2 accumulation
+
+### 5. Binding signature
+Binding signature is used to make sure the transaction is balanced. Value commitments produced in each partial transaction are accumulated and checked against the commitment to the expected net value change. The value change might be zero, indicating that the whole transaction was done in the schielded space, or non-zero, indicating that some value came from/to the transparent space. We use the same binding signature mechanism as Zcash Orchard.
+
+#### Taiga balance vs Application balance
+Certain applications might allow to create more value having less input, which makes the total value change non-zero. This application-specific balance is different from the Taiga balance and the application needs to make sure the transaction is balanced in the Taiga sense by adding some non-zero value dummy notes to the transaction.
+
+## 6. Instantiations
 |Function|Instantiation|Domain/Range|Description|
 |-|-|-|-|
 |Nullifier PRF|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF_{nk}(ρ) + ψ \mod{q}]K + cm)$|
 |`nk` commitment|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|`Com(nk) = Poseidon(nk, user_derived_key)`; used to protect `nk` stored in a note. `user_derived_key` is currently not used
-|`nk` PRF|Blake2s|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|`nk = PRF(nk, r)`| Used to derive `nk`; currently not implemented
+|`PRF_nk`|Blake2s|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|`nk = PRF_nk(nk, r)`| Used to derive `nk`; currently not implemented
 |address|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$| `address = Poseidon(app_data_dynamic, nk_com)`; compresses the data fields that contain some ownership information
 |`NoteCommit`|[Sincemilla](https://zcash.github.io/halo2/design/gadgets/sinsemilla.html)|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|
 |`VPCommit`|Blake2s|-|Efficient over both $\mathrm{F}_p$ and $\mathrm{F}_q$
-|Value base derivation|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|`value_base = hash_to_curve(Poseidon(app_vk, app_data_static))`; compresses the fields related to the resource type
+|`PRF_vb`|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|`value_base = hash_to_curve(Poseidon(app_vk, app_data_static))`; compresses the fields related to the resource type
 |`ValueCommit`|Pedersen-like|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|`cv = (v_i * VB_i - v_o * VB_o) + r[R]`, `VB_x` - value base of a note
 |VE|DH + Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$| `ek = DH(recv.pk, sender.sk)`, `ce = Poseidon(note, ek)`
+|Binding signature|||
 
-## The Taiga Application
-    
-For each epoch the state consists of:
-- Merkle tree, $MT$, of note commitments with root `rt`
-    - Supporting add: $MT.add(cm, ce)$
-    - Only `cm` is hashed in derivation of `rt`, note encryption `ce` is simply stored alongside `cm`
-- Set of input note nullifiers, $NF$
-    - Supporting add: $NF.add(nf)$
-    - Supports memership checks
-    
-The state should make past `rt` accessible as well
 
-### Taiga `tx`
-A Taiga transaction contains:
-- a set of `k` partial transactions: `[ptx_1, .., ptx_k]`
-- a binding signature
+## 7. Taiga Execution Model
+### Taiga partial transaction
 
-### Taiga `ptx`
+Taiga uses partial transactions to build atomic Taiga transactions. For partial transactions, it is required that all VP proofs are valid but the partial transaction is not balanced. Later, valid partial transactions are composed in a way that the total set of partial transactions balances, which is proven by the binding signature check.
+If a partial transaction is balanced, it is transformed into a transaction immediately.
 
-Each Taiga `ptx` contains 2 input and 2 output notes. Each of the notes requires at least one VP to be satisfied, resulting in at most 4 VP proofs per `ptx`. If the same VP controls 2+ notes in a `ptx`, the VP is called just once per `ptx`, reducing the total amount of non-dummy proofs. 
+Each Taiga `ptx` contains n input and n output notes. Currently, `n = 2`. Each of the notes requires at least one VP to be satisfied, resulting in at most `2n` VP proofs per `ptx`. The VP is called once per `ptx`, meaning that if the `ptx` has 2 or more notes belonging to the same application, the total amount of non-dummy proofs is reduced.
 
-Note: it is possible that a VP requires checks of other VPs in order to be satisfied. In that case, the total amount of VPs checked could be more than 4, but we can count such check as a single check.
+Note: it is possible that a VP requires checks of other VPs in order to be satisfied. In that case, the total amount of VPs checked could be more than `2n`, but we can count such check as a single check.
 
-Note: For security reasons, it might make sense to require a minimal amount of proofs attached to be 4 and attach dummy proofs if needed.
-
+#### Partial transaction fields
 Each Taiga ptx contains:
-- `2` actions:
+- `n` actions (one action covers one input and one output note):
     - `π_action` - proof of the action
-    - `(rt, nf, cm, com_vp_input, com_vp_output, ce)` - public input
+    - `(rt, nf, cm, com_vp_input, com_vp_output, ce)` - action's public input
 - for each input note:
     - `π_VP` proof
-    - VP public input
-    - desc_VP
-    - `extra_VP_vk` (if the "main" VP requires additional VPs to be checked) 
+    - VP's public input
+    - `desc_VP`
+    - `extra_desc_VP` (if the "main" VP requires additional VPs to be checked) 
 - for each output note:
     - `π_VP` proof
     - VP public input
-    - desc_VP
+    - `desc_VP`
     - `extra_desc_VP` (if the "main" VP requires additional VPs to be checked)
 
-#### Validity of `tx`
-A transaction `tx` is valid if:
+#### Validity of a `ptx`
+A partial transaction `ptx` is valid if:
 1. For each $i$-th action:
     - [if `is_merkle_checked = true`] `rt_i` is a valid Merkle root from current or past epoch.
     - `Verify(desc_Action, ActionPublicInput, π_action_i) = True`
 2. For each VP:
     - `Verify'(desc_VP, VPPublicInput, π_VP) = True`
-3. Balance check: the binding signature is valid
     
-#### Processing of `tx`
+### Taiga transaction
+Taiga transaction is build from a set of partial transactions. Unlike partial transactions, a transaction must balance, this is checked by the binding signature.
+
+#### Taiga transaction fields
+A Taiga transaction contains:
+- a set of `k` partial transactions: `[ptx_1, .., ptx_k]`
+- a binding signature
+
+#### Validity of a `tx`
+A transaction is valid if:
+- each partial transaction in the `tx` is valid
+- the binding signature is correct
+    
+### Taiga state
+Taiga is stateless in the sense that it doesn't store and update the state, but Taiga produces the state change that assumes a certain state structure.
+
+For each epoch the state consists of:
+- Merkle tree, $CMtree$, of note commitments with root `rt`
+    - Supporting add: $CMtree.add(cm, ce)$
+    - Only `cm` is hashed in derivation of `rt`, note encryption `ce` is simply stored alongside `cm`
+- Set of input note nullifiers, $NF$
+    - Supporting add: $NF.add(nf)$
+    - Supports memership checks
+    
+The state should make past `rt` accessible as well.
+
+#### Produced state change
 A valid Taiga transaction `tx` induces a state change as follows:
-1. For each `nf` ∈ `NF_tx`: $NF.add(nf)$
-1. For each `cm` ∈ `CM_tx` with associated `ce`: $MT.add(cm, ce)$
+1. For each `nf`: $NF.add(nf)$
+1. For each `cm` with associated `ce`: $MT.add(cm, ce)$
     - `rt` is not updated for operation
 1. Re-compute `rt` of $MT$
-
-
-## Halo2 Accumulation
-TBD
