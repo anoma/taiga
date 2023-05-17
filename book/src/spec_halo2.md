@@ -1,13 +1,13 @@
-# Taiga Spec
+# Taiga Spec Draft
 
-⚠️ Instantiations and the exact formulas are not stable ⚠ ️
+⚠️ Instantiations and the exact formulas might be not stable ⚠ ️
 
 ## 1. Proving system
 
 We use Halo2/IPA with [Pasta curves](https://github.com/zcash/pasta) developed by Zcash to instantiate our proving system.
 
 ### 1.1 Circuits
-Let `C(x; w) ⟶ 0/1` be a circuit with up to `n` gates. The circuit is represented as polynomials over the chosen curve's **scalar field**, following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html). Commitments are generated over the curve's **base field**.
+Let `C(x; w) ⟶ 0/1` be a circuit with up to `m` gates. The circuit is represented as polynomials over the chosen curve's **scalar field**, following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html). Commitments are generated over the curve's **base field**.
 
 ### 1.2 Elliptic curves
 ||Name|Scalar field| Base field|Purpose|Instantiation|
@@ -23,57 +23,60 @@ Let `C(x; w) ⟶ 0/1` be a circuit with up to `n` gates. The circuit is represen
 |__Prove__|`P(C, x, w) ⟶ π`||
 |__Verify__|`V(desc_C, x, π) ⟶ 0/1`||
 
-Does it apply to the action circuit?
-
 ## 2. Notes
 Note is an immutable particle of the application state.
 
 ### 2.1 Note structure
-|Variable|Description|
-|-|-|
-|`value_base`|`value_base = hash_to_curve(Poseidon(app_vk, app_data_static))`|
-|`app_data_dynamic`|Commitment to the note's extra data|
-|`v`|The quantity of fungible value (u64)|
-|`nk_com`|`Poseidon(nk)`; commitment to the nullifier key that will be used to derive the note's nullifier|
-|`ρ`| an old nullifier from the same Action description|
-|`ψ`| the prf output of `ρ` and `rcm_note`|
-|`is_merkle_checked`|dummy note flag|
-|`rcm_note`| a random commitment trapdoor|
+|Variable|Type|Description|
+|-|-|-|
+|`value_base`|Pallas point|value base represents the note type|
+|`app_data_dynamic`||Commitment to the note's extra data|
+|`v`|${0..2^{64} - 1}$|The quantity of fungible value|
+|`nk_com`||commitment to the nullifier key that will be used to derive the note's nullifier|
+|`ρ`|$\mathbb{F}_p$| an old nullifier from the same Action description (see Orchard)|
+|`ψ`|$\mathbb{F}_p$|the prf output of `ρ` and `rcm_note` (see Orchard)|
+|`is_merkle_checked`|bool|dummy note flag|
+|`rcm_note`|${0..2^{255} - 1}$| a random commitment trapdoor|
 
 #### 2.1.1 Application-related fields
 
 Each note has three fields with application data.
 
-|Variable|Description|
-|-|-|
-|`app_vk`| Contains the application's main VP verifier key. Used to identify the application the note belongs to|
-|`app_data_static`|Contains the application data that affects fungibility of the note. Along with the verifier key, it is used to derive note's value base|
-|`app_data_dynamic`|Contains the application data that doesn't affect the fungibility of the note|
-
-TODO: add examples of static and dynamic data
+|Variable|Type|Description|
+|-|-|-|
+|`app_vk`|| Contains the application's main VP verifier key. Used to identify the application the note belongs to|
+|`app_data_static`||Contains the application data that affects fungibility of the note. Along with `desc_app`, it is used to derive note's value base||
+|`app_data_dynamic`||Contains the application data that doesn't affect the fungibility of the note|
 
 #### Value base
 
-Value base is used to distinguish note types. Notes with different value bases belong to different note types. The value base of the note is derived from two fields: `app_vk` and `app_data_static`.
+Value base is used to distinguish note types. Notes with different value bases have different note types. The value base of a note is derived from two fields: `desc_app` and `app_data_static`.
 
-|Variable|Description|
-|-|-|
-|`app_vk`|Verifying key of the VP circuit|
-|`app_data_static`|Application data that influences note's fungibility. Notes with the same `app_vk` but different `app_data_static` are not fungible|
+`value_base = PRF_vb(desc_app, app_data_static)`
 
-`value_base = PRF_vb(app_vk, app_data_static)`
+
 
 #### Value commitment
 
 Used to ensure balance across the notes in an Action.
 
-One-type value commitment computation (orchard, p. 93, homomorphic pedersen commitment):
+One-type value commitment computation (Orchard, p. 93, homomorphic pedersen commitment):
 
-$[v^{old} - v^{new}]VB + [rcv]R$
+$[v^{in} - v^{out}]VB + [rcv]R$
 
 Multiple types value commitment computation:
 
-$cv = [v^{old}]VB^{old} - [v^{new}]VB^{new} + [rcv]R$
+$cv = [v^{in}]VB^{in} - [v^{out}]VB^{out} + [rcv]R$
+
+|Variable|Type|Description|
+|-|-|-|
+|$v^{in}$|${0..2^{64} - 1}$|Input note's value|
+|$v^{out}$|${0..2^{64} - 1}$|Output note's value|
+|$VB^{in}$|Pallas point|Input note's value base|
+|$VB^{out}$|Pallas point|Output note's value base|
+|R|Pallas point|Randomness base, fixed|
+|`rcv`|${0..2^{255} - 1}$|Value commitment trapdoor|
+|`cv`|Pallas point|Value commitment|
 
 ### 2.3 Note commitment
 
@@ -92,9 +95,9 @@ Note nullifiers are stored in a global nullifier set. Adding a note's nullifier 
 |`nk` | $\mathbb F_p$ | the nullifier deriving key|
 |`ρ`| $\mathbb{F}_p$ | an old nullifier|
 |`ψ`| $\mathbb{F}_p$ | $PRF_{rcm\_note}(ρ)$ -- should it be the same as in zcash?|
-|`cm` | Pallas point($\mathbb F_p$, $\mathbb F_p$) | note commitment |
-|`K`|Pallas point($\mathbb F_p$, $\mathbb F_p$)| a fixed base generator of the inner curve|
-|`Extract` | $(\mathbb F_p$, $\mathbb F_p) \rightarrow \mathbb F_p$ | the $x$ coordinate of a (inner curve) point|
+|`cm` | Pallas point| note commitment |
+|`K`|Pallas point| a fixed base generator of the inner curve|
+|`Extract` | $(\mathbb F_p$, $\mathbb F_p) \rightarrow \mathbb F_p$ | the $x$ coordinate of an (inner curve) point|
 
 #### 2.5.1 Nullifier deriving key `nk`
 
@@ -110,7 +113,6 @@ Encryption is used for in-band distribution of notes. Encrypted notes are stored
 
 We want the encryption to be verifiable to make sure the receiver of the notes can decrypt them. In other systems like Zcash it doesn't make sense to send the wrong notes to the receiver (essentially burning them), but in Taiga as the notes are created not by the sender but an intermediate party (solver) 
 
-Add: motivation
 
 We use the combination of DH key exchange with Poseidon symmetric encryption.
 ```
@@ -154,7 +156,7 @@ Note: opening of a parameter is every field used to derive the parameter
 - For output note:
     - Commitment integrity(output note only): `cm = NoteCom(note, rcm_note)`
     - Application VP integrity: `com_vp = VPCommit(vp, rcm_vp)`
-    - Value base integrity: `vb = PRF_vb(app_vk, app_data_static)`
+    - Value base integrity: `vb = PRF_vb(desc_app, app_data_static)`
 - Value commitment integrity: `cv = ValueCommit(v_in - v_out, rcv)` 
 
 ### 3.1 Validity Predicate (VP) circuits
@@ -210,7 +212,7 @@ Certain applications might allow to create more value having less input, which m
 |address|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$| `address = Poseidon(app_data_dynamic, nk_com)`; compresses the data fields that contain some ownership information
 |`NoteCommit`|[Sincemilla](https://zcash.github.io/halo2/design/gadgets/sinsemilla.html)|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|
 |`VPCommit`|Blake2s|-|Efficient over both $\mathrm{F}_p$ and $\mathrm{F}_q$
-|`PRF_vb`|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|`value_base = hash_to_curve(Poseidon(app_vk, app_data_static))`; compresses the fields related to the resource type
+|`PRF_vb`|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|`value_base = hash_to_curve(Poseidon(desc_app, app_data_static))`; compresses the fields related to the resource type
 |`ValueCommit`|Pedersen-like|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|`cv = (v_i * VB_i - v_o * VB_o) + r[R]`, `VB_x` - value base of a note
 |VE|DH + Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$| `ek = DH(recv.pk, sender.sk)`, `ce = Poseidon(note, ek)`
 |Binding signature|||
