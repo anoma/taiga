@@ -16,6 +16,8 @@ bitvec = "1"
 subtle = { version = "2.3", default-features = false }
 dyn-clone = "1.0"
 reddsa = "0.5"
+vamp-ir = { git = "https://github.com/anoma/vamp-ir.git", rev = "e11fbcd6d5a358e33456ae7cd7abe5fea9dfcc3e"}
+bincode = "2.0.0-rc.1"
 
 [dev-dependencies]
 criterion = "0.3"
