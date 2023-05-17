@@ -1,6 +1,6 @@
 # Taiga Spec Draft
 
-⚠️ Instantiations and the exact formulas might be not stable ⚠ ️
+⚠️ Instantiations and the exact formulas are unstable ⚠ ️
 
 ## 1. Proving system
 
@@ -38,7 +38,7 @@ Note is an immutable particle of the application state.
 |`is_merkle_checked`|bool|Dummy note flag|
 |`rcm_note`|${0..2^{255} - 1}$|A random commitment trapdoor|
 
-#### 2.1.1 Application-related fields
+#### Application-related fields
 
 Each note has three fields with application data.
 
@@ -52,7 +52,7 @@ Each note has three fields with application data.
 
 Value base is used to distinguish note types. Notes with different value bases have different note types. The value base of a note is derived from two application-related fields: `cm_app_vk` and `app_data_static`.
 
-$value\_base = PRF^{vb}(cm\_app\_vk, app\_data\_static)$
+$VB = PRF^{vb}(cm_{app\_vk}, app\_data\_static)$
 
 #### Value commitment
 
@@ -60,19 +60,19 @@ Used to ensure balance across the notes in an Action.
 
 Compare one-type value commitment computation used in Orchard (Orchard spec p. 93, homomorphic pedersen commitment):
 
-$[v^{old} - v^{new}]VB + [rcv]R$
+$[v^{in} - v^{out}]VB + [rcv]R$
 
 And multiple types value commitment computation used in Taiga:
 
-$cv = [v^{old}]VB^{old} - [v^{new}]VB^{new} + [rcv]R$
+$cv = [v^{in}]VB^{in} - [v^{out}]VB^{nut} + [rcv]R$
 
 |Variable|Type/size|Description|
 |-|-|-|
-|$v^{old}$|${0..2^{64} - 1}$||
-|$v^{new}$|${0..2^{64} - 1}$||
-|$VB^{old}$|outer curve point|Input note's value base|
-|$VB^{new}$|outer curve point|Output note's value base|
-|R|outer curve point|Randomness base, fixed|
+|$v^{in}$|${0..2^{64} - 1}$||
+|$v^{out}$|${0..2^{64} - 1}$||
+|$VB^{in}$|outer curve point|Input note's value base|
+|$VB^{out}$|outer curve point|Output note's value base|
+|`R`|outer curve point|Randomness base, fixed|
 |`rcv`|${0..2^{255} - 1}$|Value commitment trapdoor|
 |`cv`|outer curve point||
 
@@ -84,7 +84,7 @@ Note commitments are stored in a global commitment tree. The global commitment t
 |-|-|-|
 |`cm` |outer curve point|$cm = \mathrm{NoteCom}(note, rcm\_note)$|
 
-### 2.5 Nullifier
+### 2.4 Nullifier
 Note nullifiers are stored in a global nullifier set. Adding a note's nullifier to the set invalidates the note. We use the same nullifier derivation algorithm as in Orchard: $\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF^{nf}_{nk}(ρ) + ψ \mod{q}]K + cm)$.
 
 |Name|Type/size|Description|
@@ -99,7 +99,7 @@ Note nullifiers are stored in a global nullifier set. Adding a note's nullifier 
 |$PRF^{nf}_{nk}(\rho)$|$\mathrm{F}_p \times \mathrm{F}_p \rightarrow \mathrm{F}_p$||
 
 
-#### 2.5.1 Nullifier deriving key `nk`
+#### 2.4.1 Nullifier deriving key `nk`
 
 The nullifier key for the note is derived when the note is created and is only known to the note's owner (or anyone the owner reveals the key to). Knowledge of the note's nullifier key is necessary (but not sufficient) to create the note's nullifier and invalidate the note.
 
@@ -112,7 +112,7 @@ $nk = PRF^{nk}_{r}(\mathrm{PERSONALIZATION\_NK})$.
 |`PERSONALIZATION_NK`|constant-size string|`Taiga_PRF_NK`, constant|
 |`r`||PRF randomness
 
-### 2.6 Verifiable encryption
+### 2.5 Verifiable encryption
 Encryption is used for in-band distribution of notes. Encrypted notes are stored on the blockchain, the receiver can scan the blockhcain trying to decrypt the notes and this way to find the notes that were sent to them.
 
 We want the encryption to be verifiable to make sure the receiver of the notes can decrypt them. In other systems like Zcash the sender and the creator of the note are the same actor, and it doesn't make sense for the sender to send a corrupted message to the receiver (essentially burning the note), but in Taiga the notes are often created and sent by different parties.
@@ -127,7 +127,7 @@ Not all of the note fields require to be encrypted (e.g. note commitment), and t
 
 
 ## 3. Circuits
-### 3.1 The ction Circuit
+### 3.1 The Action Circuit
 
 The action circuit `ActionCircuit(x; w)` checks that the Taiga rules are being followed by a partial transaction. The Action circuit performs checks over 1 input and 1 output note. A partial transaction containing `n` input and `n` output notes requires `n` Action proofs. The circuit is arithmetized over $\mathbb{F}_p$.
 
@@ -158,7 +158,7 @@ Note: opening of a parameter is every field used to derive the parameter
     - Value base integrity: $vb = PRF^{vb}(cm_{app\_vk}, app\_data\_static)$
 - Value commitment integrity: $cv = ValueCommit(v_{in}, v_{out}, VB_{in}, VB_{out}, rcv)$
 
-### 3.1 Validity Predicate (VP) circuits
+### 3.2 Validity Predicate (VP) circuits
 Validity predicate is a circuit containing the application logic. Validity predicates take `n` input and `n` output notes, are represented as Halo2 circuits `VP(x; w) ⟶ 0/1` and arithmetized over $\mathbb{F}_p$.
 
 #### Inputs
