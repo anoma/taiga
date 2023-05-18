@@ -101,6 +101,7 @@ impl ShieldedPartialTransaction {
 
     // check the nullifiers are from action proofs
     fn check_nullifiers(&self) -> Result<(), TransactionError> {
+        assert_eq!(NUM_NOTE, 2);
         let action_nfs = self.get_nullifiers();
         for vp_info in self.spends.iter() {
             for nfs in vp_info.get_nullifiers().iter() {
@@ -132,6 +133,7 @@ impl ShieldedPartialTransaction {
 
     // check the output cms are from action proofs
     fn check_note_commitments(&self) -> Result<(), TransactionError> {
+        assert_eq!(NUM_NOTE, 2);
         let action_cms = self.get_output_cms();
         for vp_info in self.outputs.iter() {
             for cms in vp_info.get_note_commitments().iter() {
