@@ -22,6 +22,7 @@ use rand::RngCore;
 
 mod field_addition;
 mod note_encryption_example;
+mod token;
 
 // TrivialValidityPredicateCircuit with empty custom constraints.
 #[derive(Clone, Debug, Default)]
