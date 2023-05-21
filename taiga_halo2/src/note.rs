@@ -54,10 +54,10 @@ pub struct Note {
     pub nk_com: NullifierKeyCom,
     /// old nullifier. Nonce which is a deterministically computed, unique nonce
     pub rho: Nullifier,
-    /// computed from spent_note_nf and rcm by using a PRF
+    /// computed from input_note_nf and rcm by using a PRF
     pub psi: pallas::Base,
     pub rcm: pallas::Scalar,
-    /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of the spent note will be checked in ActionProof.
+    /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of input note will be checked in ActionProof.
     pub is_merkle_checked: bool,
 }
 
@@ -71,7 +71,7 @@ pub struct ValueBase {
 }
 
 #[derive(Clone)]
-pub struct SpendNoteInfo {
+pub struct InputNoteInfo {
     pub note: Note,
     pub auth_path: [(pallas::Base, LR); TAIGA_COMMITMENT_TREE_DEPTH],
     pub root: pallas::Base,
@@ -230,7 +230,7 @@ impl ValueBase {
     }
 }
 
-impl SpendNoteInfo {
+impl InputNoteInfo {
     pub fn new(
         note: Note,
         merkle_path: MerklePath,

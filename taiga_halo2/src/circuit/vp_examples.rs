@@ -27,7 +27,7 @@ mod note_encryption_example;
 #[derive(Clone, Debug, Default)]
 pub struct TrivialValidityPredicateCircuit {
     pub owned_note_pub_id: pallas::Base,
-    pub spend_notes: [Note; NUM_NOTE],
+    pub input_notes: [Note; NUM_NOTE],
     pub output_notes: [Note; NUM_NOTE],
 }
 
@@ -50,19 +50,19 @@ impl ValidityPredicateConfig for DummyValidityPredicateConfig {
 impl TrivialValidityPredicateCircuit {
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
         let owned_note_pub_id = pallas::Base::zero();
-        let spend_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         Self {
             owned_note_pub_id,
-            spend_notes,
+            input_notes,
             output_notes,
         }
     }
 }
 
 impl ValidityPredicateInfo for TrivialValidityPredicateCircuit {
-    fn get_spend_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.spend_notes
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.input_notes
     }
 
     fn get_output_notes(&self) -> &[Note; NUM_NOTE] {

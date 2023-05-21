@@ -45,7 +45,7 @@ use rand::RngCore;
 #[derive(Clone, Debug)]
 struct NoteEncryptionValidityPredicateCircuit {
     owned_note_pub_id: pallas::Base,
-    spend_notes: [Note; NUM_NOTE],
+    input_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
     nonce: pallas::Base,
     sk: pallas::Base,
@@ -56,7 +56,7 @@ impl Default for NoteEncryptionValidityPredicateCircuit {
     fn default() -> Self {
         Self {
             owned_note_pub_id: pallas::Base::zero(),
-            spend_notes: [(); NUM_NOTE].map(|_| Note::default()),
+            input_notes: [(); NUM_NOTE].map(|_| Note::default()),
             output_notes: [(); NUM_NOTE].map(|_| Note::default()),
             nonce: pallas::Base::zero(),
             sk: pallas::Base::zero(),
@@ -106,7 +106,7 @@ impl ValidityPredicateConfig for NoteEncryptionValidityPredicateConfig {
 
 impl NoteEncryptionValidityPredicateCircuit {
     pub fn new<R: RngCore>(mut rng: R) -> Self {
-        let spend_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let nonce = pallas::Base::from_u128(23333u128);
         let sk = pallas::Base::random(&mut rng);
@@ -116,7 +116,7 @@ impl NoteEncryptionValidityPredicateCircuit {
         let owned_note_pub_id = output_notes[0].commitment().get_x();
         Self {
             owned_note_pub_id,
-            spend_notes,
+            input_notes,
             output_notes,
             nonce,
             sk,
@@ -126,8 +126,8 @@ impl NoteEncryptionValidityPredicateCircuit {
 }
 
 impl ValidityPredicateInfo for NoteEncryptionValidityPredicateCircuit {
-    fn get_spend_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.spend_notes
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.input_notes
     }
 
     fn get_output_notes(&self) -> &[Note; NUM_NOTE] {

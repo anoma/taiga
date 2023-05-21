@@ -1,7 +1,7 @@
 use crate::{
     circuit::{
         gadgets::{add::AddChip, assign_free_advice},
-        integrity::{check_output_note, check_spend_note},
+        integrity::{check_input_note, check_output_note},
         note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig},
     },
     constant::{
@@ -92,15 +92,15 @@ pub trait ValidityPredicateConfig {
 }
 
 pub trait ValidityPredicateInfo {
-    fn get_spend_notes(&self) -> &[Note; NUM_NOTE];
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE];
     fn get_output_notes(&self) -> &[Note; NUM_NOTE];
     fn get_note_instances(&self) -> Vec<pallas::Base> {
         let mut instances = vec![];
-        self.get_spend_notes()
+        self.get_input_notes()
             .iter()
             .zip(self.get_output_notes().iter())
-            .for_each(|(spend_note, output_note)| {
-                let nf = spend_note.get_nf().unwrap().inner();
+            .for_each(|(input_note, output_note)| {
+                let nf = input_note.get_nf().unwrap().inner();
                 instances.push(nf);
                 let cm = output_note.commitment();
                 instances.push(cm.get_x());
@@ -109,9 +109,9 @@ pub trait ValidityPredicateInfo {
         instances
     }
     fn get_instances(&self) -> Vec<pallas::Base>;
-    // The owned_note_pub_id is the spend_note_nf or the output_note_cm_x
+    // The owned_note_pub_id is the input_note_nf or the output_note_cm_x
     // The owned_note_pub_id is the key to look up the target variables and
-    // help determine whether the owned note is the spend note or not in VP circuit.
+    // help determine whether the owned note is the input note or not in VP circuit.
     fn get_owned_note_pub_id(&self) -> pallas::Base;
 }
 
@@ -154,13 +154,13 @@ pub trait ValidityPredicateCircuit:
         // Construct an add chip
         let add_chip = AddChip::<pallas::Base>::construct(note_config.add_config, ());
 
-        let spend_notes = self.get_spend_notes();
+        let input_notes = self.get_input_notes();
         let output_notes = self.get_output_notes();
-        let mut spend_note_variables = vec![];
+        let mut input_note_variables = vec![];
         let mut output_note_variables = vec![];
         for i in 0..NUM_NOTE {
-            spend_note_variables.push(check_spend_note(
-                layouter.namespace(|| "check spend note"),
+            input_note_variables.push(check_input_note(
+                layouter.namespace(|| "check input note"),
                 note_config.advices,
                 note_config.instances,
                 ecc_chip.clone(),
@@ -168,11 +168,11 @@ pub trait ValidityPredicateCircuit:
                 note_commit_chip.clone(),
                 note_config.poseidon_config.clone(),
                 add_chip.clone(),
-                spend_notes[i].clone(),
+                input_notes[i].clone(),
                 i * 2,
             )?);
 
-            // The old_nf may not be from above spend note
+            // The old_nf may not be from above input note
             let old_nf = assign_free_advice(
                 layouter.namespace(|| "old nf"),
                 note_config.advices[0],
@@ -206,13 +206,13 @@ pub trait ValidityPredicateCircuit:
 
         Ok(BasicValidityPredicateVariables {
             owned_note_pub_id,
-            spend_note_variables: spend_note_variables.try_into().unwrap(),
+            input_note_variables: input_note_variables.try_into().unwrap(),
             output_note_variables: output_note_variables.try_into().unwrap(),
         })
     }
 
     // VP designer need to implement the following functions.
-    // `get_spend_notes` and `get_output_notes` will be used in `basic_constraints` to get the basic note info.
+    // `get_input_notes` and `get_output_notes` will be used in `basic_constraints` to get the basic note info.
 
     // Add custom constraints on basic note variables and user-defined variables.
     fn custom_constraints(
@@ -230,7 +230,7 @@ pub trait ValidityPredicateCircuit:
 #[derive(Debug, Clone)]
 pub struct BasicValidityPredicateVariables {
     pub owned_note_pub_id: AssignedCell<pallas::Base, pallas::Base>,
-    pub spend_note_variables: [SpendNoteVariables; NUM_NOTE],
+    pub input_note_variables: [InputNoteVariables; NUM_NOTE],
     pub output_note_variables: [OutputNoteVariables; NUM_NOTE],
 }
 
@@ -244,9 +244,9 @@ pub struct NoteVariables {
     pub app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
 }
 
-// Variables in the spend note
+// Variables in the input note
 #[derive(Debug, Clone)]
-pub struct SpendNoteVariables {
+pub struct InputNoteVariables {
     pub nf: AssignedCell<pallas::Base, pallas::Base>,
     pub cm_x: AssignedCell<pallas::Base, pallas::Base>,
     pub note_variables: NoteVariables,
@@ -261,7 +261,7 @@ pub struct OutputNoteVariables {
 
 #[derive(Debug, Clone)]
 pub struct NoteSearchableVariablePair {
-    // src_variable is the spend_note_nf or the output_note_cm_x
+    // src_variable is the input_note_nf or the output_note_cm_x
     pub src_variable: AssignedCell<pallas::Base, pallas::Base>,
     // target_variable is one of the parameter in the NoteVariables
     pub target_variable: AssignedCell<pallas::Base, pallas::Base>,
@@ -272,9 +272,9 @@ impl BasicValidityPredicateVariables {
         self.owned_note_pub_id.clone()
     }
 
-    pub fn get_spend_note_nfs(&self) -> [AssignedCell<pallas::Base, pallas::Base>; NUM_NOTE] {
+    pub fn get_input_note_nfs(&self) -> [AssignedCell<pallas::Base, pallas::Base>; NUM_NOTE] {
         let ret: Vec<_> = self
-            .spend_note_variables
+            .input_note_variables
             .iter()
             .map(|variables| variables.nf.clone())
             .collect();
@@ -291,8 +291,8 @@ impl BasicValidityPredicateVariables {
     }
 
     pub fn get_address_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
-        let mut spend_note_pairs: Vec<_> = self
-            .spend_note_variables
+        let mut input_note_pairs: Vec<_> = self
+            .input_note_variables
             .iter()
             .map(|variables| NoteSearchableVariablePair {
                 src_variable: variables.nf.clone(),
@@ -307,13 +307,13 @@ impl BasicValidityPredicateVariables {
                 target_variable: variables.note_variables.address.clone(),
             })
             .collect();
-        spend_note_pairs.extend(output_note_pairs);
-        spend_note_pairs.try_into().unwrap()
+        input_note_pairs.extend(output_note_pairs);
+        input_note_pairs.try_into().unwrap()
     }
 
     pub fn get_app_vk_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
-        let mut spend_note_pairs: Vec<_> = self
-            .spend_note_variables
+        let mut input_note_pairs: Vec<_> = self
+            .input_note_variables
             .iter()
             .map(|variables| NoteSearchableVariablePair {
                 src_variable: variables.nf.clone(),
@@ -328,15 +328,15 @@ impl BasicValidityPredicateVariables {
                 target_variable: variables.note_variables.app_vk.clone(),
             })
             .collect();
-        spend_note_pairs.extend(output_note_pairs);
-        spend_note_pairs.try_into().unwrap()
+        input_note_pairs.extend(output_note_pairs);
+        input_note_pairs.try_into().unwrap()
     }
 
     pub fn get_app_data_static_searchable_pairs(
         &self,
     ) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
-        let mut spend_note_pairs: Vec<_> = self
-            .spend_note_variables
+        let mut input_note_pairs: Vec<_> = self
+            .input_note_variables
             .iter()
             .map(|variables| NoteSearchableVariablePair {
                 src_variable: variables.nf.clone(),
@@ -351,13 +351,13 @@ impl BasicValidityPredicateVariables {
                 target_variable: variables.note_variables.app_data_static.clone(),
             })
             .collect();
-        spend_note_pairs.extend(output_note_pairs);
-        spend_note_pairs.try_into().unwrap()
+        input_note_pairs.extend(output_note_pairs);
+        input_note_pairs.try_into().unwrap()
     }
 
     pub fn get_value_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
-        let mut spend_note_pairs: Vec<_> = self
-            .spend_note_variables
+        let mut input_note_pairs: Vec<_> = self
+            .input_note_variables
             .iter()
             .map(|variables| NoteSearchableVariablePair {
                 src_variable: variables.nf.clone(),
@@ -372,15 +372,15 @@ impl BasicValidityPredicateVariables {
                 target_variable: variables.note_variables.value.clone(),
             })
             .collect();
-        spend_note_pairs.extend(output_note_pairs);
-        spend_note_pairs.try_into().unwrap()
+        input_note_pairs.extend(output_note_pairs);
+        input_note_pairs.try_into().unwrap()
     }
 
     pub fn get_is_merkle_checked_searchable_pairs(
         &self,
     ) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
-        let mut spend_note_pairs: Vec<_> = self
-            .spend_note_variables
+        let mut input_note_pairs: Vec<_> = self
+            .input_note_variables
             .iter()
             .map(|variables| NoteSearchableVariablePair {
                 src_variable: variables.nf.clone(),
@@ -395,15 +395,15 @@ impl BasicValidityPredicateVariables {
                 target_variable: variables.note_variables.is_merkle_checked.clone(),
             })
             .collect();
-        spend_note_pairs.extend(output_note_pairs);
-        spend_note_pairs.try_into().unwrap()
+        input_note_pairs.extend(output_note_pairs);
+        input_note_pairs.try_into().unwrap()
     }
 
     pub fn get_app_data_dynamic_searchable_pairs(
         &self,
     ) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
-        let mut spend_note_pairs: Vec<_> = self
-            .spend_note_variables
+        let mut input_note_pairs: Vec<_> = self
+            .input_note_variables
             .iter()
             .map(|variables| NoteSearchableVariablePair {
                 src_variable: variables.nf.clone(),
@@ -418,8 +418,8 @@ impl BasicValidityPredicateVariables {
                 target_variable: variables.note_variables.app_data_dynamic.clone(),
             })
             .collect();
-        spend_note_pairs.extend(output_note_pairs);
-        spend_note_pairs.try_into().unwrap()
+        input_note_pairs.extend(output_note_pairs);
+        input_note_pairs.try_into().unwrap()
     }
 }
 

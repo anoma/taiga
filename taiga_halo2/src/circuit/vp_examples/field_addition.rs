@@ -28,7 +28,7 @@ use rand::RngCore;
 #[derive(Clone, Debug, Default)]
 struct FieldAdditionValidityPredicateCircuit {
     owned_note_pub_id: pallas::Base,
-    spend_notes: [Note; NUM_NOTE],
+    input_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
     a: pallas::Base,
     b: pallas::Base,
@@ -67,14 +67,14 @@ impl ValidityPredicateConfig for FieldAdditionValidityPredicateConfig {
 
 impl FieldAdditionValidityPredicateCircuit {
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        let spend_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let a = pallas::Base::random(&mut rng);
         let b = pallas::Base::random(&mut rng);
         let owned_note_pub_id = pallas::Base::zero();
         Self {
             owned_note_pub_id,
-            spend_notes,
+            input_notes,
             output_notes,
             a,
             b,
@@ -83,8 +83,8 @@ impl FieldAdditionValidityPredicateCircuit {
 }
 
 impl ValidityPredicateInfo for FieldAdditionValidityPredicateCircuit {
-    fn get_spend_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.spend_notes
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.input_notes
     }
 
     fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
@@ -107,7 +107,7 @@ impl ValidityPredicateInfo for FieldAdditionValidityPredicateCircuit {
 impl ValidityPredicateCircuit for FieldAdditionValidityPredicateCircuit {
     type VPConfig = FieldAdditionValidityPredicateConfig;
     // Add custom constraints
-    // Note: the trivial vp doesn't constrain on spend_note_variables and output_note_variables
+    // Note: the trivial vp doesn't constrain on input_note_variables and output_note_variables
     fn custom_constraints(
         &self,
         config: Self::Config,

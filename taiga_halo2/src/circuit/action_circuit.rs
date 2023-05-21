@@ -1,6 +1,6 @@
 use crate::circuit::gadgets::add::AddChip;
 use crate::circuit::hash_to_curve::HashToCurveConfig;
-use crate::circuit::integrity::{check_output_note, check_spend_note, compute_value_commitment};
+use crate::circuit::integrity::{check_input_note, check_output_note, compute_value_commitment};
 use crate::circuit::merkle_circuit::{
     merkle_poseidon_gadget, MerklePoseidonChip, MerklePoseidonConfig,
 };
@@ -35,9 +35,9 @@ pub struct ActionConfig {
 /// The Action circuit.
 #[derive(Clone, Debug, Default)]
 pub struct ActionCircuit {
-    /// Spent note
-    pub spend_note: Note,
-    /// The authorization path of spend note
+    /// Input note
+    pub input_note: Note,
+    /// The authorization path of input note
     pub auth_path: [(pallas::Base, LR); TAIGA_COMMITMENT_TREE_DEPTH],
     /// Output note
     pub output_note: Note,
@@ -77,7 +77,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
         let merkle_path_selector = meta.selector();
         meta.create_gate("merkle path check", |meta| {
             let merkle_path_selector = meta.query_selector(merkle_path_selector);
-            let is_merkle_checked_spend = meta.query_advice(advices[0], Rotation::cur());
+            let is_merkle_checked_input = meta.query_advice(advices[0], Rotation::cur());
             let anchor = meta.query_advice(advices[1], Rotation::cur());
             let root = meta.query_advice(advices[2], Rotation::cur());
 
@@ -85,7 +85,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
                 merkle_path_selector,
                 [(
                     "is_merkle_checked is false, or root = anchor",
-                    is_merkle_checked_spend * (root - anchor),
+                    is_merkle_checked_input * (root - anchor),
                 )],
             )
         });
@@ -140,10 +140,10 @@ impl Circuit<pallas::Base> for ActionCircuit {
         // Construct a merkle chip
         let merkle_chip = MerklePoseidonChip::construct(config.merkle_config);
 
-        // Spend note
-        // Check the spend note commitment
-        let spend_note_variables = check_spend_note(
-            layouter.namespace(|| "check spend note"),
+        // Input note
+        // Check the input note commitment
+        let input_note_variables = check_input_note(
+            layouter.namespace(|| "check input note"),
             config.advices,
             config.instances,
             ecc_chip.clone(),
@@ -151,7 +151,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             note_commit_chip.clone(),
             config.note_config.poseidon_config.clone(),
             add_chip,
-            self.spend_note.clone(),
+            self.input_note.clone(),
             ACTION_NF_INSTANCE_ROW_IDX,
         )?;
 
@@ -159,7 +159,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
         let root = merkle_poseidon_gadget(
             layouter.namespace(|| "poseidon merkle"),
             merkle_chip,
-            spend_note_variables.cm_x,
+            input_note_variables.cm_x,
             &self.auth_path,
         )?;
 
@@ -175,7 +175,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             note_commit_chip,
             config.note_config.poseidon_config,
             self.output_note.clone(),
-            spend_note_variables.nf,
+            input_note_variables.nf,
             ACTION_OUTPUT_CM_INSTANCE_ROW_IDX,
         )?;
 
@@ -183,14 +183,14 @@ impl Circuit<pallas::Base> for ActionCircuit {
 
         // TODO: add note verifiable encryption
 
-        // compute and public net value commitment(spend_value_commitment - output_value_commitment)
+        // compute and public net value commitment(input_value_commitment - output_value_commitment)
         let cv_net = compute_value_commitment(
             layouter.namespace(|| "net value commitment"),
             ecc_chip,
             config.hash_to_curve_config.clone(),
-            spend_note_variables.note_variables.app_vk.clone(),
-            spend_note_variables.note_variables.app_data_static.clone(),
-            spend_note_variables.note_variables.value.clone(),
+            input_note_variables.note_variables.app_vk.clone(),
+            input_note_variables.note_variables.app_data_static.clone(),
+            input_note_variables.note_variables.value.clone(),
             output_note_vars.note_variables.app_vk.clone(),
             output_note_vars.note_variables.app_data_static.clone(),
             output_note_vars.note_variables.value,
@@ -211,11 +211,11 @@ impl Circuit<pallas::Base> for ActionCircuit {
         layouter.assign_region(
             || "merkle path check",
             |mut region| {
-                spend_note_variables
+                input_note_variables
                     .note_variables
                     .is_merkle_checked
                     .copy_advice(
-                        || "is_merkle_checked_spend",
+                        || "is_merkle_checked_input",
                         &mut region,
                         config.advices[0],
                         0,

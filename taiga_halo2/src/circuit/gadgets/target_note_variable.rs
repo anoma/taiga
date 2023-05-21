@@ -13,9 +13,9 @@ use pasta_curves::pallas;
 pub fn get_owned_note_variable(
     config: GetOwnedNoteVariableConfig,
     mut layouter: impl Layouter<pallas::Base>,
-    // The owned_note_pub_id is the spend_note_nf or the output_note_cm_x
+    // The owned_note_pub_id is the input_note_nf or the output_note_cm_x
     owned_note_pub_id: &AssignedCell<pallas::Base, pallas::Base>,
-    // NUM_NOTE pairs are from spend notes, the other NUM_NOTE are from output notes
+    // NUM_NOTE pairs are from input notes, the other NUM_NOTE are from output notes
     note_variable_pairs: &[NoteSearchableVariablePair; NUM_NOTE * 2],
 ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
     layouter.assign_region(
@@ -24,21 +24,21 @@ pub fn get_owned_note_variable(
     )
 }
 
-// Search and get is_spend_note_flag variable
-pub fn get_is_spend_note_flag(
-    config: GetIsSpendNoteFlagConfig,
+// Search and get is_input_note_flag variable
+pub fn get_is_input_note_flag(
+    config: GetIsInputNoteFlagConfig,
     mut layouter: impl Layouter<pallas::Base>,
-    // The owned_note_pub_id is the spend_note_nf or the output_note_cm_x
+    // The owned_note_pub_id is the input_note_nf or the output_note_cm_x
     owned_note_pub_id: &AssignedCell<pallas::Base, pallas::Base>,
-    spend_note_nfs: &[AssignedCell<pallas::Base, pallas::Base>; NUM_NOTE],
+    input_note_nfs: &[AssignedCell<pallas::Base, pallas::Base>; NUM_NOTE],
     output_note_cms: &[AssignedCell<pallas::Base, pallas::Base>; NUM_NOTE],
 ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
     layouter.assign_region(
-        || "get is_spend_note_flag",
+        || "get is_input_note_flag",
         |mut region| {
             config.assign_region(
                 owned_note_pub_id,
-                spend_note_nfs,
+                input_note_nfs,
                 output_note_cms,
                 0,
                 &mut region,
@@ -215,29 +215,29 @@ impl GetOwnedNoteVariableConfig {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct GetIsSpendNoteFlagConfig {
-    q_get_is_spend_note_flag: Selector,
+pub struct GetIsInputNoteFlagConfig {
+    q_get_is_input_note_flag: Selector,
     owned_note_pub_id: Column<Advice>,
-    spend_note_nf: Column<Advice>,
+    input_note_nf: Column<Advice>,
     output_note_cm: Column<Advice>,
 }
 
-impl GetIsSpendNoteFlagConfig {
+impl GetIsInputNoteFlagConfig {
     #[allow(clippy::too_many_arguments)]
     pub fn configure(
         meta: &mut ConstraintSystem<pallas::Base>,
         owned_note_pub_id: Column<Advice>,
-        spend_note_nf: Column<Advice>,
+        input_note_nf: Column<Advice>,
         output_note_cm: Column<Advice>,
     ) -> Self {
         meta.enable_equality(owned_note_pub_id);
-        meta.enable_equality(spend_note_nf);
+        meta.enable_equality(input_note_nf);
         meta.enable_equality(output_note_cm);
 
         let config = Self {
-            q_get_is_spend_note_flag: meta.selector(),
+            q_get_is_input_note_flag: meta.selector(),
             owned_note_pub_id,
-            spend_note_nf,
+            input_note_nf,
             output_note_cm,
         };
 
@@ -247,12 +247,12 @@ impl GetIsSpendNoteFlagConfig {
     }
 
     fn create_gate(&self, meta: &mut ConstraintSystem<pallas::Base>) {
-        meta.create_gate("get is_spend_note_flag", |meta| {
-            let q_get_is_spend_note_flag = meta.query_selector(self.q_get_is_spend_note_flag);
+        meta.create_gate("get is_input_note_flag", |meta| {
+            let q_get_is_input_note_flag = meta.query_selector(self.q_get_is_input_note_flag);
             let owned_note_pub_id = meta.query_advice(self.owned_note_pub_id, Rotation::cur());
-            let is_spend_note_flag = meta.query_advice(self.owned_note_pub_id, Rotation::next());
-            let spend_note_nf_1 = meta.query_advice(self.spend_note_nf, Rotation::cur());
-            let spend_note_nf_2 = meta.query_advice(self.spend_note_nf, Rotation::next());
+            let is_input_note_flag = meta.query_advice(self.owned_note_pub_id, Rotation::next());
+            let input_note_nf_1 = meta.query_advice(self.input_note_nf, Rotation::cur());
+            let input_note_nf_2 = meta.query_advice(self.input_note_nf, Rotation::next());
             let output_note_cm_1 =
                 meta.query_advice(self.output_note_cm, Rotation::cur());
             let output_note_cm_2 =
@@ -260,16 +260,16 @@ impl GetIsSpendNoteFlagConfig {
                 let one = Expression::Constant(pallas::Base::one());
 
             Constraints::with_selector(
-                q_get_is_spend_note_flag,
+                q_get_is_input_note_flag,
                 [
-                    ("bool_check is_spend_note_flag", bool_check(is_spend_note_flag.clone())),
+                    ("bool_check is_input_note_flag", bool_check(is_input_note_flag.clone())),
                     (
-                        "if is_spend_note_flag, then owned_note_pub_id == spend_note_nf_1 or owned_note_pub_id == spend_note_nf_2",
-                        is_spend_note_flag.clone() * (owned_note_pub_id.clone() - spend_note_nf_1) * (owned_note_pub_id.clone() - spend_note_nf_2),
+                        "if is_input_note_flag, then owned_note_pub_id == input_note_nf_1 or owned_note_pub_id == input_note_nf_2",
+                        is_input_note_flag.clone() * (owned_note_pub_id.clone() - input_note_nf_1) * (owned_note_pub_id.clone() - input_note_nf_2),
                     ),
                     (
-                        "if not is_spend_note_flag, then owned_note_pub_id == output_note_cm_1 or owned_note_pub_id == output_note_cm_2",
-                        (is_spend_note_flag - one) * (owned_note_pub_id.clone() - output_note_cm_1) * (owned_note_pub_id - output_note_cm_2),
+                        "if not is_input_note_flag, then owned_note_pub_id == output_note_cm_1 or owned_note_pub_id == output_note_cm_2",
+                        (is_input_note_flag - one) * (owned_note_pub_id.clone() - output_note_cm_1) * (owned_note_pub_id - output_note_cm_2),
                     ),
                 ],
             )
@@ -279,26 +279,26 @@ impl GetIsSpendNoteFlagConfig {
     pub fn assign_region(
         &self,
         owned_note_pub_id: &AssignedCell<pallas::Base, pallas::Base>,
-        spend_note_nfs: &[AssignedCell<pallas::Base, pallas::Base>; NUM_NOTE],
+        input_note_nfs: &[AssignedCell<pallas::Base, pallas::Base>; NUM_NOTE],
         output_note_cms: &[AssignedCell<pallas::Base, pallas::Base>; NUM_NOTE],
         offset: usize,
         region: &mut Region<'_, pallas::Base>,
     ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
-        // Enable `q_get_is_spend_note_flag` selector
-        self.q_get_is_spend_note_flag.enable(region, offset)?;
+        // Enable `q_get_is_input_note_flag` selector
+        self.q_get_is_input_note_flag.enable(region, offset)?;
 
-        // copy owned_note_pub_id, spend_note_nfs and output_note_cms into the advice columns
+        // copy owned_note_pub_id, input_note_nfs and output_note_cms into the advice columns
         owned_note_pub_id.copy_advice(
             || "owned_note_pub_id",
             region,
             self.owned_note_pub_id,
             offset,
         )?;
-        spend_note_nfs[0].copy_advice(|| "spend_note_nf 1", region, self.spend_note_nf, offset)?;
-        spend_note_nfs[1].copy_advice(
-            || "spend_note_nf 2",
+        input_note_nfs[0].copy_advice(|| "input_note_nf 1", region, self.input_note_nf, offset)?;
+        input_note_nfs[1].copy_advice(
+            || "input_note_nf 2",
             region,
-            self.spend_note_nf,
+            self.input_note_nf,
             offset + 1,
         )?;
         output_note_cms[0].copy_advice(
@@ -314,14 +314,14 @@ impl GetIsSpendNoteFlagConfig {
             offset + 1,
         )?;
 
-        // compute the is_spend_note_flag
-        let is_spend_note_flag = owned_note_pub_id
+        // compute the is_input_note_flag
+        let is_input_note_flag = owned_note_pub_id
             .value()
-            .zip(spend_note_nfs[0].value())
-            .zip(spend_note_nfs[0].value())
+            .zip(input_note_nfs[0].value())
+            .zip(input_note_nfs[0].value())
             .map(
-                |((&owned_note_pub_id, &spend_note_nf_1), &spend_note_nf_2)| {
-                    if owned_note_pub_id == spend_note_nf_1 || owned_note_pub_id == spend_note_nf_2
+                |((&owned_note_pub_id, &input_note_nf_1), &input_note_nf_2)| {
+                    if owned_note_pub_id == input_note_nf_1 || owned_note_pub_id == input_note_nf_2
                     {
                         pallas::Base::one()
                     } else {
@@ -330,10 +330,10 @@ impl GetIsSpendNoteFlagConfig {
                 },
             );
         region.assign_advice(
-            || "is_spend_note_flag",
+            || "is_input_note_flag",
             self.owned_note_pub_id,
             offset + 1,
-            || is_spend_note_flag,
+            || is_input_note_flag,
         )
     }
 }

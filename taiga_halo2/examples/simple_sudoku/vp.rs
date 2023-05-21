@@ -47,7 +47,7 @@ impl ValidityPredicateConfig for SudokuVPConfig {
 #[derive(Clone, Debug, Default)]
 pub struct SudokuVP {
     pub sudoku: SudokuCircuit,
-    spend_notes: [Note; NUM_NOTE],
+    input_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
 }
 
@@ -65,8 +65,8 @@ impl ValidityPredicateCircuit for SudokuVP {
 }
 
 impl ValidityPredicateInfo for SudokuVP {
-    fn get_spend_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.spend_notes
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.input_notes
     }
 
     fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
@@ -85,12 +85,12 @@ impl ValidityPredicateInfo for SudokuVP {
 impl SudokuVP {
     pub fn new(
         sudoku: SudokuCircuit,
-        spend_notes: [Note; NUM_NOTE],
+        input_notes: [Note; NUM_NOTE],
         output_notes: [Note; NUM_NOTE],
     ) -> Self {
         Self {
             sudoku,
-            spend_notes,
+            input_notes,
             output_notes,
         }
     }
