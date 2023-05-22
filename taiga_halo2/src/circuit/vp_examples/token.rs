@@ -106,6 +106,7 @@ impl ValidityPredicateConfig for TokenValidityPredicateConfig {
 }
 
 impl TokenValidityPredicateCircuit {
+    // TODO: Move the random function to the test mod
     pub fn random<R: RngCore>(mut rng: R) -> Self {
         let mut input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
