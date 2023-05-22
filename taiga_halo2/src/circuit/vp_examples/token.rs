@@ -10,7 +10,7 @@ use crate::{
             ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
     },
-    constant::{NUM_NOTE, SETUP_PARAMS_MAP},
+    constant::{NOTE_COMMIT_DOMAIN, NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
     proof::Proof,
     utils::poseidon_hash_n,
@@ -47,7 +47,7 @@ pub struct TokenValidityPredicateCircuit {
 #[derive(Clone, Debug)]
 pub struct TokenAuthorization {
     pub pk: pallas::Point,
-    pub auth_vk: ValidityPredicateVerifyingKey,
+    pub vk: pallas::Base,
 }
 
 #[derive(Clone, Debug)]
@@ -62,7 +62,7 @@ impl Default for TokenAuthorization {
     fn default() -> Self {
         Self {
             pk: pallas::Point::generator(),
-            auth_vk: ValidityPredicateVerifyingKey::default(),
+            vk: pallas::Base::one(),
         }
     }
 }
@@ -183,10 +183,10 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             Value::known(self.auth.pk.to_affine()),
         )?;
 
-        let auth_vk = assign_free_advice(
-            layouter.namespace(|| "witness auth_vk"),
+        let vk = assign_free_advice(
+            layouter.namespace(|| "witness vk"),
             config.advices[0],
-            Value::known(self.auth.auth_vk.get_compressed()),
+            Value::known(self.auth.vk),
         )?;
 
         // search target note and get the app_data_dynamic
@@ -212,7 +212,7 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
                 config.advices[0],
                 pallas::Base::zero(),
             )?;
-            let poseidon_message = [pk.inner().x(), pk.inner().y(), auth_vk, padding_zero];
+            let poseidon_message = [pk.inner().x(), pk.inner().y(), vk, padding_zero];
             poseidon_hasher.hash(
                 layouter.namespace(|| "check app_data_dynamic encoding"),
                 poseidon_message,
@@ -237,18 +237,19 @@ impl TokenAuthorization {
     pub fn random<R: RngCore>(mut rng: R) -> Self {
         Self {
             pk: pallas::Point::random(&mut rng),
-            auth_vk: ValidityPredicateVerifyingKey::dummy(&mut rng),
+            vk: pallas::Base::random(&mut rng),
         }
     }
 
     pub fn to_app_data_dynamic(&self) -> pallas::Base {
         let pk_coord = self.pk.to_affine().coordinates().unwrap();
-        poseidon_hash_n::<4>([
-            *pk_coord.x(),
-            *pk_coord.y(),
-            self.auth_vk.get_compressed(),
-            pallas::Base::zero(),
-        ])
+        poseidon_hash_n::<4>([*pk_coord.x(), *pk_coord.y(), self.vk, pallas::Base::zero()])
+    }
+
+    pub fn from_sk_vk(sk: pallas::Scalar, vk: pallas::Base) -> Self {
+        let generator = NOTE_COMMIT_DOMAIN.R();
+        let pk = generator * sk;
+        Self { pk, vk }
     }
 }
 
