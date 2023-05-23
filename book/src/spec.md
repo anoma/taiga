@@ -161,7 +161,7 @@ Note: opening of a parameter is every field used to derive the parameter
 - For output note:
     - Commitment integrity(output note only): $cm = NoteCom(note, rcm_{note})$
     - Application VP integrity: $cm_{vp} = VPCommit(cm_{app\_vk}, rcm_{vp})$
-     - Value base integrity: $vb = PRF^{vb}(cm_{app\_vk}, app\_data\_static)$
+    - Value base integrity: $vb = PRF^{vb}(cm_{app\_vk}, app\_data\_static)$
 - Value commitment integrity: $cv = ValueCommit(v_{in}, v_{out}, VB_{in}, VB_{out}, rcv)$
 
 Note: unlike MASP, the value base in Taiga is not used to compute note's commitment and the Action circuit doesn't take `vb` as private input but computes it from the note fields, and it is checked for both input and output notes.
