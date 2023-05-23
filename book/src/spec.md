@@ -35,8 +35,10 @@ Note is an immutable particle of the application state.
 |`cm_nk`||Commitment to the nullifier key that will be used to derive the note's nullifier|
 |`ρ`|$\mathbb{F}_p$|An old nullifier from the same Action description (see Orchard)|
 |`ψ`|$\mathbb{F}_p$|The prf output of `ρ` and `rcm_note` (see Orchard)|
-|`is_merkle_checked`|bool|Dummy note flag|
+|`is_merkle_checked`|bool|Dummy note flag. It indicates whether the note's commitment Merkle path should be checked when spending the note.|
 |`rcm_note`|${0..2^{255} - 1}$|A random commitment trapdoor|
+
+Note: the value size cannot be bigger or close to the curve's scalar field size (to avoid overflowing) but besides that there are no strict reasons for choosing 64. We can use more notes to express a value that doesn't fit in one note (splitting the value into limbs). Having bigger value size requires fewer notes to express such a value and is more efficient. For example, a value size of 128 bits would require two times less notes to express a maximum value
 
 #### Application-related fields
 
@@ -64,7 +66,7 @@ $[v^{in} - v^{out}]VB + [rcv]R$
 
 And multiple types value commitment computation used in Taiga:
 
-$cv = [v^{in}]VB^{in} - [v^{out}]VB^{nut} + [rcv]R$
+$cv = [v^{in}]VB^{in} - [v^{out}]VB^{out} + [rcv]R$
 
 |Variable|Type/size|Description|
 |-|-|-|
@@ -124,6 +126,9 @@ $sk = DH(pub_{recv}, priv_{send})$
 $ce = Encrypt(note, sk)$
 
 Not all of the note fields require to be encrypted (e.g. note commitment), and the encrypted fields may vary depending on the application.
+
+### 2.6 Dummy notes
+In Taiga, note's value doesn't define if the note is dummy or not, unlike some other systems. Dummy notes can have non-zero value and are marked explicitly as dummy by setting `is_merkle_checked = false` meaning that for dummy notes the commitment's Merkle path is not checked when spending the note. Non-zero value dummy notes are handy for carrying additional constraints (e.g. intents) and balancing transactions.
 
 
 ## 3. Circuits
@@ -262,7 +267,8 @@ A partial transaction `ptx` is valid if:
     - `Verify(desc_Action, ActionPublicInput, π_action_i) = True`
 2. For each VP:
     - `Verify'(desc_VP, VPPublicInput, π_VP) = True`
- 
+    - Public input consistency: VP's public input `nf` and `cm` are the same as in Actions' public input
+
 ### Taiga transaction
 Taiga transaction is built from a set of partial transactions. Unlike partial transactions, a transaction must balance, which is checked by the binding signature.
 
