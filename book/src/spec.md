@@ -157,11 +157,14 @@ Note: opening of a parameter is every field used to derive the parameter
     - If `is_merkle_checked = true`, check that the note is a valid note in `rt`: there is a path in Merkle tree with root `rt` to a note commitment `cm` that opens to `note`
     - Nullifier integrity: $nf = DeriveNullier_{nk}(note)$.
     - Application VP integrity: $cm_{vp} = VPCommit(cm_{app\_vk}, rcm_{vp})$
+    - Value base integrity: $vb = PRF^{vb}(cm_{app\_vk}, app\_data\_static)$
 - For output note:
     - Commitment integrity(output note only): $cm = NoteCom(note, rcm_{note})$
     - Application VP integrity: $cm_{vp} = VPCommit(cm_{app\_vk}, rcm_{vp})$
-    - Value base integrity: $vb = PRF^{vb}(cm_{app\_vk}, app\_data\_static)$
+     - Value base integrity: $vb = PRF^{vb}(cm_{app\_vk}, app\_data\_static)$
 - Value commitment integrity: $cv = ValueCommit(v_{in}, v_{out}, VB_{in}, VB_{out}, rcv)$
+
+Note: unlike MASP, the value base in Taiga is not used to compute note's commitment and the Action circuit doesn't take `vb` as private input but computes it from the note fields, and it is checked for both input and output notes.
 
 ### 3.2 Validity Predicate (VP) circuits
 Validity predicate is a circuit containing the application logic. Validity predicates take `n` input and `n` output notes, are represented as Halo2 circuits `VP(x; w) ⟶ 0/1` and arithmetized over $\mathbb{F}_p$.
