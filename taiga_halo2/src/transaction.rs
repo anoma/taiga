@@ -1,54 +1,25 @@
-use crate::action::{ActionInfo, ActionInstance};
-use crate::binding_signature::*;
-use crate::circuit::vp_circuit::{VPVerifyingInfo, ValidityPredicateInfo};
-use crate::constant::{
-    ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, NUM_NOTE,
-    SETUP_PARAMS_MAP, TRANSACTION_BINDING_HASH_PERSONALIZATION,
-};
-use crate::note::{NoteCommitment, OutputNoteInfo, SpendNoteInfo};
+use crate::binding_signature::{BindingSignature, BindingSigningKey, BindingVerificationKey};
+use crate::constant::TRANSACTION_BINDING_HASH_PERSONALIZATION;
+use crate::error::TransactionError;
+use crate::executable::Executable;
+use crate::note::NoteCommitment;
 use crate::nullifier::Nullifier;
-use crate::proof::Proof;
+use crate::shielded_ptx::ShieldedPartialTransaction;
+use crate::transparent_ptx::{OutputResource, TransparentPartialTransaction};
 use crate::value_commitment::ValueCommitment;
 use blake2b_simd::Params as Blake2bParams;
-use core::fmt;
-use ff::PrimeField;
-use group::Group;
-use halo2_proofs::plonk::Error;
-use pasta_curves::pallas;
+use pasta_curves::{
+    group::{ff::PrimeField, Group},
+    pallas,
+};
 use rand::{CryptoRng, RngCore};
-use std::fmt::Display;
-
-#[derive(Debug)]
-pub enum TransactionError {
-    /// An error occurred when creating halo2 proof.
-    Proof(Error),
-    /// Binding signature is not valid.
-    InvalidBindingSignature,
-    /// Binding signature is missing.
-    MissingBindingSignatures,
-}
-
-impl Display for TransactionError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use TransactionError::*;
-        match self {
-            Proof(e) => f.write_str(&format!("Proof error: {e}")),
-            InvalidBindingSignature => f.write_str("Binding signature was invalid"),
-            MissingBindingSignatures => f.write_str("Binding signature is missing"),
-        }
-    }
-}
-
-impl From<Error> for TransactionError {
-    fn from(e: Error) -> Self {
-        TransactionError::Proof(e)
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct Transaction {
-    partial_txs: Vec<PartialTransaction>,
-    // binding signature to check sum balance
+    // TODO: Other parameters to be added.
+    shielded_ptx_bundle: Option<ShieldedPartialTxBundle>,
+    transparent_ptx_bundle: Option<TransparentPartialTxBundle>,
+    // binding signature to check balance
     signature: InProgressBindingSignature,
 }
 
@@ -59,70 +30,194 @@ pub enum InProgressBindingSignature {
 }
 
 #[derive(Debug, Clone)]
-pub struct PartialTransaction {
-    actions: [ActionVerifyingInfo; NUM_NOTE],
-    spends: [NoteVPVerifyingInfoSet; NUM_NOTE],
-    outputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
+pub struct ShieldedPartialTxBundle {
+    partial_txs: Vec<ShieldedPartialTransaction>,
 }
 
 #[derive(Debug, Clone)]
-pub struct ActionVerifyingInfo {
-    action_proof: Proof,
-    action_instance: ActionInstance,
+pub struct ShieldedResult {
+    anchors: Vec<pallas::Base>,
+    nullifiers: Vec<Nullifier>,
+    output_cms: Vec<NoteCommitment>,
 }
 
 #[derive(Debug, Clone)]
-pub struct NoteVPVerifyingInfoSet {
-    app_vp_verifying_info: VPVerifyingInfo,
-    app_logic_vp_verifying_info: Vec<VPVerifyingInfo>,
-    // TODO: add verifier proof and according public inputs.
-    // When the verifier proof is added, we may need to reconsider the structure of `VPVerifyingInfo`
+pub struct TransparentPartialTxBundle {
+    partial_txs: Vec<TransparentPartialTransaction>,
+}
+
+// TODO: add other outputs if needed.
+#[derive(Debug, Clone)]
+pub struct TransparentResult {
+    pub nullifiers: Vec<Nullifier>,
+    pub outputs: Vec<OutputResource>,
 }
 
 impl Transaction {
-    pub fn build(partial_txs: Vec<PartialTransaction>, rcv_vec: Vec<pallas::Scalar>) -> Self {
+    pub fn new(
+        shielded_ptx_bundle: Option<ShieldedPartialTxBundle>,
+        transparent_ptx_bundle: Option<TransparentPartialTxBundle>,
+        // random from value commitment
+        rcv_vec: Vec<pallas::Scalar>,
+    ) -> Self {
+        assert!(shielded_ptx_bundle.is_some() || transparent_ptx_bundle.is_some());
+        assert!(!rcv_vec.is_empty());
         let sk = rcv_vec
             .iter()
             .fold(pallas::Scalar::zero(), |acc, rcv| acc + rcv);
         let signature = InProgressBindingSignature::Unauthorized(BindingSigningKey::from(sk));
         Self {
-            partial_txs,
+            shielded_ptx_bundle,
+            transparent_ptx_bundle,
             signature,
         }
     }
 
     pub fn binding_sign<R: RngCore + CryptoRng>(&mut self, rng: R) {
-        if let InProgressBindingSignature::Unauthorized(sk) = self.signature.clone() {
+        if let InProgressBindingSignature::Unauthorized(sk) = &self.signature {
             let vk = self.get_binding_vk();
             assert_eq!(vk, sk.get_vk(), "The notes value is unbalanced");
-            let sig_hash = self.commitment();
+            let sig_hash = self.digest();
             let signature = sk.sign(rng, &sig_hash);
             self.signature = InProgressBindingSignature::Authorized(signature);
         }
     }
 
-    fn commitment(&self) -> [u8; 32] {
+    pub fn transparent_bundle(&self) -> Option<&TransparentPartialTxBundle> {
+        self.transparent_ptx_bundle.as_ref()
+    }
+
+    pub fn shielded_bundle(&self) -> Option<&ShieldedPartialTxBundle> {
+        self.shielded_ptx_bundle.as_ref()
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn execute(
+        &self,
+    ) -> Result<(Option<ShieldedResult>, Option<TransparentResult>), TransactionError> {
+        let shielded_result = match self.shielded_bundle() {
+            Some(bundle) => Some(bundle.execute()?),
+            None => None,
+        };
+
+        let transparent_result = match self.transparent_bundle() {
+            Some(bundle) => Some(bundle.execute()?),
+            None => None,
+        };
+
+        // check balance
+        self.verify_binding_sig()?;
+
+        Ok((shielded_result, transparent_result))
+    }
+
+    fn verify_binding_sig(&self) -> Result<(), TransactionError> {
+        let binding_vk = self.get_binding_vk();
+        let sig_hash = self.digest();
+        if let InProgressBindingSignature::Authorized(sig) = &self.signature {
+            binding_vk
+                .verify(&sig_hash, sig)
+                .map_err(|_| TransactionError::InvalidBindingSignature)?;
+        } else {
+            return Err(TransactionError::MissingBindingSignatures);
+        }
+
+        Ok(())
+    }
+
+    fn get_binding_vk(&self) -> BindingVerificationKey {
+        let mut vk = pallas::Point::identity();
+        if let Some(bundle) = self.shielded_bundle() {
+            vk = bundle
+                .get_value_commitments()
+                .iter()
+                .fold(vk, |acc, cv| acc + cv.inner());
+        }
+
+        if let Some(bundle) = self.transparent_bundle() {
+            vk = bundle
+                .get_value_commitments()
+                .iter()
+                .fold(vk, |acc, cv| acc + cv.inner());
+        }
+
+        BindingVerificationKey::from(vk)
+    }
+
+    fn digest(&self) -> [u8; 32] {
         let mut h = Blake2bParams::new()
             .hash_length(32)
             .personal(TRANSACTION_BINDING_HASH_PERSONALIZATION)
             .to_state();
-        self.get_nullifiers().iter().for_each(|nf| {
-            h.update(&nf.to_bytes());
-        });
-        self.get_output_cms().iter().for_each(|cm| {
-            h.update(&cm.to_bytes());
-        });
-        self.get_value_commitments().iter().for_each(|vc| {
-            h.update(&vc.to_bytes());
-        });
-        self.get_value_anchors().iter().for_each(|anchor| {
-            h.update(&anchor.to_repr());
-        });
+        if let Some(bundle) = self.shielded_bundle() {
+            bundle.get_nullifiers().iter().for_each(|nf| {
+                h.update(&nf.to_bytes());
+            });
+            bundle.get_output_cms().iter().for_each(|cm| {
+                h.update(&cm.to_bytes());
+            });
+            bundle.get_value_commitments().iter().for_each(|vc| {
+                h.update(&vc.to_bytes());
+            });
+            bundle.get_anchors().iter().for_each(|anchor| {
+                h.update(&anchor.to_repr());
+            });
+        }
+
+        // TODO: the transparent digest may be not reasonable, fix it once the transparent execution is nailed down.
+        if let Some(bundle) = self.transparent_bundle() {
+            bundle.get_nullifiers().iter().for_each(|nf| {
+                h.update(&nf.to_bytes());
+            });
+            bundle.get_output_cms().iter().for_each(|cm| {
+                h.update(&cm.to_bytes());
+            });
+            bundle.get_value_commitments().iter().for_each(|vc| {
+                h.update(&vc.to_bytes());
+            });
+            bundle.get_anchors().iter().for_each(|anchor| {
+                h.update(&anchor.to_repr());
+            });
+        }
+
         h.finalize().as_bytes().try_into().unwrap()
     }
+}
 
-    pub fn add_partial_tx(&mut self, ptx: PartialTransaction) {
+impl ShieldedPartialTxBundle {
+    pub fn new() -> Self {
+        Self {
+            partial_txs: vec![],
+        }
+    }
+
+    pub fn build(partial_txs: Vec<ShieldedPartialTransaction>) -> Self {
+        Self { partial_txs }
+    }
+
+    pub fn add_partial_tx(&mut self, ptx: ShieldedPartialTransaction) {
         self.partial_txs.push(ptx);
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn execute(&self) -> Result<ShieldedResult, TransactionError> {
+        for partial_tx in self.partial_txs.iter() {
+            partial_tx.execute()?;
+        }
+
+        // Return Nullifiers to check double-spent, NoteCommitments to store, anchors to check the root-existence
+        Ok(ShieldedResult {
+            nullifiers: self.get_nullifiers(),
+            output_cms: self.get_output_cms(),
+            anchors: self.get_anchors(),
+        })
+    }
+
+    pub fn get_value_commitments(&self) -> Vec<ValueCommitment> {
+        self.partial_txs
+            .iter()
+            .flat_map(|ptx| ptx.get_value_commitments())
+            .collect()
     }
 
     pub fn get_nullifiers(&self) -> Vec<Nullifier> {
@@ -139,21 +234,14 @@ impl Transaction {
             .collect()
     }
 
-    pub fn get_value_commitments(&self) -> Vec<ValueCommitment> {
-        self.partial_txs
-            .iter()
-            .flat_map(|ptx| ptx.get_value_commitments())
-            .collect()
-    }
-
-    pub fn get_value_anchors(&self) -> Vec<pallas::Base> {
+    pub fn get_anchors(&self) -> Vec<pallas::Base> {
         self.partial_txs
             .iter()
             .flat_map(|ptx| ptx.get_anchors())
             .collect()
     }
 
-    pub fn get_binding_vk(&self) -> BindingVerificationKey {
+    fn get_binding_vk(&self) -> BindingVerificationKey {
         let vk = self
             .get_value_commitments()
             .iter()
@@ -161,338 +249,83 @@ impl Transaction {
 
         BindingVerificationKey::from(vk)
     }
+}
 
-    //
-    pub fn verify_proofs(&self) -> Result<(), Error> {
-        for partial_tx in self.partial_txs.iter() {
-            partial_tx.verify()?;
-        }
-
-        Ok(())
-    }
-
-    pub fn verify_binding_sig(&self) -> Result<(), TransactionError> {
-        let binding_vk = self.get_binding_vk();
-        let sig_hash = self.commitment();
-        if let InProgressBindingSignature::Authorized(sig) = self.signature.clone() {
-            binding_vk
-                .verify(&sig_hash, &sig)
-                .map_err(|_| TransactionError::InvalidBindingSignature)?;
-        } else {
-            return Err(TransactionError::MissingBindingSignatures);
-        }
-
-        Ok(())
-    }
-
-    #[allow(clippy::type_complexity)]
-    pub fn execute(
-        &self,
-    ) -> Result<(Vec<Nullifier>, Vec<NoteCommitment>, Vec<pallas::Base>), TransactionError> {
-        // Verify proofs
-        self.verify_proofs()?;
-
-        // Verify binding signature
-        self.verify_binding_sig()?;
-
-        // Return Nullifiers to check double-spent, NoteCommitments to store, anchors to check the root-existence
-        Ok((
-            self.get_nullifiers(),
-            self.get_output_cms(),
-            self.get_value_anchors(),
-        ))
+impl Default for ShieldedPartialTxBundle {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
-impl PartialTransaction {
-    pub fn build<R: RngCore>(
-        spend_info: [SpendNoteInfo; NUM_NOTE],
-        output_info: [OutputNoteInfo; NUM_NOTE],
-        mut rng: R,
-    ) -> (Self, pallas::Scalar) {
-        let spends: Vec<NoteVPVerifyingInfoSet> = spend_info
-            .iter()
-            .map(|spend_note| {
-                NoteVPVerifyingInfoSet::build(
-                    spend_note.get_app_vp_proving_info(),
-                    spend_note.get_app_vp_proving_info_dynamic(),
-                )
-            })
-            .collect();
-        let outputs: Vec<NoteVPVerifyingInfoSet> = output_info
-            .iter()
-            .map(|output_note| {
-                NoteVPVerifyingInfoSet::build(
-                    output_note.get_app_vp_proving_info(),
-                    output_note.get_app_vp_proving_info_dynamic(),
-                )
-            })
-            .collect();
-        let mut rcv_sum = pallas::Scalar::zero();
-        let actions: Vec<ActionVerifyingInfo> = spend_info
-            .into_iter()
-            .zip(output_info.into_iter())
-            .map(|(spend, output)| {
-                let action_info = ActionInfo::new(spend, output, &mut rng);
-                rcv_sum += action_info.get_rcv();
-                ActionVerifyingInfo::create(action_info, &mut rng).unwrap()
-            })
-            .collect();
+impl TransparentPartialTxBundle {
+    pub fn execute(&self) -> Result<TransparentResult, TransactionError> {
+        for partial_tx in self.partial_txs.iter() {
+            partial_tx.execute()?;
+        }
 
-        (
-            Self {
-                actions: actions.try_into().unwrap(),
-                spends: spends.try_into().unwrap(),
-                outputs: outputs.try_into().unwrap(),
-            },
-            rcv_sum,
-        )
+        Ok(TransparentResult {
+            nullifiers: vec![],
+            outputs: vec![],
+        })
     }
 
-    pub fn verify(&self) -> Result<(), Error> {
-        // Verify action proofs
-        for verifying_info in self.actions.iter() {
-            verifying_info.verify()?;
-        }
-
-        // Verify proofs in spend notes
-        for verifying_info in self.spends.iter() {
-            verifying_info.verify()?;
-        }
-        // Verify proofs in output notes
-        for verifying_info in self.outputs.iter() {
-            verifying_info.verify()?;
-        }
-
-        Ok(())
+    pub fn get_value_commitments(&self) -> Vec<ValueCommitment> {
+        unimplemented!()
     }
 
     pub fn get_nullifiers(&self) -> Vec<Nullifier> {
-        self.actions
+        self.partial_txs
             .iter()
-            .map(|action| action.action_instance.nf)
+            .flat_map(|ptx| ptx.get_nullifiers())
             .collect()
     }
 
     pub fn get_output_cms(&self) -> Vec<NoteCommitment> {
-        self.actions
+        self.partial_txs
             .iter()
-            .map(|action| action.action_instance.cm)
-            .collect()
-    }
-
-    pub fn get_value_commitments(&self) -> Vec<ValueCommitment> {
-        self.actions
-            .iter()
-            .map(|action| action.action_instance.cv_net)
+            .flat_map(|ptx| ptx.get_output_cms())
             .collect()
     }
 
     pub fn get_anchors(&self) -> Vec<pallas::Base> {
-        self.actions
+        self.partial_txs
             .iter()
-            .map(|action| action.action_instance.anchor)
+            .flat_map(|ptx| ptx.get_anchors())
             .collect()
     }
 }
 
-impl ActionVerifyingInfo {
-    pub fn create<R: RngCore>(action_info: ActionInfo, mut rng: R) -> Result<Self, Error> {
-        let (action_instance, circuit) = action_info.build();
-        let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
-        let action_proof = Proof::create(
-            &ACTION_PROVING_KEY,
-            params,
-            circuit,
-            &[&action_instance.to_instance()],
-            &mut rng,
-        )
-        .unwrap();
-        Ok(Self {
-            action_proof,
-            action_instance,
-        })
-    }
+pub mod testing {
+    use crate::shielded_ptx::testing::create_shielded_ptx;
+    use crate::transaction::ShieldedPartialTxBundle;
+    use pasta_curves::pallas;
 
-    pub fn verify(&self) -> Result<(), Error> {
-        let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
-        self.action_proof.verify(
-            &ACTION_VERIFYING_KEY,
-            params,
-            &[&self.action_instance.to_instance()],
-        )
-    }
-}
-
-impl NoteVPVerifyingInfoSet {
-    pub fn new(
-        app_vp_verifying_info: VPVerifyingInfo,
-        app_logic_vp_verifying_info: Vec<VPVerifyingInfo>,
-    ) -> Self {
-        Self {
-            app_vp_verifying_info,
-            app_logic_vp_verifying_info,
-        }
-    }
-
-    pub fn build(
-        app_vp_proving_info: Box<dyn ValidityPredicateInfo>,
-        app_vp_proving_info_dynamic: Vec<Box<dyn ValidityPredicateInfo>>,
-    ) -> Self {
-        let app_vp_verifying_info = app_vp_proving_info.get_verifying_info();
-
-        let app_logic_vp_verifying_info = app_vp_proving_info_dynamic
-            .into_iter()
-            .map(|proving_info| proving_info.get_verifying_info())
-            .collect();
-
-        Self {
-            app_vp_verifying_info,
-            app_logic_vp_verifying_info,
-        }
-    }
-
-    pub fn verify(&self) -> Result<(), Error> {
-        // Verify application vp proof
-        self.app_vp_verifying_info.verify()?;
-
-        // Verify application logic vp proofs
-        for verify_info in self.app_logic_vp_verifying_info.iter() {
-            verify_info.verify()?;
-        }
-
-        // TODO: Verify vp verifier proofs
-
-        Ok(())
+    pub fn create_shielded_ptx_bundle(
+        num: usize,
+    ) -> (ShieldedPartialTxBundle, Vec<pallas::Scalar>) {
+        let mut bundle = ShieldedPartialTxBundle::new();
+        let mut r_vec = vec![];
+        [0..num].iter().for_each(|_| {
+            let (ptx, r) = create_shielded_ptx();
+            bundle.add_partial_tx(ptx);
+            r_vec.push(r);
+        });
+        (bundle, r_vec)
     }
 }
 
 #[test]
-fn test_transaction_creation() {
-    use crate::{
-        circuit::vp_examples::TrivialValidityPredicateCircuit,
-        constant::TAIGA_COMMITMENT_TREE_DEPTH,
-        merkle_tree::MerklePath,
-        note::{Note, OutputNoteInfo, SpendNoteInfo},
-        nullifier::{Nullifier, NullifierKeyCom},
-        utils::poseidon_hash,
-    };
-    use ff::Field;
+fn test_halo2_transaction() {
+    use crate::transaction::testing::create_shielded_ptx_bundle;
     use rand::rngs::OsRng;
 
-    let mut rng = OsRng;
+    let rng = OsRng;
 
-    // Create empty vp circuit without note info
-    let trivial_vp_circuit = TrivialValidityPredicateCircuit::default();
-    let trivail_vp_description = trivial_vp_circuit.get_vp_description();
-
-    // Generate notes
-    let spend_note_1 = {
-        let app_data = pallas::Base::zero();
-        // TODO: add real application logic vps and encode them to app_data_dynamic later.
-        let app_logic_vps_description = vec![
-            trivail_vp_description.clone(),
-            trivail_vp_description.clone(),
-        ];
-        // Encode the app_logic_vps_description into app_data_dynamic
-        // The encoding method is flexible and defined in the application vp.
-        // Use poseidon hash to encode the two logic vps here
-        let app_data_dynamic = poseidon_hash(
-            app_logic_vps_description[0].get_compressed(),
-            app_logic_vps_description[1].get_compressed(),
-        );
-        let app_vk = trivail_vp_description.clone();
-        let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        let value = 5000u64;
-        let nk_com = NullifierKeyCom::rand(&mut rng);
-        let rcm = pallas::Scalar::random(&mut rng);
-        let psi = pallas::Base::random(&mut rng);
-        let is_merkle_checked = true;
-        Note::new(
-            app_vk,
-            app_data,
-            app_data_dynamic,
-            value,
-            nk_com,
-            rho,
-            psi,
-            rcm,
-            is_merkle_checked,
-            vec![0u8; 32],
-        )
-    };
-    let output_note_1 = {
-        let app_data = pallas::Base::zero();
-        // TODO: add real application logic vps and encode them to app_data_dynamic later.
-        // If the logic vp is not used, set app_data_dynamic pallas::Base::zero() by defualt.
-        let app_data_dynamic = pallas::Base::zero();
-        let rho = spend_note_1.get_nf().unwrap();
-        let value = 5000u64;
-        let nk_com = NullifierKeyCom::rand(&mut rng);
-        let rcm = pallas::Scalar::random(&mut rng);
-        let psi = pallas::Base::random(&mut rng);
-        let is_merkle_checked = true;
-        Note::new(
-            trivail_vp_description,
-            app_data,
-            app_data_dynamic,
-            value,
-            nk_com,
-            rho,
-            psi,
-            rcm,
-            is_merkle_checked,
-            vec![0u8; 32],
-        )
-    };
-    let spend_note_2 = spend_note_1.clone();
-    let output_note_2 = output_note_1.clone();
-
-    // Generate note info
-    let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-    // Create vp circuit and fulfill the note info
-    let trivial_vp_circuit = TrivialValidityPredicateCircuit {
-        spend_notes: [spend_note_1.clone(), spend_note_2.clone()],
-        output_notes: [output_note_1.clone(), output_note_2.clone()],
-    };
-    let app_vp_proving_info = Box::new(trivial_vp_circuit.clone());
-    let trivial_app_logic_1: Box<dyn ValidityPredicateInfo> = Box::new(trivial_vp_circuit.clone());
-    let trivial_app_logic_2 = Box::new(trivial_vp_circuit);
-    let trivial_app_vp_proving_info_dynamic = vec![trivial_app_logic_1, trivial_app_logic_2];
-    let spend_note_info_1 = SpendNoteInfo::new(
-        spend_note_1,
-        merkle_path.clone(),
-        app_vp_proving_info.clone(),
-        trivial_app_vp_proving_info_dynamic.clone(),
-    );
-    // The following notes use empty logic vps and use app_data_dynamic with pallas::Base::zero() by default.
-    let app_vp_proving_info_dynamic = vec![];
-    let spend_note_info_2 = SpendNoteInfo::new(
-        spend_note_2,
-        merkle_path,
-        app_vp_proving_info.clone(),
-        app_vp_proving_info_dynamic.clone(),
-    );
-    let output_note_info_1 = OutputNoteInfo::new(
-        output_note_1,
-        app_vp_proving_info.clone(),
-        app_vp_proving_info_dynamic.clone(),
-    );
-    let output_note_info_2 = OutputNoteInfo::new(
-        output_note_2,
-        app_vp_proving_info,
-        app_vp_proving_info_dynamic,
-    );
-
-    // Create partial tx
-    let (ptx, rcv) = PartialTransaction::build(
-        [spend_note_info_1, spend_note_info_2],
-        [output_note_info_1, output_note_info_2],
-        &mut rng,
-    );
-
-    // Create tx
-    let mut tx = Transaction::build(vec![ptx], vec![rcv]);
+    // Create shielded partial tx bundle
+    let (shielded_tx_bundle, r_vec) = create_shielded_ptx_bundle(2);
+    // TODO: add transparent_ptx_bundle test
+    let transparent_ptx_bundle = None;
+    let mut tx = Transaction::new(Some(shielded_tx_bundle), transparent_ptx_bundle, r_vec);
     tx.binding_sign(rng);
     tx.execute().unwrap();
 }

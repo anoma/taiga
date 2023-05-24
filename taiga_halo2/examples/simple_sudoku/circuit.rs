@@ -1,6 +1,5 @@
 use ff::PrimeField;
 use halo2_proofs::{
-    arithmetic::FieldExt,
     circuit::{floor_planner, AssignedCell, Layouter, Value},
     plonk::{self, Advice, Column, Instance as InstanceColumn},
 };
@@ -383,15 +382,11 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
 
 #[cfg(test)]
 mod tests {
+    use crate::circuit::SudokuCircuit;
     use halo2_proofs::{arithmetic::FieldExt, dev::MockProver};
     use rand::rngs::OsRng;
 
-    use crate::valid_sudoku::circuit::SudokuCircuit;
-
-    use halo2_proofs::{
-        plonk::{self, ProvingKey, VerifyingKey},
-        poly::commitment::Params,
-    };
+    use halo2_proofs::{plonk, poly::commitment::Params};
     use pasta_curves::{pallas, vesta};
     use std::time::Instant;
     use taiga_halo2::proof::Proof;
@@ -441,31 +436,31 @@ mod tests {
         );
         let pub_instance: [pallas::Base; 108] = pub_instance_vec.try_into().unwrap();
 
-        // ------- PLOTTING SECTION --------
-        use plotters::prelude::*;
-        let root = BitMapBackend::new("layout.png", (1024, 768)).into_drawing_area();
-        root.fill(&WHITE).unwrap();
-        let root = root
-            .titled("Example Circuit Layout", ("sans-serif", 60))
-            .unwrap();
+        // // ------- PLOTTING SECTION --------
+        // use plotters::prelude::*;
+        // let root = BitMapBackend::new("layout.png", (1024, 768)).into_drawing_area();
+        // root.fill(&WHITE).unwrap();
+        // let root = root
+        //     .titled("Example Circuit Layout", ("sans-serif", 60))
+        //     .unwrap();
 
-        halo2_proofs::dev::CircuitLayout::default()
-            // You can optionally render only a section of the circuit.
-            // .view_width(0..7)
-            // .view_height(0..60)
-            // You can hide labels, which can be useful with smaller areas.
-            .show_labels(false)
-            // Render the circuit onto your area!
-            // The first argument is the size parameter for the circuit.
-            .render(K, &circuit, &root)
-            .unwrap();
+        // halo2_proofs::dev::CircuitLayout::default()
+        //     // You can optionally render only a section of the circuit.
+        //     // .view_width(0..7)
+        //     // .view_height(0..60)
+        //     // You can hide labels, which can be useful with smaller areas.
+        //     .show_labels(false)
+        //     // Render the circuit onto your area!
+        //     // The first argument is the size parameter for the circuit.
+        //     .render(K, &circuit, &root)
+        //     .unwrap();
 
-        let dot_string = halo2_proofs::dev::circuit_dot_graph(&circuit);
+        // let dot_string = halo2_proofs::dev::circuit_dot_graph(&circuit);
 
-        // Now you can either handle it in Rust, or just
-        // print it out to use with command-line tools.
-        print!("{}", dot_string);
-        // ---- END OF PLOTTING SECTION --------
+        // // Now you can either handle it in Rust, or just
+        // // print it out to use with command-line tools.
+        // print!("{}", dot_string);
+        // // ---- END OF PLOTTING SECTION --------
 
         println!("Success!");
         let time = Instant::now();
@@ -494,7 +489,7 @@ mod tests {
 
     #[test]
     fn test_synthesize() {
-        use crate::valid_sudoku::circuit::SudokuCircuit;
+        use crate::circuit::SudokuCircuit;
 
         let sudoku = [
             [5, 8, 1, 6, 7, 2, 4, 3, 9],
@@ -513,6 +508,6 @@ mod tests {
         let circuit = SudokuCircuit { sudoku };
         let params: Params<vesta::Affine> = Params::new(K);
 
-        let vk = plonk::keygen_vk(&params, &circuit).unwrap(); // this would fail on this specific puzzle with the old implementation of synthesize
+        let _vk = plonk::keygen_vk(&params, &circuit).unwrap(); // this would fail on this specific puzzle with the old implementation of synthesize
     }
 }

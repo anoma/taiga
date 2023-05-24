@@ -7,15 +7,17 @@ edition = "2021"
 rand = "0.8.4"
 lazy_static = "1"
 blake2b_simd = "1"
-pasta_curves = "0.4"
-ff = "0.12"
-group = "0.12"
-halo2_gadgets = {version = "0.2", features = ["test-dependencies"]}
-halo2_proofs = {version="0.2", features = ["dev-graph"]}
+pasta_curves = "0.5.1"
+ff = "0.13"
+group = "0.13"
+halo2_gadgets = {version = "0.3", features = ["test-dependencies"]}
+halo2_proofs = {version="0.3", features = ["dev-graph"]}
 bitvec = "1"
 subtle = { version = "2.3", default-features = false }
 dyn-clone = "1.0"
-reddsa = "0.3"
+reddsa = "0.5"
+vamp-ir = { git = "https://github.com/anoma/vamp-ir.git", rev = "e11fbcd6d5a358e33456ae7cd7abe5fea9dfcc3e"}
+bincode = "2.0.0-rc.1"
 
 [dev-dependencies]
 criterion = "0.3"

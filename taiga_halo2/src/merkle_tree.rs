@@ -2,16 +2,17 @@
 //!
 use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
 use crate::utils::poseidon_hash;
-use ff::Field;
+use halo2_proofs::arithmetic::Field;
 use pasta_curves::pallas;
 use rand::{Rng, RngCore};
 
 use crate::merkle_tree::LR::{L, R};
 use rand::distributions::{Distribution, Standard};
 
-#[derive(Clone, Debug, PartialEq, Eq, Copy)]
+#[derive(Clone, Debug, PartialEq, Eq, Copy, Default)]
 pub enum LR {
     R,
+    #[default]
     L,
 }
 
@@ -41,12 +42,6 @@ impl Distribution<LR> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> LR {
         let u: usize = rng.gen();
         lr(u)
-    }
-}
-
-impl Default for LR {
-    fn default() -> Self {
-        L
     }
 }
 

@@ -1,6 +1,5 @@
 use crate::circuit::action_circuit::ActionCircuit;
 use crate::utils::to_field_elements;
-use group::Curve;
 use halo2_gadgets::{
     ecc::{
         chip::{
@@ -16,7 +15,7 @@ use halo2_proofs::{
     poly::commitment::Params,
 };
 use lazy_static::lazy_static;
-use pasta_curves::{pallas, vesta};
+use pasta_curves::{group::Curve, pallas, vesta};
 use std::collections::HashMap;
 
 /// SWU hash-to-curve personalization for the note commitment generator
@@ -41,6 +40,17 @@ pub const ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX: usize = 4;
 pub const POSEIDON_TO_CURVE_INPUT_LEN: usize = 4;
 pub const CURVE_ID: &str = "pallas";
 pub const VALUE_BASE_DOMAIN_POSTFIX: &str = "Taiga-ValueBase";
+
+pub const VP_CIRCUIT_NULLIFIER_ONE_INSTANCE_IDX: usize = 0;
+pub const VP_CIRCUIT_OUTPUT_CM_ONE_INSTANCE_IDX: usize = 1;
+pub const VP_CIRCUIT_NULLIFIER_TWO_INSTANCE_IDX: usize = 2;
+pub const VP_CIRCUIT_OUTPUT_CM_TWO_INSTANCE_IDX: usize = 3;
+pub const VP_CIRCUIT_OWNED_NOTE_PUB_ID_INSTANCE_IDX: usize = 4;
+pub const VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX: usize = 5;
+
+// Poseidon parameters
+pub const POSEIDON_RATE: usize = 2;
+pub const POSEIDON_WIDTH: usize = 3;
 
 // TODO: After moving is_merkle_checked out of value base derivation, POSEIDON_TO_CURVE_INPUT_LEN would be 3.
 // But there is something wrong with poseidon hash gadget in Halo2(probably a padding bug). MockProver is fine. create_proof results in a Synthesis Error.
@@ -3132,8 +3142,9 @@ impl FixedPoint<pallas::Affine> for Short {
 #[ignore]
 #[test]
 fn r_u_z_generate() {
-    use ff::PrimeField;
     use halo2_gadgets::ecc::chip::constants::find_zs_and_us;
+    use pasta_curves::group::ff::PrimeField;
+
     let r_zs_and_us: Vec<(u64, [pallas::Base; H])> =
         find_zs_and_us(*NOTE_COMMITMENT_R_GENERATOR, NUM_WINDOWS).unwrap();
     println!("pub const R_U: [[[u8; 32]; H]; NUM_WINDOWS] = [");

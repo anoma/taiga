@@ -3,8 +3,9 @@ use crate::{
     note::NoteCommitment,
     utils::{extract_p, mod_r_p, poseidon_hash, prf_nf},
 };
-use ff::{Field, PrimeField};
-use group::cofactor::CofactorCurveAffine;
+use halo2_proofs::arithmetic::Field;
+use pasta_curves::group::cofactor::CofactorCurveAffine;
+use pasta_curves::group::ff::PrimeField;
 use pasta_curves::pallas;
 use rand::RngCore;
 

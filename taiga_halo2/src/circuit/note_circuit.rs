@@ -15,7 +15,8 @@ use halo2_proofs::{
     plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Instance, Selector},
     poly::Rotation,
 };
-use pasta_curves::{arithmetic::FieldExt, pallas};
+use pasta_curves::group::ff::PrimeField;
+use pasta_curves::pallas;
 
 type NoteCommitPiece = MessagePiece<
     pallas::Affine,
@@ -479,7 +480,7 @@ pub fn note_commitment_gadget(
     note_commit_chip: NoteCommitmentChip,
     address: AssignedCell<pallas::Base, pallas::Base>,
     app_vp: AssignedCell<pallas::Base, pallas::Base>,
-    app_data: AssignedCell<pallas::Base, pallas::Base>,
+    app_data_static: AssignedCell<pallas::Base, pallas::Base>,
     rho: AssignedCell<pallas::Base, pallas::Base>,
     psi: AssignedCell<pallas::Base, pallas::Base>,
     value: AssignedCell<pallas::Base, pallas::Base>,
@@ -511,16 +512,24 @@ pub fn note_commitment_gadget(
         [RangeConstrained::bitrange_of(app_vp.value(), 5..255)],
     )?;
 
-    // `data_0_249` = bits 0..=249 of `app_data`
+    // `data_0_249` = bits 0..=249 of `app_data_static`
     let data_0_249 = MessagePiece::from_subpieces(
         chip.clone(),
         layouter.namespace(|| "data_0_249"),
-        [RangeConstrained::bitrange_of(app_data.value(), 0..250)],
+        [RangeConstrained::bitrange_of(
+            app_data_static.value(),
+            0..250,
+        )],
     )?;
 
-    // b = (bits 250..=255 of app_data) || (bits 0..=4 of rho)
-    let (b, data_tail_bit5, rho_pre_bit5) =
-        Decompose5_5::decompose(&lookup_config, chip.clone(), &mut layouter, &app_data, &rho)?;
+    // b = (bits 250..=255 of app_data_static) || (bits 0..=4 of rho)
+    let (b, data_tail_bit5, rho_pre_bit5) = Decompose5_5::decompose(
+        &lookup_config,
+        chip.clone(),
+        &mut layouter,
+        &app_data_static,
+        &rho,
+    )?;
 
     // `rho_5_254` = bits 5..=254 of `rho`
     let rho_5_254 = MessagePiece::from_subpieces(
@@ -546,7 +555,7 @@ pub fn note_commitment_gadget(
         &value,
     )?;
 
-    // cm = NoteCommit^rcm(address || app_vp || app_data || rho || psi || is_merkle_checked || value)
+    // cm = NoteCommit^rcm(address || app_vp || app_data_static || rho || psi || is_merkle_checked || value)
     let (cm, _zs) = {
         let message = Message::from_pieces(
             chip.clone(),
@@ -599,7 +608,7 @@ pub fn note_commitment_gadget(
     cfg.base_canonicity_5
         .assign(&mut layouter, app_vp, app_5_254, app_pre_bit5)?;
     cfg.base_canonicity_250_5
-        .assign(&mut layouter, app_data, data_0_249, data_tail_bit5)?;
+        .assign(&mut layouter, app_data_static, data_0_249, data_tail_bit5)?;
     cfg.base_canonicity_5
         .assign(&mut layouter, rho, rho_5_254, rho_pre_bit5)?;
     cfg.base_canonicity_250_5
@@ -709,8 +718,6 @@ fn test_halo2_note_commitment_circuit() {
         nullifier::{Nullifier, NullifierKeyCom},
         vp_vk::ValidityPredicateVerifyingKey,
     };
-    use ff::Field;
-    use group::Curve;
     use halo2_gadgets::{
         ecc::{
             chip::{EccChip, EccConfig},
@@ -720,16 +727,18 @@ fn test_halo2_note_commitment_circuit() {
         utilities::lookup_range_check::LookupRangeCheckConfig,
     };
     use halo2_proofs::{
+        arithmetic::Field,
         circuit::{Layouter, SimpleFloorPlanner, Value},
         dev::MockProver,
         plonk::{Circuit, ConstraintSystem, Error},
     };
+    use pasta_curves::group::Curve;
     use rand::{rngs::OsRng, RngCore};
 
     #[derive(Default)]
     struct MyCircuit {
         app_vk: ValidityPredicateVerifyingKey,
-        app_data: pallas::Base,
+        app_data_static: pallas::Base,
         app_data_dynamic: pallas::Base,
         value: u64,
         nk_com: NullifierKeyCom,
@@ -827,7 +836,7 @@ fn test_halo2_note_commitment_circuit() {
             >::load(note_commit_config.sinsemilla_config.clone(), &mut layouter)?;
             let note = Note::new(
                 self.app_vk.clone(),
-                self.app_data,
+                self.app_data_static,
                 self.app_data_dynamic,
                 self.value,
                 self.nk_com,
@@ -835,7 +844,6 @@ fn test_halo2_note_commitment_circuit() {
                 self.psi,
                 self.rcm,
                 self.is_merkle_checked,
-                vec![0u8; 32],
             );
             // Construct a Sinsemilla chip
             let sinsemilla_chip =
@@ -861,11 +869,11 @@ fn test_halo2_note_commitment_circuit() {
                 Value::known(note.get_compressed_app_vk()),
             )?;
 
-            // Witness value_base_app_data
-            let app_data = assign_free_advice(
-                layouter.namespace(|| "witness value_base_app_data"),
+            // Witness app_data_static
+            let app_data_static = assign_free_advice(
+                layouter.namespace(|| "witness app_data_static"),
                 note_commit_config.advices[0],
-                Value::known(note.get_value_base_app_data()),
+                Value::known(note.get_app_data_static()),
             )?;
 
             // Witness a random non-negative u64 note value
@@ -911,7 +919,7 @@ fn test_halo2_note_commitment_circuit() {
                 note_commit_chip,
                 address,
                 app_vp,
-                app_data,
+                app_data_static,
                 rho,
                 psi,
                 value_var,
@@ -936,7 +944,7 @@ fn test_halo2_note_commitment_circuit() {
     {
         let circuit = MyCircuit {
             app_vk: ValidityPredicateVerifyingKey::dummy(&mut rng),
-            app_data: pallas::Base::random(&mut rng),
+            app_data_static: pallas::Base::random(&mut rng),
             app_data_dynamic: pallas::Base::random(&mut rng),
             value: rng.next_u64(),
             nk_com: NullifierKeyCom::rand(&mut rng),
@@ -954,7 +962,7 @@ fn test_halo2_note_commitment_circuit() {
     {
         let circuit = MyCircuit {
             app_vk: ValidityPredicateVerifyingKey::dummy(&mut rng),
-            app_data: pallas::Base::random(&mut rng),
+            app_data_static: pallas::Base::random(&mut rng),
             app_data_dynamic: pallas::Base::random(&mut rng),
             value: rng.next_u64(),
             nk_com: NullifierKeyCom::rand(&mut rng),

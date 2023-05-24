@@ -4,9 +4,8 @@ use halo2_gadgets::poseidon::{
     Pow5Chip as PoseidonChip,
 };
 use halo2_proofs::{
-    arithmetic::FieldExt,
     circuit::{floor_planner, AssignedCell, Layouter, Value},
-    plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
+    plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error},
 };
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
@@ -17,13 +16,14 @@ use taiga_halo2::{
             assign_free_advice, assign_free_constant,
             mul::{MulChip, MulConfig, MulInstructions},
             sub::{SubChip, SubConfig, SubInstructions},
+            target_note_variable::{get_is_input_note_flag, GetIsInputNoteFlagConfig},
             triple_mul::TripleMulConfig,
         },
-        integrity::{OutputNoteVar, SpendNoteVar},
         note_circuit::NoteConfig,
         vp_circuit::{
+            BasicValidityPredicateVariables, InputNoteVariables, OutputNoteVariables,
             VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo,
+            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
@@ -45,7 +45,7 @@ pub struct SudokuState {
 
 impl SudokuState {
     pub fn encode(&self) -> pallas::Base {
-        // TODO: add the rho of note to make the app_data unique.
+        // TODO: add the rho of note to make the app_data_static unique.
 
         let sudoku = self.state.concat();
         let s1 = &sudoku[..sudoku.len() / 2]; // s1 contains 40 elements
@@ -110,11 +110,9 @@ impl Default for SudokuState {
 
 #[derive(Clone, Debug, Default)]
 struct SudokuAppValidityPredicateCircuit {
-    spend_notes: [Note; NUM_NOTE],
+    owned_note_pub_id: pallas::Base,
+    input_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
-    // The note that vp owned is set at spend_notes[0] or output_notes[0] by default. Make it mandatory later.
-    // is_spend_note helps locate the target note in spend_notes and output_notes.
-    is_spend_note: pallas::Base,
     // Initial puzzle encoded in a single field
     encoded_init_state: pallas::Base,
     // If it is a init state, previous_state is equal to current_state
@@ -126,8 +124,7 @@ struct SudokuAppValidityPredicateCircuit {
 struct SudokuAppValidityPredicateConfig {
     note_config: NoteConfig,
     advices: [Column<Advice>; 10],
-    instances: Column<Instance>,
-    // get_target_variable_config: GetTargetNoteVariableConfig,
+    get_is_input_note_flag_config: GetIsInputNoteFlagConfig,
     sudoku_state_check_config: SudokuStateCheckConfig,
     state_update_config: StateUpdateConfig,
     triple_mul_config: TripleMulConfig,
@@ -155,7 +152,6 @@ impl ValidityPredicateConfig for SudokuAppValidityPredicateConfig {
         let note_config = Self::configure_note(meta);
 
         let advices = note_config.advices;
-        let instances = note_config.instances;
         let sudoku_state_check_config = SudokuStateCheckConfig::configure(
             meta, advices[0], advices[1], advices[2], advices[3], advices[4], advices[5],
             advices[6], advices[7],
@@ -167,10 +163,12 @@ impl ValidityPredicateConfig for SudokuAppValidityPredicateConfig {
             ValueCheckConfig::configure(meta, advices[0], advices[1], advices[2]);
         let sub_config = SubChip::configure(meta, [advices[0], advices[1]]);
         let mul_config = MulChip::configure(meta, [advices[0], advices[1]]);
+        let get_is_input_note_flag_config =
+            GetIsInputNoteFlagConfig::configure(meta, advices[0], advices[1], advices[2]);
         Self {
             note_config,
             advices,
-            instances,
+            get_is_input_note_flag_config,
             sudoku_state_check_config,
             state_update_config,
             triple_mul_config,
@@ -184,19 +182,19 @@ impl ValidityPredicateConfig for SudokuAppValidityPredicateConfig {
 impl SudokuAppValidityPredicateCircuit {
     #![allow(dead_code)]
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        let spend_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let is_spend_note = pallas::Base::zero();
         let encoded_init_state = SudokuState::default().encode();
         let previous_state = SudokuState::default();
         let current_state = SudokuState::default();
-        output_notes[0].value_base.app_data =
+        output_notes[0].note_type.app_data_static =
             poseidon_hash(encoded_init_state, current_state.encode());
         output_notes[0].value = 1u64;
+        let owned_note_pub_id = output_notes[0].commitment().get_x();
         Self {
-            spend_notes,
+            owned_note_pub_id,
+            input_notes,
             output_notes,
-            is_spend_note,
             encoded_init_state,
             previous_state,
             current_state,
@@ -316,25 +314,25 @@ impl SudokuAppValidityPredicateCircuit {
     fn check_state(
         config: &SudokuStateCheckConfig,
         mut layouter: impl Layouter<pallas::Base>,
-        is_spend_note: &AssignedCell<pallas::Base, pallas::Base>,
+        is_input_note: &AssignedCell<pallas::Base, pallas::Base>,
         init_state: &AssignedCell<pallas::Base, pallas::Base>,
-        spend_note_pre_state: &AssignedCell<pallas::Base, pallas::Base>,
+        input_note_pre_state: &AssignedCell<pallas::Base, pallas::Base>,
         output_note_cur_state: &AssignedCell<pallas::Base, pallas::Base>,
-        spend_note_app_data_encode: &AssignedCell<pallas::Base, pallas::Base>,
-        spend_note: &SpendNoteVar,
-        output_note: &OutputNoteVar,
+        input_note_app_data_static_encode: &AssignedCell<pallas::Base, pallas::Base>,
+        input_note: &InputNoteVariables,
+        output_note: &OutputNoteVariables,
     ) -> Result<(), Error> {
         layouter.assign_region(
             || "dealer intent check",
             |mut region| {
                 config.assign_region(
-                    is_spend_note,
+                    is_input_note,
                     init_state,
-                    &spend_note.app_data,
-                    spend_note_app_data_encode,
-                    &spend_note.app_vk,
-                    &output_note.app_vk,
-                    spend_note_pre_state,
+                    &input_note.note_variables.app_data_static,
+                    input_note_app_data_static_encode,
+                    &input_note.note_variables.app_vk,
+                    &output_note.note_variables.app_vk,
+                    input_note_pre_state,
                     output_note_cur_state,
                     0,
                     &mut region,
@@ -349,11 +347,11 @@ impl SudokuAppValidityPredicateCircuit {
         state_update_config: &StateUpdateConfig,
         triple_mul_config: &TripleMulConfig,
         value_check_config: &ValueCheckConfig,
-        is_spend_note: &AssignedCell<pallas::Base, pallas::Base>,
+        is_input_note: &AssignedCell<pallas::Base, pallas::Base>,
         pre_state: &[AssignedCell<pallas::Base, pallas::Base>],
         cur_state: &[AssignedCell<pallas::Base, pallas::Base>],
-        spend_note: &SpendNoteVar,
-        output_note: &OutputNoteVar,
+        input_note: &InputNoteVariables,
+        output_note: &OutputNoteVariables,
     ) -> Result<(), Error> {
         // check state update: the cur_state is updated from pre_state
         pre_state
@@ -365,7 +363,7 @@ impl SudokuAppValidityPredicateCircuit {
                         || "state update check",
                         |mut region| {
                             state_update_config.assign_region(
-                                is_spend_note,
+                                is_input_note,
                                 pre_state_cell,
                                 cur_state_cell,
                                 0,
@@ -446,10 +444,10 @@ impl SudokuAppValidityPredicateCircuit {
             || "check value",
             |mut region| {
                 value_check_config.assign_region(
-                    is_spend_note,
+                    is_input_note,
                     &product,
-                    &spend_note.value,
-                    &output_note.value,
+                    &input_note.note_variables.value,
+                    &output_note.note_variables.value,
                     0,
                     &mut region,
                 )
@@ -461,8 +459,8 @@ impl SudokuAppValidityPredicateCircuit {
 }
 
 impl ValidityPredicateInfo for SudokuAppValidityPredicateCircuit {
-    fn get_spend_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.spend_notes
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.input_notes
     }
 
     fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
@@ -470,30 +468,11 @@ impl ValidityPredicateInfo for SudokuAppValidityPredicateCircuit {
     }
 
     fn get_instances(&self) -> Vec<pallas::Base> {
-        let mut instances = self.get_note_instances();
-        instances.push(self.is_spend_note);
-
-        instances
+        self.get_note_instances()
     }
 
-    fn get_verifying_info(&self) -> VPVerifyingInfo {
-        let mut rng = OsRng;
-        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
-        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
-        let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
-        let instance = self.get_instances();
-        let proof = Proof::create(&pk, params, self.clone(), &[&instance], &mut rng).unwrap();
-        VPVerifyingInfo {
-            vk,
-            proof,
-            instance,
-        }
-    }
-
-    fn get_vp_description(&self) -> ValidityPredicateVerifyingKey {
-        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
-        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
-        ValidityPredicateVerifyingKey::from_vk(vk)
+    fn get_owned_note_pub_id(&self) -> pallas::Base {
+        self.owned_note_pub_id
     }
 }
 
@@ -504,17 +483,16 @@ impl ValidityPredicateCircuit for SudokuAppValidityPredicateCircuit {
         &self,
         config: Self::VPConfig,
         mut layouter: impl Layouter<pallas::Base>,
-        spend_note_variables: &[SpendNoteVar],
-        output_note_variables: &[OutputNoteVar],
+        basic_variables: BasicValidityPredicateVariables,
     ) -> Result<(), Error> {
-        let is_spend_note = assign_free_advice(
-            layouter.namespace(|| "witness is_spend_note"),
-            config.advices[0],
-            Value::known(self.is_spend_note),
+        let owned_note_pub_id = basic_variables.get_owned_note_pub_id();
+        let is_input_note = get_is_input_note_flag(
+            config.get_is_input_note_flag_config,
+            layouter.namespace(|| "get is_input_note_flag"),
+            &owned_note_pub_id,
+            &basic_variables.get_input_note_nfs(),
+            &basic_variables.get_output_note_cms(),
         )?;
-
-        // publicize is_spend_note and check it outside of circuit.
-        layouter.constrain_instance(is_spend_note.cell(), config.instances, 2 * NUM_NOTE)?;
 
         // witness the sudoku previous state
         let previous_sudoku_cells: Vec<AssignedCell<_, _>> = self
@@ -561,13 +539,13 @@ impl ValidityPredicateCircuit for SudokuAppValidityPredicateCircuit {
             Value::known(self.current_state.encode()),
         )?;
 
-        // app_data = poseidon_hash(encoded_init_state || encoded_state)
+        // app_data_static = poseidon_hash(encoded_init_state || encoded_state)
         let encoded_init_state = assign_free_advice(
             layouter.namespace(|| "witness encoded_init_state"),
             config.advices[0],
             Value::known(self.encoded_init_state),
         )?;
-        let spend_note_app_data_encode = {
+        let input_note_app_data_static_encode = {
             let poseidon_config = config.get_note_config().poseidon_config;
             let poseidon_chip = PoseidonChip::construct(poseidon_config);
             let poseidon_hasher =
@@ -577,11 +555,11 @@ impl ValidityPredicateCircuit for SudokuAppValidityPredicateCircuit {
                 )?;
             let poseidon_message = [encoded_init_state.clone(), encoded_previous_state.clone()];
             poseidon_hasher.hash(
-                layouter.namespace(|| "get spend note app_data encoding"),
+                layouter.namespace(|| "get input note app_data_static encoding"),
                 poseidon_message,
             )?
         };
-        let output_note_app_data_encode = {
+        let output_note_app_data_static_encode = {
             let poseidon_config = config.get_note_config().poseidon_config;
             let poseidon_chip = PoseidonChip::construct(poseidon_config);
             let poseidon_hasher =
@@ -591,17 +569,20 @@ impl ValidityPredicateCircuit for SudokuAppValidityPredicateCircuit {
                 )?;
             let poseidon_message = [encoded_init_state.clone(), encoded_current_state.clone()];
             poseidon_hasher.hash(
-                layouter.namespace(|| "get output note app_data encoding"),
+                layouter.namespace(|| "get output note app_data_static encoding"),
                 poseidon_message,
             )?
         };
 
         layouter.assign_region(
-            || "check output note app_data encoding",
+            || "check output note app_data_static encoding",
             |mut region| {
                 region.constrain_equal(
-                    output_note_app_data_encode.cell(),
-                    output_note_variables[0].app_data.cell(),
+                    output_note_app_data_static_encode.cell(),
+                    basic_variables.output_note_variables[0]
+                        .note_variables
+                        .app_data_static
+                        .cell(),
                 )
             },
         )?;
@@ -616,27 +597,27 @@ impl ValidityPredicateCircuit for SudokuAppValidityPredicateCircuit {
         Self::check_state(
             &config.sudoku_state_check_config,
             layouter.namespace(|| "check state"),
-            &is_spend_note,
+            &is_input_note,
             &encoded_init_state,
             &encoded_previous_state,
             &encoded_current_state,
-            &spend_note_app_data_encode,
-            &spend_note_variables[0],
-            &output_note_variables[0],
+            &input_note_app_data_static_encode,
+            &basic_variables.input_note_variables[0],
+            &basic_variables.output_note_variables[0],
         )?;
 
-        // if it is a spend note, check that the cur_state is updated from pre_state
+        // if it is an input note, check that the cur_state is updated from pre_state
         // if encoded_current_state is the final solution, check the output.value is zero else check the output.value is one
         Self::check_solution(
             layouter.namespace(|| "check solution"),
             &config.state_update_config,
             &config.triple_mul_config,
             &config.value_check_config,
-            &is_spend_note,
+            &is_input_note,
             &previous_sudoku_cells,
             &current_sudoku_cells,
-            &spend_note_variables[0],
-            &output_note_variables[0],
+            &basic_variables.input_note_variables[0],
+            &basic_variables.output_note_variables[0],
         )?;
 
         Ok(())
@@ -666,9 +647,8 @@ fn test_halo2_sudoku_app_vp_circuit_update() {
     let mut rng = OsRng;
     // Construct circuit
     let circuit = {
-        let mut spend_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let mut input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let is_spend_note = pallas::Base::one();
         let init_state = SudokuState {
             state: [
                 [5, 0, 1, 6, 7, 2, 4, 3, 9],
@@ -709,17 +689,17 @@ fn test_halo2_sudoku_app_vp_circuit_update() {
                 [6, 0, 7, 4, 3, 5, 1, 9, 8],
             ],
         };
-        spend_notes[0].value_base.app_data =
+        input_notes[0].note_type.app_data_static =
             poseidon_hash(encoded_init_state, previous_state.encode());
-        spend_notes[0].value = 1u64;
-        output_notes[0].value_base.app_data =
+        input_notes[0].value = 1u64;
+        output_notes[0].note_type.app_data_static =
             poseidon_hash(encoded_init_state, current_state.encode());
         output_notes[0].value = 1u64;
-        output_notes[0].value_base.app_vk = spend_notes[0].value_base.app_vk.clone();
+        output_notes[0].note_type.app_vk = input_notes[0].note_type.app_vk.clone();
         SudokuAppValidityPredicateCircuit {
-            spend_notes,
+            owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
+            input_notes,
             output_notes,
-            is_spend_note,
             encoded_init_state,
             previous_state,
             current_state,
@@ -737,9 +717,8 @@ pub fn halo2_sudoku_app_vp_circuit_final() {
     let mut rng = OsRng;
     // Construct circuit
     let circuit = {
-        let mut spend_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let mut input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let is_spend_note = pallas::Base::one();
         let init_state = SudokuState {
             state: [
                 [5, 0, 1, 6, 7, 2, 4, 3, 9],
@@ -780,17 +759,17 @@ pub fn halo2_sudoku_app_vp_circuit_final() {
                 [6, 2, 7, 4, 3, 5, 1, 9, 8],
             ],
         };
-        spend_notes[0].value_base.app_data =
+        input_notes[0].note_type.app_data_static =
             poseidon_hash(encoded_init_state, previous_state.encode());
-        spend_notes[0].value = 1u64;
-        output_notes[0].value_base.app_data =
+        input_notes[0].value = 1u64;
+        output_notes[0].note_type.app_data_static =
             poseidon_hash(encoded_init_state, current_state.encode());
         output_notes[0].value = 0u64;
-        output_notes[0].value_base.app_vk = spend_notes[0].value_base.app_vk.clone();
+        output_notes[0].note_type.app_vk = input_notes[0].note_type.app_vk.clone();
         SudokuAppValidityPredicateCircuit {
-            spend_notes,
+            owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
+            input_notes,
             output_notes,
-            is_spend_note,
             encoded_init_state,
             previous_state,
             current_state,

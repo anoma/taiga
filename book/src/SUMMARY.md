@@ -1,13 +1,12 @@
-# Taiga
+# Taiga Overview
 
-- [Taiga overview](./overview.md)
-- [Validity predicates](./validity-predicates.md)
-- [Applications](app.md)
-- [Users](./users.md)
+- [Introduction](./intro.md)
+- [Applications](./app.md)
 - [Notes](./notes.md)
-- [Action](./action.md)
-- [Blinding](./blinding.md)
-- [Transaction](./transaction.md)
-- [Performance & conclusion](./conclusion.md)
+- [Validity predicates](./validity-predicates.md)
+- [The Action circuit](./action.md)
 - [Execution model](./exec.md)
+- [Intent Application](./intent.md)
+- [Examples](./exec_examples.md)
+- [Performance](./performance.md)
 - [The specification](./spec.md)

@@ -118,8 +118,8 @@ fn test_halo2_merkle_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
     use crate::merkle_tree::{MerklePath, Node};
-    use ff::Field;
     use halo2_proofs::{
+        arithmetic::Field,
         circuit::{Layouter, SimpleFloorPlanner, Value},
         dev::MockProver,
         plonk::{Circuit, ConstraintSystem, Error},

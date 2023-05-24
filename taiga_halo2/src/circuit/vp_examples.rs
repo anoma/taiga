@@ -3,7 +3,7 @@ use crate::{
         note_circuit::NoteConfig,
         vp_circuit::{
             VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo,
+            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
@@ -21,11 +21,13 @@ use rand::rngs::OsRng;
 use rand::RngCore;
 
 mod field_addition;
+mod note_encryption_example;
 
 // TrivialValidityPredicateCircuit with empty custom constraints.
 #[derive(Clone, Debug, Default)]
 pub struct TrivialValidityPredicateCircuit {
-    pub spend_notes: [Note; NUM_NOTE],
+    pub owned_note_pub_id: pallas::Base,
+    pub input_notes: [Note; NUM_NOTE],
     pub output_notes: [Note; NUM_NOTE],
 }
 
@@ -47,18 +49,20 @@ impl ValidityPredicateConfig for DummyValidityPredicateConfig {
 
 impl TrivialValidityPredicateCircuit {
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        let spend_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let owned_note_pub_id = pallas::Base::zero();
+        let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         Self {
-            spend_notes,
+            owned_note_pub_id,
+            input_notes,
             output_notes,
         }
     }
 }
 
 impl ValidityPredicateInfo for TrivialValidityPredicateCircuit {
-    fn get_spend_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.spend_notes
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.input_notes
     }
 
     fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
@@ -69,24 +73,8 @@ impl ValidityPredicateInfo for TrivialValidityPredicateCircuit {
         self.get_note_instances()
     }
 
-    fn get_verifying_info(&self) -> VPVerifyingInfo {
-        let mut rng = OsRng;
-        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
-        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
-        let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
-        let instance = self.get_instances();
-        let proof = Proof::create(&pk, params, self.clone(), &[&instance], &mut rng).unwrap();
-        VPVerifyingInfo {
-            vk,
-            proof,
-            instance,
-        }
-    }
-
-    fn get_vp_description(&self) -> ValidityPredicateVerifyingKey {
-        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
-        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
-        ValidityPredicateVerifyingKey::from_vk(vk)
+    fn get_owned_note_pub_id(&self) -> pallas::Base {
+        self.owned_note_pub_id
     }
 }
 

@@ -4,15 +4,17 @@ use crate::circuit::gadgets::{
     add::{AddChip, AddInstructions},
     assign_free_advice, assign_free_constant,
 };
-use crate::circuit::hash_to_curve::{hash_to_curve_circuit, HashToCurveConfig};
-use crate::circuit::note_circuit::{note_commitment_gadget, NoteCommitmentChip};
+use crate::circuit::{
+    hash_to_curve::{hash_to_curve_circuit, HashToCurveConfig},
+    note_circuit::{note_commitment_gadget, NoteCommitmentChip},
+    vp_circuit::{InputNoteVariables, NoteVariables, OutputNoteVariables},
+};
 use crate::constant::{
     NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentFixedBasesFull,
     NoteCommitmentHashDomain, NullifierK, POSEIDON_TO_CURVE_INPUT_LEN,
 };
 use crate::note::Note;
 use crate::utils::poseidon_to_curve;
-use group::Curve;
 use halo2_gadgets::{
     ecc::{
         chip::EccChip, FixedPoint, FixedPointBaseField, NonIdentityPoint, Point, ScalarFixed,
@@ -28,6 +30,7 @@ use halo2_proofs::{
     circuit::{AssignedCell, Layouter, Value},
     plonk::{Advice, Column, Error, Instance},
 };
+use pasta_curves::group::Curve;
 use pasta_curves::pallas;
 
 // cm is a point
@@ -70,21 +73,9 @@ pub fn nullifier_circuit(
         .map(|res| res.extract_p().inner().clone())
 }
 
-// Return variables in the spend note
-#[derive(Debug)]
-pub struct SpendNoteVar {
-    pub address: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_vk: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_data: AssignedCell<pallas::Base, pallas::Base>,
-    pub value: AssignedCell<pallas::Base, pallas::Base>,
-    pub nf: AssignedCell<pallas::Base, pallas::Base>,
-    pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
-    pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
-}
-
+// Check input note integrity and return the input note variables and the nullifier
 #[allow(clippy::too_many_arguments)]
-pub fn check_spend_note(
+pub fn check_input_note(
     mut layouter: impl Layouter<pallas::Base>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
@@ -99,13 +90,13 @@ pub fn check_spend_note(
     poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
     // poseidon_chip: PoseidonChip<pallas::Base, 3, 2>,
     add_chip: AddChip<pallas::Base>,
-    spend_note: Note,
+    input_note: Note,
     nf_row_idx: usize,
-) -> Result<SpendNoteVar, Error> {
-    // Check spend note user integrity: address = Com_r(Com_r(nk, zero), app_data_dynamic)
+) -> Result<InputNoteVariables, Error> {
+    // Check input note user integrity: address = Com_r(Com_r(nk, zero), app_data_dynamic)
     let (address, nk, app_data_dynamic) = {
         // Witness nk
-        let nk = spend_note.get_nk().unwrap();
+        let nk = input_note.get_nk().unwrap();
         let nk_var = assign_free_advice(
             layouter.namespace(|| "witness nk"),
             advices[0],
@@ -134,7 +125,7 @@ pub fn check_spend_note(
         let app_data_dynamic = assign_free_advice(
             layouter.namespace(|| "witness app_data_dynamic"),
             advices[0],
-            Value::known(spend_note.app_data_dynamic),
+            Value::known(input_note.app_data_dynamic),
         )?;
 
         // address = Com_r(app_data_dynamic, nk_com)
@@ -146,7 +137,7 @@ pub fn check_spend_note(
                     layouter.namespace(|| "Poseidon init"),
                 )?;
             let poseidon_message = [app_data_dynamic.clone(), nk_com];
-            poseidon_hasher.hash(layouter.namespace(|| "spend address"), poseidon_message)?
+            poseidon_hasher.hash(layouter.namespace(|| "input address"), poseidon_message)?
         };
 
         (address, nk_var, app_data_dynamic)
@@ -156,49 +147,49 @@ pub fn check_spend_note(
     let app_vk = assign_free_advice(
         layouter.namespace(|| "witness app_vk"),
         advices[0],
-        Value::known(spend_note.get_compressed_app_vk()),
+        Value::known(input_note.get_compressed_app_vk()),
     )?;
 
-    // Witness value_base_app_data
-    let app_data = assign_free_advice(
-        layouter.namespace(|| "witness value_base_app_data"),
+    // Witness app_data_static
+    let app_data_static = assign_free_advice(
+        layouter.namespace(|| "witness app_data_static"),
         advices[0],
-        Value::known(spend_note.get_value_base_app_data()),
+        Value::known(input_note.get_app_data_static()),
     )?;
 
     // Witness value(u64)
     let value = assign_free_advice(
         layouter.namespace(|| "witness value"),
         advices[0],
-        Value::known(pallas::Base::from(spend_note.value)),
+        Value::known(pallas::Base::from(input_note.value)),
     )?;
 
     // Witness rho
     let rho = assign_free_advice(
         layouter.namespace(|| "witness rho"),
         advices[0],
-        Value::known(spend_note.rho.inner()),
+        Value::known(input_note.rho.inner()),
     )?;
 
     // Witness psi
     let psi = assign_free_advice(
-        layouter.namespace(|| "witness psi_spend"),
+        layouter.namespace(|| "witness psi_input"),
         advices[0],
-        Value::known(spend_note.psi),
+        Value::known(input_note.psi),
     )?;
 
     // Witness rcm
     let rcm = ScalarFixed::new(
         ecc_chip.clone(),
         layouter.namespace(|| "rcm"),
-        Value::known(spend_note.rcm),
+        Value::known(input_note.rcm),
     )?;
 
     // Witness is_merkle_checked
     let is_merkle_checked = assign_free_advice(
         layouter.namespace(|| "witness is_merkle_checked"),
         advices[0],
-        Value::known(pallas::Base::from(spend_note.is_merkle_checked)),
+        Value::known(pallas::Base::from(input_note.is_merkle_checked)),
     )?;
 
     // Check note commitment
@@ -209,7 +200,7 @@ pub fn check_spend_note(
         note_commit_chip,
         address.clone(),
         app_vk.clone(),
-        app_data.clone(),
+        app_data_static.clone(),
         rho.clone(),
         psi.clone(),
         value.clone(),
@@ -233,28 +224,22 @@ pub fn check_spend_note(
     // Public nullifier
     layouter.constrain_instance(nf.cell(), instances, nf_row_idx)?;
 
-    Ok(SpendNoteVar {
+    let cm_x = cm.extract_p().inner().clone();
+
+    let note_variables = NoteVariables {
         address,
         app_vk,
         value,
-        app_data,
-        nf,
-        cm,
+        app_data_static,
         is_merkle_checked,
         app_data_dynamic,
-    })
-}
+    };
 
-// Return variables in the output note
-#[derive(Debug)]
-pub struct OutputNoteVar {
-    pub address: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_vk: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_data: AssignedCell<pallas::Base, pallas::Base>,
-    pub value: AssignedCell<pallas::Base, pallas::Base>,
-    pub cm: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
-    pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
+    Ok(InputNoteVariables {
+        note_variables,
+        nf,
+        cm_x,
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -275,7 +260,7 @@ pub fn check_output_note(
     output_note: Note,
     old_nf: AssignedCell<pallas::Base, pallas::Base>,
     cm_row_idx: usize,
-) -> Result<OutputNoteVar, Error> {
+) -> Result<OutputNoteVariables, Error> {
     // Check output note user integrity: address = Com_r(app_data_dynamic, nk_com)
     let (address, app_data_dynamic) = {
         // Witness nk_com
@@ -312,11 +297,11 @@ pub fn check_output_note(
         Value::known(output_note.get_compressed_app_vk()),
     )?;
 
-    // Witness value_base_app_data
-    let app_data = assign_free_advice(
-        layouter.namespace(|| "witness value_base_app_data"),
+    // Witness app_data_static
+    let app_data_static = assign_free_advice(
+        layouter.namespace(|| "witness app_data_static"),
         advices[0],
-        Value::known(output_note.get_value_base_app_data()),
+        Value::known(output_note.get_app_data_static()),
     )?;
 
     // Witness value(u64)
@@ -355,7 +340,7 @@ pub fn check_output_note(
         note_commit_chip,
         address.clone(),
         app_vk.clone(),
-        app_data.clone(),
+        app_data_static.clone(),
         old_nf,
         psi,
         value.clone(),
@@ -367,14 +352,18 @@ pub fn check_output_note(
     let cm_x = cm.extract_p().inner().clone();
     layouter.constrain_instance(cm_x.cell(), instances, cm_row_idx)?;
 
-    Ok(OutputNoteVar {
+    let note_variables = NoteVariables {
         address,
         app_vk,
-        app_data,
+        app_data_static,
         value,
-        cm,
         is_merkle_checked,
         app_data_dynamic,
+    };
+
+    Ok(OutputNoteVariables {
+        note_variables,
+        cm_x,
     })
 }
 
@@ -383,20 +372,23 @@ pub fn derive_value_base(
     hash_to_curve_config: HashToCurveConfig,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
     app_vk: AssignedCell<pallas::Base, pallas::Base>,
-    app_data: AssignedCell<pallas::Base, pallas::Base>,
+    app_data_static: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<NonIdentityPoint<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
     let point = hash_to_curve_circuit(
         layouter.namespace(|| "hash to curve"),
         hash_to_curve_config,
         ecc_chip.clone(),
-        &[app_vk.clone(), app_data.clone()],
+        &[app_vk.clone(), app_data_static.clone()],
     )?;
 
     // Assign a new `NonIdentityPoint` and constran equal to hash_to_curve point since `Point` doesn't have mul operation
     // IndentityPoint is an invalid value base and it returns an error.
-    let non_identity_point = app_vk.value().zip(app_data.value()).map(|(&vk, &data)| {
-        poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&[vk, data]).to_affine()
-    });
+    let non_identity_point = app_vk
+        .value()
+        .zip(app_data_static.value())
+        .map(|(&vk, &data)| {
+            poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&[vk, data]).to_affine()
+        });
     let non_identity_point_var = NonIdentityPoint::new(
         ecc_chip,
         layouter.namespace(|| "non-identity value base"),
@@ -414,29 +406,29 @@ pub fn compute_value_commitment(
     mut layouter: impl Layouter<pallas::Base>,
     ecc_chip: EccChip<NoteCommitmentFixedBases>,
     hash_to_curve_config: HashToCurveConfig,
-    app_address_spend: AssignedCell<pallas::Base, pallas::Base>,
-    data_spend: AssignedCell<pallas::Base, pallas::Base>,
-    v_spend: AssignedCell<pallas::Base, pallas::Base>,
+    app_address_input: AssignedCell<pallas::Base, pallas::Base>,
+    data_input: AssignedCell<pallas::Base, pallas::Base>,
+    v_input: AssignedCell<pallas::Base, pallas::Base>,
     app_address_output: AssignedCell<pallas::Base, pallas::Base>,
     data_output: AssignedCell<pallas::Base, pallas::Base>,
     v_output: AssignedCell<pallas::Base, pallas::Base>,
     rcv: pallas::Scalar,
 ) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
-    // spend value point
-    let value_base_spend = derive_value_base(
-        layouter.namespace(|| "derive spend value base"),
+    // input value point
+    let value_base_input = derive_value_base(
+        layouter.namespace(|| "derive input value base"),
         hash_to_curve_config.clone(),
         ecc_chip.clone(),
-        app_address_spend,
-        data_spend,
+        app_address_input,
+        data_input,
     )?;
-    let v_spend_scalar = ScalarVar::from_base(
+    let v_input_scalar = ScalarVar::from_base(
         ecc_chip.clone(),
         layouter.namespace(|| "ScalarVar from_base"),
-        &v_spend,
+        &v_input,
     )?;
-    let (value_point_spend, _) =
-        value_base_spend.mul(layouter.namespace(|| "spend value point"), v_spend_scalar)?;
+    let (value_point_input, _) =
+        value_base_input.mul(layouter.namespace(|| "input value point"), v_input_scalar)?;
 
     // output value point
     let value_base_output = derive_value_base(
@@ -475,8 +467,8 @@ pub fn compute_value_commitment(
         },
     )?;
 
-    let commitment_v = value_point_spend.add(
-        layouter.namespace(|| "v_pioint_spend - v_point_output"),
+    let commitment_v = value_point_input.add(
+        layouter.namespace(|| "v_pioint_input - v_point_output"),
         &neg_v_point_output,
     )?;
 
@@ -505,8 +497,6 @@ fn test_halo2_nullifier_circuit() {
     };
     use crate::note::NoteCommitment;
     use crate::nullifier::{Nullifier, NullifierDerivingKey};
-    use ff::Field;
-    use group::Curve;
     use halo2_gadgets::{
         ecc::chip::EccConfig,
         poseidon::{
@@ -516,6 +506,7 @@ fn test_halo2_nullifier_circuit() {
         utilities::lookup_range_check::LookupRangeCheckConfig,
     };
     use halo2_proofs::{
+        arithmetic::Field,
         circuit::{Layouter, SimpleFloorPlanner, Value},
         dev::MockProver,
         plonk::{Advice, Circuit, Column, ConstraintSystem, Error},

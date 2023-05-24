@@ -2,11 +2,11 @@ use crate::{
     circuit::action_circuit::ActionCircuit,
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::MerklePath,
-    note::{Note, NoteCommitment, OutputNoteInfo, SpendNoteInfo},
+    note::{InputNoteInfo, Note, NoteCommitment, OutputNoteInfo},
     nullifier::Nullifier,
     value_commitment::ValueCommitment,
 };
-use ff::Field;
+use halo2_proofs::arithmetic::Field;
 use pasta_curves::pallas;
 use rand::RngCore;
 
@@ -15,7 +15,7 @@ use rand::RngCore;
 pub struct ActionInstance {
     /// The root of the note commitment Merkle tree.
     pub anchor: pallas::Base,
-    /// The nullifier of the spend note.
+    /// The nullifier of input note.
     pub nf: Nullifier,
     /// The commitment of the output note.
     pub cm: NoteCommitment,
@@ -28,7 +28,7 @@ pub struct ActionInstance {
 /// The information to build ActionInstance and ActionCircuit.
 #[derive(Clone)]
 pub struct ActionInfo {
-    spend: SpendNoteInfo,
+    input: InputNoteInfo,
     output: OutputNoteInfo,
     rcv: pallas::Scalar,
 }
@@ -46,9 +46,9 @@ impl ActionInstance {
 }
 
 impl ActionInfo {
-    pub fn new<R: RngCore>(spend: SpendNoteInfo, output: OutputNoteInfo, mut rng: R) -> Self {
+    pub fn new<R: RngCore>(input: InputNoteInfo, output: OutputNoteInfo, mut rng: R) -> Self {
         let rcv = pallas::Scalar::random(&mut rng);
-        Self { spend, output, rcv }
+        Self { input, output, rcv }
     }
 
     pub fn get_rcv(&self) -> pallas::Scalar {
@@ -57,41 +57,41 @@ impl ActionInfo {
 
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
         use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
-        let spend_note = Note::dummy(&mut rng);
-        let output_info = OutputNoteInfo::dummy(&mut rng, spend_note.get_nf().unwrap());
+        let input_note = Note::dummy(&mut rng);
+        let output_info = OutputNoteInfo::dummy(&mut rng, input_note.get_nf().unwrap());
         let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         let app_vp_proving_info = Box::new(TrivialValidityPredicateCircuit::dummy(&mut rng));
         let app_vp_proving_info_dynamic = vec![];
-        let spend_info = SpendNoteInfo::new(
-            spend_note,
+        let input_info = InputNoteInfo::new(
+            input_note,
             merkle_path,
             app_vp_proving_info,
             app_vp_proving_info_dynamic,
         );
 
-        ActionInfo::new(spend_info, output_info, &mut rng)
+        ActionInfo::new(input_info, output_info, &mut rng)
     }
 
     pub fn build(self) -> (ActionInstance, ActionCircuit) {
-        let nf = self.spend.note.get_nf().unwrap();
+        let nf = self.input.note.get_nf().unwrap();
         assert_eq!(
             nf, self.output.note.rho,
-            "The nf of spend note should be equal to the rho of output note"
+            "The nf of input note should be equal to the rho of output note"
         );
 
         let output_cm = self.output.note.commitment();
 
-        let cv_net = ValueCommitment::new(&self.spend.note, &self.output.note, &self.rcv);
+        let cv_net = ValueCommitment::new(&self.input.note, &self.output.note, &self.rcv);
         let action = ActionInstance {
             nf,
             cm: output_cm,
-            anchor: self.spend.root,
+            anchor: self.input.root,
             cv_net,
         };
 
         let action_circuit = ActionCircuit {
-            spend_note: self.spend.note,
-            auth_path: self.spend.auth_path,
+            input_note: self.input.note,
+            auth_path: self.input.auth_path,
             output_note: self.output.note,
             rcv: self.rcv,
         };

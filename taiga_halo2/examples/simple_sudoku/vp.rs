@@ -7,11 +7,10 @@ use pasta_curves::pallas;
 extern crate taiga_halo2;
 use taiga_halo2::{
     circuit::{
-        integrity::{OutputNoteVar, SpendNoteVar},
         note_circuit::NoteConfig,
         vp_circuit::{
-            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo,
+            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
+            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
@@ -48,7 +47,7 @@ impl ValidityPredicateConfig for SudokuVPConfig {
 #[derive(Clone, Debug, Default)]
 pub struct SudokuVP {
     pub sudoku: SudokuCircuit,
-    spend_notes: [Note; NUM_NOTE],
+    input_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
 }
 
@@ -59,16 +58,15 @@ impl ValidityPredicateCircuit for SudokuVP {
         &self,
         config: Self::VPConfig,
         layouter: impl Layouter<pallas::Base>,
-        _spend_note_variables: &[SpendNoteVar],
-        _output_note_variables: &[OutputNoteVar],
+        _basic_variables: BasicValidityPredicateVariables,
     ) -> Result<(), plonk::Error> {
         self.sudoku.synthesize(config.sudoku_config, layouter)
     }
 }
 
 impl ValidityPredicateInfo for SudokuVP {
-    fn get_spend_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.spend_notes
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.input_notes
     }
 
     fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
@@ -79,36 +77,20 @@ impl ValidityPredicateInfo for SudokuVP {
         self.get_note_instances()
     }
 
-    fn get_verifying_info(&self) -> VPVerifyingInfo {
-        let mut rng = OsRng;
-        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
-        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
-        let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
-        let instance = self.get_instances();
-        let proof = Proof::create(&pk, params, self.clone(), &[&instance], &mut rng).unwrap();
-        VPVerifyingInfo {
-            vk,
-            proof,
-            instance,
-        }
-    }
-
-    fn get_vp_description(&self) -> ValidityPredicateVerifyingKey {
-        let params = SETUP_PARAMS_MAP.get(&12).unwrap();
-        let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
-        ValidityPredicateVerifyingKey::from_vk(vk)
+    fn get_owned_note_pub_id(&self) -> pallas::Base {
+        pallas::Base::zero()
     }
 }
 
 impl SudokuVP {
     pub fn new(
         sudoku: SudokuCircuit,
-        spend_notes: [Note; NUM_NOTE],
+        input_notes: [Note; NUM_NOTE],
         output_notes: [Note; NUM_NOTE],
     ) -> Self {
         Self {
             sudoku,
-            spend_notes,
+            input_notes,
             output_notes,
         }
     }
@@ -118,15 +100,7 @@ vp_circuit_impl!(SudokuVP);
 
 #[cfg(test)]
 mod tests {
-    use std::time::Instant;
-
     use taiga_halo2::{
-        circuit::gadgets::{
-            add::{AddChip, AddConfig, AddInstructions},
-            assign_free_advice, assign_free_instance,
-            mul::{MulChip, MulConfig, MulInstructions},
-            sub::{SubChip, SubConfig, SubInstructions},
-        },
         constant::NUM_NOTE,
         note::Note,
         nullifier::{Nullifier, NullifierKeyCom},
@@ -137,12 +111,9 @@ mod tests {
     use pasta_curves::pallas;
     use rand::rngs::OsRng;
 
-    use halo2_proofs::{
-        plonk::{self, ProvingKey, VerifyingKey},
-        poly::commitment::Params,
-    };
+    use halo2_proofs::{plonk, poly::commitment::Params};
 
-    use crate::valid_sudoku::{circuit::SudokuCircuit, vp::SudokuVP};
+    use crate::{circuit::SudokuCircuit, vp::SudokuVP};
 
     #[test]
     fn test_vp() {
@@ -170,9 +141,9 @@ mod tests {
 
         let mut _vp = SudokuVP::new(sudoku, input_notes, output_notes);
 
-        let vp_desc = ValidityPredicateVerifyingKey::from_vk(vk);
+        let vp_vk = ValidityPredicateVerifyingKey::from_vk(vk);
 
-        let app_data = pallas::Base::zero();
+        let app_data_static = pallas::Base::zero();
         let app_data_dynamic = pallas::Base::zero();
 
         let value: u64 = 0;
@@ -181,8 +152,8 @@ mod tests {
         let psi = pallas::Base::random(&mut rng);
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
         Note::new(
-            vp_desc,
-            app_data,
+            vp_vk,
+            app_data_static,
             app_data_dynamic,
             value,
             nk_com,
@@ -190,7 +161,6 @@ mod tests {
             psi,
             rcm,
             true,
-            vec![],
         );
     }
 }
