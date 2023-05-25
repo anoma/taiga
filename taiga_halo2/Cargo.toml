@@ -16,8 +16,7 @@ bitvec = "1"
 subtle = { version = "2.3", default-features = false }
 dyn-clone = "1.0"
 reddsa = "0.5"
-# TODO: update the rev when the PR in vamp-ir is merged
-vamp-ir = { git = "https://github.com/anoma/vamp-ir.git", rev = "6dc29bc8396eb3089626447c4bbe9c0461ac5aaa"}
+vamp-ir = { git = "https://github.com/anoma/vamp-ir.git", rev = "778d5b53548cae5a2776c3bfd01fa9afa4543470"}
 bincode = "2.0.0-rc.1"
 
 [dev-dependencies]
