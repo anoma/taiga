@@ -90,12 +90,12 @@ impl SchnorrSignature {
 // SignatureVerificationValidityPredicateCircuit uses the schnorr signature.
 #[derive(Clone, Debug, Default)]
 pub struct SignatureVerificationValidityPredicateCircuit {
-    owned_note_pub_id: pallas::Base,
-    input_notes: [Note; NUM_NOTE],
-    output_notes: [Note; NUM_NOTE],
+    pub owned_note_pub_id: pallas::Base,
+    pub input_notes: [Note; NUM_NOTE],
+    pub output_notes: [Note; NUM_NOTE],
     // The compressed verifying_key and the pk are encoded in app_data_dynamic
-    verifying_key: pallas::Base,
-    signature: SchnorrSignature,
+    pub verifying_key: pallas::Base,
+    pub signature: SchnorrSignature,
 }
 
 #[derive(Clone, Debug)]
@@ -186,7 +186,7 @@ impl SignatureVerificationValidityPredicateCircuit {
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let sk = pallas::Scalar::random(&mut rng);
         let auth_vk = pallas::Base::random(&mut rng);
-        let auth = TokenAuthorization::from_sk_vk(sk, auth_vk);
+        let auth = TokenAuthorization::from_sk_vk(&sk, &auth_vk);
         input_notes[0].app_data_dynamic = auth.to_app_data_dynamic();
         let owned_note_pub_id = input_notes[0].get_nf().unwrap().inner();
         Self::from_sk_and_sign(

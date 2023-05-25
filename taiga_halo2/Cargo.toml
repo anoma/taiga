@@ -33,3 +33,6 @@ harness = false
 
 [[example]]
 name = "taiga_sudoku"
+
+[[example]]
+name = "tx_examples"

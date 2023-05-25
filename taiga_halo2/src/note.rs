@@ -1,5 +1,5 @@
 use crate::{
-    circuit::vp_circuit::ValidityPredicateVerifyingInfo,
+    circuit::{vp_circuit::ValidityPredicateVerifyingInfo, vp_examples::TRIVIAL_VP_VK},
     constant::{
         BASE_BITS_NUM, NOTE_COMMIT_DOMAIN, POSEIDON_TO_CURVE_INPUT_LEN, TAIGA_COMMITMENT_TREE_DEPTH,
     },
@@ -42,6 +42,7 @@ impl Default for NoteCommitment {
 }
 
 /// A note
+// TODO: add copy when app_vk is changed to pallas::Base
 #[derive(Debug, Clone, Default)]
 pub struct Note {
     pub note_type: ValueBase,
@@ -62,6 +63,7 @@ pub struct Note {
 }
 
 /// The parameters in the ValueBase are used to derive note value base.
+// TODO: add copy when app_vk is changed to pallas::Base
 #[derive(Debug, Clone, Default)]
 pub struct ValueBase {
     /// app_vk is the verifying key of VP
@@ -135,6 +137,26 @@ impl Note {
             psi,
             rcm,
             is_merkle_checked: true,
+        }
+    }
+
+    pub fn dummy_zero_note<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
+        let app_vk = TRIVIAL_VP_VK.clone();
+        let app_data_static = pallas::Base::random(&mut rng);
+        let note_type = ValueBase::new(app_vk, app_data_static);
+        let app_data_dynamic = pallas::Base::zero();
+        let nk_com = NullifierKeyCom::rand(&mut rng);
+        let rcm = pallas::Scalar::random(&mut rng);
+        let psi = pallas::Base::random(&mut rng);
+        Self {
+            note_type,
+            app_data_dynamic,
+            value: 0,
+            nk_com,
+            rho,
+            psi,
+            rcm,
+            is_merkle_checked: false,
         }
     }
 

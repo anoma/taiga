@@ -28,23 +28,30 @@ use halo2_proofs::{
     plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
 };
 use pasta_curves::arithmetic::CurveAffine;
-use pasta_curves::pallas;
+use pasta_curves::{group::ff::PrimeField, pallas};
 use rand::rngs::OsRng;
 use rand::RngCore;
+
+pub fn transfrom_token_name_to_token_property(token_name: &str) -> pallas::Base {
+    assert!(token_name.len() < 32);
+    let mut bytes: [u8; 32] = [0; 32];
+    bytes[..token_name.len()].copy_from_slice(token_name.as_bytes());
+    pallas::Base::from_repr(bytes).unwrap()
+}
 
 // TokenValidityPredicateCircuit
 #[derive(Clone, Debug)]
 pub struct TokenValidityPredicateCircuit {
-    owned_note_pub_id: pallas::Base,
-    input_notes: [Note; NUM_NOTE],
-    output_notes: [Note; NUM_NOTE],
-    // The token_property goes to app_data_static and decides the note type. It can be extended to a list and embedded to app_data_static.
-    token_property: pallas::Base,
+    pub owned_note_pub_id: pallas::Base,
+    pub input_notes: [Note; NUM_NOTE],
+    pub output_notes: [Note; NUM_NOTE],
+    // The token_name goes to app_data_static. It can be extended to a list and embedded to app_data_static.
+    pub token_name: String,
     // The auth goes to app_data_dynamic and defines how to consume and create the note.
-    auth: TokenAuthorization,
+    pub auth: TokenAuthorization,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy)]
 pub struct TokenAuthorization {
     pub pk: pallas::Point,
     pub vk: pallas::Base,
@@ -73,7 +80,7 @@ impl Default for TokenValidityPredicateCircuit {
             owned_note_pub_id: pallas::Base::zero(),
             input_notes: [(); NUM_NOTE].map(|_| Note::default()),
             output_notes: [(); NUM_NOTE].map(|_| Note::default()),
-            token_property: pallas::Base::zero(),
+            token_name: "Token_name".to_string(),
             auth: TokenAuthorization::default(),
         }
     }
@@ -110,15 +117,16 @@ impl TokenValidityPredicateCircuit {
     pub fn random<R: RngCore>(mut rng: R) -> Self {
         let mut input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let token_property = pallas::Base::random(&mut rng);
+        let token_name = "Token_name".to_string();
         let auth = TokenAuthorization::random(&mut rng);
-        input_notes[0].note_type.app_data_static = token_property;
+        input_notes[0].note_type.app_data_static =
+            transfrom_token_name_to_token_property(&token_name);
         input_notes[0].app_data_dynamic = auth.to_app_data_dynamic();
         Self {
             owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
             input_notes,
             output_notes,
-            token_property,
+            token_name,
             auth,
         }
     }
@@ -156,7 +164,7 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
         let token_property = assign_free_advice(
             layouter.namespace(|| "witness token_property"),
             config.advices[0],
-            Value::known(self.token_property),
+            Value::known(transfrom_token_name_to_token_property(&self.token_name)),
         )?;
 
         // We can add more constraints on token_property or extend the token_properties.
@@ -247,10 +255,10 @@ impl TokenAuthorization {
         poseidon_hash_n::<4>([*pk_coord.x(), *pk_coord.y(), self.vk, pallas::Base::zero()])
     }
 
-    pub fn from_sk_vk(sk: pallas::Scalar, vk: pallas::Base) -> Self {
+    pub fn from_sk_vk(sk: &pallas::Scalar, vk: &pallas::Base) -> Self {
         let generator = NOTE_COMMIT_DOMAIN.R();
         let pk = generator * sk;
-        Self { pk, vk }
+        Self { pk, vk: *vk }
     }
 }
 

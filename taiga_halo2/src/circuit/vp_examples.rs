@@ -16,14 +16,21 @@ use halo2_proofs::{
     circuit::{floor_planner, Layouter},
     plonk::{Circuit, ConstraintSystem, Error},
 };
+use lazy_static::lazy_static;
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
 use rand::RngCore;
 
 mod field_addition;
 mod note_encryption_example;
-mod signature_verification;
-mod token;
+pub mod signature_verification;
+pub mod token;
+
+lazy_static! {
+    pub static ref TRIVIAL_VP_VK: ValidityPredicateVerifyingKey =
+        TrivialValidityPredicateCircuit::default().get_vp_vk();
+    pub static ref COMPRESSED_TRIVIAL_VP_VK: pallas::Base = TRIVIAL_VP_VK.get_compressed();
+}
 
 // TrivialValidityPredicateCircuit with empty custom constraints.
 #[derive(Clone, Debug, Default)]
