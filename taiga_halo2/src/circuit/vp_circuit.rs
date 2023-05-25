@@ -508,13 +508,20 @@ impl VampIRValidityPredicateCircuit {
         }
 
         // Populate variable definitions
-        circuit.populate_variables(var_assignments);
+        circuit.populate_variables(var_assignments.clone());
 
-        // TODO: export and handle the instances
+        // Get public inputs Fp
+        let instances = circuit
+            .module
+            .pubs
+            .iter()
+            .map(|inst| var_assignments[&inst.id])
+            .collect::<Vec<pallas::Base>>();
+
         Self {
             params,
             circuit,
-            instances: vec![],
+            instances,
         }
     }
 }
@@ -526,8 +533,14 @@ impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
         let vk = keygen_vk(&self.params, &self.circuit).expect("keygen_vk should not fail");
         let pk =
             keygen_pk(&self.params, vk.clone(), &self.circuit).expect("keygen_pk should not fail");
-        // TODO: export and handle the instances
-        let proof = Proof::create(&pk, &self.params, self.circuit.clone(), &[], &mut rng).unwrap();
+        let proof = Proof::create(
+            &pk,
+            &self.params,
+            self.circuit.clone(),
+            &[&self.instances],
+            &mut rng,
+        )
+        .unwrap();
         VPVerifyingInfo {
             vk,
             proof,
@@ -573,9 +586,8 @@ fn test_create_vp_from_vamp_ir_circuit() {
 
     // verify the proof
     // TODO: use the vp_info.verify() instead. vp_info.verify() doesn't work now because it uses the fixed VP_CIRCUIT_PARAMS_SIZE params.
-    // TODO: export and handle the instances
     vp_info
         .proof
-        .verify(&vp_info.vk, &vp_circuit.params, &[])
+        .verify(&vp_info.vk, &vp_circuit.params, &[&vp_info.instance])
         .unwrap();
 }
