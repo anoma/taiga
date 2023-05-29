@@ -243,6 +243,10 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
 vp_circuit_impl!(TokenValidityPredicateCircuit);
 
 impl TokenAuthorization {
+    pub fn new(pk: pallas::Point, vk: pallas::Base) -> Self {
+        Self { pk, vk }
+    }
+
     pub fn random<R: RngCore>(mut rng: R) -> Self {
         Self {
             pk: pallas::Point::random(&mut rng),
