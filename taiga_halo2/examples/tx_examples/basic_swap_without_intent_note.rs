@@ -36,18 +36,12 @@ fn create_token_swap_ptx<R: RngCore>(
 
     // input note
     let rho = Nullifier::new(pallas::Base::random(&mut rng));
-    let inpute_note =
-        create_random_token_note(&mut rng, input_token, input_value, rho.clone(), &auth);
+    let inpute_note = create_random_token_note(&mut rng, input_token, input_value, rho, &auth);
 
     // output note
     let input_note_nf = inpute_note.get_nf().unwrap();
-    let output_note = create_random_token_note(
-        &mut rng,
-        output_toke,
-        output_value,
-        input_note_nf.clone(),
-        &auth,
-    );
+    let output_note =
+        create_random_token_note(&mut rng, output_toke, output_value, input_note_nf, &auth);
 
     // padding the zero notes
     let padding_input_note = Note::dummy_zero_note(&mut rng, rho);
@@ -110,22 +104,17 @@ fn create_token_swap_ptx<R: RngCore>(
             input_notes: [inpute_note.clone(), padding_input_note.clone()],
             output_notes: [output_note.clone(), padding_output_note.clone()],
         });
-        InputNoteInfo::new(
-            padding_input_note.clone(),
-            merkle_path.clone(),
-            trivail_vp,
-            vec![],
-        )
+        InputNoteInfo::new(padding_input_note.clone(), merkle_path, trivail_vp, vec![])
     };
 
     // Create the padding output note proving info
     let padding_output_note_proving_info = {
         let trivail_vp = Box::new(TrivialValidityPredicateCircuit {
             owned_note_pub_id: padding_output_note.commitment().get_x(),
-            input_notes: [inpute_note.clone(), padding_input_note.clone()],
-            output_notes: [output_note.clone(), padding_output_note.clone()],
+            input_notes: [inpute_note, padding_input_note],
+            output_notes: [output_note, padding_output_note.clone()],
         });
-        OutputNoteInfo::new(padding_output_note.clone(), trivail_vp, vec![])
+        OutputNoteInfo::new(padding_output_note, trivail_vp, vec![])
     };
 
     // Create shielded partial tx
@@ -136,33 +125,23 @@ fn create_token_swap_ptx<R: RngCore>(
     )
 }
 
-fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
+pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
     // Alice creates the partial transaction
-    let (alice_ptx, alice_r) = create_token_swap_ptx(&mut rng, "btc", 5, "btc", 5);
+    let (alice_ptx, alice_r) = create_token_swap_ptx(&mut rng, "btc", 5, "eth", 10);
 
-    // // Bob creates the partial transaction
-    // let (bob_ptx, bob_r) = create_token_swap_ptx(
-    //     &mut rng,
-    //     "eth",
-    //     10,
-    //     "xan",
-    //     15,
-    // );
+    // Bob creates the partial transaction
+    let (bob_ptx, bob_r) = create_token_swap_ptx(&mut rng, "eth", 10, "xan", 15);
 
-    // // Carol creates the partial transaction
-    // let (carol_ptx, carol_r) = create_token_swap_ptx(
-    //     &mut rng,
-    //     "xan",
-    //     15,
-    //     "btc",
-    //     5,
-    // );
+    // Carol creates the partial transaction
+    let (carol_ptx, carol_r) = create_token_swap_ptx(&mut rng, "xan", 15, "btc", 5);
 
     // Solver creates the final transaction
-    // let shielded_tx_bundle = ShieldedPartialTxBundle::build(vec![alice_ptx, bob_ptx, carol_ptx]);
-    // let mut tx = Transaction::new(Some(shielded_tx_bundle), None, vec![alice_r, bob_r, carol_r]);
-    let shielded_tx_bundle = ShieldedPartialTxBundle::build(vec![alice_ptx]);
-    let mut tx = Transaction::new(Some(shielded_tx_bundle), None, vec![alice_r]);
+    let shielded_tx_bundle = ShieldedPartialTxBundle::build(vec![alice_ptx, bob_ptx, carol_ptx]);
+    let mut tx = Transaction::new(
+        Some(shielded_tx_bundle),
+        None,
+        vec![alice_r, bob_r, carol_r],
+    );
     tx.binding_sign(rng);
     tx
 }
