@@ -397,6 +397,13 @@ fn test_halo2_dealer_intent_vp_circuit() {
     let circuit = DealerIntentValidityPredicateCircuit::dummy(&mut rng);
     let instances = circuit.get_instances();
 
-    let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances]).unwrap();
+    let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances.clone()]).unwrap();
     assert_eq!(prover.verify(), Ok(()));
+
+    let params = SETUP_PARAMS_MAP.get(&12).unwrap();
+    let vk = keygen_vk(params, &circuit).expect("keygen_vk should not fail");
+    let pk = keygen_pk(params, vk.clone(), &circuit).expect("keygen_pk should not fail");
+    let proof = Proof::create(&pk, params, circuit, &[&instances], &mut rng).unwrap();
+
+    proof.verify(&vk, params, &[&instances]).unwrap();
 }
