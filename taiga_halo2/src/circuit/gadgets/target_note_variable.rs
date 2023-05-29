@@ -3,7 +3,7 @@ use crate::constant::NUM_NOTE;
 use halo2_gadgets::utilities::bool_check;
 use halo2_proofs::{
     arithmetic::Field,
-    circuit::{AssignedCell, Layouter, Region},
+    circuit::{AssignedCell, Layouter, Region, Value},
     plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Expression, Selector},
     poly::Rotation,
 };
@@ -158,6 +158,13 @@ impl GetOwnedNoteVariableConfig {
                         nf_or_cm_minus_owned_note_pub_id_is_zero_vec[3].clone()
                             * (owned_note_variable - target_variable_vec[3].clone()),
                     ),
+                    (
+                        "owned_note_pub_id exists in the notes",
+                        nf_or_cm_minus_owned_note_pub_id_is_zero_vec[0].clone()
+                            * nf_or_cm_minus_owned_note_pub_id_is_zero_vec[1].clone()
+                            * nf_or_cm_minus_owned_note_pub_id_is_zero_vec[2].clone()
+                            * nf_or_cm_minus_owned_note_pub_id_is_zero_vec[3].clone(),
+                    ),
                 ],
             )
         });
@@ -174,12 +181,14 @@ impl GetOwnedNoteVariableConfig {
         self.q_get_owned_note_variable.enable(region, offset + 1)?;
 
         // copy owned_note_pub_id, note_variable_pairs into the advice columns
-        let mut ret = owned_note_pub_id.copy_advice(
+        owned_note_pub_id.copy_advice(
             || "owned_note_pub_id",
             region,
             self.owned_note_pub_id,
             offset + 1,
         )?;
+
+        let mut ret = Value::known(pallas::Base::zero());
         for (pair, column) in note_variable_pairs
             .iter()
             .zip(self.note_variable_pairs.into_iter())
@@ -196,21 +205,16 @@ impl GetOwnedNoteVariableConfig {
                     let inv = (nf_or_cm - owned_note_pub_id)
                         .invert()
                         .unwrap_or(pallas::Base::zero());
+
+                    // Find the target variable
                     if inv == pallas::Base::zero() {
-                        ret = region
-                            .assign_advice(
-                                || "ret",
-                                self.owned_note_pub_id,
-                                offset + 2,
-                                || pair.target_variable.value().copied(),
-                            )
-                            .unwrap();
+                        ret = pair.target_variable.value().copied();
                     }
                     inv
                 });
             region.assign_advice(|| "inv", column, offset, || inv)?;
         }
-        Ok(ret)
+        region.assign_advice(|| "ret", self.owned_note_pub_id, offset + 2, || ret)
     }
 }
 
