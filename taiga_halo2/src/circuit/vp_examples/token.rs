@@ -27,10 +27,16 @@ use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
 };
+use lazy_static::lazy_static;
 use pasta_curves::arithmetic::CurveAffine;
 use pasta_curves::{group::ff::PrimeField, pallas};
 use rand::rngs::OsRng;
 use rand::RngCore;
+
+lazy_static! {
+    pub static ref TOKEN_VK: ValidityPredicateVerifyingKey =
+        TokenValidityPredicateCircuit::default().get_vp_vk();
+}
 
 pub fn transfrom_token_name_to_token_property(token_name: &str) -> pallas::Base {
     assert!(token_name.len() < 32);

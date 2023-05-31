@@ -23,6 +23,7 @@ use rand::RngCore;
 
 mod field_addition;
 mod note_encryption_example;
+pub mod or_relation_intent;
 pub mod signature_verification;
 pub mod token;
 

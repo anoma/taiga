@@ -1,0 +1,329 @@
+/// The intent can be satisfied with two conditions.
+/// For example, Alice has 5 BTC and wants 1 Dolphin or 2 Monkeys.
+/// Then Alice creates an intent with the "or relaiton".
+///
+use crate::{
+    circuit::{
+        gadgets::{
+            assign_free_advice, assign_free_constant,
+            extended_or_relation::ExtendedOrRelationConfig,
+            target_note_variable::{get_owned_note_variable, GetOwnedNoteVariableConfig},
+        },
+        note_circuit::NoteConfig,
+        vp_circuit::{
+            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
+            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
+        },
+        vp_examples::token::{transfrom_token_name_to_token_property, TOKEN_VK},
+    },
+    constant::{NUM_NOTE, SETUP_PARAMS_MAP},
+    note::Note,
+    proof::Proof,
+    utils::poseidon_hash_n,
+    vp_vk::ValidityPredicateVerifyingKey,
+};
+use halo2_gadgets::poseidon::{
+    primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
+    Pow5Chip as PoseidonChip,
+};
+use halo2_proofs::{
+    circuit::{floor_planner, Layouter, Value},
+    plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
+};
+use pasta_curves::pallas;
+use rand::rngs::OsRng;
+use rand::RngCore;
+
+// Token swap condition
+#[derive(Clone, Debug, Default)]
+pub struct Condition {
+    pub token_name: String,
+    pub token_value: u64,
+}
+
+// OrRelationIntentValidityPredicateCircuit
+#[derive(Clone, Debug, Default)]
+pub struct OrRelationIntentValidityPredicateCircuit {
+    pub owned_note_pub_id: pallas::Base,
+    pub input_notes: [Note; NUM_NOTE],
+    pub output_notes: [Note; NUM_NOTE],
+    pub condition1: Condition,
+    pub condition2: Condition,
+    pub receiver_address: pallas::Base,
+}
+
+#[derive(Clone, Debug)]
+pub struct OrRelationIntentValidityPredicateConfig {
+    note_conifg: NoteConfig,
+    advices: [Column<Advice>; 10],
+    instances: Column<Instance>,
+    get_owned_note_variable_config: GetOwnedNoteVariableConfig,
+    extended_or_relation_config: ExtendedOrRelationConfig,
+}
+
+impl ValidityPredicateConfig for OrRelationIntentValidityPredicateConfig {
+    fn get_note_config(&self) -> NoteConfig {
+        self.note_conifg.clone()
+    }
+
+    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
+        let note_conifg = Self::configure_note(meta);
+
+        let advices = note_conifg.advices;
+        let instances = note_conifg.instances;
+
+        let get_owned_note_variable_config = GetOwnedNoteVariableConfig::configure(
+            meta,
+            advices[0],
+            [advices[1], advices[2], advices[3], advices[4]],
+        );
+
+        let extended_or_relation_config =
+            ExtendedOrRelationConfig::configure(meta, [advices[0], advices[1]]);
+
+        Self {
+            note_conifg,
+            advices,
+            instances,
+            get_owned_note_variable_config,
+            extended_or_relation_config,
+        }
+    }
+}
+
+impl OrRelationIntentValidityPredicateCircuit {
+    pub fn encode_app_data_static(
+        condition1: &Condition,
+        condition2: &Condition,
+        receiver_address: pallas::Base,
+    ) -> pallas::Base {
+        let token_property_1 = transfrom_token_name_to_token_property(&condition1.token_name);
+        let token_value_1 = pallas::Base::from(condition1.token_value);
+        let token_property_2 = transfrom_token_name_to_token_property(&condition2.token_name);
+        let token_value_2 = pallas::Base::from(condition2.token_value);
+        poseidon_hash_n::<8>([
+            token_property_1,
+            token_value_1,
+            token_property_2,
+            token_value_2,
+            TOKEN_VK.get_compressed(),
+            receiver_address,
+            pallas::Base::zero(),
+            pallas::Base::zero(),
+        ])
+    }
+
+    // TODO: Move the random function to the test mod
+    pub fn random<R: RngCore>(mut rng: R) -> Self {
+        let mut input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let condition1 = Condition {
+            token_name: "token1".to_string(),
+            token_value: 1u64,
+        };
+        let condition2 = Condition {
+            token_name: "token2".to_string(),
+            token_value: 2u64,
+        };
+        let receiver_address = output_notes[0].get_address();
+        let intent_app_data_static =
+            Self::encode_app_data_static(&condition1, &condition2, receiver_address);
+        input_notes[0].note_type.app_data_static = intent_app_data_static;
+        input_notes[0].value = 1u64;
+        output_notes[0].note_type.app_vk = TOKEN_VK.clone();
+        output_notes[0].note_type.app_data_static =
+            transfrom_token_name_to_token_property(&condition1.token_name);
+        output_notes[0].value = condition1.token_value;
+        Self {
+            owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
+            input_notes,
+            output_notes,
+            condition1,
+            condition2,
+            receiver_address,
+        }
+    }
+}
+
+impl ValidityPredicateInfo for OrRelationIntentValidityPredicateCircuit {
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.input_notes
+    }
+
+    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.output_notes
+    }
+
+    fn get_instances(&self) -> Vec<pallas::Base> {
+        self.get_note_instances()
+    }
+
+    fn get_owned_note_pub_id(&self) -> pallas::Base {
+        self.owned_note_pub_id
+    }
+}
+
+impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
+    type VPConfig = OrRelationIntentValidityPredicateConfig;
+    // Add custom constraints
+    fn custom_constraints(
+        &self,
+        config: Self::Config,
+        mut layouter: impl Layouter<pallas::Base>,
+        basic_variables: BasicValidityPredicateVariables,
+    ) -> Result<(), Error> {
+        let owned_note_pub_id = basic_variables.get_owned_note_pub_id();
+
+        let token_vp_vk = assign_free_advice(
+            layouter.namespace(|| "witness token vp vk"),
+            config.advices[0],
+            Value::known(TOKEN_VK.get_compressed()),
+        )?;
+
+        let token_property_1 = assign_free_advice(
+            layouter.namespace(|| "witness token name in condition1"),
+            config.advices[0],
+            Value::known(transfrom_token_name_to_token_property(
+                &self.condition1.token_name,
+            )),
+        )?;
+
+        let token_value_1 = assign_free_advice(
+            layouter.namespace(|| "witness token value in condition1"),
+            config.advices[0],
+            Value::known(pallas::Base::from(self.condition1.token_value)),
+        )?;
+
+        let token_property_2 = assign_free_advice(
+            layouter.namespace(|| "witness token name in condition2"),
+            config.advices[0],
+            Value::known(transfrom_token_name_to_token_property(
+                &self.condition2.token_name,
+            )),
+        )?;
+
+        let token_value_2 = assign_free_advice(
+            layouter.namespace(|| "witness token value in condition2"),
+            config.advices[0],
+            Value::known(pallas::Base::from(self.condition2.token_value)),
+        )?;
+
+        let receiver_address = assign_free_advice(
+            layouter.namespace(|| "witness receiver address"),
+            config.advices[0],
+            Value::known(self.receiver_address),
+        )?;
+
+        let padding_zero = assign_free_constant(
+            layouter.namespace(|| "zero"),
+            config.advices[0],
+            pallas::Base::zero(),
+        )?;
+
+        // Encode the app_data_static of intent note
+        let encoded_app_data_static = {
+            let poseidon_config = config.get_note_config().poseidon_config;
+            let poseidon_chip = PoseidonChip::construct(poseidon_config);
+            let poseidon_hasher =
+                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<8>, 3, 2>::init(
+                    poseidon_chip,
+                    layouter.namespace(|| "Poseidon init"),
+                )?;
+            let poseidon_message = [
+                token_property_1.clone(),
+                token_value_1.clone(),
+                token_property_2.clone(),
+                token_value_2.clone(),
+                token_vp_vk.clone(),
+                receiver_address.clone(),
+                padding_zero.clone(),
+                padding_zero,
+            ];
+            poseidon_hasher.hash(
+                layouter.namespace(|| "encode app_data_static"),
+                poseidon_message,
+            )?
+        };
+
+        // search target note and get the intent app_static_data
+        let app_data_static = get_owned_note_variable(
+            config.get_owned_note_variable_config,
+            layouter.namespace(|| "get owned note app_data_static"),
+            &owned_note_pub_id,
+            &basic_variables.get_app_data_static_searchable_pairs(),
+        )?;
+
+        // check the app_data_static of intent note
+        layouter.assign_region(
+            || "check app_data_static",
+            |mut region| {
+                region.constrain_equal(encoded_app_data_static.cell(), app_data_static.cell())
+            },
+        )?;
+
+        // check the vp vk of output note
+        layouter.assign_region(
+            || "check vp vk",
+            |mut region| {
+                region.constrain_equal(
+                    token_vp_vk.cell(),
+                    basic_variables.output_note_variables[0]
+                        .note_variables
+                        .app_vk
+                        .cell(),
+                )
+            },
+        )?;
+
+        // check the address of output note
+        layouter.assign_region(
+            || "check address",
+            |mut region| {
+                region.constrain_equal(
+                    receiver_address.cell(),
+                    basic_variables.output_note_variables[0]
+                        .note_variables
+                        .address
+                        .cell(),
+                )
+            },
+        )?;
+
+        // check the token_property and token_value in conditions
+        let output_note_token_property = &basic_variables.output_note_variables[0]
+            .note_variables
+            .app_data_static;
+        let output_note_token_value = &basic_variables.output_note_variables[0]
+            .note_variables
+            .value;
+        layouter.assign_region(
+            || "extended or relatioin",
+            |mut region| {
+                config.extended_or_relation_config.assign_region(
+                    (&token_property_1, &token_value_1),
+                    (&token_property_2, &token_value_2),
+                    (output_note_token_property, output_note_token_value),
+                    0,
+                    &mut region,
+                )
+            },
+        )?;
+
+        Ok(())
+    }
+}
+
+vp_circuit_impl!(OrRelationIntentValidityPredicateCircuit);
+
+#[test]
+fn test_halo2_or_relation_intent_vp_circuit() {
+    use halo2_proofs::dev::MockProver;
+    use rand::rngs::OsRng;
+
+    let mut rng = OsRng;
+    let circuit = OrRelationIntentValidityPredicateCircuit::random(&mut rng);
+    let instances = circuit.get_instances();
+
+    let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances]).unwrap();
+    assert_eq!(prover.verify(), Ok(()));
+}

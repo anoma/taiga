@@ -1,35 +1,23 @@
 use halo2_proofs::arithmetic::Field;
-use lazy_static::lazy_static;
+
 use pasta_curves::pallas;
 use rand::RngCore;
 
 use taiga_halo2::{
-    circuit::{
-        vp_circuit::ValidityPredicateVerifyingInfo,
-        vp_examples::{
-            signature_verification::SignatureVerificationValidityPredicateCircuit,
-            token::{
-                transfrom_token_name_to_token_property, TokenAuthorization,
-                TokenValidityPredicateCircuit,
-            },
-            TrivialValidityPredicateCircuit,
+    circuit::vp_examples::{
+        signature_verification::{SignatureVerificationValidityPredicateCircuit, TOKEN_AUTH_VK},
+        token::{
+            transfrom_token_name_to_token_property, TokenAuthorization,
+            TokenValidityPredicateCircuit, TOKEN_VK,
         },
+        TrivialValidityPredicateCircuit,
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::MerklePath,
     note::{InputNoteInfo, Note, OutputNoteInfo},
     nullifier::{Nullifier, NullifierDerivingKey, NullifierKeyCom},
     shielded_ptx::ShieldedPartialTransaction,
-    // transaction::{ShieldedPartialTxBundle, Transaction},
-    vp_vk::ValidityPredicateVerifyingKey,
 };
-
-lazy_static! {
-    pub(crate) static ref TOKEN_VK: ValidityPredicateVerifyingKey =
-        TokenValidityPredicateCircuit::default().get_vp_vk();
-    pub(crate) static ref TOKEN_AUTH_VK: ValidityPredicateVerifyingKey =
-        SignatureVerificationValidityPredicateCircuit::default().get_vp_vk();
-}
 
 pub fn create_random_token_note<R: RngCore>(
     mut rng: R,

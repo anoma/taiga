@@ -28,6 +28,7 @@ use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
 };
+use lazy_static::lazy_static;
 use pasta_curves::{
     arithmetic::CurveAffine,
     group::{Curve, Group},
@@ -39,6 +40,10 @@ use rand::RngCore;
 // The message contains the input note nullifiers and output note commitments
 const MESSAGE_LEN: usize = NUM_NOTE * 2;
 const POSEIDON_HASH_LEN: usize = MESSAGE_LEN + 4;
+lazy_static! {
+    pub static ref TOKEN_AUTH_VK: ValidityPredicateVerifyingKey =
+        SignatureVerificationValidityPredicateCircuit::default().get_vp_vk();
+}
 
 #[derive(Clone, Debug)]
 pub struct SchnorrSignature {
