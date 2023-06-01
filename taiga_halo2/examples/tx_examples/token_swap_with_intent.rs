@@ -12,8 +12,11 @@ use taiga_halo2::{
         or_relation_intent::{
             create_intent_note, Condition, OrRelationIntentValidityPredicateCircuit,
         },
-        signature_verification::{SignatureVerificationValidityPredicateCircuit, TOKEN_AUTH_VK},
-        token::{TokenAuthorization, TokenValidityPredicateCircuit},
+        signature_verification::TOKEN_AUTH_VK,
+        token::{
+            generate_input_token_note_proving_info, generate_output_token_note_proving_info,
+            TokenAuthorization,
+        },
     },
     constant::NOTE_COMMIT_DOMAIN,
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
@@ -46,7 +49,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
     // input note
     let rho = Nullifier::new(pallas::Base::random(&mut rng));
     let input_nk_com = NullifierKeyCom::from_open(input_nk);
-    let inpute_note = create_random_token_note(
+    let input_note = create_random_token_note(
         &mut rng,
         input_token,
         input_value,
@@ -57,8 +60,8 @@ pub fn create_token_intent_ptx<R: RngCore>(
 
     // output intent note
     // Use the same address as that in the input note. They can be different.
-    let receiver_address = inpute_note.get_address();
-    let input_note_nf = inpute_note.get_nf().unwrap();
+    let receiver_address = input_note.get_address();
+    let input_note_nf = input_note.get_nf().unwrap();
     let intent_note = create_intent_note(
         &mut rng,
         &condition1,
@@ -73,40 +76,22 @@ pub fn create_token_intent_ptx<R: RngCore>(
     let padding_input_note_nf = padding_input_note.get_nf().unwrap();
     let padding_output_note = Note::dummy_zero_note(&mut rng, padding_input_note_nf);
 
-    let input_notes = [inpute_note.clone(), padding_input_note.clone()];
+    let input_notes = [input_note.clone(), padding_input_note.clone()];
     let output_notes = [intent_note.clone(), padding_output_note.clone()];
 
     let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
     // Create the input note proving info
-    let input_note_proving_info = {
-        // input note token VP
-        let token_vp = TokenValidityPredicateCircuit {
-            owned_note_pub_id: input_note_nf.inner(),
-            input_notes: input_notes.clone(),
-            output_notes: output_notes.clone(),
-            token_name: input_token.to_string(),
-            auth: input_auth,
-        };
-
-        // token auth VP
-        let token_auth_vp = SignatureVerificationValidityPredicateCircuit::from_sk_and_sign(
-            &mut rng,
-            input_note_nf.inner(),
-            input_notes.clone(),
-            output_notes.clone(),
-            compressed_auth_vk,
-            input_auth_sk,
-        );
-
-        // inpute note proving info
-        InputNoteInfo::new(
-            inpute_note,
-            merkle_path.clone(),
-            Box::new(token_vp),
-            vec![Box::new(token_auth_vp)],
-        )
-    };
+    let input_note_proving_info = generate_input_token_note_proving_info(
+        &mut rng,
+        input_note,
+        input_token.to_string(),
+        input_auth,
+        input_auth_sk,
+        merkle_path.clone(),
+        input_notes.clone(),
+        output_notes.clone(),
+    );
 
     // Create the intent note proving info
     let intent_note_proving_info = {
@@ -161,7 +146,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
 ) -> (ShieldedPartialTransaction, pallas::Scalar) {
     let compressed_auth_vk = TOKEN_AUTH_VK.get_compressed();
 
-    // inpute intent note
+    // input intent note
     let intent_note = create_intent_note(
         &mut rng,
         &condition1,
@@ -216,19 +201,13 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     };
 
     // Create the output note proving info
-    let output_note_proving_info = {
-        // input note token VP
-        let token_vp = TokenValidityPredicateCircuit {
-            owned_note_pub_id: output_note.commitment().get_x(),
-            input_notes: input_notes.clone(),
-            output_notes: output_notes.clone(),
-            token_name: output_token.to_string(),
-            auth: output_auth,
-        };
-
-        // inpute note proving info
-        OutputNoteInfo::new(output_note, Box::new(token_vp), vec![])
-    };
+    let output_note_proving_info = generate_output_token_note_proving_info(
+        output_note,
+        output_token.to_string(),
+        output_auth,
+        input_notes.clone(),
+        output_notes.clone(),
+    );
 
     // Create the padding input note proving info
     let padding_input_note_proving_info = InputNoteInfo::create_padding_note_proving_info(

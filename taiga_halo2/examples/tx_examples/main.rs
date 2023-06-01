@@ -1,6 +1,6 @@
+mod token;
 mod token_swap_with_intent;
 mod token_swap_without_intent;
-mod token;
 fn main() {
     use rand::rngs::OsRng;
 

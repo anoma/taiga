@@ -5,10 +5,10 @@ use rand::RngCore;
 
 use taiga_halo2::{
     circuit::vp_examples::{
-        signature_verification::{SignatureVerificationValidityPredicateCircuit, TOKEN_AUTH_VK},
+        signature_verification::TOKEN_AUTH_VK,
         token::{
-            transfrom_token_name_to_token_property, TokenAuthorization,
-            TokenValidityPredicateCircuit, TOKEN_VK,
+            generate_input_token_note_proving_info, generate_output_token_note_proving_info,
+            transfrom_token_name_to_token_property, TokenAuthorization, TOKEN_VK,
         },
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
@@ -62,7 +62,7 @@ pub fn create_token_swap_ptx<R: RngCore>(
     // input note
     let rho = Nullifier::new(pallas::Base::random(&mut rng));
     let input_nk_com = NullifierKeyCom::from_open(input_nk);
-    let inpute_note = create_random_token_note(
+    let input_note = create_random_token_note(
         &mut rng,
         input_token,
         input_value,
@@ -72,7 +72,7 @@ pub fn create_token_swap_ptx<R: RngCore>(
     );
 
     // output note
-    let input_note_nf = inpute_note.get_nf().unwrap();
+    let input_note_nf = input_note.get_nf().unwrap();
     let output_auth = TokenAuthorization::new(output_auth_pk, compressed_auth_vk);
     let output_nk_com = NullifierKeyCom::from_closed(output_nk_com);
     let output_note = create_random_token_note(
@@ -89,55 +89,32 @@ pub fn create_token_swap_ptx<R: RngCore>(
     let padding_input_note_nf = padding_input_note.get_nf().unwrap();
     let padding_output_note = Note::dummy_zero_note(&mut rng, padding_input_note_nf);
 
-    let input_notes = [inpute_note.clone(), padding_input_note.clone()];
+    let input_notes = [input_note.clone(), padding_input_note.clone()];
     let output_notes = [output_note.clone(), padding_output_note.clone()];
 
     // Generate proving info
     let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
     // Create the input note proving info
-    let input_note_proving_info = {
-        // input note token VP
-        let token_vp = TokenValidityPredicateCircuit {
-            owned_note_pub_id: input_note_nf.inner(),
-            input_notes: input_notes.clone(),
-            output_notes: output_notes.clone(),
-            token_name: input_token.to_string(),
-            auth: input_auth,
-        };
-
-        // token auth VP
-        let token_auth_vp = SignatureVerificationValidityPredicateCircuit::from_sk_and_sign(
-            &mut rng,
-            input_note_nf.inner(),
-            input_notes.clone(),
-            output_notes.clone(),
-            compressed_auth_vk,
-            input_auth_sk,
-        );
-
-        // inpute note proving info
-        InputNoteInfo::new(
-            inpute_note,
-            merkle_path.clone(),
-            Box::new(token_vp),
-            vec![Box::new(token_auth_vp)],
-        )
-    };
+    let input_note_proving_info = generate_input_token_note_proving_info(
+        &mut rng,
+        input_note,
+        input_token.to_string(),
+        input_auth,
+        input_auth_sk,
+        merkle_path.clone(),
+        input_notes.clone(),
+        output_notes.clone(),
+    );
 
     // Create the output note proving info
-    let output_note_proving_info = {
-        // token VP
-        let token_vp = TokenValidityPredicateCircuit {
-            owned_note_pub_id: output_note.commitment().get_x(),
-            input_notes: input_notes.clone(),
-            output_notes: output_notes.clone(),
-            token_name: output_token.to_string(),
-            auth: output_auth,
-        };
-
-        OutputNoteInfo::new(output_note, Box::new(token_vp), vec![])
-    };
+    let output_note_proving_info = generate_output_token_note_proving_info(
+        output_note,
+        output_token.to_string(),
+        output_auth,
+        input_notes.clone(),
+        output_notes.clone(),
+    );
 
     // Create the padding input note proving info
     let padding_input_note_proving_info = InputNoteInfo::create_padding_note_proving_info(

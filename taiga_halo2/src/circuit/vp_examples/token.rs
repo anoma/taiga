@@ -9,9 +9,11 @@ use crate::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
+        vp_examples::signature_verification::SignatureVerificationValidityPredicateCircuit,
     },
     constant::{NOTE_COMMIT_DOMAIN, NUM_NOTE, SETUP_PARAMS_MAP},
-    note::Note,
+    merkle_tree::MerklePath,
+    note::{InputNoteInfo, Note, OutputNoteInfo},
     proof::Proof,
     utils::poseidon_hash_n,
     vp_vk::ValidityPredicateVerifyingKey,
@@ -270,6 +272,65 @@ impl TokenAuthorization {
         let pk = generator * sk;
         Self { pk, vk: *vk }
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn generate_input_token_note_proving_info<R: RngCore>(
+    mut rng: R,
+    input_note: Note,
+    token_name: String,
+    auth: TokenAuthorization,
+    auth_sk: pallas::Scalar,
+    merkle_path: MerklePath,
+    input_notes: [Note; NUM_NOTE],
+    output_notes: [Note; NUM_NOTE],
+) -> InputNoteInfo {
+    // token VP
+    let nf = input_note.get_nf().unwrap().inner();
+    let token_vp = TokenValidityPredicateCircuit {
+        owned_note_pub_id: nf,
+        input_notes: input_notes.clone(),
+        output_notes: output_notes.clone(),
+        token_name,
+        auth,
+    };
+
+    // token auth VP
+    let token_auth_vp = SignatureVerificationValidityPredicateCircuit::from_sk_and_sign(
+        &mut rng,
+        nf,
+        input_notes,
+        output_notes,
+        auth.vk,
+        auth_sk,
+    );
+
+    // input note proving info
+    InputNoteInfo::new(
+        input_note,
+        merkle_path,
+        Box::new(token_vp),
+        vec![Box::new(token_auth_vp)],
+    )
+}
+
+pub fn generate_output_token_note_proving_info(
+    output_note: Note,
+    token_name: String,
+    auth: TokenAuthorization,
+    input_notes: [Note; NUM_NOTE],
+    output_notes: [Note; NUM_NOTE],
+) -> OutputNoteInfo {
+    // token VP
+    let token_vp = TokenValidityPredicateCircuit {
+        owned_note_pub_id: output_note.commitment().get_x(),
+        input_notes,
+        output_notes,
+        token_name,
+        auth,
+    };
+
+    OutputNoteInfo::new(output_note, Box::new(token_vp), vec![])
 }
 
 #[test]
