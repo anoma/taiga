@@ -13,7 +13,7 @@ use crate::{
     },
     constant::{NOTE_COMMIT_DOMAIN, NUM_NOTE, SETUP_PARAMS_MAP},
     merkle_tree::MerklePath,
-    note::{InputNoteInfo, Note, OutputNoteInfo},
+    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
     proof::Proof,
     utils::poseidon_hash_n,
     vp_vk::ValidityPredicateVerifyingKey,
@@ -284,7 +284,7 @@ pub fn generate_input_token_note_proving_info<R: RngCore>(
     merkle_path: MerklePath,
     input_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
-) -> InputNoteInfo {
+) -> InputNoteProvingInfo {
     // token VP
     let nf = input_note.get_nf().unwrap().inner();
     let token_vp = TokenValidityPredicateCircuit {
@@ -306,7 +306,7 @@ pub fn generate_input_token_note_proving_info<R: RngCore>(
     );
 
     // input note proving info
-    InputNoteInfo::new(
+    InputNoteProvingInfo::new(
         input_note,
         merkle_path,
         Box::new(token_vp),
@@ -320,7 +320,7 @@ pub fn generate_output_token_note_proving_info(
     auth: TokenAuthorization,
     input_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
-) -> OutputNoteInfo {
+) -> OutputNoteProvingInfo {
     // token VP
     let token_vp = TokenValidityPredicateCircuit {
         owned_note_pub_id: output_note.commitment().get_x(),
@@ -330,7 +330,7 @@ pub fn generate_output_token_note_proving_info(
         auth,
     };
 
-    OutputNoteInfo::new(output_note, Box::new(token_vp), vec![])
+    OutputNoteProvingInfo::new(output_note, Box::new(token_vp), vec![])
 }
 
 #[test]

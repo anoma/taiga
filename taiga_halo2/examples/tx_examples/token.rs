@@ -13,7 +13,7 @@ use taiga_halo2::{
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::MerklePath,
-    note::{InputNoteInfo, Note, OutputNoteInfo},
+    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
     nullifier::{Nullifier, NullifierDerivingKey, NullifierKeyCom},
     shielded_ptx::ShieldedPartialTransaction,
 };
@@ -117,7 +117,7 @@ pub fn create_token_swap_ptx<R: RngCore>(
     );
 
     // Create the padding input note proving info
-    let padding_input_note_proving_info = InputNoteInfo::create_padding_note_proving_info(
+    let padding_input_note_proving_info = InputNoteProvingInfo::create_padding_note_proving_info(
         padding_input_note,
         merkle_path,
         input_notes.clone(),
@@ -125,7 +125,7 @@ pub fn create_token_swap_ptx<R: RngCore>(
     );
 
     // Create the padding output note proving info
-    let padding_output_note_proving_info = OutputNoteInfo::create_padding_note_proving_info(
+    let padding_output_note_proving_info = OutputNoteProvingInfo::create_padding_note_proving_info(
         padding_output_note,
         input_notes,
         output_notes,

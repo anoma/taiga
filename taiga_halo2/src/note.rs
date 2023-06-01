@@ -297,7 +297,7 @@ impl InputNoteProvingInfo {
             input_notes,
             output_notes,
         });
-        InputNoteInfo::new(padding_note, merkle_path, trivail_vp, vec![])
+        InputNoteProvingInfo::new(padding_note, merkle_path, trivail_vp, vec![])
     }
 }
 
@@ -346,6 +346,6 @@ impl OutputNoteProvingInfo {
             input_notes,
             output_notes,
         });
-        OutputNoteInfo::new(padding_note, trivail_vp, vec![])
+        OutputNoteProvingInfo::new(padding_note, trivail_vp, vec![])
     }
 }
