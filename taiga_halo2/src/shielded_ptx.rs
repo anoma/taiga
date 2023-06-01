@@ -6,7 +6,7 @@ use crate::constant::{
 };
 use crate::error::TransactionError;
 use crate::executable::Executable;
-use crate::note::{InputNoteInfo, NoteCommitment, OutputNoteInfo};
+use crate::note::{InputNoteProvingInfo, NoteCommitment, OutputNoteProvingInfo};
 use crate::nullifier::Nullifier;
 use crate::proof::Proof;
 use crate::value_commitment::ValueCommitment;
@@ -37,8 +37,8 @@ pub struct NoteVPVerifyingInfoSet {
 
 impl ShieldedPartialTransaction {
     pub fn build<R: RngCore>(
-        input_info: [InputNoteInfo; NUM_NOTE],
-        output_info: [OutputNoteInfo; NUM_NOTE],
+        input_info: [InputNoteProvingInfo; NUM_NOTE],
+        output_info: [OutputNoteProvingInfo; NUM_NOTE],
         mut rng: R,
     ) -> (Self, pallas::Scalar) {
         let inputs: Vec<NoteVPVerifyingInfoSet> = input_info
@@ -294,7 +294,7 @@ pub mod testing {
         circuit::vp_examples::TrivialValidityPredicateCircuit,
         constant::TAIGA_COMMITMENT_TREE_DEPTH,
         merkle_tree::MerklePath,
-        note::{InputNoteInfo, Note, OutputNoteInfo},
+        note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
         nullifier::{Nullifier, NullifierKeyCom},
         shielded_ptx::ShieldedPartialTransaction,
         utils::poseidon_hash,
@@ -422,7 +422,7 @@ pub mod testing {
             Box::new(trivial_vp_circuit.clone());
         let trivial_app_logic_2 = Box::new(trivial_vp_circuit.clone());
         let trivial_app_vp_verifying_info_dynamic = vec![trivial_app_logic_1, trivial_app_logic_2];
-        let input_note_info_1 = InputNoteInfo::new(
+        let input_note_proving_info_1 = InputNoteProvingInfo::new(
             input_note_1,
             merkle_path.clone(),
             input_app_vp_verifying_info_1,
@@ -432,7 +432,7 @@ pub mod testing {
         trivial_vp_circuit.owned_note_pub_id = input_note_2.get_nf().unwrap().inner();
         let input_app_vp_verifying_info_2 = Box::new(trivial_vp_circuit.clone());
         let app_vp_verifying_info_dynamic = vec![];
-        let input_note_info_2 = InputNoteInfo::new(
+        let input_note_proving_info_2 = InputNoteProvingInfo::new(
             input_note_2,
             merkle_path,
             input_app_vp_verifying_info_2,
@@ -441,7 +441,7 @@ pub mod testing {
 
         trivial_vp_circuit.owned_note_pub_id = output_note_1.commitment().get_x();
         let output_app_vp_verifying_info_1 = Box::new(trivial_vp_circuit.clone());
-        let output_note_info_1 = OutputNoteInfo::new(
+        let output_note_proving_info_1 = OutputNoteProvingInfo::new(
             output_note_1,
             output_app_vp_verifying_info_1,
             app_vp_verifying_info_dynamic.clone(),
@@ -449,7 +449,7 @@ pub mod testing {
 
         trivial_vp_circuit.owned_note_pub_id = output_note_2.commitment().get_x();
         let output_app_vp_verifying_info_2 = Box::new(trivial_vp_circuit);
-        let output_note_info_2 = OutputNoteInfo::new(
+        let output_note_proving_info_2 = OutputNoteProvingInfo::new(
             output_note_2,
             output_app_vp_verifying_info_2,
             app_vp_verifying_info_dynamic,
@@ -457,8 +457,8 @@ pub mod testing {
 
         // Create shielded partial tx
         ShieldedPartialTransaction::build(
-            [input_note_info_1, input_note_info_2],
-            [output_note_info_1, output_note_info_2],
+            [input_note_proving_info_1, input_note_proving_info_2],
+            [output_note_proving_info_1, output_note_proving_info_2],
             &mut rng,
         )
     }

@@ -71,7 +71,7 @@ pub struct ValueBase {
 }
 
 #[derive(Clone)]
-pub struct InputNoteInfo {
+pub struct InputNoteProvingInfo {
     pub note: Note,
     pub auth_path: [(pallas::Base, LR); TAIGA_COMMITMENT_TREE_DEPTH],
     pub root: pallas::Base,
@@ -80,7 +80,7 @@ pub struct InputNoteInfo {
 }
 
 #[derive(Clone)]
-pub struct OutputNoteInfo {
+pub struct OutputNoteProvingInfo {
     pub note: Note,
     app_vp_verifying_info: Box<dyn ValidityPredicateVerifyingInfo>,
     app_vp_verifying_info_dynamic: Vec<Box<dyn ValidityPredicateVerifyingInfo>>,
@@ -230,7 +230,7 @@ impl ValueBase {
     }
 }
 
-impl InputNoteInfo {
+impl InputNoteProvingInfo {
     pub fn new(
         note: Note,
         merkle_path: MerklePath,
@@ -261,7 +261,7 @@ impl InputNoteInfo {
     }
 }
 
-impl OutputNoteInfo {
+impl OutputNoteProvingInfo {
     pub fn new(
         note: Note,
         app_vp_verifying_info: Box<dyn ValidityPredicateVerifyingInfo>,
