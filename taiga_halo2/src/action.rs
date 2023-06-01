@@ -2,7 +2,7 @@ use crate::{
     circuit::action_circuit::ActionCircuit,
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::MerklePath,
-    note::{InputNoteInfo, Note, NoteCommitment, OutputNoteInfo},
+    note::{InputNoteProvingInfo, Note, NoteCommitment, OutputNoteProvingInfo},
     nullifier::Nullifier,
     value_commitment::ValueCommitment,
 };
@@ -28,8 +28,8 @@ pub struct ActionInstance {
 /// The information to build ActionInstance and ActionCircuit.
 #[derive(Clone)]
 pub struct ActionInfo {
-    input: InputNoteInfo,
-    output: OutputNoteInfo,
+    input: InputNoteProvingInfo,
+    output: OutputNoteProvingInfo,
     rcv: pallas::Scalar,
 }
 
@@ -46,7 +46,11 @@ impl ActionInstance {
 }
 
 impl ActionInfo {
-    pub fn new<R: RngCore>(input: InputNoteInfo, output: OutputNoteInfo, mut rng: R) -> Self {
+    pub fn new<R: RngCore>(
+        input: InputNoteProvingInfo,
+        output: OutputNoteProvingInfo,
+        mut rng: R,
+    ) -> Self {
         let rcv = pallas::Scalar::random(&mut rng);
         Self { input, output, rcv }
     }
@@ -58,18 +62,19 @@ impl ActionInfo {
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
         use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
         let input_note = Note::dummy(&mut rng);
-        let output_info = OutputNoteInfo::dummy(&mut rng, input_note.get_nf().unwrap());
+        let output_proving_info =
+            OutputNoteProvingInfo::dummy(&mut rng, input_note.get_nf().unwrap());
         let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         let app_vp_proving_info = Box::new(TrivialValidityPredicateCircuit::dummy(&mut rng));
         let app_vp_proving_info_dynamic = vec![];
-        let input_info = InputNoteInfo::new(
+        let input_proving_info = InputNoteProvingInfo::new(
             input_note,
             merkle_path,
             app_vp_proving_info,
             app_vp_proving_info_dynamic,
         );
 
-        ActionInfo::new(input_info, output_info, &mut rng)
+        ActionInfo::new(input_proving_info, output_proving_info, &mut rng)
     }
 
     pub fn build(self) -> (ActionInstance, ActionCircuit) {
