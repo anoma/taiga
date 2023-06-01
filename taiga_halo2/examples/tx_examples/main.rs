@@ -1,9 +1,13 @@
-mod basic_swap_without_intent_note;
+mod token_swap_with_intent;
+mod token_swap_without_intent;
 mod token;
 fn main() {
     use rand::rngs::OsRng;
 
     let rng = OsRng;
-    let tx = basic_swap_without_intent_note::create_token_swap_transaction(rng);
+    let tx = token_swap_without_intent::create_token_swap_transaction(rng);
+    tx.execute().unwrap();
+
+    let tx = token_swap_with_intent::create_token_swap_intent_transaction(rng);
     tx.execute().unwrap();
 }

@@ -10,7 +10,6 @@ use taiga_halo2::{
             transfrom_token_name_to_token_property, TokenAuthorization,
             TokenValidityPredicateCircuit, TOKEN_VK,
         },
-        TrivialValidityPredicateCircuit,
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::MerklePath,
@@ -90,6 +89,9 @@ pub fn create_token_swap_ptx<R: RngCore>(
     let padding_input_note_nf = padding_input_note.get_nf().unwrap();
     let padding_output_note = Note::dummy_zero_note(&mut rng, padding_input_note_nf);
 
+    let input_notes = [inpute_note.clone(), padding_input_note.clone()];
+    let output_notes = [output_note.clone(), padding_output_note.clone()];
+
     // Generate proving info
     let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
@@ -98,8 +100,8 @@ pub fn create_token_swap_ptx<R: RngCore>(
         // input note token VP
         let token_vp = TokenValidityPredicateCircuit {
             owned_note_pub_id: input_note_nf.inner(),
-            input_notes: [inpute_note.clone(), padding_input_note.clone()],
-            output_notes: [output_note.clone(), padding_output_note.clone()],
+            input_notes: input_notes.clone(),
+            output_notes: output_notes.clone(),
             token_name: input_token.to_string(),
             auth: input_auth,
         };
@@ -108,15 +110,15 @@ pub fn create_token_swap_ptx<R: RngCore>(
         let token_auth_vp = SignatureVerificationValidityPredicateCircuit::from_sk_and_sign(
             &mut rng,
             input_note_nf.inner(),
-            [inpute_note.clone(), padding_input_note.clone()],
-            [output_note.clone(), padding_output_note.clone()],
+            input_notes.clone(),
+            output_notes.clone(),
             compressed_auth_vk,
             input_auth_sk,
         );
 
         // inpute note proving info
         InputNoteInfo::new(
-            inpute_note.clone(),
+            inpute_note,
             merkle_path.clone(),
             Box::new(token_vp),
             vec![Box::new(token_auth_vp)],
@@ -128,34 +130,29 @@ pub fn create_token_swap_ptx<R: RngCore>(
         // token VP
         let token_vp = TokenValidityPredicateCircuit {
             owned_note_pub_id: output_note.commitment().get_x(),
-            input_notes: [inpute_note.clone(), padding_input_note.clone()],
-            output_notes: [output_note.clone(), padding_output_note.clone()],
+            input_notes: input_notes.clone(),
+            output_notes: output_notes.clone(),
             token_name: output_token.to_string(),
             auth: output_auth,
         };
 
-        OutputNoteInfo::new(output_note.clone(), Box::new(token_vp), vec![])
+        OutputNoteInfo::new(output_note, Box::new(token_vp), vec![])
     };
 
     // Create the padding input note proving info
-    let padding_input_note_proving_info = {
-        let trivail_vp = Box::new(TrivialValidityPredicateCircuit {
-            owned_note_pub_id: padding_input_note_nf.inner(),
-            input_notes: [inpute_note.clone(), padding_input_note.clone()],
-            output_notes: [output_note.clone(), padding_output_note.clone()],
-        });
-        InputNoteInfo::new(padding_input_note.clone(), merkle_path, trivail_vp, vec![])
-    };
+    let padding_input_note_proving_info = InputNoteInfo::create_padding_note_proving_info(
+        padding_input_note,
+        merkle_path,
+        input_notes.clone(),
+        output_notes.clone(),
+    );
 
     // Create the padding output note proving info
-    let padding_output_note_proving_info = {
-        let trivail_vp = Box::new(TrivialValidityPredicateCircuit {
-            owned_note_pub_id: padding_output_note.commitment().get_x(),
-            input_notes: [inpute_note, padding_input_note],
-            output_notes: [output_note, padding_output_note.clone()],
-        });
-        OutputNoteInfo::new(padding_output_note, trivail_vp, vec![])
-    };
+    let padding_output_note_proving_info = OutputNoteInfo::create_padding_note_proving_info(
+        padding_output_note,
+        input_notes,
+        output_notes,
+    );
 
     // Create shielded partial tx
     ShieldedPartialTransaction::build(

@@ -1,7 +1,11 @@
 use crate::{
-    circuit::{vp_circuit::ValidityPredicateVerifyingInfo, vp_examples::TRIVIAL_VP_VK},
+    circuit::{
+        vp_circuit::ValidityPredicateVerifyingInfo,
+        vp_examples::{TrivialValidityPredicateCircuit, TRIVIAL_VP_VK},
+    },
     constant::{
-        BASE_BITS_NUM, NOTE_COMMIT_DOMAIN, POSEIDON_TO_CURVE_INPUT_LEN, TAIGA_COMMITMENT_TREE_DEPTH,
+        BASE_BITS_NUM, NOTE_COMMIT_DOMAIN, NUM_NOTE, POSEIDON_TO_CURVE_INPUT_LEN,
+        TAIGA_COMMITMENT_TREE_DEPTH,
     },
     merkle_tree::{MerklePath, Node, LR},
     nullifier::{Nullifier, NullifierDerivingKey, NullifierKeyCom},
@@ -281,6 +285,20 @@ impl InputNoteInfo {
     ) -> Vec<Box<dyn ValidityPredicateVerifyingInfo>> {
         self.app_vp_verifying_info_dynamic.clone()
     }
+
+    pub fn create_padding_note_proving_info(
+        padding_note: Note,
+        merkle_path: MerklePath,
+        input_notes: [Note; NUM_NOTE],
+        output_notes: [Note; NUM_NOTE],
+    ) -> Self {
+        let trivail_vp = Box::new(TrivialValidityPredicateCircuit {
+            owned_note_pub_id: padding_note.get_nf().unwrap().inner(),
+            input_notes,
+            output_notes,
+        });
+        InputNoteInfo::new(padding_note, merkle_path, trivail_vp, vec![])
+    }
 }
 
 impl OutputNoteInfo {
@@ -296,8 +314,8 @@ impl OutputNoteInfo {
         }
     }
 
+    // TODO: move it to test mod
     pub fn dummy<R: RngCore>(mut rng: R, nf: Nullifier) -> Self {
-        use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
         let note = Note::dummy_from_rho(&mut rng, nf);
         let app_vp_verifying_info = Box::new(TrivialValidityPredicateCircuit::dummy(&mut rng));
         let app_vp_verifying_info_dynamic = vec![];
@@ -316,5 +334,18 @@ impl OutputNoteInfo {
         &self,
     ) -> Vec<Box<dyn ValidityPredicateVerifyingInfo>> {
         self.app_vp_verifying_info_dynamic.clone()
+    }
+
+    pub fn create_padding_note_proving_info(
+        padding_note: Note,
+        input_notes: [Note; NUM_NOTE],
+        output_notes: [Note; NUM_NOTE],
+    ) -> Self {
+        let trivail_vp = Box::new(TrivialValidityPredicateCircuit {
+            owned_note_pub_id: padding_note.commitment().get_x(),
+            input_notes,
+            output_notes,
+        });
+        OutputNoteInfo::new(padding_note, trivail_vp, vec![])
     }
 }

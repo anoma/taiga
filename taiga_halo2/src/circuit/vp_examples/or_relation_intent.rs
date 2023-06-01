@@ -6,8 +6,12 @@ use crate::{
     circuit::{
         gadgets::{
             assign_free_advice, assign_free_constant,
+            conditional_equal::ConditionalEqualConfig,
             extended_or_relation::ExtendedOrRelationConfig,
-            target_note_variable::{get_owned_note_variable, GetOwnedNoteVariableConfig},
+            target_note_variable::{
+                get_is_input_note_flag, get_owned_note_variable, GetIsInputNoteFlagConfig,
+                GetOwnedNoteVariableConfig,
+            },
         },
         note_circuit::NoteConfig,
         vp_circuit::{
@@ -18,6 +22,7 @@ use crate::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
+    nullifier::{Nullifier, NullifierKeyCom},
     proof::Proof,
     utils::poseidon_hash_n,
     vp_vk::ValidityPredicateVerifyingKey,
@@ -27,6 +32,7 @@ use halo2_gadgets::poseidon::{
     Pow5Chip as PoseidonChip,
 };
 use halo2_proofs::{
+    arithmetic::Field,
     circuit::{floor_planner, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
 };
@@ -57,7 +63,9 @@ pub struct OrRelationIntentValidityPredicateConfig {
     note_conifg: NoteConfig,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
+    get_is_input_note_flag_config: GetIsInputNoteFlagConfig,
     get_owned_note_variable_config: GetOwnedNoteVariableConfig,
+    conditional_equal_config: ConditionalEqualConfig,
     extended_or_relation_config: ExtendedOrRelationConfig,
 }
 
@@ -78,15 +86,22 @@ impl ValidityPredicateConfig for OrRelationIntentValidityPredicateConfig {
             [advices[1], advices[2], advices[3], advices[4]],
         );
 
-        let extended_or_relation_config =
-            ExtendedOrRelationConfig::configure(meta, [advices[0], advices[1]]);
+        let get_is_input_note_flag_config =
+            GetIsInputNoteFlagConfig::configure(meta, advices[0], advices[1], advices[2]);
 
+        let extended_or_relation_config =
+            ExtendedOrRelationConfig::configure(meta, [advices[0], advices[1], advices[2]]);
+
+        let conditional_equal_config =
+            ConditionalEqualConfig::configure(meta, [advices[0], advices[1], advices[2]]);
         Self {
             note_conifg,
             advices,
             instances,
+            get_is_input_note_flag_config,
             get_owned_note_variable_config,
             extended_or_relation_config,
+            conditional_equal_config,
         }
     }
 }
@@ -115,7 +130,6 @@ impl OrRelationIntentValidityPredicateCircuit {
 
     // TODO: Move the random function to the test mod
     pub fn random<R: RngCore>(mut rng: R) -> Self {
-        let mut input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
         let condition1 = Condition {
             token_name: "token1".to_string(),
@@ -125,15 +139,24 @@ impl OrRelationIntentValidityPredicateCircuit {
             token_name: "token2".to_string(),
             token_value: 2u64,
         };
-        let receiver_address = output_notes[0].get_address();
-        let intent_app_data_static =
-            Self::encode_app_data_static(&condition1, &condition2, receiver_address);
-        input_notes[0].note_type.app_data_static = intent_app_data_static;
-        input_notes[0].value = 1u64;
         output_notes[0].note_type.app_vk = TOKEN_VK.clone();
         output_notes[0].note_type.app_data_static =
             transfrom_token_name_to_token_property(&condition1.token_name);
         output_notes[0].value = condition1.token_value;
+        let receiver_address = output_notes[0].get_address();
+
+        let rho = Nullifier::new(pallas::Base::random(&mut rng));
+        let nk_com = NullifierKeyCom::rand(&mut rng);
+        let intent_note = create_intent_note(
+            &mut rng,
+            &condition1,
+            &condition2,
+            receiver_address,
+            rho,
+            nk_com,
+        );
+        let padding_input_note = Note::dummy(&mut rng);
+        let input_notes = [intent_note, padding_input_note];
         Self {
             owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
             input_notes,
@@ -173,6 +196,13 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
         basic_variables: BasicValidityPredicateVariables,
     ) -> Result<(), Error> {
         let owned_note_pub_id = basic_variables.get_owned_note_pub_id();
+        let is_input_note = get_is_input_note_flag(
+            config.get_is_input_note_flag_config,
+            layouter.namespace(|| "get is_input_note_flag"),
+            &owned_note_pub_id,
+            &basic_variables.get_input_note_nfs(),
+            &basic_variables.get_output_note_cms(),
+        )?;
 
         let token_vp_vk = assign_free_advice(
             layouter.namespace(|| "witness token vp vk"),
@@ -263,28 +293,32 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
 
         // check the vp vk of output note
         layouter.assign_region(
-            || "check vp vk",
+            || "conditional equal: check vp vk",
             |mut region| {
-                region.constrain_equal(
-                    token_vp_vk.cell(),
-                    basic_variables.output_note_variables[0]
+                config.conditional_equal_config.assign_region(
+                    &is_input_note,
+                    &token_vp_vk,
+                    &basic_variables.output_note_variables[0]
                         .note_variables
-                        .app_vk
-                        .cell(),
+                        .app_vk,
+                    0,
+                    &mut region,
                 )
             },
         )?;
 
         // check the address of output note
         layouter.assign_region(
-            || "check address",
+            || "conditional equal: check address",
             |mut region| {
-                region.constrain_equal(
-                    receiver_address.cell(),
-                    basic_variables.output_note_variables[0]
+                config.conditional_equal_config.assign_region(
+                    &is_input_note,
+                    &receiver_address,
+                    &basic_variables.output_note_variables[0]
                         .note_variables
-                        .address
-                        .cell(),
+                        .address,
+                    0,
+                    &mut region,
                 )
             },
         )?;
@@ -300,6 +334,7 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
             || "extended or relatioin",
             |mut region| {
                 config.extended_or_relation_config.assign_region(
+                    &is_input_note,
                     (&token_property_1, &token_value_1),
                     (&token_property_2, &token_value_2),
                     (output_note_token_property, output_note_token_value),
@@ -314,6 +349,34 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
 }
 
 vp_circuit_impl!(OrRelationIntentValidityPredicateCircuit);
+
+pub fn create_intent_note<R: RngCore>(
+    mut rng: R,
+    condition1: &Condition,
+    condition2: &Condition,
+    receiver_address: pallas::Base,
+    rho: Nullifier,
+    nk_com: NullifierKeyCom,
+) -> Note {
+    let app_data_static = OrRelationIntentValidityPredicateCircuit::encode_app_data_static(
+        condition1,
+        condition2,
+        receiver_address,
+    );
+    let rcm = pallas::Scalar::random(&mut rng);
+    let psi = pallas::Base::random(&mut rng);
+    Note::new(
+        TOKEN_VK.clone(),
+        app_data_static,
+        pallas::Base::zero(),
+        1u64,
+        nk_com,
+        rho,
+        psi,
+        rcm,
+        false,
+    )
+}
 
 #[test]
 fn test_halo2_or_relation_intent_vp_circuit() {
