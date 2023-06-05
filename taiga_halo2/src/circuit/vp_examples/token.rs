@@ -47,6 +47,12 @@ pub fn transfrom_token_name_to_token_property(token_name: &str) -> pallas::Base 
     pallas::Base::from_repr(bytes).unwrap()
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct Token {
+    pub name: String,
+    pub value: u64,
+}
+
 // TokenValidityPredicateCircuit
 #[derive(Clone, Debug)]
 pub struct TokenValidityPredicateCircuit {
