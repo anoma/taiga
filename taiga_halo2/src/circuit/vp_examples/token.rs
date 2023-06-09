@@ -249,6 +249,23 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             },
         )?;
 
+        // check the is_merkle_checked flag
+        let is_merkle_checked = get_owned_note_variable(
+            config.get_owned_note_variable_config,
+            layouter.namespace(|| "get is_merkle_checked"),
+            &owned_note_pub_id,
+            &basic_variables.get_is_merkle_checked_searchable_pairs(),
+        )?;
+        let constant_one = assign_free_constant(
+            layouter.namespace(|| "one"),
+            config.advices[0],
+            pallas::Base::one(),
+        )?;
+        layouter.assign_region(
+            || "check is_merkle_checked",
+            |mut region| region.constrain_equal(is_merkle_checked.cell(), constant_one.cell()),
+        )?;
+
         // TODO: add authorization vp commitment
 
         Ok(())
