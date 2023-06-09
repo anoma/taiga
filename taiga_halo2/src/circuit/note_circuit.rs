@@ -714,10 +714,7 @@ impl NoteChip {
 fn test_halo2_note_commitment_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use crate::note::Note;
-    use crate::{
-        nullifier::{Nullifier, NullifierKeyCom},
-        vp_vk::ValidityPredicateVerifyingKey,
-    };
+    use crate::nullifier::{Nullifier, NullifierKeyCom};
     use halo2_gadgets::{
         ecc::{
             chip::{EccChip, EccConfig},
@@ -737,7 +734,7 @@ fn test_halo2_note_commitment_circuit() {
 
     #[derive(Default)]
     struct MyCircuit {
-        app_vk: ValidityPredicateVerifyingKey,
+        app_vk: pallas::Base,
         app_data_static: pallas::Base,
         app_data_dynamic: pallas::Base,
         value: u64,
@@ -835,7 +832,7 @@ fn test_halo2_note_commitment_circuit() {
                 NoteCommitmentFixedBases,
             >::load(note_commit_config.sinsemilla_config.clone(), &mut layouter)?;
             let note = Note::new(
-                self.app_vk.clone(),
+                self.app_vk,
                 self.app_data_static,
                 self.app_data_dynamic,
                 self.value,
@@ -866,7 +863,7 @@ fn test_halo2_note_commitment_circuit() {
             let app_vp = assign_free_advice(
                 layouter.namespace(|| "witness app_vk"),
                 note_commit_config.advices[0],
-                Value::known(note.get_compressed_app_vk()),
+                Value::known(note.get_app_vk()),
             )?;
 
             // Witness app_data_static
@@ -943,7 +940,7 @@ fn test_halo2_note_commitment_circuit() {
     // Test note with flase is_merkle_checked flag
     {
         let circuit = MyCircuit {
-            app_vk: ValidityPredicateVerifyingKey::dummy(&mut rng),
+            app_vk: pallas::Base::random(&mut rng),
             app_data_static: pallas::Base::random(&mut rng),
             app_data_dynamic: pallas::Base::random(&mut rng),
             value: rng.next_u64(),
@@ -961,7 +958,7 @@ fn test_halo2_note_commitment_circuit() {
     // Test note with true is_merkle_checked flag
     {
         let circuit = MyCircuit {
-            app_vk: ValidityPredicateVerifyingKey::dummy(&mut rng),
+            app_vk: pallas::Base::random(&mut rng),
             app_data_static: pallas::Base::random(&mut rng),
             app_data_dynamic: pallas::Base::random(&mut rng),
             value: rng.next_u64(),

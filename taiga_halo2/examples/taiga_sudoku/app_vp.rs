@@ -695,7 +695,7 @@ fn test_halo2_sudoku_app_vp_circuit_update() {
         output_notes[0].note_type.app_data_static =
             poseidon_hash(encoded_init_state, current_state.encode());
         output_notes[0].value = 1u64;
-        output_notes[0].note_type.app_vk = input_notes[0].note_type.app_vk.clone();
+        output_notes[0].note_type.app_vk = input_notes[0].note_type.app_vk;
         SudokuAppValidityPredicateCircuit {
             owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
             input_notes,
@@ -765,7 +765,7 @@ pub fn halo2_sudoku_app_vp_circuit_final() {
         output_notes[0].note_type.app_data_static =
             poseidon_hash(encoded_init_state, current_state.encode());
         output_notes[0].value = 0u64;
-        output_notes[0].note_type.app_vk = input_notes[0].note_type.app_vk.clone();
+        output_notes[0].note_type.app_vk = input_notes[0].note_type.app_vk;
         SudokuAppValidityPredicateCircuit {
             owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
             input_notes,
