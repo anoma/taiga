@@ -12,7 +12,7 @@ use taiga_halo2::{
         partial_fulfillment_intent::{
             create_intent_note, PartialFulfillmentIntentValidityPredicateCircuit,
         },
-        signature_verification::TOKEN_AUTH_VK,
+        signature_verification::COMPRESSED_TOKEN_AUTH_VK,
         token::{
             generate_input_token_note_proving_info, generate_output_token_note_proving_info, Token,
             TokenAuthorization,
@@ -40,9 +40,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
     pallas::Base,
     Nullifier,
 ) {
-    let compressed_auth_vk = TOKEN_AUTH_VK.get_compressed();
-
-    let input_auth = TokenAuthorization::from_sk_vk(&input_auth_sk, &compressed_auth_vk);
+    let input_auth = TokenAuthorization::from_sk_vk(&input_auth_sk, &COMPRESSED_TOKEN_AUTH_VK);
 
     // input note
     let rho = Nullifier::new(pallas::Base::random(&mut rng));
@@ -74,8 +72,8 @@ pub fn create_token_intent_ptx<R: RngCore>(
     let padding_input_note_nf = padding_input_note.get_nf().unwrap();
     let padding_output_note = Note::dummy_zero_note(&mut rng, padding_input_note_nf);
 
-    let input_notes = [input_note.clone(), padding_input_note.clone()];
-    let output_notes = [intent_note.clone(), padding_output_note.clone()];
+    let input_notes = [input_note, padding_input_note];
+    let output_notes = [intent_note, padding_output_note];
 
     let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
@@ -87,16 +85,16 @@ pub fn create_token_intent_ptx<R: RngCore>(
         input_auth,
         input_auth_sk,
         merkle_path.clone(),
-        input_notes.clone(),
-        output_notes.clone(),
+        input_notes,
+        output_notes,
     );
 
     // Create the intent note proving info
     let intent_note_proving_info = {
         let intent_vp = PartialFulfillmentIntentValidityPredicateCircuit {
             owned_note_pub_id: intent_note.commitment().get_x(),
-            input_notes: input_notes.clone(),
-            output_notes: output_notes.clone(),
+            input_notes,
+            output_notes,
             sell: sell.clone(),
             buy,
             receiver_address,
@@ -109,8 +107,8 @@ pub fn create_token_intent_ptx<R: RngCore>(
     let padding_input_note_proving_info = InputNoteProvingInfo::create_padding_note_proving_info(
         padding_input_note,
         merkle_path,
-        input_notes.clone(),
-        output_notes.clone(),
+        input_notes,
+        output_notes,
     );
 
     // Create the padding output note proving info
@@ -142,14 +140,12 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     input_address: pallas::Base,
     output_auth_pk: pallas::Point,
 ) -> (ShieldedPartialTransaction, pallas::Scalar) {
-    let compressed_auth_vk = TOKEN_AUTH_VK.get_compressed();
-
     // input intent note
     let intent_note = create_intent_note(&mut rng, &sell, &buy, input_address, input_rho, input_nk);
 
     // output notes
     let input_note_nf = intent_note.get_nf().unwrap();
-    let output_auth = TokenAuthorization::new(output_auth_pk, compressed_auth_vk);
+    let output_auth = TokenAuthorization::new(output_auth_pk, *COMPRESSED_TOKEN_AUTH_VK);
     let bought_note = create_random_token_note(
         &mut rng,
         &buy.name,
@@ -175,8 +171,8 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     );
     // let padding_output_note = Note::dummy_zero_note(&mut rng, padding_input_note_nf);
 
-    let input_notes = [intent_note.clone(), padding_input_note.clone()];
-    let output_notes = [bought_note.clone(), returned_note.clone()];
+    let input_notes = [intent_note, padding_input_note];
+    let output_notes = [bought_note, returned_note];
 
     let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
@@ -184,8 +180,8 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     let intent_note_proving_info = {
         let intent_vp = PartialFulfillmentIntentValidityPredicateCircuit {
             owned_note_pub_id: input_note_nf.inner(),
-            input_notes: input_notes.clone(),
-            output_notes: output_notes.clone(),
+            input_notes,
+            output_notes,
             sell: sell.clone(),
             buy: buy.clone(),
             receiver_address: input_address,
@@ -204,16 +200,16 @@ pub fn consume_token_intent_ptx<R: RngCore>(
         bought_note,
         buy.name,
         output_auth,
-        input_notes.clone(),
-        output_notes.clone(),
+        input_notes,
+        output_notes,
     );
 
     // Create the padding input note proving info
     let padding_input_note_proving_info = InputNoteProvingInfo::create_padding_note_proving_info(
         padding_input_note,
         merkle_path,
-        input_notes.clone(),
-        output_notes.clone(),
+        input_notes,
+        output_notes,
     );
 
     // Create the returned note proving info

@@ -1,7 +1,7 @@
 use crate::{
     circuit::{
         vp_circuit::ValidityPredicateVerifyingInfo,
-        vp_examples::{TrivialValidityPredicateCircuit, TRIVIAL_VP_VK},
+        vp_examples::{TrivialValidityPredicateCircuit, COMPRESSED_TRIVIAL_VP_VK},
     },
     constant::{
         BASE_BITS_NUM, NOTE_COMMIT_DOMAIN, NUM_NOTE, POSEIDON_TO_CURVE_INPUT_LEN,
@@ -142,7 +142,7 @@ impl Note {
     }
 
     pub fn dummy_zero_note<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
-        let app_vk = TRIVIAL_VP_VK.clone();
+        let app_vk = *COMPRESSED_TRIVIAL_VP_VK;
         let app_data_static = pallas::Base::random(&mut rng);
         let note_type = ValueBase::new(app_vk, app_data_static);
         let app_data_dynamic = pallas::Base::zero();

@@ -38,6 +38,7 @@ use rand::RngCore;
 lazy_static! {
     pub static ref TOKEN_VK: ValidityPredicateVerifyingKey =
         TokenValidityPredicateCircuit::default().get_vp_vk();
+    pub static ref COMPRESSED_TOKEN_VK: pallas::Base = TOKEN_VK.get_compressed();
 }
 
 pub fn transfrom_token_name_to_token_property(token_name: &str) -> pallas::Base {
@@ -295,8 +296,8 @@ pub fn generate_input_token_note_proving_info<R: RngCore>(
     let nf = input_note.get_nf().unwrap().inner();
     let token_vp = TokenValidityPredicateCircuit {
         owned_note_pub_id: nf,
-        input_notes: input_notes.clone(),
-        output_notes: output_notes.clone(),
+        input_notes,
+        output_notes,
         token_name,
         auth,
     };

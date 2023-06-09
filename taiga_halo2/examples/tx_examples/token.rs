@@ -5,10 +5,10 @@ use rand::RngCore;
 
 use taiga_halo2::{
     circuit::vp_examples::{
-        signature_verification::TOKEN_AUTH_VK,
+        signature_verification::COMPRESSED_TOKEN_AUTH_VK,
         token::{
             generate_input_token_note_proving_info, generate_output_token_note_proving_info,
-            transfrom_token_name_to_token_property, TokenAuthorization, TOKEN_VK,
+            transfrom_token_name_to_token_property, TokenAuthorization, COMPRESSED_TOKEN_VK,
         },
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
@@ -31,7 +31,7 @@ pub fn create_random_token_note<R: RngCore>(
     let rcm = pallas::Scalar::random(&mut rng);
     let psi = pallas::Base::random(&mut rng);
     Note::new(
-        TOKEN_VK.clone(),
+        *COMPRESSED_TOKEN_VK,
         app_data_static,
         app_data_dynamic,
         value,
@@ -55,9 +55,7 @@ pub fn create_token_swap_ptx<R: RngCore>(
     output_auth_pk: pallas::Point,
     output_nk_com: pallas::Base, // NullifierKeyCom::Closed
 ) -> (ShieldedPartialTransaction, pallas::Scalar) {
-    let compressed_auth_vk = TOKEN_AUTH_VK.get_compressed();
-
-    let input_auth = TokenAuthorization::from_sk_vk(&input_auth_sk, &compressed_auth_vk);
+    let input_auth = TokenAuthorization::from_sk_vk(&input_auth_sk, &COMPRESSED_TOKEN_AUTH_VK);
 
     // input note
     let rho = Nullifier::new(pallas::Base::random(&mut rng));
@@ -73,7 +71,7 @@ pub fn create_token_swap_ptx<R: RngCore>(
 
     // output note
     let input_note_nf = input_note.get_nf().unwrap();
-    let output_auth = TokenAuthorization::new(output_auth_pk, compressed_auth_vk);
+    let output_auth = TokenAuthorization::new(output_auth_pk, *COMPRESSED_TOKEN_AUTH_VK);
     let output_nk_com = NullifierKeyCom::from_closed(output_nk_com);
     let output_note = create_random_token_note(
         &mut rng,
@@ -89,8 +87,8 @@ pub fn create_token_swap_ptx<R: RngCore>(
     let padding_input_note_nf = padding_input_note.get_nf().unwrap();
     let padding_output_note = Note::dummy_zero_note(&mut rng, padding_input_note_nf);
 
-    let input_notes = [input_note.clone(), padding_input_note.clone()];
-    let output_notes = [output_note.clone(), padding_output_note.clone()];
+    let input_notes = [input_note, padding_input_note];
+    let output_notes = [output_note, padding_output_note];
 
     // Generate proving info
     let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
@@ -103,8 +101,8 @@ pub fn create_token_swap_ptx<R: RngCore>(
         input_auth,
         input_auth_sk,
         merkle_path.clone(),
-        input_notes.clone(),
-        output_notes.clone(),
+        input_notes,
+        output_notes,
     );
 
     // Create the output note proving info
@@ -112,16 +110,16 @@ pub fn create_token_swap_ptx<R: RngCore>(
         output_note,
         output_token.to_string(),
         output_auth,
-        input_notes.clone(),
-        output_notes.clone(),
+        input_notes,
+        output_notes,
     );
 
     // Create the padding input note proving info
     let padding_input_note_proving_info = InputNoteProvingInfo::create_padding_note_proving_info(
         padding_input_note,
         merkle_path,
-        input_notes.clone(),
-        output_notes.clone(),
+        input_notes,
+        output_notes,
     );
 
     // Create the padding output note proving info

@@ -19,7 +19,9 @@ use crate::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
-        vp_examples::token::{transfrom_token_name_to_token_property, Token, TOKEN_VK},
+        vp_examples::token::{
+            transfrom_token_name_to_token_property, Token, COMPRESSED_TOKEN_VK, TOKEN_VK,
+        },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
@@ -37,10 +39,17 @@ use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
 };
+use lazy_static::lazy_static;
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
 use rand::RngCore;
 
+lazy_static! {
+    pub static ref PARTIAL_FULFILLMENT_INTENT_VK: ValidityPredicateVerifyingKey =
+        PartialFulfillmentIntentValidityPredicateCircuit::default().get_vp_vk();
+    pub static ref COMPRESSED_PARTIAL_FULFILLMENT_INTENT_VK: pallas::Base =
+        PARTIAL_FULFILLMENT_INTENT_VK.get_compressed();
+}
 // PartialFulfillmentIntentValidityPredicateCircuit
 #[derive(Clone, Debug, Default)]
 pub struct PartialFulfillmentIntentValidityPredicateCircuit {
@@ -138,7 +147,7 @@ impl PartialFulfillmentIntentValidityPredicateCircuit {
             name: "token2".to_string(),
             value: 4u64,
         };
-        output_notes[0].note_type.app_vk = TOKEN_VK.clone();
+        output_notes[0].note_type.app_vk = *COMPRESSED_TOKEN_VK;
         output_notes[0].note_type.app_data_static =
             transfrom_token_name_to_token_property(&sell.name);
         output_notes[0].value = sell.value;
@@ -515,7 +524,7 @@ pub fn create_intent_note<R: RngCore>(
     let rcm = pallas::Scalar::random(&mut rng);
     let psi = pallas::Base::random(&mut rng);
     Note::new(
-        TOKEN_VK.clone(),
+        *COMPRESSED_PARTIAL_FULFILLMENT_INTENT_VK,
         app_data_static,
         pallas::Base::zero(),
         1u64,
@@ -544,8 +553,8 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
     };
 
     let dummy_note = Note::dummy(&mut rng);
-    let mut sold_note = dummy_note.clone();
-    sold_note.note_type.app_vk = TOKEN_VK.clone();
+    let mut sold_note = dummy_note;
+    sold_note.note_type.app_vk = *COMPRESSED_TOKEN_VK;
     sold_note.note_type.app_data_static = transfrom_token_name_to_token_property(&sell.name);
     sold_note.value = sell.value;
     let receiver_address = sold_note.get_address();
@@ -554,8 +563,8 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
     let intent_note = create_intent_note(&mut rng, &sell, &buy, receiver_address, rho, nk_com);
     // Creating intent test
     {
-        let input_notes = [sold_note.clone(), dummy_note.clone()];
-        let output_notes = [intent_note.clone(), dummy_note.clone()];
+        let input_notes = [sold_note, dummy_note];
+        let output_notes = [intent_note, dummy_note];
 
         let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
             owned_note_pub_id: intent_note.commitment().get_x(),
@@ -574,8 +583,8 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
     // Consuming intent test
     {
         {
-            let input_notes = [intent_note.clone(), dummy_note.clone()];
-            let mut bought_note = sold_note.clone();
+            let input_notes = [intent_note, dummy_note];
+            let mut bought_note = sold_note;
             bought_note.note_type.app_data_static =
                 transfrom_token_name_to_token_property(&buy.name);
             bought_note.app_data_dynamic = sold_note.app_data_dynamic;
@@ -584,11 +593,11 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
             // full fulfillment
             {
                 bought_note.value = buy.value;
-                let output_notes = [bought_note.clone(), dummy_note];
+                let output_notes = [bought_note, dummy_note];
 
                 let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
                     owned_note_pub_id: intent_note.get_nf().unwrap().inner(),
-                    input_notes: input_notes.clone(),
+                    input_notes,
                     output_notes,
                     sell: sell.clone(),
                     buy: buy.clone(),
@@ -604,7 +613,7 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
             // partial fulfillment
             {
                 bought_note.value = 2u64;
-                let mut returned_note = bought_note.clone();
+                let mut returned_note = bought_note;
                 returned_note.note_type.app_data_static =
                     transfrom_token_name_to_token_property(&sell.name);
                 returned_note.value = 1u64;

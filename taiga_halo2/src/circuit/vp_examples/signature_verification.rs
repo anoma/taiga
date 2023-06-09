@@ -43,6 +43,7 @@ const POSEIDON_HASH_LEN: usize = MESSAGE_LEN + 4;
 lazy_static! {
     pub static ref TOKEN_AUTH_VK: ValidityPredicateVerifyingKey =
         SignatureVerificationValidityPredicateCircuit::default().get_vp_vk();
+    pub static ref COMPRESSED_TOKEN_AUTH_VK: pallas::Base = TOKEN_AUTH_VK.get_compressed();
 }
 
 #[derive(Clone, Debug)]

@@ -18,7 +18,9 @@ use crate::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
-        vp_examples::token::{transfrom_token_name_to_token_property, TOKEN_VK},
+        vp_examples::token::{
+            transfrom_token_name_to_token_property, COMPRESSED_TOKEN_VK, TOKEN_VK,
+        },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
@@ -36,9 +38,17 @@ use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
 };
+use lazy_static::lazy_static;
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
 use rand::RngCore;
+
+lazy_static! {
+    pub static ref OR_RELATION_INTENT_VK: ValidityPredicateVerifyingKey =
+        OrRelationIntentValidityPredicateCircuit::default().get_vp_vk();
+    pub static ref COMPRESSED_OR_RELATION_INTENT_VK: pallas::Base =
+        OR_RELATION_INTENT_VK.get_compressed();
+}
 
 // Token swap condition
 #[derive(Clone, Debug, Default)]
@@ -139,7 +149,7 @@ impl OrRelationIntentValidityPredicateCircuit {
             token_name: "token2".to_string(),
             token_value: 2u64,
         };
-        output_notes[0].note_type.app_vk = TOKEN_VK.clone();
+        output_notes[0].note_type.app_vk = *COMPRESSED_TOKEN_VK;
         output_notes[0].note_type.app_data_static =
             transfrom_token_name_to_token_property(&condition1.token_name);
         output_notes[0].value = condition1.token_value;
@@ -366,7 +376,7 @@ pub fn create_intent_note<R: RngCore>(
     let rcm = pallas::Scalar::random(&mut rng);
     let psi = pallas::Base::random(&mut rng);
     Note::new(
-        TOKEN_VK.clone(),
+        *COMPRESSED_OR_RELATION_INTENT_VK,
         app_data_static,
         pallas::Base::zero(),
         1u64,
