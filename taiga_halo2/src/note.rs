@@ -10,7 +10,6 @@ use crate::{
     merkle_tree::{MerklePath, Node, LR},
     nullifier::{Nullifier, NullifierDerivingKey, NullifierKeyCom},
     utils::{extract_p, poseidon_hash, poseidon_to_curve},
-    vp_vk::ValidityPredicateVerifyingKey,
 };
 use bitvec::{array::BitArray, order::Lsb0};
 use core::iter;
@@ -46,8 +45,7 @@ impl Default for NoteCommitment {
 }
 
 /// A note
-// TODO: add copy when app_vk is changed to pallas::Base
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Note {
     pub note_type: ValueBase,
     /// app_data_dynamic is the data defined in application vp and will NOT be used to derive value base
@@ -67,11 +65,10 @@ pub struct Note {
 }
 
 /// The parameters in the ValueBase are used to derive note value base.
-// TODO: add copy when app_vk is changed to pallas::Base
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct ValueBase {
-    /// app_vk is the verifying key of VP
-    pub app_vk: ValidityPredicateVerifyingKey,
+    /// app_vk is the compressed verifying key of VP
+    pub app_vk: pallas::Base,
     /// app_data_static is the encoded data that is defined in application vp
     pub app_data_static: pallas::Base,
 }
@@ -95,7 +92,7 @@ pub struct OutputNoteProvingInfo {
 impl Note {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        app_vk: ValidityPredicateVerifyingKey,
+        app_vk: pallas::Base,
         app_data_static: pallas::Base,
         app_data_dynamic: pallas::Base,
         value: u64,
@@ -124,7 +121,7 @@ impl Note {
     }
 
     pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
-        let app_vk = ValidityPredicateVerifyingKey::dummy(&mut rng);
+        let app_vk = pallas::Base::random(&mut rng);
         let app_data_static = pallas::Base::random(&mut rng);
         let note_type = ValueBase::new(app_vk, app_data_static);
         let app_data_dynamic = pallas::Base::zero();
@@ -172,7 +169,7 @@ impl Note {
                 iter::empty()
                     .chain(address.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
                     .chain(
-                        self.get_compressed_app_vk()
+                        self.get_app_vk()
                             .to_le_bits()
                             .iter()
                             .by_vals()
@@ -233,8 +230,8 @@ impl Note {
         self.note_type.derive_value_base()
     }
 
-    pub fn get_compressed_app_vk(&self) -> pallas::Base {
-        self.note_type.app_vk.get_compressed()
+    pub fn get_app_vk(&self) -> pallas::Base {
+        self.note_type.app_vk
     }
 
     pub fn get_app_data_static(&self) -> pallas::Base {
@@ -243,7 +240,7 @@ impl Note {
 }
 
 impl ValueBase {
-    pub fn new(vk: ValidityPredicateVerifyingKey, data: pallas::Base) -> Self {
+    pub fn new(vk: pallas::Base, data: pallas::Base) -> Self {
         Self {
             app_vk: vk,
             app_data_static: data,
@@ -251,7 +248,7 @@ impl ValueBase {
     }
 
     pub fn derive_value_base(&self) -> pallas::Point {
-        let inputs = [self.app_vk.get_compressed(), self.app_data_static];
+        let inputs = [self.app_vk, self.app_data_static];
         poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&inputs)
     }
 }

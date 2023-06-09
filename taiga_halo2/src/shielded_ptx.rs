@@ -309,20 +309,17 @@ pub mod testing {
         // Create empty VP circuit without note info
         let trivial_vp_circuit = TrivialValidityPredicateCircuit::default();
         let trivial_vp_vk = trivial_vp_circuit.get_vp_vk();
+        let compressed_trivial_vp_vk = trivial_vp_vk.get_compressed();
 
         // Generate notes
         let input_note_1 = {
             let app_data_static = pallas::Base::zero();
             // TODO: add real application dynamic VPs and encode them to app_data_dynamic later.
-            let app_dynamic_vp_vk = vec![trivial_vp_vk.clone(), trivial_vp_vk.clone()];
+            let app_dynamic_vp_vk = vec![compressed_trivial_vp_vk, compressed_trivial_vp_vk];
             // Encode the app_dynamic_vp_vk into app_data_dynamic
             // The encoding method is flexible and defined in the application vp.
             // Use poseidon hash to encode the two dynamic VPs here
-            let app_data_dynamic = poseidon_hash(
-                app_dynamic_vp_vk[0].get_compressed(),
-                app_dynamic_vp_vk[1].get_compressed(),
-            );
-            let app_vk = trivial_vp_vk.clone();
+            let app_data_dynamic = poseidon_hash(app_dynamic_vp_vk[0], app_dynamic_vp_vk[1]);
             let rho = Nullifier::new(pallas::Base::random(&mut rng));
             let value = 5000u64;
             let nk_com = NullifierKeyCom::rand(&mut rng);
@@ -330,7 +327,7 @@ pub mod testing {
             let psi = pallas::Base::random(&mut rng);
             let is_merkle_checked = true;
             Note::new(
-                app_vk,
+                compressed_trivial_vp_vk,
                 app_data_static,
                 app_data_dynamic,
                 value,
@@ -353,7 +350,7 @@ pub mod testing {
             let psi = pallas::Base::random(&mut rng);
             let is_merkle_checked = true;
             Note::new(
-                trivial_vp_vk.clone(),
+                compressed_trivial_vp_vk,
                 app_data_static,
                 app_data_dynamic,
                 value,
@@ -368,7 +365,6 @@ pub mod testing {
         let input_note_2 = {
             let app_data_static = pallas::Base::one();
             let app_data_dynamic = pallas::Base::zero();
-            let app_vk = trivial_vp_vk.clone();
             let rho = Nullifier::new(pallas::Base::random(&mut rng));
             let value = 10u64;
             let nk_com = NullifierKeyCom::rand(&mut rng);
@@ -376,7 +372,7 @@ pub mod testing {
             let psi = pallas::Base::random(&mut rng);
             let is_merkle_checked = true;
             Note::new(
-                app_vk,
+                compressed_trivial_vp_vk,
                 app_data_static,
                 app_data_dynamic,
                 value,
@@ -397,7 +393,7 @@ pub mod testing {
             let psi = pallas::Base::random(&mut rng);
             let is_merkle_checked = true;
             Note::new(
-                trivial_vp_vk,
+                compressed_trivial_vp_vk,
                 app_data_static,
                 app_data_dynamic,
                 value,
@@ -414,8 +410,8 @@ pub mod testing {
         // Create vp circuit and fill the note info
         let mut trivial_vp_circuit = TrivialValidityPredicateCircuit {
             owned_note_pub_id: input_note_1.get_nf().unwrap().inner(),
-            input_notes: [input_note_1.clone(), input_note_2.clone()],
-            output_notes: [output_note_1.clone(), output_note_2.clone()],
+            input_notes: [input_note_1, input_note_2],
+            output_notes: [output_note_1, output_note_2],
         };
         let input_app_vp_verifying_info_1 = Box::new(trivial_vp_circuit.clone());
         let trivial_app_logic_1: Box<dyn ValidityPredicateVerifyingInfo> =

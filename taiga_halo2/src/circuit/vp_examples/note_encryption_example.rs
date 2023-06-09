@@ -138,10 +138,10 @@ impl ValidityPredicateInfo for NoteEncryptionValidityPredicateCircuit {
         let mut instances = self.get_note_instances();
 
         // Should search the target note, hardcode the first output note as the target note for simplicity.
-        let target_note = self.get_output_notes()[0].clone();
+        let target_note = self.get_output_notes()[0];
         let message = vec![
             target_note.note_type.app_data_static,
-            target_note.note_type.app_vk.get_compressed(),
+            target_note.note_type.app_vk,
             pallas::Base::from(target_note.value),
         ];
         let key = SecretKey::from_dh_exchange(&self.rcv_pk, &mod_r_p(self.sk));
