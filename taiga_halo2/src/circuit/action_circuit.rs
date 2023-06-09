@@ -151,7 +151,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             note_commit_chip.clone(),
             config.note_config.poseidon_config.clone(),
             add_chip,
-            self.input_note.clone(),
+            self.input_note,
             ACTION_NF_INSTANCE_ROW_IDX,
         )?;
 
@@ -174,7 +174,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             sinsemilla_chip,
             note_commit_chip,
             config.note_config.poseidon_config,
-            self.output_note.clone(),
+            self.output_note,
             input_note_variables.nf,
             ACTION_OUTPUT_CM_INSTANCE_ROW_IDX,
         )?;

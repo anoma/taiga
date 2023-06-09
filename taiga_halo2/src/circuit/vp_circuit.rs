@@ -168,7 +168,7 @@ pub trait ValidityPredicateCircuit:
                 note_commit_chip.clone(),
                 note_config.poseidon_config.clone(),
                 add_chip.clone(),
-                input_notes[i].clone(),
+                input_notes[i],
                 i * 2,
             )?);
 
@@ -186,7 +186,7 @@ pub trait ValidityPredicateCircuit:
                 sinsemilla_chip.clone(),
                 note_commit_chip.clone(),
                 note_config.poseidon_config.clone(),
-                output_notes[i].clone(),
+                output_notes[i],
                 old_nf,
                 i * 2 + 1,
             )?);

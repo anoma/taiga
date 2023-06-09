@@ -147,7 +147,7 @@ pub fn check_input_note(
     let app_vk = assign_free_advice(
         layouter.namespace(|| "witness app_vk"),
         advices[0],
-        Value::known(input_note.get_compressed_app_vk()),
+        Value::known(input_note.get_app_vk()),
     )?;
 
     // Witness app_data_static
@@ -294,7 +294,7 @@ pub fn check_output_note(
     let app_vk = assign_free_advice(
         layouter.namespace(|| "witness app_vk"),
         advices[0],
-        Value::known(output_note.get_compressed_app_vk()),
+        Value::known(output_note.get_app_vk()),
     )?;
 
     // Witness app_data_static
