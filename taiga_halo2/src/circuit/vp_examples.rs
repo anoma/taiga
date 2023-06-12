@@ -21,6 +21,7 @@ use pasta_curves::pallas;
 use rand::rngs::OsRng;
 use rand::RngCore;
 
+pub mod cascade_intent;
 mod field_addition;
 mod note_encryption_example;
 pub mod or_relation_intent;
