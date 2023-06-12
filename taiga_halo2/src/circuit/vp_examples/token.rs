@@ -9,7 +9,9 @@ use crate::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
-        vp_examples::signature_verification::SignatureVerificationValidityPredicateCircuit,
+        vp_examples::signature_verification::{
+            SignatureVerificationValidityPredicateCircuit, COMPRESSED_TOKEN_AUTH_VK,
+        },
     },
     constant::{NOTE_COMMIT_DOMAIN, NUM_NOTE, SETUP_PARAMS_MAP},
     merkle_tree::MerklePath,
@@ -25,7 +27,6 @@ use halo2_gadgets::poseidon::{
     Pow5Chip as PoseidonChip,
 };
 use halo2_proofs::{
-    arithmetic::Field,
     circuit::{floor_planner, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
 };
@@ -282,7 +283,7 @@ impl TokenAuthorization {
     pub fn random<R: RngCore>(mut rng: R) -> Self {
         Self {
             pk: pallas::Point::random(&mut rng),
-            vk: pallas::Base::random(&mut rng),
+            vk: *COMPRESSED_TOKEN_AUTH_VK,
         }
     }
 
