@@ -1,11 +1,5 @@
 use ff::Field;
-use halo2_gadgets::{
-    poseidon::{
-        primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
-        Pow5Chip as PoseidonChip,
-    },
-    utilities::bool_check,
-};
+use halo2_gadgets::utilities::bool_check;
 use halo2_proofs::{
     circuit::{floor_planner, AssignedCell, Layouter, Region, Value},
     plonk::{
@@ -21,6 +15,7 @@ use taiga_halo2::{
     circuit::{
         gadgets::{
             assign_free_advice,
+            poseidon_hash::poseidon_hash_gadget,
             target_note_variable::{
                 get_is_input_note_flag, get_owned_note_variable, GetIsInputNoteFlagConfig,
                 GetOwnedNoteVariableConfig,
@@ -134,20 +129,11 @@ impl DealerIntentValidityPredicateCircuit {
             config.advices[0],
             Value::known(self.encoded_solution),
         )?;
-        let encoded_puzzle_note_app_data_static = {
-            let poseidon_config = config.get_note_config().poseidon_config;
-            let poseidon_chip = PoseidonChip::construct(poseidon_config);
-            let poseidon_hasher =
-                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
-                    poseidon_chip,
-                    layouter.namespace(|| "Poseidon init"),
-                )?;
-            let poseidon_message = [encoded_puzzle.clone(), encoded_solution];
-            poseidon_hasher.hash(
-                layouter.namespace(|| "check app_data_static encoding"),
-                poseidon_message,
-            )?
-        };
+        let encoded_puzzle_note_app_data_static = poseidon_hash_gadget(
+            config.get_note_config().poseidon_config,
+            layouter.namespace(|| "app_data_static encoding"),
+            [encoded_puzzle.clone(), encoded_solution],
+        )?;
 
         layouter.assign_region(
             || "dealer intent check",
@@ -223,20 +209,11 @@ impl ValidityPredicateCircuit for DealerIntentValidityPredicateCircuit {
             config.advices[0],
             Value::known(self.sudoku_app_vk),
         )?;
-        let app_data_static_encode = {
-            let poseidon_config = config.get_note_config().poseidon_config;
-            let poseidon_chip = PoseidonChip::construct(poseidon_config);
-            let poseidon_hasher =
-                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
-                    poseidon_chip,
-                    layouter.namespace(|| "Poseidon init"),
-                )?;
-            let poseidon_message = [encoded_puzzle.clone(), sudoku_app_vk.clone()];
-            poseidon_hasher.hash(
-                layouter.namespace(|| "check app_data_static encoding"),
-                poseidon_message,
-            )?
-        };
+        let app_data_static_encode = poseidon_hash_gadget(
+            config.get_note_config().poseidon_config,
+            layouter.namespace(|| "app_data_static encoding"),
+            [encoded_puzzle.clone(), sudoku_app_vk.clone()],
+        )?;
 
         layouter.assign_region(
             || "check app_data_static encoding",

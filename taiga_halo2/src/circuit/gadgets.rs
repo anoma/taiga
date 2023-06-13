@@ -6,6 +6,7 @@ use halo2_proofs::{
 
 pub mod add;
 pub mod mul;
+pub mod poseidon_hash;
 pub mod sub;
 pub mod target_note_variable;
 pub mod triple_mul;

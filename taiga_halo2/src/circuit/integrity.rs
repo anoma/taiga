@@ -1,10 +1,9 @@
-use std::ops::Neg;
-
-use crate::circuit::gadgets::{
-    add::{AddChip, AddInstructions},
-    assign_free_advice, assign_free_constant,
-};
 use crate::circuit::{
+    gadgets::{
+        add::{AddChip, AddInstructions},
+        assign_free_advice, assign_free_constant,
+        poseidon_hash::poseidon_hash_gadget,
+    },
     hash_to_curve::{hash_to_curve_circuit, HashToCurveConfig},
     note_circuit::{note_commitment_gadget, NoteCommitmentChip},
     vp_circuit::{InputNoteVariables, NoteVariables, OutputNoteVariables},
@@ -32,6 +31,7 @@ use halo2_proofs::{
 };
 use pasta_curves::group::Curve;
 use pasta_curves::pallas;
+use std::ops::Neg;
 
 // cm is a point
 #[allow(clippy::too_many_arguments)]
@@ -110,16 +110,11 @@ pub fn check_input_note(
         )?;
 
         // nk_com = Com_r(nk, zero)
-        let nk_com = {
-            let poseidon_chip = PoseidonChip::construct(poseidon_config.clone());
-            let poseidon_hasher =
-                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
-                    poseidon_chip,
-                    layouter.namespace(|| "Poseidon init"),
-                )?;
-            let poseidon_message = [nk_var.clone(), zero_constant];
-            poseidon_hasher.hash(layouter.namespace(|| "nk_com"), poseidon_message)?
-        };
+        let nk_com = poseidon_hash_gadget(
+            poseidon_config.clone(),
+            layouter.namespace(|| "nk_com encoding"),
+            [nk_var.clone(), zero_constant],
+        )?;
 
         // Witness app_data_dynamic
         let app_data_dynamic = assign_free_advice(
@@ -129,16 +124,11 @@ pub fn check_input_note(
         )?;
 
         // address = Com_r(app_data_dynamic, nk_com)
-        let address = {
-            let poseidon_chip = PoseidonChip::construct(poseidon_config.clone());
-            let poseidon_hasher =
-                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
-                    poseidon_chip,
-                    layouter.namespace(|| "Poseidon init"),
-                )?;
-            let poseidon_message = [app_data_dynamic.clone(), nk_com];
-            poseidon_hasher.hash(layouter.namespace(|| "input address"), poseidon_message)?
-        };
+        let address = poseidon_hash_gadget(
+            poseidon_config.clone(),
+            layouter.namespace(|| "address encoding"),
+            [app_data_dynamic.clone(), nk_com],
+        )?;
 
         (address, nk_var, app_data_dynamic)
     };
@@ -261,34 +251,26 @@ pub fn check_output_note(
     old_nf: AssignedCell<pallas::Base, pallas::Base>,
     cm_row_idx: usize,
 ) -> Result<OutputNoteVariables, Error> {
+    // Witness nk_com
+    let nk_com = assign_free_advice(
+        layouter.namespace(|| "witness nk_com"),
+        advices[0],
+        Value::known(output_note.nk_com.get_nk_com()),
+    )?;
+
+    // Witness app_data_dynamic
+    let app_data_dynamic = assign_free_advice(
+        layouter.namespace(|| "witness app_data_dynamic"),
+        advices[0],
+        Value::known(output_note.app_data_dynamic),
+    )?;
+
     // Check output note user integrity: address = Com_r(app_data_dynamic, nk_com)
-    let (address, app_data_dynamic) = {
-        // Witness nk_com
-        let nk_com = assign_free_advice(
-            layouter.namespace(|| "witness nk_com"),
-            advices[0],
-            Value::known(output_note.nk_com.get_nk_com()),
-        )?;
-
-        // Witness app_data_dynamic
-        let app_data_dynamic = assign_free_advice(
-            layouter.namespace(|| "witness app_data_dynamic"),
-            advices[0],
-            Value::known(output_note.app_data_dynamic),
-        )?;
-
-        let poseidon_chip = PoseidonChip::construct(poseidon_config);
-        let poseidon_hasher =
-            PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
-                poseidon_chip,
-                layouter.namespace(|| "Poseidon init"),
-            )?;
-        let poseidon_message = [app_data_dynamic.clone(), nk_com];
-        (
-            poseidon_hasher.hash(layouter.namespace(|| "output address"), poseidon_message)?,
-            app_data_dynamic,
-        )
-    };
+    let address = poseidon_hash_gadget(
+        poseidon_config,
+        layouter.namespace(|| "address encoding"),
+        [app_data_dynamic.clone(), nk_com],
+    )?;
 
     // Witness app_vk
     let app_vk = assign_free_advice(
