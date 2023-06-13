@@ -8,6 +8,7 @@ pub mod add;
 pub mod conditional_equal;
 pub mod extended_or_relation;
 pub mod mul;
+pub mod poseidon_hash;
 pub mod sub;
 pub mod target_note_variable;
 pub mod triple_mul;

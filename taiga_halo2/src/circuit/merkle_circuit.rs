@@ -1,9 +1,7 @@
+use crate::circuit::gadgets::poseidon_hash::poseidon_hash_gadget;
 use crate::merkle_tree::{is_left, LR};
 use halo2_gadgets::{
-    poseidon::{
-        primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
-        Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
-    },
+    poseidon::Pow5Config as PoseidonConfig,
     utilities::cond_swap::{CondSwapChip, CondSwapConfig, CondSwapInstructions},
 };
 use halo2_proofs::{
@@ -98,13 +96,8 @@ pub fn merkle_poseidon_gadget(
         };
         let poseidon_message = [pair.0, pair.1];
 
-        let poseidon_chip = PoseidonChip::construct(chip.config().poseidon_config.clone());
-        let poseidon_hasher =
-            PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
-                poseidon_chip,
-                layouter.namespace(|| "Poseidon init"),
-            )?;
-        cur = poseidon_hasher.hash(
+        cur = poseidon_hash_gadget(
+            chip.config().poseidon_config.clone(),
             layouter.namespace(|| "merkle poseidon hash"),
             poseidon_message,
         )?;
@@ -118,6 +111,7 @@ fn test_halo2_merkle_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
     use crate::merkle_tree::{MerklePath, Node};
+    use halo2_gadgets::poseidon::{primitives as poseidon, Pow5Chip as PoseidonChip};
     use halo2_proofs::{
         arithmetic::Field,
         circuit::{Layouter, SimpleFloorPlanner, Value},

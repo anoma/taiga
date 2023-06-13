@@ -12,6 +12,7 @@ use crate::{
         add::{AddChip, AddConfig},
         assign_free_advice, assign_free_instance,
         mul::{MulChip, MulConfig},
+        poseidon_hash::poseidon_hash_gadget,
         sub::{SubChip, SubConfig},
     },
     constant::{
@@ -24,10 +25,7 @@ use halo2_gadgets::{
         chip::{EccChip, EccConfig},
         FixedPoint, NonIdentityPoint, ScalarFixed, ScalarVar,
     },
-    poseidon::{
-        primitives::{self as poseidon, ConstantLength},
-        Hash as PoseidonHash, Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
-    },
+    poseidon::{primitives as poseidon, Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig},
     sinsemilla::chip::{SinsemillaChip, SinsemillaConfig},
     utilities::lookup_range_check::LookupRangeCheckConfig,
 };
@@ -264,7 +262,6 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
 
         // Hash(r||P||m)
         let h_scalar = {
-            let poseidon_chip = PoseidonChip::construct(config.poseidon_config);
             let rx_cell = R.inner().x();
             let ry_cell = R.inner().y();
             let zero_cell = assign_free_advice(
@@ -282,12 +279,8 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
                 zero_cell.clone(),
                 zero_cell,
             ];
-            let poseidon_hasher =
-                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<8>, 3, 2>::init(
-                    poseidon_chip,
-                    layouter.namespace(|| "Poseidon init"),
-                )?;
-            let h = poseidon_hasher.hash(
+            let h = poseidon_hash_gadget::<8>(
+                config.poseidon_config,
                 layouter.namespace(|| "Poseidon_hash(r, P, m)"),
                 poseidon_message,
             )?;
