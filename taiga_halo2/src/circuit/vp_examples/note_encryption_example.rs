@@ -3,6 +3,7 @@ use crate::{
         gadgets::{
             add::{AddChip, AddConfig},
             assign_free_advice,
+            poseidon_hash::poseidon_hash_gadget,
             target_note_variable::{get_owned_note_variable, GetOwnedNoteVariableConfig},
         },
         note_circuit::NoteConfig,
@@ -25,13 +26,7 @@ use crate::{
 use ff::{Field, PrimeField};
 use group::Group;
 use group::{cofactor::CofactorCurveAffine, Curve};
-use halo2_gadgets::{
-    ecc::{chip::EccChip, NonIdentityPoint},
-    poseidon::{
-        primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
-        Pow5Chip as PoseidonChip,
-    },
-};
+use halo2_gadgets::ecc::{chip::EccChip, NonIdentityPoint};
 use halo2_proofs::{
     arithmetic::CurveAffine,
     circuit::{floor_planner, Layouter, Value},
@@ -229,21 +224,11 @@ impl ValidityPredicateCircuit for NoteEncryptionValidityPredicateCircuit {
         )?;
 
         // Decode the app_data_static, the rcv_pk is embedded in the app_data_static
-        let encoded_rcv_pk = {
-            let poseidon_config = config.get_note_config().poseidon_config;
-            let poseidon_chip = PoseidonChip::construct(poseidon_config);
-            let poseidon_hasher =
-                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
-                    poseidon_chip,
-                    layouter.namespace(|| "Poseidon init"),
-                )?;
-
-            let poseidon_message = [rcv_pk.inner().x(), rcv_pk.inner().y()];
-            poseidon_hasher.hash(
-                layouter.namespace(|| "check app_data_static encoding"),
-                poseidon_message,
-            )?
-        };
+        let encoded_rcv_pk = poseidon_hash_gadget::<2>(
+            config.get_note_config().poseidon_config,
+            layouter.namespace(|| "app_data_static encoding"),
+            [rcv_pk.inner().x(), rcv_pk.inner().y()],
+        )?;
 
         layouter.assign_region(
             || "check app_data_dynamic encoding",

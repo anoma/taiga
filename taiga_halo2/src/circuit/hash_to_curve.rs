@@ -4,10 +4,7 @@ use crate::constant::{
 };
 use halo2_gadgets::{
     ecc::{chip::EccChip, Point},
-    poseidon::{
-        primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
-        Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
-    },
+    poseidon::Pow5Config as PoseidonConfig,
 };
 use halo2_proofs::{
     circuit::{AssignedCell, Layouter},
@@ -18,6 +15,7 @@ use pasta_curves::pallas;
 use super::curve::{
     iso_map::MapToCurveConfig, map_to_curve::IsoMapConfig, to_affine::ToAffineConfig,
 };
+use crate::circuit::gadgets::poseidon_hash::poseidon_hash_gadget;
 
 // TODO: make HashToCurve a chip
 // pub trait HashToCurveInstructions<F: FieldExt>: Chip<F> {
@@ -67,16 +65,6 @@ pub fn hash_to_curve_circuit(
 ) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
     // hash to u_0
     let u_0 = {
-        let poseidon_chip = PoseidonChip::construct(config.poseidon_config.clone());
-        let poseidon_hasher =
-            PoseidonHash::<
-                _,
-                _,
-                poseidon::P128Pow5T3,
-                ConstantLength<POSEIDON_TO_CURVE_INPUT_LEN>,
-                3,
-                2,
-            >::init(poseidon_chip, layouter.namespace(|| "Poseidon init u_0"))?;
         let u_0_postfix: Vec<AssignedCell<pallas::Base, pallas::Base>> =
             POSEIDON_TO_FIELD_U_0_POSTFIX
                 .iter()
@@ -96,27 +84,19 @@ pub fn hash_to_curve_circuit(
                         .unwrap()
                 })
                 .collect();
-        poseidon_hasher.hash(
-            layouter.namespace(|| "get u_0"),
-            [messages, &u_0_postfix]
-                .concat()
-                .try_into()
-                .expect("slice with incorrect length"),
+        let poseidon_msg = [messages, &u_0_postfix]
+            .concat()
+            .try_into()
+            .expect("slice with incorrect length");
+        poseidon_hash_gadget::<POSEIDON_TO_CURVE_INPUT_LEN>(
+            config.poseidon_config.clone(),
+            layouter.namespace(|| "compute u_0"),
+            poseidon_msg,
         )?
     };
 
     // hash to u_1
     let u_1 = {
-        let poseidon_chip = PoseidonChip::construct(config.poseidon_config.clone());
-        let poseidon_hasher =
-            PoseidonHash::<
-                _,
-                _,
-                poseidon::P128Pow5T3,
-                ConstantLength<POSEIDON_TO_CURVE_INPUT_LEN>,
-                3,
-                2,
-            >::init(poseidon_chip, layouter.namespace(|| "Poseidon init u_1"))?;
         let u_1_postfix: Vec<AssignedCell<pallas::Base, pallas::Base>> =
             POSEIDON_TO_FIELD_U_1_POSTFIX
                 .iter()
@@ -136,12 +116,14 @@ pub fn hash_to_curve_circuit(
                         .unwrap()
                 })
                 .collect();
-        poseidon_hasher.hash(
-            layouter.namespace(|| "get u_1"),
-            [messages, &u_1_postfix]
-                .concat()
-                .try_into()
-                .expect("slice with incorrect length"),
+        let poseidon_msg = [messages, &u_1_postfix]
+            .concat()
+            .try_into()
+            .expect("slice with incorrect length");
+        poseidon_hash_gadget::<POSEIDON_TO_CURVE_INPUT_LEN>(
+            config.poseidon_config.clone(),
+            layouter.namespace(|| "compute u_1"),
+            poseidon_msg,
         )?
     };
 
@@ -248,15 +230,17 @@ impl HashToCurveConfig {
 #[test]
 fn test_hash_to_curve_circuit() {
     use halo2_gadgets::{
-        ecc::chip::EccConfig, utilities::lookup_range_check::LookupRangeCheckConfig,
+        ecc::chip::EccConfig,
+        poseidon::{primitives as poseidon, Pow5Chip as PoseidonChip},
+        utilities::lookup_range_check::LookupRangeCheckConfig,
     };
-    use halo2_proofs::{circuit::Value, dev::MockProver};
     use pasta_curves::group::Curve;
 
     use crate::circuit::gadgets::assign_free_advice;
     use crate::utils::poseidon_to_curve;
     use halo2_proofs::{
-        circuit::{Layouter, SimpleFloorPlanner},
+        circuit::{Layouter, SimpleFloorPlanner, Value},
+        dev::MockProver,
         plonk::{Advice, Circuit, Column, ConstraintSystem, Error},
     };
     #[derive(Default)]

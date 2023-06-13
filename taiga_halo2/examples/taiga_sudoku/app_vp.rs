@@ -1,8 +1,4 @@
 use ff::{Field, PrimeField};
-use halo2_gadgets::poseidon::{
-    primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
-    Pow5Chip as PoseidonChip,
-};
 use halo2_proofs::{
     circuit::{floor_planner, AssignedCell, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error},
@@ -15,6 +11,7 @@ use taiga_halo2::{
         gadgets::{
             assign_free_advice, assign_free_constant,
             mul::{MulChip, MulConfig, MulInstructions},
+            poseidon_hash::poseidon_hash_gadget,
             sub::{SubChip, SubConfig, SubInstructions},
             target_note_variable::{get_is_input_note_flag, GetIsInputNoteFlagConfig},
             triple_mul::TripleMulConfig,
@@ -545,34 +542,17 @@ impl ValidityPredicateCircuit for SudokuAppValidityPredicateCircuit {
             config.advices[0],
             Value::known(self.encoded_init_state),
         )?;
-        let input_note_app_data_static_encode = {
-            let poseidon_config = config.get_note_config().poseidon_config;
-            let poseidon_chip = PoseidonChip::construct(poseidon_config);
-            let poseidon_hasher =
-                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
-                    poseidon_chip,
-                    layouter.namespace(|| "Poseidon init"),
-                )?;
-            let poseidon_message = [encoded_init_state.clone(), encoded_previous_state.clone()];
-            poseidon_hasher.hash(
-                layouter.namespace(|| "get input note app_data_static encoding"),
-                poseidon_message,
-            )?
-        };
-        let output_note_app_data_static_encode = {
-            let poseidon_config = config.get_note_config().poseidon_config;
-            let poseidon_chip = PoseidonChip::construct(poseidon_config);
-            let poseidon_hasher =
-                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
-                    poseidon_chip,
-                    layouter.namespace(|| "Poseidon init"),
-                )?;
-            let poseidon_message = [encoded_init_state.clone(), encoded_current_state.clone()];
-            poseidon_hasher.hash(
-                layouter.namespace(|| "get output note app_data_static encoding"),
-                poseidon_message,
-            )?
-        };
+        let input_note_app_data_static_encode = poseidon_hash_gadget(
+            config.get_note_config().poseidon_config,
+            layouter.namespace(|| "input note app_data_static encoding"),
+            [encoded_init_state.clone(), encoded_previous_state.clone()],
+        )?;
+
+        let output_note_app_data_static_encode = poseidon_hash_gadget(
+            config.get_note_config().poseidon_config,
+            layouter.namespace(|| "output note app_data_static encoding"),
+            [encoded_init_state.clone(), encoded_current_state.clone()],
+        )?;
 
         layouter.assign_region(
             || "check output note app_data_static encoding",
