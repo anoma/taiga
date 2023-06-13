@@ -8,6 +8,7 @@ use crate::{
             assign_free_advice, assign_free_constant,
             conditional_equal::ConditionalEqualConfig,
             mul::{MulChip, MulConfig, MulInstructions},
+            poseidon_hash::poseidon_hash_gadget,
             sub::{SubChip, SubConfig, SubInstructions},
             target_note_variable::{
                 get_is_input_note_flag, get_owned_note_variable, GetIsInputNoteFlagConfig,
@@ -29,10 +30,6 @@ use crate::{
     proof::Proof,
     utils::poseidon_hash_n,
     vp_vk::ValidityPredicateVerifyingKey,
-};
-use halo2_gadgets::poseidon::{
-    primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
-    Pow5Chip as PoseidonChip,
 };
 use halo2_proofs::{
     arithmetic::Field,
@@ -248,15 +245,10 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
         )?;
 
         // Encode the app_data_static of intent note
-        let encoded_app_data_static = {
-            let poseidon_config = config.get_note_config().poseidon_config;
-            let poseidon_chip = PoseidonChip::construct(poseidon_config);
-            let poseidon_hasher =
-                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<8>, 3, 2>::init(
-                    poseidon_chip,
-                    layouter.namespace(|| "Poseidon init"),
-                )?;
-            let poseidon_message = [
+        let encoded_app_data_static = poseidon_hash_gadget(
+            config.get_note_config().poseidon_config,
+            layouter.namespace(|| "app_data_static encoding"),
+            [
                 sold_token.clone(),
                 sold_token_value.clone(),
                 bought_token.clone(),
@@ -265,12 +257,8 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
                 receiver_address.clone(),
                 padding_zero.clone(),
                 padding_zero,
-            ];
-            poseidon_hasher.hash(
-                layouter.namespace(|| "encode app_data_static"),
-                poseidon_message,
-            )?
-        };
+            ],
+        )?;
 
         // search target note and get the intent app_static_data
         let app_data_static = get_owned_note_variable(

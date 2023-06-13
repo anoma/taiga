@@ -2,6 +2,7 @@ use crate::{
     circuit::{
         gadgets::{
             assign_free_advice, assign_free_constant,
+            poseidon_hash::poseidon_hash_gadget,
             target_note_variable::{get_owned_note_variable, GetOwnedNoteVariableConfig},
         },
         note_circuit::NoteConfig,
@@ -16,13 +17,7 @@ use crate::{
     utils::{mod_r_p, poseidon_hash_n},
     vp_vk::ValidityPredicateVerifyingKey,
 };
-use halo2_gadgets::{
-    ecc::{chip::EccChip, FixedPoint, NonIdentityPoint, ScalarFixed, ScalarVar},
-    poseidon::{
-        primitives::{self as poseidon, ConstantLength},
-        Hash as PoseidonHash, Pow5Chip as PoseidonChip,
-    },
-};
+use halo2_gadgets::ecc::{chip::EccChip, FixedPoint, NonIdentityPoint, ScalarFixed, ScalarVar};
 use halo2_proofs::{
     arithmetic::Field,
     circuit::{floor_planner, Layouter, Value},
@@ -251,32 +246,24 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
             &basic_variables.get_app_data_dynamic_searchable_pairs(),
         )?;
 
-        // Decode the app_data_dynamic, and check the app_data_dynamic encoding
-        let encoded_app_data_dynamic = {
-            let poseidon_config = config.get_note_config().poseidon_config;
-            let poseidon_chip = PoseidonChip::construct(poseidon_config);
-            let poseidon_hasher =
-                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<4>, 3, 2>::init(
-                    poseidon_chip,
-                    layouter.namespace(|| "Poseidon init"),
-                )?;
+        let vk = assign_free_advice(
+            layouter.namespace(|| "witness vk"),
+            config.advices[0],
+            Value::known(self.verifying_key),
+        )?;
+        let padding_zero = assign_free_constant(
+            layouter.namespace(|| "zero"),
+            config.advices[0],
+            pallas::Base::zero(),
+        )?;
 
-            let vk = assign_free_advice(
-                layouter.namespace(|| "witness vk"),
-                config.advices[0],
-                Value::known(self.verifying_key),
-            )?;
-            let padding_zero = assign_free_constant(
-                layouter.namespace(|| "zero"),
-                config.advices[0],
-                pallas::Base::zero(),
-            )?;
-            let poseidon_message = [pk.inner().x(), pk.inner().y(), vk, padding_zero];
-            poseidon_hasher.hash(
-                layouter.namespace(|| "check app_data_dynamic encoding"),
-                poseidon_message,
-            )?
-        };
+        // Decode the app_data_dynamic, and check the app_data_dynamic encoding
+        let encoded_app_data_dynamic = poseidon_hash_gadget(
+            config.get_note_config().poseidon_config,
+            layouter.namespace(|| "app_data_dynamic encoding"),
+            [pk.inner().x(), pk.inner().y(), vk, padding_zero],
+        )?;
+
         layouter.assign_region(
             || "check app_data_dynamic encoding",
             |mut region| {
@@ -305,31 +292,19 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
             let nfs = basic_variables.get_input_note_nfs();
             let cms = basic_variables.get_output_note_cms();
             assert_eq!(NUM_NOTE, 2);
-            let poseidon_message = [
-                r.inner().x(),
-                r.inner().y(),
-                pk.inner().x(),
-                pk.inner().y(),
-                nfs[0].clone(),
-                cms[0].clone(),
-                nfs[1].clone(),
-                cms[1].clone(),
-            ];
-            let poseidon_config = config.get_note_config().poseidon_config;
-            let poseidon_chip = PoseidonChip::construct(poseidon_config);
-            let poseidon_hasher = PoseidonHash::<
-                _,
-                _,
-                poseidon::P128Pow5T3,
-                ConstantLength<POSEIDON_HASH_LEN>,
-                3,
-                2,
-            >::init(
-                poseidon_chip, layouter.namespace(|| "Poseidon init")
-            )?;
-            let h = poseidon_hasher.hash(
+            let h = poseidon_hash_gadget(
+                config.get_note_config().poseidon_config,
                 layouter.namespace(|| "Poseidon_hash(r, P, m)"),
-                poseidon_message,
+                [
+                    r.inner().x(),
+                    r.inner().y(),
+                    pk.inner().x(),
+                    pk.inner().y(),
+                    nfs[0].clone(),
+                    cms[0].clone(),
+                    nfs[1].clone(),
+                    cms[1].clone(),
+                ],
             )?;
 
             ScalarVar::from_base(ecc_chip, layouter.namespace(|| "ScalarVar from_base"), &h)?

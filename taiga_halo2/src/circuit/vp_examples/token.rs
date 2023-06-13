@@ -2,6 +2,7 @@ use crate::{
     circuit::{
         gadgets::{
             assign_free_advice, assign_free_constant,
+            poseidon_hash::poseidon_hash_gadget,
             target_note_variable::{get_owned_note_variable, GetOwnedNoteVariableConfig},
         },
         note_circuit::NoteConfig,
@@ -22,10 +23,6 @@ use crate::{
 };
 use group::{Curve, Group};
 use halo2_gadgets::ecc::{chip::EccChip, NonIdentityPoint};
-use halo2_gadgets::poseidon::{
-    primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
-    Pow5Chip as PoseidonChip,
-};
 use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
@@ -222,27 +219,19 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             &basic_variables.get_app_data_dynamic_searchable_pairs(),
         )?;
 
-        // Decode the app_data_dynamic, and check the app_data_dynamic encoding
-        let encoded_app_data_dynamic = {
-            let poseidon_config = config.get_note_config().poseidon_config;
-            let poseidon_chip = PoseidonChip::construct(poseidon_config);
-            let poseidon_hasher =
-                PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<4>, 3, 2>::init(
-                    poseidon_chip,
-                    layouter.namespace(|| "Poseidon init"),
-                )?;
+        let padding_zero = assign_free_constant(
+            layouter.namespace(|| "zero"),
+            config.advices[0],
+            pallas::Base::zero(),
+        )?;
 
-            let padding_zero = assign_free_constant(
-                layouter.namespace(|| "zero"),
-                config.advices[0],
-                pallas::Base::zero(),
-            )?;
-            let poseidon_message = [pk.inner().x(), pk.inner().y(), vk, padding_zero];
-            poseidon_hasher.hash(
-                layouter.namespace(|| "check app_data_dynamic encoding"),
-                poseidon_message,
-            )?
-        };
+        // Decode the app_data_dynamic, and check the app_data_dynamic encoding
+        let encoded_app_data_dynamic = poseidon_hash_gadget(
+            config.get_note_config().poseidon_config,
+            layouter.namespace(|| "app_data_dynamic encoding"),
+            [pk.inner().x(), pk.inner().y(), vk, padding_zero],
+        )?;
+
         layouter.assign_region(
             || "check app_data_dynamic encoding",
             |mut region| {
