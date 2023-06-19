@@ -70,6 +70,7 @@ pub fn poseidon_to_curve<const L: usize>(message: &[pallas::Base]) -> pallas::Po
 /// Hashes over a message and writes the output to all of `buf`.
 fn poseidon_to_field<const L: usize>(message: &[pallas::Base]) -> [pallas::Base; 2] {
     assert!(message.len() + POSEIDON_TO_FIELD_U_0_POSTFIX.len() == L);
+    assert!(message.len() + POSEIDON_TO_FIELD_U_1_POSTFIX.len() == L);
 
     let poseidon =
         poseidon::Hash::<_, poseidon::P128Pow5T3, poseidon::ConstantLength<L>, 3, 2>::init();

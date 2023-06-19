@@ -37,7 +37,7 @@ pub const ACTION_OUTPUT_CM_INSTANCE_ROW_IDX: usize = 2;
 pub const ACTION_NET_VALUE_CM_X_INSTANCE_ROW_IDX: usize = 3;
 pub const ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX: usize = 4;
 
-pub const POSEIDON_TO_CURVE_INPUT_LEN: usize = 4;
+pub const POSEIDON_TO_CURVE_INPUT_LEN: usize = 3;
 pub const CURVE_ID: &str = "pallas";
 pub const VALUE_BASE_DOMAIN_POSTFIX: &str = "Taiga-ValueBase";
 
@@ -52,22 +52,11 @@ pub const VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX: usize = 5;
 pub const POSEIDON_RATE: usize = 2;
 pub const POSEIDON_WIDTH: usize = 3;
 
-// TODO: After moving is_merkle_checked out of value base derivation, POSEIDON_TO_CURVE_INPUT_LEN would be 3.
-// But there is something wrong with poseidon hash gadget in Halo2(probably a padding bug). MockProver is fine. create_proof results in a Synthesis Error.
-// Temporary fix: add a dummy post string to extend the POSEIDON_TO_FIELD_U_0_POSTFIX to two field elements
-// so that we can keep POSEIDON_TO_CURVE_INPUT_LEN as 4. Fix it once poseidon hash gadget in Halo2 is fixed.
-pub const VALUE_BASE_DOMAIN_POSTFIX_DUMMY_STRING: &str = "This is a dummy postfix string";
-
 lazy_static! {
     pub static ref POSEIDON_TO_FIELD_U_0_POSTFIX: Vec<pallas::Base> = {
         let mut postfix = format!(
-            "{}{}{}{}{}{}",
-            VALUE_BASE_DOMAIN_POSTFIX,
-            "-",
-            CURVE_ID,
-            "-",
-            0,
-            VALUE_BASE_DOMAIN_POSTFIX_DUMMY_STRING
+            "{}{}{}{}{}",
+            VALUE_BASE_DOMAIN_POSTFIX, "-", CURVE_ID, "-", 0,
         )
         .into_bytes();
         postfix.push((4 + CURVE_ID.len() + VALUE_BASE_DOMAIN_POSTFIX.len()) as u8);
@@ -75,13 +64,8 @@ lazy_static! {
     };
     pub static ref POSEIDON_TO_FIELD_U_1_POSTFIX: Vec<pallas::Base> = {
         let mut postfix = format!(
-            "{}{}{}{}{}{}",
-            VALUE_BASE_DOMAIN_POSTFIX,
-            "-",
-            CURVE_ID,
-            "-",
-            1,
-            VALUE_BASE_DOMAIN_POSTFIX_DUMMY_STRING
+            "{}{}{}{}{}",
+            VALUE_BASE_DOMAIN_POSTFIX, "-", CURVE_ID, "-", 1,
         )
         .into_bytes();
         postfix.push((4 + CURVE_ID.len() + VALUE_BASE_DOMAIN_POSTFIX.len()) as u8);
