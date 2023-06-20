@@ -2,7 +2,7 @@ use crate::circuit::gadgets::{
     add::{AddChip, AddInstructions},
     assign_free_constant,
 };
-use crate::constant::{NoteCommitmentFixedBases, NullifierK, POSEIDON_RATE, POSEIDON_WIDTH};
+use crate::constant::{BaseGenerator, NoteCommitmentFixedBases, POSEIDON_RATE, POSEIDON_WIDTH};
 use ff::PrimeField;
 use halo2_gadgets::{
     ecc::{chip::EccChip, FixedPointBaseField, NonIdentityPoint, Point, ScalarVar},
@@ -42,7 +42,7 @@ pub fn note_encryption_gadget(
         layouter.namespace(|| "ScalarVar from_base"),
         &sender_sk,
     )?;
-    let generator = FixedPointBaseField::from_inner(ecc_chip, NullifierK);
+    let generator = FixedPointBaseField::from_inner(ecc_chip, BaseGenerator);
     let sender_pk = generator.mul(layouter.namespace(|| "sender_sk * generator"), sender_sk)?;
     let (secret_key, _) = rcv_pk.mul(layouter.namespace(|| "sender_sk * rcv_pk"), sk)?;
 

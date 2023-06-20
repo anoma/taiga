@@ -1,4 +1,4 @@
-use crate::constant::NOTE_COMMITMENT_R_GENERATOR;
+use crate::constant::GENERATOR;
 use crate::{
     note::NoteCommitment,
     utils::{extract_p, mod_r_p, poseidon_hash, prf_nf},
@@ -36,8 +36,7 @@ impl Nullifier {
         psi: &pallas::Base,
         cm: &NoteCommitment,
     ) -> Self {
-        // TODO: generate a new generator for nullifier_k
-        let k = NOTE_COMMITMENT_R_GENERATOR.to_curve();
+        let k = GENERATOR.to_curve();
 
         Nullifier(extract_p(
             &(k * mod_r_p(nk.compute_nf(*rho) + psi) + cm.inner()),

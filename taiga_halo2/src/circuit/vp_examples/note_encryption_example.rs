@@ -13,10 +13,7 @@ use crate::{
             ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
     },
-    constant::{
-        NOTE_COMMITMENT_R_GENERATOR, NUM_NOTE, SETUP_PARAMS_MAP,
-        VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX,
-    },
+    constant::{GENERATOR, NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX},
     note::Note,
     note_encryption::{NoteCipher, SecretKey},
     proof::Proof,
@@ -144,7 +141,7 @@ impl ValidityPredicateInfo for NoteEncryptionValidityPredicateCircuit {
         cipher.cipher.iter().for_each(|&c| instances.push(c));
 
         instances.push(self.nonce);
-        let generator = NOTE_COMMITMENT_R_GENERATOR.to_curve();
+        let generator = GENERATOR.to_curve();
         let pk = generator * mod_r_p(self.sk);
         let pk_coord = pk.to_affine().coordinates().unwrap();
         instances.push(*pk_coord.x());
