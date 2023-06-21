@@ -9,8 +9,8 @@ use crate::circuit::{
     vp_circuit::{InputNoteVariables, NoteVariables, OutputNoteVariables},
 };
 use crate::constant::{
-    NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentFixedBasesFull,
-    NoteCommitmentHashDomain, NullifierK, POSEIDON_TO_CURVE_INPUT_LEN,
+    BaseGenerator, NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentFixedBasesFull,
+    NoteCommitmentHashDomain, POSEIDON_TO_CURVE_INPUT_LEN,
 };
 use crate::note::Note;
 use crate::utils::poseidon_to_curve;
@@ -62,8 +62,7 @@ pub fn nullifier_circuit(
         &psi,
     )?;
 
-    // TODO: generate a new generator for nullifier_k
-    let nullifier_k = FixedPointBaseField::from_inner(ecc_chip, NullifierK);
+    let nullifier_k = FixedPointBaseField::from_inner(ecc_chip, BaseGenerator);
     let hash_nk_rho_add_psi_mul_k = nullifier_k.mul(
         layouter.namespace(|| "hash_nk_rho_add_psi * nullifier_k"),
         hash_nk_rho_add_psi,
