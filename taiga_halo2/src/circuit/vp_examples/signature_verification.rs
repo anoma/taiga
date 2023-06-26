@@ -1,7 +1,7 @@
 use crate::{
     circuit::{
         gadgets::{
-            assign_free_advice, assign_free_constant,
+            assign_free_advice,
             poseidon_hash::poseidon_hash_gadget,
             target_note_variable::{get_owned_note_variable, GetOwnedNoteVariableConfig},
         },
@@ -10,6 +10,7 @@ use crate::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
+        // vp_examples::receiver_vp::COMPRESSED_RECEIVER_VK,
     },
     constant::{TaigaFixedBasesFull, NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
@@ -246,22 +247,23 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
             &basic_variables.get_app_data_dynamic_searchable_pairs(),
         )?;
 
-        let vk = assign_free_advice(
-            layouter.namespace(|| "witness vk"),
+        let auth_vp_vk = assign_free_advice(
+            layouter.namespace(|| "witness auth vp vk"),
             config.advices[0],
             Value::known(self.verifying_key),
         )?;
-        let padding_zero = assign_free_constant(
-            layouter.namespace(|| "zero"),
+        let receiver_vp_vk = assign_free_advice(
+            layouter.namespace(|| "witness receiver vp vk"),
             config.advices[0],
-            pallas::Base::zero(),
+            // Value::known(*COMPRESSED_RECEIVER_VK),
+            Value::known(pallas::Base::zero()),
         )?;
 
         // Decode the app_data_dynamic, and check the app_data_dynamic encoding
         let encoded_app_data_dynamic = poseidon_hash_gadget(
             config.get_note_config().poseidon_config,
             layouter.namespace(|| "app_data_dynamic encoding"),
-            [pk.inner().x(), pk.inner().y(), vk, padding_zero],
+            [pk.inner().x(), pk.inner().y(), auth_vp_vk, receiver_vp_vk],
         )?;
 
         layouter.assign_region(

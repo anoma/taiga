@@ -93,44 +93,40 @@ pub fn check_input_note(
     nf_row_idx: usize,
 ) -> Result<InputNoteVariables, Error> {
     // Check input note user integrity: address = Com_r(Com_r(nk, zero), app_data_dynamic)
-    let (address, nk, app_data_dynamic) = {
-        // Witness nk
-        let nk = input_note.get_nk().unwrap();
-        let nk_var = assign_free_advice(
-            layouter.namespace(|| "witness nk"),
-            advices[0],
-            Value::known(nk.inner()),
-        )?;
+    // Witness nk
+    let nk = input_note.get_nk().unwrap();
+    let nk_var = assign_free_advice(
+        layouter.namespace(|| "witness nk"),
+        advices[0],
+        Value::known(nk.inner()),
+    )?;
 
-        let zero_constant = assign_free_constant(
-            layouter.namespace(|| "constant zero"),
-            advices[0],
-            pallas::Base::zero(),
-        )?;
+    let zero_constant = assign_free_constant(
+        layouter.namespace(|| "constant zero"),
+        advices[0],
+        pallas::Base::zero(),
+    )?;
 
-        // nk_com = Com_r(nk, zero)
-        let nk_com = poseidon_hash_gadget(
-            poseidon_config.clone(),
-            layouter.namespace(|| "nk_com encoding"),
-            [nk_var.clone(), zero_constant],
-        )?;
+    // nk_com = Com_r(nk, zero)
+    let nk_com = poseidon_hash_gadget(
+        poseidon_config.clone(),
+        layouter.namespace(|| "nk_com encoding"),
+        [nk_var.clone(), zero_constant],
+    )?;
 
-        // Witness app_data_dynamic
-        let app_data_dynamic = assign_free_advice(
-            layouter.namespace(|| "witness app_data_dynamic"),
-            advices[0],
-            Value::known(input_note.app_data_dynamic),
-        )?;
+    // Witness app_data_dynamic
+    let app_data_dynamic = assign_free_advice(
+        layouter.namespace(|| "witness app_data_dynamic"),
+        advices[0],
+        Value::known(input_note.app_data_dynamic),
+    )?;
 
-        // address = Com_r(app_data_dynamic, nk_com)
-        let address = poseidon_hash_gadget(
-            poseidon_config.clone(),
-            layouter.namespace(|| "address encoding"),
-            [app_data_dynamic.clone(), nk_com],
-        )?;
-
-        (address, nk_var, app_data_dynamic)
-    };
+    // address = Com_r(app_data_dynamic, nk_com)
+    let address = poseidon_hash_gadget(
+        poseidon_config.clone(),
+        layouter.namespace(|| "address encoding"),
+        [app_data_dynamic.clone(), nk_com.clone()],
+    )?;
 
     // Witness app_vk
     let app_vk = assign_free_advice(
@@ -204,9 +200,9 @@ pub fn check_input_note(
         poseidon_chip,
         add_chip,
         ecc_chip,
-        nk,
-        rho,
-        psi,
+        nk_var,
+        rho.clone(),
+        psi.clone(),
         &cm,
     )?;
 
@@ -222,6 +218,10 @@ pub fn check_input_note(
         app_data_static,
         is_merkle_checked,
         app_data_dynamic,
+        rho,
+        nk_com,
+        psi,
+        // rcm,
     };
 
     Ok(InputNoteVariables {
@@ -268,7 +268,7 @@ pub fn check_output_note(
     let address = poseidon_hash_gadget(
         poseidon_config,
         layouter.namespace(|| "address encoding"),
-        [app_data_dynamic.clone(), nk_com],
+        [app_data_dynamic.clone(), nk_com.clone()],
     )?;
 
     // Witness app_vk
@@ -322,8 +322,8 @@ pub fn check_output_note(
         address.clone(),
         app_vk.clone(),
         app_data_static.clone(),
-        old_nf,
-        psi,
+        old_nf.clone(),
+        psi.clone(),
         value.clone(),
         rcm,
         is_merkle_checked.clone(),
@@ -340,6 +340,10 @@ pub fn check_output_note(
         value,
         is_merkle_checked,
         app_data_dynamic,
+        rho: old_nf,
+        nk_com,
+        psi,
+        // rcm,
     };
 
     Ok(OutputNoteVariables {

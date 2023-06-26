@@ -10,6 +10,7 @@ use crate::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
+        // vp_examples::receiver_vp::{COMPRESSED_RECEIVER_VK},
         vp_examples::signature_verification::{
             SignatureVerificationValidityPredicateCircuit, COMPRESSED_TOKEN_AUTH_VK,
         },
@@ -205,8 +206,8 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             Value::known(self.auth.pk.to_affine()),
         )?;
 
-        let vk = assign_free_advice(
-            layouter.namespace(|| "witness vk"),
+        let auth_vp_vk = assign_free_advice(
+            layouter.namespace(|| "witness auth vp vk"),
             config.advices[0],
             Value::known(self.auth.vk),
         )?;
@@ -219,17 +220,18 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             &basic_variables.get_app_data_dynamic_searchable_pairs(),
         )?;
 
-        let padding_zero = assign_free_constant(
-            layouter.namespace(|| "zero"),
+        let receiver_vp_vk = assign_free_advice(
+            layouter.namespace(|| "witness receiver vp vk"),
             config.advices[0],
-            pallas::Base::zero(),
+            // Value::known(*COMPRESSED_RECEIVER_VK),
+            Value::known(pallas::Base::zero()),
         )?;
 
         // Decode the app_data_dynamic, and check the app_data_dynamic encoding
         let encoded_app_data_dynamic = poseidon_hash_gadget(
             config.get_note_config().poseidon_config,
             layouter.namespace(|| "app_data_dynamic encoding"),
-            [pk.inner().x(), pk.inner().y(), vk, padding_zero],
+            [pk.inner().x(), pk.inner().y(), auth_vp_vk, receiver_vp_vk],
         )?;
 
         layouter.assign_region(
@@ -256,7 +258,8 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             |mut region| region.constrain_equal(is_merkle_checked.cell(), constant_one.cell()),
         )?;
 
-        // TODO: add authorization vp commitment
+        // TODO: add the sender(authorization method included) vp commitment if it's an input note;
+        // Add the receiver(note encryption constraints included) vp commitment if it's an output note.
 
         Ok(())
     }
@@ -278,7 +281,13 @@ impl TokenAuthorization {
 
     pub fn to_app_data_dynamic(&self) -> pallas::Base {
         let pk_coord = self.pk.to_affine().coordinates().unwrap();
-        poseidon_hash_n::<4>([*pk_coord.x(), *pk_coord.y(), self.vk, pallas::Base::zero()])
+        poseidon_hash_n::<4>([
+            *pk_coord.x(),
+            *pk_coord.y(),
+            self.vk,
+            // *COMPRESSED_RECEIVER_VK,
+            pallas::Base::zero(),
+        ])
     }
 
     pub fn from_sk_vk(sk: &pallas::Scalar, vk: &pallas::Base) -> Self {
