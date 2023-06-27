@@ -44,13 +44,14 @@ lazy_static! {
 // ReceiverValidityPredicateCircuit is used in the token vp as dynamic vp and contains the note encryption constraints.
 #[derive(Clone, Debug)]
 pub struct ReceiverValidityPredicateCircuit {
-    owned_note_pub_id: pallas::Base,
-    input_notes: [Note; NUM_NOTE],
-    output_notes: [Note; NUM_NOTE],
-    vp_vk: pallas::Base,
-    nonce: pallas::Base,
-    sk: pallas::Base,
-    rcv_pk: pallas::Point,
+    pub owned_note_pub_id: pallas::Base,
+    pub input_notes: [Note; NUM_NOTE],
+    pub output_notes: [Note; NUM_NOTE],
+    pub vp_vk: pallas::Base,
+    pub nonce: pallas::Base,
+    pub sk: pallas::Base,
+    pub rcv_pk: pallas::Point,
+    pub auth_vp_vk: pallas::Base,
 }
 
 impl Default for ReceiverValidityPredicateCircuit {
@@ -63,6 +64,7 @@ impl Default for ReceiverValidityPredicateCircuit {
             nonce: pallas::Base::zero(),
             sk: pallas::Base::zero(),
             rcv_pk: pallas::Point::generator(),
+            auth_vp_vk: pallas::Base::zero(),
         }
     }
 }
@@ -129,6 +131,7 @@ impl ReceiverValidityPredicateCircuit {
             nonce,
             sk,
             rcv_pk,
+            auth_vp_vk: *COMPRESSED_TOKEN_AUTH_VK,
         }
     }
 }

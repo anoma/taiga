@@ -10,7 +10,7 @@ use crate::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
-        // vp_examples::receiver_vp::{COMPRESSED_RECEIVER_VK},
+        vp_examples::receiver_vp::{ReceiverValidityPredicateCircuit, COMPRESSED_RECEIVER_VK},
         vp_examples::signature_verification::{
             SignatureVerificationValidityPredicateCircuit, COMPRESSED_TOKEN_AUTH_VK,
         },
@@ -22,6 +22,7 @@ use crate::{
     utils::poseidon_hash_n,
     vp_vk::ValidityPredicateVerifyingKey,
 };
+use ff::Field;
 use group::{Curve, Group};
 use halo2_gadgets::ecc::{chip::EccChip, NonIdentityPoint};
 use halo2_proofs::{
@@ -31,8 +32,7 @@ use halo2_proofs::{
 use lazy_static::lazy_static;
 use pasta_curves::arithmetic::CurveAffine;
 use pasta_curves::{group::ff::PrimeField, pallas};
-use rand::rngs::OsRng;
-use rand::RngCore;
+use rand::{rngs::OsRng, Rng, RngCore};
 
 lazy_static! {
     pub static ref TOKEN_VK: ValidityPredicateVerifyingKey =
@@ -63,6 +63,7 @@ pub struct TokenValidityPredicateCircuit {
     pub token_name: String,
     // The auth goes to app_data_dynamic and defines how to consume and create the note.
     pub auth: TokenAuthorization,
+    pub receiver_vp_vk: pallas::Base,
 }
 
 #[derive(Clone, Debug, Copy)]
@@ -96,6 +97,7 @@ impl Default for TokenValidityPredicateCircuit {
             output_notes: [(); NUM_NOTE].map(|_| Note::default()),
             token_name: "Token_name".to_string(),
             auth: TokenAuthorization::default(),
+            receiver_vp_vk: pallas::Base::zero(),
         }
     }
 }
@@ -142,6 +144,7 @@ impl TokenValidityPredicateCircuit {
             output_notes,
             token_name,
             auth,
+            receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
         }
     }
 }
@@ -223,8 +226,7 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
         let receiver_vp_vk = assign_free_advice(
             layouter.namespace(|| "witness receiver vp vk"),
             config.advices[0],
-            // Value::known(*COMPRESSED_RECEIVER_VK),
-            Value::known(pallas::Base::zero()),
+            Value::known(self.receiver_vp_vk),
         )?;
 
         // Decode the app_data_dynamic, and check the app_data_dynamic encoding
@@ -285,8 +287,7 @@ impl TokenAuthorization {
             *pk_coord.x(),
             *pk_coord.y(),
             self.vk,
-            // *COMPRESSED_RECEIVER_VK,
-            pallas::Base::zero(),
+            *COMPRESSED_RECEIVER_VK,
         ])
     }
 
@@ -316,6 +317,7 @@ pub fn generate_input_token_note_proving_info<R: RngCore>(
         output_notes,
         token_name,
         auth,
+        receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
     };
 
     // token auth VP
@@ -326,6 +328,7 @@ pub fn generate_input_token_note_proving_info<R: RngCore>(
         output_notes,
         auth.vk,
         auth_sk,
+        *COMPRESSED_RECEIVER_VK,
     );
 
     // input note proving info
@@ -337,23 +340,38 @@ pub fn generate_input_token_note_proving_info<R: RngCore>(
     )
 }
 
-pub fn generate_output_token_note_proving_info(
+pub fn generate_output_token_note_proving_info<R: RngCore>(
+    mut rng: R,
     output_note: Note,
     token_name: String,
     auth: TokenAuthorization,
     input_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
 ) -> OutputNoteProvingInfo {
+    let owned_note_pub_id = output_note.commitment().get_x();
     // token VP
     let token_vp = TokenValidityPredicateCircuit {
-        owned_note_pub_id: output_note.commitment().get_x(),
+        owned_note_pub_id,
         input_notes,
         output_notes,
         token_name,
         auth,
+        receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
     };
 
-    OutputNoteProvingInfo::new(output_note, Box::new(token_vp), vec![])
+    // receiver VP
+    let receiver_vp = ReceiverValidityPredicateCircuit {
+        owned_note_pub_id,
+        input_notes,
+        output_notes,
+        vp_vk: *COMPRESSED_RECEIVER_VK,
+        nonce: pallas::Base::from_u128(rng.gen()),
+        sk: pallas::Base::random(&mut rng),
+        rcv_pk: auth.pk,
+        auth_vp_vk: *COMPRESSED_TOKEN_AUTH_VK,
+    };
+
+    OutputNoteProvingInfo::new(output_note, Box::new(token_vp), vec![Box::new(receiver_vp)])
 }
 
 #[test]

@@ -101,6 +101,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
 
         // Create the output note proving info
         let output_note_1_proving_info = generate_output_token_note_proving_info(
+            &mut rng,
             output_note_1,
             "btc".to_string(),
             bob_auth,
@@ -161,6 +162,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
         );
         // Create the output note proving info
         let output_note_2_proving_info = generate_output_token_note_proving_info(
+            &mut rng,
             output_note_2,
             "eth".to_string(),
             bob_auth,
@@ -168,6 +170,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
             output_notes,
         );
         let output_note_3_proving_info = generate_output_token_note_proving_info(
+            &mut rng,
             output_note_3,
             "xan".to_string(),
             bob_auth,
