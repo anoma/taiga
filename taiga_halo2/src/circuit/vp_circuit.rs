@@ -697,7 +697,7 @@ pub fn get_circuit_assignments(
     named_assignments: &HashMap<String, Fp>,
 ) -> HashMap<VariableId, Fp> {
     let mut input_variables = HashMap::new();
-    collect_module_variables(&module, &mut input_variables);
+    collect_module_variables(module, &mut input_variables);
     // Defined variables should not be requested from user
     for def in &module.defs {
         if let Pat::Variable(var) = &def.0 .0.v {
@@ -738,7 +738,7 @@ impl VampIRValidityPredicateCircuit {
         named_field_assignments: HashMap<String, Fp>,
     ) -> Self {
         let config = Config { quiet: true };
-        let parsed_vamp_ir_module = Module::parse(&vamp_ir_source).unwrap();
+        let parsed_vamp_ir_module = Module::parse(vamp_ir_source).unwrap();
         let vamp_ir_module = compile(
             parsed_vamp_ir_module,
             &PrimeFieldOps::<Fp>::default(),
