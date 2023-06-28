@@ -43,9 +43,9 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 use std::rc::Rc;
-use vamp_ir::ast::Module;
+use vamp_ir::ast::{Module, Pat, VariableId};
 use vamp_ir::halo2::synth::{make_constant, Halo2Module, PrimeFieldOps};
-use vamp_ir::transform::compile;
+use vamp_ir::transform::{collect_module_variables, compile};
 use vamp_ir::util::{read_inputs_from_file, Config};
 
 #[derive(Debug, Clone)]
@@ -690,6 +690,38 @@ macro_rules! vp_circuit_impl {
     };
 }
 
+/// Convert named circuit assignments to assignments of vamp-ir variableIds.
+/// Useful for calling vamp-ir Halo2Module::populate_variable_assigments
+pub fn get_circuit_assignments(
+    module: &Module,
+    named_assignments: &HashMap<String, Fp>,
+) -> HashMap<VariableId, Fp> {
+    let mut input_variables = HashMap::new();
+    collect_module_variables(&module, &mut input_variables);
+    // Defined variables should not be requested from user
+    for def in &module.defs {
+        if let Pat::Variable(var) = &def.0 .0.v {
+            input_variables.remove(&var.id);
+        }
+    }
+
+    let mut variable_assignments = HashMap::new();
+
+    // Check that the user supplied the expected inputs
+    for (id, expected_var) in input_variables {
+        variable_assignments.insert(
+            id,
+            named_assignments[&expected_var.name.unwrap_or_else(|| {
+                panic!(
+                    "could not find circuit variable with expected id {}",
+                    &expected_var.id
+                )
+            })],
+        );
+    }
+    variable_assignments
+}
+
 #[derive(Clone)]
 pub struct VampIRValidityPredicateCircuit {
     // TODO: vamp_ir doesn't support to set the params size manually, add the params here temporarily.
@@ -700,6 +732,39 @@ pub struct VampIRValidityPredicateCircuit {
 }
 
 impl VampIRValidityPredicateCircuit {
+    pub fn from_vamp_ir_source(
+        vamp_ir_source: &str,
+        named_field_assignments: HashMap<String, Fp>,
+    ) -> Self {
+        let config = Config { quiet: true };
+        let parsed_vamp_ir_module = Module::parse(&vamp_ir_source).unwrap();
+        let vamp_ir_module = compile(
+            parsed_vamp_ir_module,
+            &PrimeFieldOps::<Fp>::default(),
+            &config,
+        );
+        let mut circuit = Halo2Module::<Fp>::new(Rc::new(vamp_ir_module));
+        let params = Params::new(circuit.k);
+        let field_assignments = get_circuit_assignments(&circuit.module, &named_field_assignments);
+
+        // Populate variable definitions
+        circuit.populate_variables(field_assignments.clone());
+
+        // Get public inputs Fp
+        let instances = circuit
+            .module
+            .pubs
+            .iter()
+            .map(|inst| field_assignments[&inst.id])
+            .collect::<Vec<pallas::Base>>();
+
+        Self {
+            params,
+            circuit,
+            instances,
+        }
+    }
+
     pub fn from_vamp_ir_file(vamp_ir_file: &PathBuf, inputs_file: &PathBuf) -> Self {
         let config = Config { quiet: true };
         let vamp_ir_source = fs::read_to_string(vamp_ir_file).expect("cannot read vamp-ir file");
