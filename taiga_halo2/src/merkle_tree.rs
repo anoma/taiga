@@ -93,6 +93,7 @@ pub struct MerklePath {
 
 impl MerklePath {
     /// Constructs a random dummy merkle path with depth.
+    // TODO: move it to test mod
     pub fn dummy(rng: &mut impl RngCore, depth: usize) -> Self {
         let auth_path = (0..depth).map(|_| (Node::rand(rng), rng.gen())).collect();
         Self::from_path(auth_path)
