@@ -1,4 +1,4 @@
-use crate::circuit::vamp_ir_utils::get_circuit_assignments;
+use crate::circuit::vamp_ir_utils::{get_circuit_assignments, VariableAssignmentError};
 use crate::{
     circuit::{
         gadgets::{
@@ -700,11 +700,26 @@ pub struct VampIRValidityPredicateCircuit {
     pub instances: Vec<pallas::Base>,
 }
 
+#[derive(Debug)]
+pub enum VampIRCircuitError {
+    MissingAssignment(String),
+}
+
+impl VampIRCircuitError {
+    fn from_variable_assignment_error(error: VariableAssignmentError) -> Self {
+        match error {
+            VariableAssignmentError::MissingAssignment(s) => {
+                VampIRCircuitError::MissingAssignment(s)
+            }
+        }
+    }
+}
+
 impl VampIRValidityPredicateCircuit {
     pub fn from_vamp_ir_source(
         vamp_ir_source: &str,
         named_field_assignments: HashMap<String, Fp>,
-    ) -> Self {
+    ) -> Result<Self, VampIRCircuitError> {
         let config = Config { quiet: true };
         let parsed_vamp_ir_module = Module::parse(vamp_ir_source).unwrap();
         let vamp_ir_module = compile(
@@ -714,7 +729,8 @@ impl VampIRValidityPredicateCircuit {
         );
         let mut circuit = Halo2Module::<Fp>::new(Rc::new(vamp_ir_module));
         let params = Params::new(circuit.k);
-        let field_assignments = get_circuit_assignments(&circuit.module, &named_field_assignments);
+        let field_assignments = get_circuit_assignments(&circuit.module, &named_field_assignments)
+            .map_err(VampIRCircuitError::from_variable_assignment_error)?;
 
         // Populate variable definitions
         circuit.populate_variables(field_assignments.clone());
@@ -727,11 +743,11 @@ impl VampIRValidityPredicateCircuit {
             .map(|inst| field_assignments[&inst.id])
             .collect::<Vec<pallas::Base>>();
 
-        Self {
+        Ok(Self {
             params,
             circuit,
             instances,
-        }
+        })
     }
 
     pub fn from_vamp_ir_file(vamp_ir_file: &PathBuf, inputs_file: &PathBuf) -> Self {
