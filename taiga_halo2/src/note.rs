@@ -56,10 +56,12 @@ pub struct Note {
     pub nk_com: NullifierKeyCom,
     /// old nullifier. Nonce which is a deterministically computed, unique nonce
     pub rho: Nullifier,
+    /// psi is to derive the nullifier
+    pub psi: pallas::Base,
+    /// rcm is the trapdoor of the note commitment
+    pub rcm: pallas::Scalar,
     /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of input note will be checked in ActionProof.
     pub is_merkle_checked: bool,
-    /// rseed is used to generate the psi and rcm. psi is to derive the nullifier and rcm is the trapdoor of the note commitment.
-    pub rseed: RandomSeed,
 }
 
 /// The parameters in the ValueBase are used to derive note value base.
@@ -108,9 +110,10 @@ impl Note {
             app_data_dynamic,
             value,
             nk_com,
-            rho,
             is_merkle_checked,
-            rseed,
+            psi: rseed.get_psi(&rho),
+            rcm: rseed.get_rcm(&rho),
+            rho,
         }
     }
 
@@ -132,9 +135,10 @@ impl Note {
             app_data_dynamic,
             value,
             nk_com,
-            rho,
             is_merkle_checked: true,
-            rseed,
+            psi: rseed.get_psi(&rho),
+            rcm: rseed.get_rcm(&rho),
+            rho,
         }
     }
 
@@ -193,7 +197,7 @@ impl Note {
                 Some(Nullifier::derive_native(
                     &nk,
                     &self.rho.inner(),
-                    &self.rseed.get_psi(&self.rho),
+                    &self.psi,
                     &cm,
                 ))
             }
@@ -222,11 +226,11 @@ impl Note {
     }
 
     pub fn get_psi(&self) -> pallas::Base {
-        self.rseed.get_psi(&self.rho)
+        self.psi
     }
 
     pub fn get_rcm(&self) -> pallas::Scalar {
-        self.rseed.get_rcm(&self.rho)
+        self.rcm
     }
 }
 
