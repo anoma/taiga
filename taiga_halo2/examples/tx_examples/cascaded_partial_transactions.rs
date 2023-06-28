@@ -185,9 +185,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
 
     // Create the final transaction
     let shielded_tx_bundle = ShieldedPartialTxBundle::build(vec![ptx_1, ptx_2]);
-    let mut tx = Transaction::new(Some(shielded_tx_bundle), None, vec![r_1, r_2]);
-    tx.binding_sign(rng);
-    tx
+    Transaction::build(&mut rng, Some(shielded_tx_bundle), None, vec![r_1, r_2])
 }
 
 #[test]

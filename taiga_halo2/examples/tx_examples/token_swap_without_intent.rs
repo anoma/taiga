@@ -72,13 +72,12 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
 
     // Solver creates the final transaction
     let shielded_tx_bundle = ShieldedPartialTxBundle::build(vec![alice_ptx, bob_ptx, carol_ptx]);
-    let mut tx = Transaction::new(
+    Transaction::build(
+        &mut rng,
         Some(shielded_tx_bundle),
         None,
         vec![alice_r, bob_r, carol_r],
-    );
-    tx.binding_sign(rng);
-    tx
+    )
 }
 
 #[test]
