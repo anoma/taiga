@@ -705,20 +705,21 @@ pub fn get_circuit_assignments(
         }
     }
 
-    let mut variable_assignments = HashMap::new();
-
-    // Check that the user supplied the expected inputs
-    for (id, expected_var) in input_variables {
-        variable_assignments.insert(
-            id,
-            named_assignments[&expected_var.name.unwrap_or_else(|| {
+    let variable_assignments = input_variables
+        .iter()
+        .map(|(id, expected_var)| {
+            let var_name = expected_var.name.as_deref().unwrap_or_else(|| {
                 panic!(
                     "could not find circuit variable with expected id {}",
-                    &expected_var.id
+                    expected_var.id
                 )
-            })],
-        );
-    }
+            });
+            let assignment = *named_assignments.get(var_name).unwrap_or_else(|| {
+                panic!("missing assignment for variable with name {}", var_name)
+            });
+            (*id, assignment)
+        })
+        .collect();
     variable_assignments
 }
 
