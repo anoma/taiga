@@ -1,4 +1,4 @@
-use crate::circuit::vamp_ir_utils::{get_circuit_assignments, VariableAssignmentError};
+use crate::circuit::vamp_ir_utils::{get_circuit_assignments, parse, VariableAssignmentError};
 use crate::{
     circuit::{
         gadgets::{
@@ -703,6 +703,7 @@ pub struct VampIRValidityPredicateCircuit {
 #[derive(Debug)]
 pub enum VampIRCircuitError {
     MissingAssignment(String),
+    SourceParsingError(String),
 }
 
 impl VampIRCircuitError {
@@ -721,7 +722,8 @@ impl VampIRValidityPredicateCircuit {
         named_field_assignments: HashMap<String, Fp>,
     ) -> Result<Self, VampIRCircuitError> {
         let config = Config { quiet: true };
-        let parsed_vamp_ir_module = Module::parse(vamp_ir_source).unwrap();
+        let parsed_vamp_ir_module =
+            parse(vamp_ir_source).map_err(VampIRCircuitError::SourceParsingError)?;
         let vamp_ir_module = compile(
             parsed_vamp_ir_module,
             &PrimeFieldOps::<Fp>::default(),

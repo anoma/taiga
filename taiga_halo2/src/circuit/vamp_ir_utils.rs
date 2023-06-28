@@ -38,3 +38,7 @@ pub(crate) fn get_circuit_assignments(
         })
         .collect()
 }
+
+pub(crate) fn parse(unparsed_file: &str) -> Result<Module, String> {
+    Module::parse(unparsed_file).map_err(|err| err.to_string())
+}
