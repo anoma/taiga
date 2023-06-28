@@ -2,7 +2,7 @@ use crate::circuit::gadgets::{
     add::{AddChip, AddInstructions},
     assign_free_constant,
 };
-use crate::constant::{NoteCommitmentFixedBases, NullifierK, POSEIDON_RATE, POSEIDON_WIDTH};
+use crate::constant::{BaseGenerator, NoteCommitmentFixedBases, POSEIDON_RATE, POSEIDON_WIDTH};
 use ff::PrimeField;
 use halo2_gadgets::{
     ecc::{chip::EccChip, FixedPointBaseField, NonIdentityPoint, Point, ScalarVar},
@@ -42,7 +42,7 @@ pub fn note_encryption_gadget(
         layouter.namespace(|| "ScalarVar from_base"),
         &sender_sk,
     )?;
-    let generator = FixedPointBaseField::from_inner(ecc_chip, NullifierK);
+    let generator = FixedPointBaseField::from_inner(ecc_chip, BaseGenerator);
     let sender_pk = generator.mul(layouter.namespace(|| "sender_sk * generator"), sender_sk)?;
     let (secret_key, _) = rcv_pk.mul(layouter.namespace(|| "sender_sk * rcv_pk"), sk)?;
 
@@ -121,9 +121,11 @@ fn test_halo2_note_encryption_circuit() {
     use crate::circuit::gadgets::add::AddConfig;
     use crate::circuit::gadgets::assign_free_advice;
     use crate::constant::{
-        NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain,
+        NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain, SETUP_PARAMS_MAP,
+        VP_CIRCUIT_PARAMS_SIZE,
     };
     use crate::note_encryption::{NoteCipher, SecretKey};
+    use crate::proof::Proof;
     use crate::utils::mod_r_p;
     use ff::Field;
     use group::Curve;
@@ -139,7 +141,7 @@ fn test_halo2_note_encryption_circuit() {
     use halo2_proofs::{
         circuit::{Layouter, SimpleFloorPlanner, Value},
         dev::MockProver,
-        plonk::{Advice, Circuit, Column, ConstraintSystem, Error},
+        plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error},
     };
     use rand::rngs::OsRng;
 
@@ -351,5 +353,11 @@ fn test_halo2_note_encryption_circuit() {
     };
 
     let prover = MockProver::run(11, &circuit, vec![]).unwrap();
-    assert_eq!(prover.verify(), Ok(()))
+    assert_eq!(prover.verify(), Ok(()));
+
+    let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
+    let vk = keygen_vk(params, &circuit).expect("keygen_vk should not fail");
+    let pk = keygen_pk(params, vk.clone(), &circuit).expect("keygen_pk should not fail");
+    let proof = Proof::create(&pk, params, circuit, &[], &mut rng).unwrap();
+    assert!(proof.verify(&vk, params, &[]).is_ok());
 }

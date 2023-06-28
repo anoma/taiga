@@ -54,7 +54,8 @@ pub struct TransparentResult {
 }
 
 impl Transaction {
-    pub fn new(
+    // Init the transaction with shielded_ptx_bundle, transparent_ptx_bundle and the key of BindingSignature
+    pub fn init(
         shielded_ptx_bundle: Option<ShieldedPartialTxBundle>,
         transparent_ptx_bundle: Option<TransparentPartialTxBundle>,
         // random from value commitment
@@ -73,7 +74,8 @@ impl Transaction {
         }
     }
 
-    pub fn binding_sign<R: RngCore + CryptoRng>(&mut self, rng: R) {
+    // Finalize the transaction and complete the Binding Signature.
+    pub fn finalize<R: RngCore + CryptoRng>(&mut self, rng: R) {
         if let InProgressBindingSignature::Unauthorized(sk) = &self.signature {
             let vk = self.get_binding_vk();
             assert_eq!(vk, sk.get_vk(), "The notes value is unbalanced");
@@ -81,6 +83,18 @@ impl Transaction {
             let signature = sk.sign(rng, &sig_hash);
             self.signature = InProgressBindingSignature::Authorized(signature);
         }
+    }
+
+    // Init and finalize the transaction
+    pub fn build<R: RngCore + CryptoRng>(
+        rng: R,
+        shielded_ptx_bundle: Option<ShieldedPartialTxBundle>,
+        transparent_ptx_bundle: Option<TransparentPartialTxBundle>,
+        rcv_vec: Vec<pallas::Scalar>,
+    ) -> Self {
+        let mut tx = Self::init(shielded_ptx_bundle, transparent_ptx_bundle, rcv_vec);
+        tx.finalize(rng);
+        tx
     }
 
     pub fn transparent_bundle(&self) -> Option<&TransparentPartialTxBundle> {
@@ -258,6 +272,14 @@ impl Default for ShieldedPartialTxBundle {
 }
 
 impl TransparentPartialTxBundle {
+    pub fn build(partial_txs: Vec<TransparentPartialTransaction>) -> Self {
+        Self { partial_txs }
+    }
+
+    pub fn add_partial_tx(&mut self, ptx: TransparentPartialTransaction) {
+        self.partial_txs.push(ptx);
+    }
+
     pub fn execute(&self) -> Result<TransparentResult, TransactionError> {
         for partial_tx in self.partial_txs.iter() {
             partial_tx.execute()?;
@@ -322,10 +344,14 @@ fn test_halo2_transaction() {
     let rng = OsRng;
 
     // Create shielded partial tx bundle
-    let (shielded_tx_bundle, r_vec) = create_shielded_ptx_bundle(2);
+    let (shielded_ptx_bundle, r_vec) = create_shielded_ptx_bundle(2);
     // TODO: add transparent_ptx_bundle test
     let transparent_ptx_bundle = None;
-    let mut tx = Transaction::new(Some(shielded_tx_bundle), transparent_ptx_bundle, r_vec);
-    tx.binding_sign(rng);
+    let tx = Transaction::build(
+        rng,
+        Some(shielded_ptx_bundle),
+        transparent_ptx_bundle,
+        r_vec,
+    );
     tx.execute().unwrap();
 }
