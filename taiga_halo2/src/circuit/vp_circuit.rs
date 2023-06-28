@@ -1,3 +1,4 @@
+use crate::circuit::vamp_ir_utils::get_circuit_assignments;
 use crate::{
     circuit::{
         gadgets::{
@@ -43,9 +44,9 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 use std::rc::Rc;
-use vamp_ir::ast::{Module, Pat, VariableId};
+use vamp_ir::ast::Module;
 use vamp_ir::halo2::synth::{make_constant, Halo2Module, PrimeFieldOps};
-use vamp_ir::transform::{collect_module_variables, compile};
+use vamp_ir::transform::compile;
 use vamp_ir::util::{read_inputs_from_file, Config};
 
 #[derive(Debug, Clone)]
@@ -688,39 +689,6 @@ macro_rules! vp_circuit_impl {
             }
         }
     };
-}
-
-/// Convert named circuit assignments to assignments of vamp-ir variableIds.
-/// Useful for calling vamp-ir Halo2Module::populate_variable_assigments
-pub fn get_circuit_assignments(
-    module: &Module,
-    named_assignments: &HashMap<String, Fp>,
-) -> HashMap<VariableId, Fp> {
-    let mut input_variables = HashMap::new();
-    collect_module_variables(module, &mut input_variables);
-    // Defined variables should not be requested from user
-    for def in &module.defs {
-        if let Pat::Variable(var) = &def.0 .0.v {
-            input_variables.remove(&var.id);
-        }
-    }
-
-    let variable_assignments = input_variables
-        .iter()
-        .map(|(id, expected_var)| {
-            let var_name = expected_var.name.as_deref().unwrap_or_else(|| {
-                panic!(
-                    "could not find circuit variable with expected id {}",
-                    expected_var.id
-                )
-            });
-            let assignment = *named_assignments.get(var_name).unwrap_or_else(|| {
-                panic!("missing assignment for variable with name {}", var_name)
-            });
-            (*id, assignment)
-        })
-        .collect();
-    variable_assignments
 }
 
 #[derive(Clone)]
