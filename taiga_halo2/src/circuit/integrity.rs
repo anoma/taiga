@@ -9,8 +9,8 @@ use crate::circuit::{
     vp_circuit::{InputNoteVariables, NoteVariables, OutputNoteVariables},
 };
 use crate::constant::{
-    BaseGenerator, NoteCommitmentDomain, NoteCommitmentFixedBasesFull, NoteCommitmentHashDomain,
-    TaigaFixedBases, POSEIDON_TO_CURVE_INPUT_LEN,
+    BaseGenerator, NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases,
+    TaigaFixedBasesFull, POSEIDON_TO_CURVE_INPUT_LEN,
 };
 use crate::note::Note;
 use crate::utils::poseidon_to_curve;
@@ -460,7 +460,7 @@ pub fn compute_value_commitment(
         Value::known(rcv),
     )?;
 
-    let blind_base = FixedPoint::from_inner(ecc_chip, NoteCommitmentFixedBasesFull);
+    let blind_base = FixedPoint::from_inner(ecc_chip, TaigaFixedBasesFull);
     let (blind, _) = blind_base.mul(
         layouter.namespace(|| "blind_scalar * blind_base"),
         &blind_scalar,

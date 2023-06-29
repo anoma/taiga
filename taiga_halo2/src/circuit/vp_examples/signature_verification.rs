@@ -11,7 +11,7 @@ use crate::{
             ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
     },
-    constant::{NoteCommitmentFixedBasesFull, NOTE_COMMIT_DOMAIN, NUM_NOTE, SETUP_PARAMS_MAP},
+    constant::{TaigaFixedBasesFull, NOTE_COMMIT_DOMAIN, NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
     proof::Proof,
     utils::{mod_r_p, poseidon_hash_n},
@@ -284,7 +284,7 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
 
         // Verify: s*G = R + Hash(r||P||m)*P
         // s*G
-        let generator = FixedPoint::from_inner(ecc_chip.clone(), NoteCommitmentFixedBasesFull);
+        let generator = FixedPoint::from_inner(ecc_chip.clone(), TaigaFixedBasesFull);
         let (s_g, _) = generator.mul(layouter.namespace(|| "s_scalar * generator"), &s_scalar)?;
 
         // Hash(r||P||m)

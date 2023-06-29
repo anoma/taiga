@@ -16,8 +16,7 @@ use crate::{
         sub::{SubChip, SubConfig},
     },
     constant::{
-        NoteCommitmentDomain, NoteCommitmentFixedBasesFull, NoteCommitmentHashDomain,
-        TaigaFixedBases,
+        NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases, TaigaFixedBasesFull,
     },
 };
 use halo2_gadgets::{
@@ -252,7 +251,7 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
 
         // Verify: s*G = R + Hash(r||P||m)*P
         // s*G
-        let generator = FixedPoint::from_inner(ecc_chip.clone(), NoteCommitmentFixedBasesFull);
+        let generator = FixedPoint::from_inner(ecc_chip.clone(), TaigaFixedBasesFull);
         let (sG, _) = generator.mul(layouter.namespace(|| "s_scalar * generator"), &s_scalar)?;
 
         // Hash(r||P||m)

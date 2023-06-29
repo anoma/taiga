@@ -5950,8 +5950,8 @@ pub struct NoteCommitmentDomain;
 impl CommitDomains<pallas::Affine, TaigaFixedBases, NoteCommitmentHashDomain>
     for NoteCommitmentDomain
 {
-    fn r(&self) -> NoteCommitmentFixedBasesFull {
-        NoteCommitmentFixedBasesFull
+    fn r(&self) -> TaigaFixedBasesFull {
+        TaigaFixedBasesFull
     }
 
     fn hash_domain(&self) -> NoteCommitmentHashDomain {
@@ -5963,15 +5963,15 @@ impl CommitDomains<pallas::Affine, TaigaFixedBases, NoteCommitmentHashDomain>
 pub struct TaigaFixedBases;
 
 impl FixedPoints<pallas::Affine> for TaigaFixedBases {
-    type FullScalar = NoteCommitmentFixedBasesFull;
+    type FullScalar = TaigaFixedBasesFull;
     type ShortScalar = Short;
     type Base = BaseGenerator;
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct NoteCommitmentFixedBasesFull;
+pub struct TaigaFixedBasesFull;
 
-impl FixedPoint<pallas::Affine> for NoteCommitmentFixedBasesFull {
+impl FixedPoint<pallas::Affine> for TaigaFixedBasesFull {
     type FixedScalarKind = FullScalar;
 
     fn generator(&self) -> pallas::Affine {
