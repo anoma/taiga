@@ -284,7 +284,8 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
 
         // Verify: s*G = R + Hash(r||P||m)*P
         // s*G
-        let generator = FixedPoint::from_inner(ecc_chip.clone(), TaigaFixedBasesFull);
+        let generator =
+            FixedPoint::from_inner(ecc_chip.clone(), TaigaFixedBasesFull::NoteCommitmentR);
         let (s_g, _) = generator.mul(layouter.namespace(|| "s_scalar * generator"), &s_scalar)?;
 
         // Hash(r||P||m)

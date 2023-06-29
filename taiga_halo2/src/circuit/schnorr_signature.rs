@@ -251,7 +251,8 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
 
         // Verify: s*G = R + Hash(r||P||m)*P
         // s*G
-        let generator = FixedPoint::from_inner(ecc_chip.clone(), TaigaFixedBasesFull);
+        let generator =
+            FixedPoint::from_inner(ecc_chip.clone(), TaigaFixedBasesFull::NoteCommitmentR);
         let (sG, _) = generator.mul(layouter.namespace(|| "s_scalar * generator"), &s_scalar)?;
 
         // Hash(r||P||m)

@@ -5951,7 +5951,7 @@ impl CommitDomains<pallas::Affine, TaigaFixedBases, NoteCommitmentHashDomain>
     for NoteCommitmentDomain
 {
     fn r(&self) -> TaigaFixedBasesFull {
-        TaigaFixedBasesFull
+        TaigaFixedBasesFull::NoteCommitmentR
     }
 
     fn hash_domain(&self) -> NoteCommitmentHashDomain {
@@ -5969,21 +5969,33 @@ impl FixedPoints<pallas::Affine> for TaigaFixedBases {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct TaigaFixedBasesFull;
+pub enum TaigaFixedBasesFull {
+    NoteCommitmentR,
+    BaseGenerator,
+}
 
 impl FixedPoint<pallas::Affine> for TaigaFixedBasesFull {
     type FixedScalarKind = FullScalar;
 
     fn generator(&self) -> pallas::Affine {
-        *NOTE_COMMITMENT_R_GENERATOR
+        match self {
+            Self::NoteCommitmentR => *NOTE_COMMITMENT_R_GENERATOR,
+            Self::BaseGenerator => *GENERATOR,
+        }
     }
 
     fn u(&self) -> Vec<[[u8; 32]; H]> {
-        R_U.to_vec()
+        match self {
+            Self::NoteCommitmentR => R_U.to_vec(),
+            Self::BaseGenerator => GENERATOR_U.to_vec(),
+        }
     }
 
     fn z(&self) -> Vec<u64> {
-        R_Z.to_vec()
+        match self {
+            Self::NoteCommitmentR => R_Z.to_vec(),
+            Self::BaseGenerator => GENERATOR_Z.to_vec(),
+        }
     }
 }
 

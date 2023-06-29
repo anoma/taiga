@@ -460,7 +460,7 @@ pub fn compute_value_commitment(
         Value::known(rcv),
     )?;
 
-    let blind_base = FixedPoint::from_inner(ecc_chip, TaigaFixedBasesFull);
+    let blind_base = FixedPoint::from_inner(ecc_chip, TaigaFixedBasesFull::NoteCommitmentR);
     let (blind, _) = blind_base.mul(
         layouter.namespace(|| "blind_scalar * blind_base"),
         &blind_scalar,
