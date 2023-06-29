@@ -5,7 +5,7 @@ use crate::{
         note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig},
     },
     constant::{
-        NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain, NUM_NOTE,
+        NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases, NUM_NOTE,
         SETUP_PARAMS_MAP, VP_CIRCUIT_NULLIFIER_ONE_INSTANCE_IDX,
         VP_CIRCUIT_NULLIFIER_TWO_INSTANCE_IDX, VP_CIRCUIT_OUTPUT_CM_ONE_INSTANCE_IDX,
         VP_CIRCUIT_OUTPUT_CM_TWO_INSTANCE_IDX, VP_CIRCUIT_OWNED_NOTE_PUB_ID_INSTANCE_IDX,
@@ -135,11 +135,10 @@ pub trait ValidityPredicateCircuit:
     ) -> Result<BasicValidityPredicateVariables, Error> {
         let note_config = config.get_note_config();
         // Load the Sinsemilla generator lookup table used by the whole circuit.
-        SinsemillaChip::<
-            NoteCommitmentHashDomain,
-            NoteCommitmentDomain,
-            NoteCommitmentFixedBases,
-        >::load(note_config.sinsemilla_config.clone(), &mut layouter)?;
+        SinsemillaChip::<NoteCommitmentHashDomain, NoteCommitmentDomain, TaigaFixedBases>::load(
+            note_config.sinsemilla_config.clone(),
+            &mut layouter,
+        )?;
 
         // Construct a Sinsemilla chip
         let sinsemilla_chip = SinsemillaChip::construct(note_config.sinsemilla_config.clone());

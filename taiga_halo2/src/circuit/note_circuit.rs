@@ -1,5 +1,5 @@
 use crate::circuit::gadgets::add::{AddChip, AddConfig};
-use crate::constant::{NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain};
+use crate::constant::{NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases};
 use halo2_gadgets::{
     ecc::chip::EccConfig,
     ecc::{chip::EccChip, Point, ScalarFixed},
@@ -20,7 +20,7 @@ use pasta_curves::pallas;
 
 type NoteCommitPiece = MessagePiece<
     pallas::Affine,
-    SinsemillaChip<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
+    SinsemillaChip<NoteCommitmentHashDomain, NoteCommitmentDomain, TaigaFixedBases>,
     10,
     253,
 >;
@@ -79,11 +79,7 @@ impl Decompose5_5 {
     #[allow(clippy::type_complexity)]
     fn decompose(
         lookup_config: &LookupRangeCheckConfig<pallas::Base, 10>,
-        chip: SinsemillaChip<
-            NoteCommitmentHashDomain,
-            NoteCommitmentDomain,
-            NoteCommitmentFixedBases,
-        >,
+        chip: SinsemillaChip<NoteCommitmentHashDomain, NoteCommitmentDomain, TaigaFixedBases>,
         layouter: &mut impl Layouter<pallas::Base>,
         first: &AssignedCell<pallas::Base, pallas::Base>,
         second: &AssignedCell<pallas::Base, pallas::Base>,
@@ -206,11 +202,7 @@ impl Decompose5_1_64 {
     #[allow(clippy::type_complexity)]
     fn decompose(
         lookup_config: &LookupRangeCheckConfig<pallas::Base, 10>,
-        chip: SinsemillaChip<
-            NoteCommitmentHashDomain,
-            NoteCommitmentDomain,
-            NoteCommitmentFixedBases,
-        >,
+        chip: SinsemillaChip<NoteCommitmentHashDomain, NoteCommitmentDomain, TaigaFixedBases>,
         layouter: &mut impl Layouter<pallas::Base>,
         first: &AssignedCell<pallas::Base, pallas::Base>,
         is_merkle_checked: &AssignedCell<pallas::Base, pallas::Base>,
@@ -420,7 +412,7 @@ pub struct NoteCommitmentConfig {
     base_canonicity_250_5: BaseCanonicity250_5,
     base_canonicity_5: BaseCanonicity5,
     pub sinsemilla_config:
-        SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
+        SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, TaigaFixedBases>,
 }
 
 #[derive(Clone, Debug)]
@@ -435,7 +427,7 @@ impl NoteCommitmentChip {
         sinsemilla_config: SinsemillaConfig<
             NoteCommitmentHashDomain,
             NoteCommitmentDomain,
-            NoteCommitmentFixedBases,
+            TaigaFixedBases,
         >,
     ) -> NoteCommitmentConfig {
         let two_pow_5 = pallas::Base::from(1 << 5);
@@ -475,8 +467,8 @@ impl NoteCommitmentChip {
 #[allow(clippy::too_many_arguments)]
 pub fn note_commitment_gadget(
     mut layouter: impl Layouter<pallas::Base>,
-    chip: SinsemillaChip<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
-    ecc_chip: EccChip<NoteCommitmentFixedBases>,
+    chip: SinsemillaChip<NoteCommitmentHashDomain, NoteCommitmentDomain, TaigaFixedBases>,
+    ecc_chip: EccChip<TaigaFixedBases>,
     note_commit_chip: NoteCommitmentChip,
     address: AssignedCell<pallas::Base, pallas::Base>,
     app_vp: AssignedCell<pallas::Base, pallas::Base>,
@@ -484,9 +476,9 @@ pub fn note_commitment_gadget(
     rho: AssignedCell<pallas::Base, pallas::Base>,
     psi: AssignedCell<pallas::Base, pallas::Base>,
     value: AssignedCell<pallas::Base, pallas::Base>,
-    rcm: ScalarFixed<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
+    rcm: ScalarFixed<pallas::Affine, EccChip<TaigaFixedBases>>,
     is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
-) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
+) -> Result<Point<pallas::Affine, EccChip<TaigaFixedBases>>, Error> {
     let lookup_config = chip.config().lookup_config();
 
     // `user_0_249` = bits 0..=249 of `address`
@@ -622,10 +614,10 @@ pub struct NoteConfig {
     pub instances: Column<Instance>,
     pub advices: [Column<Advice>; 10],
     pub add_config: AddConfig,
-    pub ecc_config: EccConfig<NoteCommitmentFixedBases>,
+    pub ecc_config: EccConfig<TaigaFixedBases>,
     pub poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
     pub sinsemilla_config:
-        SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
+        SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, TaigaFixedBases>,
     pub note_commit_config: NoteCommitmentConfig,
 }
 
@@ -663,12 +655,8 @@ impl NoteChip {
         ];
         meta.enable_constant(lagrange_coeffs[0]);
 
-        let ecc_config = EccChip::<NoteCommitmentFixedBases>::configure(
-            meta,
-            advices,
-            lagrange_coeffs,
-            range_check,
-        );
+        let ecc_config =
+            EccChip::<TaigaFixedBases>::configure(meta, advices, lagrange_coeffs, range_check);
 
         let poseidon_config = PoseidonChip::configure::<poseidon::P128Pow5T3>(
             meta,
@@ -681,7 +669,7 @@ impl NoteChip {
         let sinsemilla_config = SinsemillaChip::<
             NoteCommitmentHashDomain,
             NoteCommitmentDomain,
-            NoteCommitmentFixedBases,
+            TaigaFixedBases,
         >::configure(
             meta,
             advices[..5].try_into().unwrap(),
@@ -746,7 +734,7 @@ fn test_halo2_note_commitment_circuit() {
     }
 
     impl Circuit<pallas::Base> for MyCircuit {
-        type Config = (NoteCommitmentConfig, EccConfig<NoteCommitmentFixedBases>);
+        type Config = (NoteCommitmentConfig, EccConfig<TaigaFixedBases>);
         type FloorPlanner = SimpleFloorPlanner;
 
         fn without_witnesses(&self) -> Self {
@@ -796,7 +784,7 @@ fn test_halo2_note_commitment_circuit() {
             let sinsemilla_config = SinsemillaChip::<
                 NoteCommitmentHashDomain,
                 NoteCommitmentDomain,
-                NoteCommitmentFixedBases,
+                TaigaFixedBases,
             >::configure(
                 meta,
                 advices[..5].try_into().unwrap(),
@@ -808,12 +796,8 @@ fn test_halo2_note_commitment_circuit() {
             let note_commit_config =
                 NoteCommitmentChip::configure(meta, advices, sinsemilla_config);
 
-            let ecc_config = EccChip::<NoteCommitmentFixedBases>::configure(
-                meta,
-                advices,
-                lagrange_coeffs,
-                range_check,
-            );
+            let ecc_config =
+                EccChip::<TaigaFixedBases>::configure(meta, advices, lagrange_coeffs, range_check);
 
             (note_commit_config, ecc_config)
         }
@@ -829,7 +813,7 @@ fn test_halo2_note_commitment_circuit() {
             SinsemillaChip::<
                 NoteCommitmentHashDomain,
                 NoteCommitmentDomain,
-                NoteCommitmentFixedBases,
+                TaigaFixedBases,
             >::load(note_commit_config.sinsemilla_config.clone(), &mut layouter)?;
             let note = Note::new(
                 self.app_vk,
