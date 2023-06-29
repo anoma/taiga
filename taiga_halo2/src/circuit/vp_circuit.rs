@@ -866,11 +866,38 @@ mod tests {
     }
 
     #[test]
-    fn test_create_vp_with_assignment() {
-        let x_assignment = VampIRValidityPredicateCircuit::from_vamp_ir_source(
+    fn test_create_vp_with_valid_assignment() {
+        let x_assignment_circuit = VampIRValidityPredicateCircuit::from_vamp_ir_source(
+            "x = 1;",
+            HashMap::from([(String::from("x"), make_constant(BigInt::from(1)))]),
+        );
+
+        assert!(x_assignment_circuit.is_ok());
+
+        let vp_circuit = x_assignment_circuit.unwrap();
+        let vp_info = vp_circuit.get_verifying_info();
+
+        assert!(vp_info
+            .proof
+            .verify(&vp_info.vk, &vp_circuit.params, &[&vp_info.instance])
+            .is_ok());
+    }
+
+    #[test]
+    fn test_create_vp_with_invalid_assignment() {
+        let x_assignment_circuit = VampIRValidityPredicateCircuit::from_vamp_ir_source(
             "x = 1;",
             HashMap::from([(String::from("x"), make_constant(BigInt::from(0)))]),
         );
-        assert!(x_assignment.is_ok());
+
+        assert!(x_assignment_circuit.is_ok());
+
+        let vp_circuit = x_assignment_circuit.unwrap();
+        let vp_info = vp_circuit.get_verifying_info();
+
+        assert!(vp_info
+            .proof
+            .verify(&vp_info.vk, &vp_circuit.params, &[&vp_info.instance])
+            .is_err());
     }
 }
