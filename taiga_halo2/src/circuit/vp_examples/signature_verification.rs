@@ -11,7 +11,7 @@ use crate::{
             ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
     },
-    constant::{TaigaFixedBasesFull, NOTE_COMMIT_DOMAIN, NUM_NOTE, SETUP_PARAMS_MAP},
+    constant::{TaigaFixedBasesFull, NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
     proof::Proof,
     utils::{mod_r_p, poseidon_hash_n},
@@ -63,7 +63,7 @@ impl Default for SchnorrSignature {
 impl SchnorrSignature {
     pub fn sign<R: RngCore>(mut rng: R, sk: pallas::Scalar, message: Vec<pallas::Base>) -> Self {
         // TDOD: figure out whether the generator is applicable.
-        let generator = NOTE_COMMIT_DOMAIN.R();
+        let generator = pallas::Point::generator();
         let pk = generator * sk;
         let pk_coord = pk.to_affine().coordinates().unwrap();
         // Generate a random number: z
@@ -285,7 +285,7 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
         // Verify: s*G = R + Hash(r||P||m)*P
         // s*G
         let generator =
-            FixedPoint::from_inner(ecc_chip.clone(), TaigaFixedBasesFull::NoteCommitmentR);
+            FixedPoint::from_inner(ecc_chip.clone(), TaigaFixedBasesFull::BaseGenerator);
         let (s_g, _) = generator.mul(layouter.namespace(|| "s_scalar * generator"), &s_scalar)?;
 
         // Hash(r||P||m)

@@ -14,7 +14,7 @@ use crate::{
             SignatureVerificationValidityPredicateCircuit, COMPRESSED_TOKEN_AUTH_VK,
         },
     },
-    constant::{NOTE_COMMIT_DOMAIN, NUM_NOTE, SETUP_PARAMS_MAP},
+    constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     merkle_tree::MerklePath,
     note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
     proof::Proof,
@@ -282,7 +282,7 @@ impl TokenAuthorization {
     }
 
     pub fn from_sk_vk(sk: &pallas::Scalar, vk: &pallas::Base) -> Self {
-        let generator = NOTE_COMMIT_DOMAIN.R();
+        let generator = pallas::Point::generator().to_affine();
         let pk = generator * sk;
         Self { pk, vk: *vk }
     }
