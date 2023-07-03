@@ -13,10 +13,10 @@ use rand::RngCore;
 #[derive(Copy, Debug, Clone, PartialEq, Eq)]
 pub struct Nullifier(pallas::Base);
 
-#[derive(Copy, Debug, Clone)]
+#[derive(Copy, Debug, Clone, PartialEq, Eq)]
 pub struct NullifierDerivingKey(pallas::Base);
 
-#[derive(Copy, Debug, Clone)]
+#[derive(Copy, Debug, Clone, PartialEq, Eq)]
 pub enum NullifierKeyCom {
     Closed(pallas::Base),
     Open(NullifierDerivingKey),

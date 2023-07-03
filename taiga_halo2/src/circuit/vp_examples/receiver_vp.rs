@@ -17,6 +17,7 @@ use crate::{
     constant::{GENERATOR, NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX},
     note::Note,
     note_encryption::{NoteCipher, SecretKey},
+    nullifier::{Nullifier, NullifierKeyCom},
     proof::Proof,
     utils::{mod_r_p, poseidon_hash_n},
     vp_vk::ValidityPredicateVerifyingKey,
@@ -34,6 +35,7 @@ use lazy_static::lazy_static;
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
 use rand::RngCore;
+const CIPHER_LEN: usize = 9;
 
 lazy_static! {
     pub static ref RECEIVER_VK: ValidityPredicateVerifyingKey =
@@ -109,12 +111,17 @@ impl ValidityPredicateConfig for ReceiverValidityPredicateConfig {
 }
 
 impl ReceiverValidityPredicateCircuit {
-    pub fn new<R: RngCore>(mut rng: R) -> Self {
-        let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+    pub fn rand<R: RngCore>(mut rng: R) -> (Self, pallas::Base) {
+        let input_notes = [(); NUM_NOTE].map(|_| Note::dummy_input(&mut rng));
+        let mut output_notes: Vec<Note> = input_notes
+            .iter()
+            .map(|input| Note::dummy_output(&mut rng, input.get_nf().unwrap()))
+            .collect();
         let nonce = pallas::Base::from_u128(23333u128);
         let sk = pallas::Base::random(&mut rng);
-        let rcv_pk = pallas::Point::random(&mut rng);
+        let rcv_sk = pallas::Base::random(&mut rng);
+        let generator = GENERATOR.to_curve();
+        let rcv_pk = generator * mod_r_p(rcv_sk);
         let rcv_pk_coord = rcv_pk.to_affine().coordinates().unwrap();
         output_notes[0].app_data_dynamic = poseidon_hash_n([
             *rcv_pk_coord.x(),
@@ -123,16 +130,19 @@ impl ReceiverValidityPredicateCircuit {
             *COMPRESSED_RECEIVER_VK,
         ]);
         let owned_note_pub_id = output_notes[0].commitment().get_x();
-        Self {
-            owned_note_pub_id,
-            input_notes,
-            output_notes,
-            vp_vk: *COMPRESSED_RECEIVER_VK,
-            nonce,
-            sk,
-            rcv_pk,
-            auth_vp_vk: *COMPRESSED_TOKEN_AUTH_VK,
-        }
+        (
+            Self {
+                owned_note_pub_id,
+                input_notes,
+                output_notes: output_notes.try_into().unwrap(),
+                vp_vk: *COMPRESSED_RECEIVER_VK,
+                nonce,
+                sk,
+                rcv_pk,
+                auth_vp_vk: *COMPRESSED_TOKEN_AUTH_VK,
+            },
+            rcv_sk,
+        )
     }
 }
 
@@ -156,14 +166,16 @@ impl ValidityPredicateInfo for ReceiverValidityPredicateCircuit {
                 self.get_output_notes()[1]
             };
         let message = vec![
-            target_note.note_type.app_data_static,
             target_note.note_type.app_vk,
+            target_note.note_type.app_data_static,
+            target_note.app_data_dynamic,
             pallas::Base::from(target_note.value),
             target_note.rho.inner(),
             target_note.nk_com.get_nk_com(),
             target_note.psi,
             target_note.rcm,
         ];
+        assert_eq!(message.len() + 1, CIPHER_LEN);
         let key = SecretKey::from_dh_exchange(&self.rcv_pk, &mod_r_p(self.sk));
         let cipher = NoteCipher::encrypt(&message, &key, &self.nonce);
         cipher.cipher.iter().for_each(|&c| instances.push(c));
@@ -302,7 +314,16 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             &basic_variables.get_rcm_searchable_pairs(),
         )?;
 
-        let message = vec![app_data_static, app_vk, value, rho, nk_com, psi, rcm];
+        let message = vec![
+            app_vk,
+            app_data_static,
+            app_data_dynamic,
+            value,
+            rho,
+            nk_com,
+            psi,
+            rcm,
+        ];
 
         let add_chip = AddChip::<pallas::Base>::construct(config.add_config.clone(), ());
 
@@ -355,15 +376,59 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
 
 vp_circuit_impl!(ReceiverValidityPredicateCircuit);
 
+// TODO: we don't have a generic API to decrypt the instances since the indexes vary among applications.
+// If we want a unified API, we may need to fix the indexes and number of the ciphertext in the instances.
+pub fn decrypt_note(instances: Vec<pallas::Base>, sk: pallas::Base) -> Option<Note> {
+    let len = instances.len();
+    let cipher = NoteCipher {
+        cipher: instances[VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX
+            ..VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX + CIPHER_LEN]
+            .to_vec(),
+    };
+    let sender_pk = pallas::Affine::from_xy(instances[len - 2], instances[len - 1])
+        .unwrap()
+        .to_curve();
+    let key = SecretKey::from_dh_exchange(&sender_pk, &mod_r_p(sk));
+    let nonce = instances[len - 3];
+    match cipher.decrypt(&key, &nonce) {
+        Some(plaintext) => {
+            assert_eq!(plaintext.len(), CIPHER_LEN - 1);
+            let value = u64::from_le_bytes(
+                plaintext[3].to_repr()[..8]
+                    .try_into()
+                    .expect("slice with incorrect length"),
+            );
+            let rho = Nullifier::new(plaintext[4]);
+            let nk_com = NullifierKeyCom::from_closed(plaintext[5]);
+            let note = Note::from_full(
+                plaintext[0],
+                plaintext[1],
+                plaintext[2],
+                value,
+                nk_com,
+                rho,
+                true,
+                plaintext[6],
+                plaintext[7],
+            );
+            Some(note)
+        }
+        None => None,
+    }
+}
+
 #[test]
 fn test_halo2_receiver_vp_circuit() {
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
-    let circuit = ReceiverValidityPredicateCircuit::new(&mut rng);
+    let (circuit, rcv_sk) = ReceiverValidityPredicateCircuit::rand(&mut rng);
     let instances = circuit.get_instances();
 
-    let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances]).unwrap();
+    let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances.clone()]).unwrap();
     assert_eq!(prover.verify(), Ok(()));
+
+    let decrypted_note = decrypt_note(instances, rcv_sk).unwrap();
+    assert_eq!(decrypted_note, circuit.output_notes[0]);
 }

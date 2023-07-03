@@ -47,7 +47,7 @@ impl Default for NoteCommitment {
 }
 
 /// A note
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Note {
     pub note_type: ValueBase,
     /// app_data_dynamic is the data defined in application vp and will NOT be used to derive value base
@@ -68,7 +68,7 @@ pub struct Note {
 }
 
 /// The parameters in the ValueBase are used to derive note value base.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ValueBase {
     /// app_vk is the compressed verifying key of VP
     pub app_vk: pallas::Base,
@@ -120,18 +120,57 @@ impl Note {
         }
     }
 
-    pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        Self::dummy_from_rho(rng, rho)
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_full(
+        app_vk: pallas::Base,
+        app_data_static: pallas::Base,
+        app_data_dynamic: pallas::Base,
+        value: u64,
+        nk_com: NullifierKeyCom,
+        rho: Nullifier,
+        is_merkle_checked: bool,
+        psi: pallas::Base,
+        rcm: pallas::Base,
+    ) -> Self {
+        let note_type = ValueBase::new(app_vk, app_data_static);
+        Self {
+            note_type,
+            app_data_dynamic,
+            value,
+            nk_com,
+            is_merkle_checked,
+            psi,
+            rcm,
+            rho,
+        }
     }
 
-    pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
+    // TODO: remove it when optimizing the tests
+    pub fn dummy<R: RngCore>(mut rng: R) -> Self {
+        Self::dummy_input(&mut rng)
+    }
+
+    pub fn dummy_input<R: RngCore>(mut rng: R) -> Self {
+        let rho = Nullifier::new(pallas::Base::random(&mut rng));
+        let nk_com = NullifierKeyCom::rand(&mut rng);
+        Self::dummy_from_parts(rng, rho, nk_com)
+    }
+
+    pub fn dummy_output<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
+        let nk_com = NullifierKeyCom::from_closed(pallas::Base::random(&mut rng));
+        Self::dummy_from_parts(rng, rho, nk_com)
+    }
+
+    pub fn dummy_from_parts<R: RngCore>(
+        mut rng: R,
+        rho: Nullifier,
+        nk_com: NullifierKeyCom,
+    ) -> Self {
         let app_vk = pallas::Base::random(&mut rng);
         let app_data_static = pallas::Base::random(&mut rng);
         let note_type = ValueBase::new(app_vk, app_data_static);
         let app_data_dynamic = pallas::Base::zero();
         let value: u64 = rng.gen();
-        let nk_com = NullifierKeyCom::rand(&mut rng);
         let rseed = RandomSeed::random(&mut rng);
         Self {
             note_type,
@@ -366,7 +405,7 @@ impl OutputNoteProvingInfo {
 
     // TODO: move it to test mod
     pub fn dummy<R: RngCore>(mut rng: R, nf: Nullifier) -> Self {
-        let note = Note::dummy_from_rho(&mut rng, nf);
+        let note = Note::dummy_output(&mut rng, nf);
         let app_vp_verifying_info = Box::new(TrivialValidityPredicateCircuit::dummy(&mut rng));
         let app_vp_verifying_info_dynamic = vec![];
         Self {
