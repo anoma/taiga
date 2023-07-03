@@ -164,9 +164,9 @@ pub fn check_input_note(
     )?;
 
     // Witness rcm
-    let rcm = ScalarFixed::new(
-        ecc_chip.clone(),
-        layouter.namespace(|| "rcm"),
+    let rcm = assign_free_advice(
+        layouter.namespace(|| "witness rcm"),
+        advices[0],
         Value::known(input_note.get_rcm()),
     )?;
 
@@ -189,7 +189,7 @@ pub fn check_input_note(
         rho.clone(),
         psi.clone(),
         value.clone(),
-        rcm,
+        rcm.clone(),
         is_merkle_checked.clone(),
     )?;
 
@@ -221,7 +221,7 @@ pub fn check_input_note(
         rho,
         nk_com,
         psi,
-        // rcm,
+        rcm,
     };
 
     Ok(InputNoteVariables {
@@ -293,9 +293,9 @@ pub fn check_output_note(
     )?;
 
     // Witness rcm
-    let rcm = ScalarFixed::new(
-        ecc_chip.clone(),
-        layouter.namespace(|| "rcm"),
+    let rcm = assign_free_advice(
+        layouter.namespace(|| "witness rcm"),
+        advices[0],
         Value::known(output_note.get_rcm()),
     )?;
 
@@ -325,7 +325,7 @@ pub fn check_output_note(
         old_nf.clone(),
         psi.clone(),
         value.clone(),
-        rcm,
+        rcm.clone(),
         is_merkle_checked.clone(),
     )?;
 
@@ -343,7 +343,7 @@ pub fn check_output_note(
         rho: old_nf,
         nk_com,
         psi,
-        // rcm,
+        rcm,
     };
 
     Ok(OutputNoteVariables {

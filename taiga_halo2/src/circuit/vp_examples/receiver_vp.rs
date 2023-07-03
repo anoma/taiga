@@ -162,6 +162,7 @@ impl ValidityPredicateInfo for ReceiverValidityPredicateCircuit {
             target_note.rho.inner(),
             target_note.nk_com.get_nk_com(),
             target_note.psi,
+            target_note.rcm,
         ];
         let key = SecretKey::from_dh_exchange(&self.rcv_pk, &mod_r_p(self.sk));
         let cipher = NoteCipher::encrypt(&message, &key, &self.nonce);
@@ -294,7 +295,14 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             &basic_variables.get_psi_searchable_pairs(),
         )?;
 
-        let message = vec![app_data_static, app_vk, value, rho, nk_com, psi];
+        let rcm = get_owned_note_variable(
+            config.get_owned_note_variable_config,
+            layouter.namespace(|| "get owned note psi"),
+            &owned_note_pub_id,
+            &basic_variables.get_rcm_searchable_pairs(),
+        )?;
+
+        let message = vec![app_data_static, app_vk, value, rho, nk_com, psi, rcm];
 
         let add_chip = AddChip::<pallas::Base>::construct(config.add_config.clone(), ());
 

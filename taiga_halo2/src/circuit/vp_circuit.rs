@@ -244,6 +244,7 @@ pub struct NoteVariables {
     pub rho: AssignedCell<pallas::Base, pallas::Base>,
     pub nk_com: AssignedCell<pallas::Base, pallas::Base>,
     pub psi: AssignedCell<pallas::Base, pallas::Base>,
+    pub rcm: AssignedCell<pallas::Base, pallas::Base>,
 }
 
 // Variables in the input note
@@ -484,6 +485,28 @@ impl BasicValidityPredicateVariables {
             .map(|variables| NoteSearchableVariablePair {
                 src_variable: variables.cm_x.clone(),
                 target_variable: variables.note_variables.psi.clone(),
+            })
+            .collect();
+        input_note_pairs.extend(output_note_pairs);
+        input_note_pairs.try_into().unwrap()
+    }
+
+    pub fn get_rcm_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+        let mut input_note_pairs: Vec<_> = self
+            .input_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.nf.clone(),
+                target_variable: variables.note_variables.rcm.clone(),
+            })
+            .collect();
+
+        let output_note_pairs: Vec<_> = self
+            .output_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.cm_x.clone(),
+                target_variable: variables.note_variables.rcm.clone(),
             })
             .collect();
         input_note_pairs.extend(output_note_pairs);

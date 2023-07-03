@@ -9,7 +9,7 @@ use crate::{
     },
     merkle_tree::{MerklePath, Node, LR},
     nullifier::{Nullifier, NullifierDerivingKey, NullifierKeyCom},
-    utils::{extract_p, poseidon_hash, poseidon_to_curve},
+    utils::{extract_p, mod_r_p, poseidon_hash, poseidon_to_curve},
 };
 use bitvec::{array::BitArray, order::Lsb0};
 use blake2b_simd::Params as Blake2bParams;
@@ -62,7 +62,7 @@ pub struct Note {
     /// psi is to derive the nullifier
     pub psi: pallas::Base,
     /// rcm is the trapdoor of the note commitment
-    pub rcm: pallas::Scalar,
+    pub rcm: pallas::Base,
     /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of input note will be checked in ActionProof.
     pub is_merkle_checked: bool,
 }
@@ -151,16 +151,15 @@ impl Note {
         let note_type = ValueBase::new(app_vk, app_data_static);
         let app_data_dynamic = pallas::Base::zero();
         let nk_com = NullifierKeyCom::rand(&mut rng);
-        let rcm = pallas::Scalar::random(&mut rng);
-        let psi = pallas::Base::random(&mut rng);
+        let rseed = RandomSeed::random(&mut rng);
         Self {
             note_type,
             app_data_dynamic,
             value: 0,
             nk_com,
             rho,
-            psi,
-            rcm,
+            psi: rseed.get_psi(&rho),
+            rcm: rseed.get_rcm(&rho),
             is_merkle_checked: false,
         }
     }
@@ -207,7 +206,7 @@ impl Note {
                             .iter()
                             .by_vals(),
                     ),
-                &self.get_rcm(),
+                &mod_r_p(self.get_rcm()),
             )
             .unwrap();
         NoteCommitment(ret)
@@ -252,7 +251,7 @@ impl Note {
         self.psi
     }
 
-    pub fn get_rcm(&self) -> pallas::Scalar {
+    pub fn get_rcm(&self) -> pallas::Base {
         self.rcm
     }
 }
@@ -294,7 +293,7 @@ impl RandomSeed {
         pallas::Base::from_uniform_bytes(&psi_bytes)
     }
 
-    pub fn get_rcm(&self, rho: &Nullifier) -> pallas::Scalar {
+    pub fn get_rcm(&self, rho: &Nullifier) -> pallas::Base {
         let mut h = Blake2bParams::new()
             .hash_length(64)
             .personal(PRF_EXPAND_PERSONALIZATION)
@@ -303,7 +302,7 @@ impl RandomSeed {
         h.update(&self.0);
         h.update(&rho.to_bytes());
         let rcm_bytes = *h.finalize().as_array();
-        pallas::Scalar::from_uniform_bytes(&rcm_bytes)
+        pallas::Base::from_uniform_bytes(&rcm_bytes)
     }
 }
 
