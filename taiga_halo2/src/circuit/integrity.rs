@@ -9,7 +9,7 @@ use crate::circuit::{
     vp_circuit::{InputNoteVariables, NoteVariables, OutputNoteVariables},
 };
 use crate::constant::{
-    BaseGenerator, NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases,
+    BaseFieldGenerators, NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases,
     TaigaFixedBasesFull, POSEIDON_TO_CURVE_INPUT_LEN,
 };
 use crate::note::Note;
@@ -62,7 +62,7 @@ pub fn nullifier_circuit(
         &psi,
     )?;
 
-    let nullifier_k = FixedPointBaseField::from_inner(ecc_chip, BaseGenerator);
+    let nullifier_k = FixedPointBaseField::from_inner(ecc_chip, BaseFieldGenerators::BaseGenerator);
     let hash_nk_rho_add_psi_mul_k = nullifier_k.mul(
         layouter.namespace(|| "hash_nk_rho_add_psi * nullifier_k"),
         hash_nk_rho_add_psi,
