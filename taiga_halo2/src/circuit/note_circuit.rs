@@ -713,7 +713,7 @@ impl NoteChip {
 #[test]
 fn test_halo2_note_commitment_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
-    use crate::note::Note;
+    use crate::note::{Note, RandomSeed};
     use crate::nullifier::{Nullifier, NullifierKeyCom};
     use halo2_gadgets::{
         ecc::{
@@ -740,9 +740,8 @@ fn test_halo2_note_commitment_circuit() {
         value: u64,
         nk_com: NullifierKeyCom,
         rho: Nullifier,
-        psi: pallas::Base,
-        rcm: pallas::Scalar,
         is_merkle_checked: bool,
+        rseed: RandomSeed,
     }
 
     impl Circuit<pallas::Base> for MyCircuit {
@@ -838,9 +837,8 @@ fn test_halo2_note_commitment_circuit() {
                 self.value,
                 self.nk_com,
                 self.rho,
-                self.psi,
-                self.rcm,
                 self.is_merkle_checked,
+                self.rseed,
             );
             // Construct a Sinsemilla chip
             let sinsemilla_chip =
@@ -894,13 +892,13 @@ fn test_halo2_note_commitment_circuit() {
             let psi = assign_free_advice(
                 layouter.namespace(|| "witness psi"),
                 note_commit_config.advices[0],
-                Value::known(note.psi),
+                Value::known(note.get_psi()),
             )?;
 
             let rcm = ScalarFixed::new(
                 ecc_chip.clone(),
                 layouter.namespace(|| "rcm"),
-                Value::known(note.rcm),
+                Value::known(note.get_rcm()),
             )?;
 
             let is_normail_var = assign_free_advice(
@@ -946,9 +944,8 @@ fn test_halo2_note_commitment_circuit() {
             value: rng.next_u64(),
             nk_com: NullifierKeyCom::rand(&mut rng),
             rho: Nullifier::default(),
-            psi: pallas::Base::random(&mut rng),
-            rcm: pallas::Scalar::random(&mut rng),
             is_merkle_checked: false,
+            rseed: RandomSeed::random(&mut rng),
         };
 
         let prover = MockProver::<pallas::Base>::run(11, &circuit, vec![]).unwrap();
@@ -964,9 +961,8 @@ fn test_halo2_note_commitment_circuit() {
             value: rng.next_u64(),
             nk_com: NullifierKeyCom::rand(&mut rng),
             rho: Nullifier::default(),
-            psi: pallas::Base::random(&mut rng),
-            rcm: pallas::Scalar::random(&mut rng),
             is_merkle_checked: true,
+            rseed: RandomSeed::random(&mut rng),
         };
 
         let prover = MockProver::<pallas::Base>::run(11, &circuit, vec![]).unwrap();

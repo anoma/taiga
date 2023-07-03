@@ -25,7 +25,7 @@ use crate::{
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
-    note::Note,
+    note::{Note, RandomSeed},
     nullifier::{Nullifier, NullifierKeyCom},
     proof::Proof,
     utils::poseidon_hash_n,
@@ -509,8 +509,7 @@ pub fn create_intent_note<R: RngCore>(
         buy,
         receiver_address,
     );
-    let rcm = pallas::Scalar::random(&mut rng);
-    let psi = pallas::Base::random(&mut rng);
+    let rseed = RandomSeed::random(&mut rng);
     Note::new(
         *COMPRESSED_PARTIAL_FULFILLMENT_INTENT_VK,
         app_data_static,
@@ -518,9 +517,8 @@ pub fn create_intent_note<R: RngCore>(
         1u64,
         nk_com,
         rho,
-        psi,
-        rcm,
         false,
+        rseed,
     )
 }
 

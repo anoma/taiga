@@ -102,7 +102,7 @@ vp_circuit_impl!(SudokuVP);
 mod tests {
     use taiga_halo2::{
         constant::NUM_NOTE,
-        note::Note,
+        note::{Note, RandomSeed},
         nullifier::{Nullifier, NullifierKeyCom},
         vp_vk::ValidityPredicateVerifyingKey,
     };
@@ -148,8 +148,7 @@ mod tests {
 
         let value: u64 = 0;
         let nk_com = NullifierKeyCom::default();
-        let rcm = pallas::Scalar::random(&mut rng);
-        let psi = pallas::Base::random(&mut rng);
+        let rseed = RandomSeed::random(&mut rng);
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
         Note::new(
             vp_vk,
@@ -158,9 +157,8 @@ mod tests {
             value,
             nk_com,
             rho,
-            psi,
-            rcm,
             true,
+            rseed,
         );
     }
 }

@@ -294,7 +294,7 @@ pub mod testing {
         circuit::vp_examples::TrivialValidityPredicateCircuit,
         constant::TAIGA_COMMITMENT_TREE_DEPTH,
         merkle_tree::MerklePath,
-        note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
+        note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
         nullifier::{Nullifier, NullifierKeyCom},
         shielded_ptx::ShieldedPartialTransaction,
         utils::poseidon_hash,
@@ -323,8 +323,7 @@ pub mod testing {
             let rho = Nullifier::new(pallas::Base::random(&mut rng));
             let value = 5000u64;
             let nk_com = NullifierKeyCom::rand(&mut rng);
-            let rcm = pallas::Scalar::random(&mut rng);
-            let psi = pallas::Base::random(&mut rng);
+            let rseed = RandomSeed::random(&mut rng);
             let is_merkle_checked = true;
             Note::new(
                 compressed_trivial_vp_vk,
@@ -333,9 +332,8 @@ pub mod testing {
                 value,
                 nk_com,
                 rho,
-                psi,
-                rcm,
                 is_merkle_checked,
+                rseed,
             )
         };
         let output_note_1 = {
@@ -346,8 +344,7 @@ pub mod testing {
             let rho = input_note_1.get_nf().unwrap();
             let value = 5000u64;
             let nk_com = NullifierKeyCom::rand(&mut rng);
-            let rcm = pallas::Scalar::random(&mut rng);
-            let psi = pallas::Base::random(&mut rng);
+            let rseed = RandomSeed::random(&mut rng);
             let is_merkle_checked = true;
             Note::new(
                 compressed_trivial_vp_vk,
@@ -356,9 +353,8 @@ pub mod testing {
                 value,
                 nk_com,
                 rho,
-                psi,
-                rcm,
                 is_merkle_checked,
+                rseed,
             )
         };
 
@@ -368,8 +364,7 @@ pub mod testing {
             let rho = Nullifier::new(pallas::Base::random(&mut rng));
             let value = 10u64;
             let nk_com = NullifierKeyCom::rand(&mut rng);
-            let rcm = pallas::Scalar::random(&mut rng);
-            let psi = pallas::Base::random(&mut rng);
+            let rseed = RandomSeed::random(&mut rng);
             let is_merkle_checked = true;
             Note::new(
                 compressed_trivial_vp_vk,
@@ -378,9 +373,8 @@ pub mod testing {
                 value,
                 nk_com,
                 rho,
-                psi,
-                rcm,
                 is_merkle_checked,
+                rseed,
             )
         };
         let output_note_2 = {
@@ -389,8 +383,7 @@ pub mod testing {
             let rho = input_note_2.get_nf().unwrap();
             let value = 10u64;
             let nk_com = NullifierKeyCom::rand(&mut rng);
-            let rcm = pallas::Scalar::random(&mut rng);
-            let psi = pallas::Base::random(&mut rng);
+            let rseed = RandomSeed::random(&mut rng);
             let is_merkle_checked = true;
             Note::new(
                 compressed_trivial_vp_vk,
@@ -399,9 +392,8 @@ pub mod testing {
                 value,
                 nk_com,
                 rho,
-                psi,
-                rcm,
                 is_merkle_checked,
+                rseed,
             )
         };
 

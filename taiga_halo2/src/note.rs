@@ -5,14 +5,16 @@ use crate::{
     },
     constant::{
         BASE_BITS_NUM, NOTE_COMMIT_DOMAIN, NUM_NOTE, POSEIDON_TO_CURVE_INPUT_LEN,
-        TAIGA_COMMITMENT_TREE_DEPTH,
+        PRF_EXPAND_PERSONALIZATION, PRF_EXPAND_PSI, PRF_EXPAND_RCM, TAIGA_COMMITMENT_TREE_DEPTH,
     },
     merkle_tree::{MerklePath, Node, LR},
     nullifier::{Nullifier, NullifierDerivingKey, NullifierKeyCom},
     utils::{extract_p, poseidon_hash, poseidon_to_curve},
 };
 use bitvec::{array::BitArray, order::Lsb0};
+use blake2b_simd::Params as Blake2bParams;
 use core::iter;
+use ff::FromUniformBytes;
 use halo2_proofs::arithmetic::Field;
 use pasta_curves::{
     group::{ff::PrimeFieldBits, Group, GroupEncoding},
@@ -57,8 +59,9 @@ pub struct Note {
     pub nk_com: NullifierKeyCom,
     /// old nullifier. Nonce which is a deterministically computed, unique nonce
     pub rho: Nullifier,
-    /// computed from input_note_nf and rcm by using a PRF
+    /// psi is to derive the nullifier
     pub psi: pallas::Base,
+    /// rcm is the trapdoor of the note commitment
     pub rcm: pallas::Scalar,
     /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of input note will be checked in ActionProof.
     pub is_merkle_checked: bool,
@@ -72,6 +75,9 @@ pub struct ValueBase {
     /// app_data_static is the encoded data that is defined in application vp
     pub app_data_static: pallas::Base,
 }
+
+#[derive(Copy, Clone, Debug, Default)]
+pub struct RandomSeed([u8; 32]);
 
 #[derive(Clone)]
 pub struct InputNoteProvingInfo {
@@ -98,9 +104,8 @@ impl Note {
         value: u64,
         nk_com: NullifierKeyCom,
         rho: Nullifier,
-        psi: pallas::Base,
-        rcm: pallas::Scalar,
         is_merkle_checked: bool,
+        rseed: RandomSeed,
     ) -> Self {
         let note_type = ValueBase::new(app_vk, app_data_static);
         Self {
@@ -108,10 +113,10 @@ impl Note {
             app_data_dynamic,
             value,
             nk_com,
-            rho,
-            psi,
-            rcm,
             is_merkle_checked,
+            psi: rseed.get_psi(&rho),
+            rcm: rseed.get_rcm(&rho),
+            rho,
         }
     }
 
@@ -127,17 +132,16 @@ impl Note {
         let app_data_dynamic = pallas::Base::zero();
         let value: u64 = rng.gen();
         let nk_com = NullifierKeyCom::rand(&mut rng);
-        let rcm = pallas::Scalar::random(&mut rng);
-        let psi = pallas::Base::random(&mut rng);
+        let rseed = RandomSeed::random(&mut rng);
         Self {
             note_type,
             app_data_dynamic,
             value,
             nk_com,
-            rho,
-            psi,
-            rcm,
             is_merkle_checked: true,
+            psi: rseed.get_psi(&rho),
+            rcm: rseed.get_rcm(&rho),
+            rho,
         }
     }
 
@@ -190,14 +194,20 @@ impl Note {
                             .by_vals()
                             .take(BASE_BITS_NUM),
                     )
-                    .chain(self.psi.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
+                    .chain(
+                        self.get_psi()
+                            .to_le_bits()
+                            .iter()
+                            .by_vals()
+                            .take(BASE_BITS_NUM),
+                    )
                     .chain([self.is_merkle_checked])
                     .chain(
                         BitArray::<_, Lsb0>::new(self.value.to_le())
                             .iter()
                             .by_vals(),
                     ),
-                &self.rcm,
+                &self.get_rcm(),
             )
             .unwrap();
         NoteCommitment(ret)
@@ -237,6 +247,14 @@ impl Note {
     pub fn get_app_data_static(&self) -> pallas::Base {
         self.note_type.app_data_static
     }
+
+    pub fn get_psi(&self) -> pallas::Base {
+        self.psi
+    }
+
+    pub fn get_rcm(&self) -> pallas::Scalar {
+        self.rcm
+    }
 }
 
 impl ValueBase {
@@ -250,6 +268,42 @@ impl ValueBase {
     pub fn derive_value_base(&self) -> pallas::Point {
         let inputs = [self.app_vk, self.app_data_static];
         poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&inputs)
+    }
+}
+
+impl RandomSeed {
+    pub fn random<R: RngCore>(mut rng: R) -> Self {
+        let mut rseed = [0; 32];
+        rng.fill_bytes(&mut rseed);
+        Self(rseed)
+    }
+
+    pub fn from_bytes(rseed: [u8; 32]) -> Self {
+        Self(rseed)
+    }
+
+    pub fn get_psi(&self, rho: &Nullifier) -> pallas::Base {
+        let mut h = Blake2bParams::new()
+            .hash_length(64)
+            .personal(PRF_EXPAND_PERSONALIZATION)
+            .to_state();
+        h.update(&[PRF_EXPAND_PSI]);
+        h.update(&self.0);
+        h.update(&rho.to_bytes());
+        let psi_bytes = *h.finalize().as_array();
+        pallas::Base::from_uniform_bytes(&psi_bytes)
+    }
+
+    pub fn get_rcm(&self, rho: &Nullifier) -> pallas::Scalar {
+        let mut h = Blake2bParams::new()
+            .hash_length(64)
+            .personal(PRF_EXPAND_PERSONALIZATION)
+            .to_state();
+        h.update(&[PRF_EXPAND_RCM]);
+        h.update(&self.0);
+        h.update(&rho.to_bytes());
+        let rcm_bytes = *h.finalize().as_array();
+        pallas::Scalar::from_uniform_bytes(&rcm_bytes)
     }
 }
 

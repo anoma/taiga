@@ -24,6 +24,10 @@ pub const NOTE_COMMITMENT_PERSONALIZATION: &str = "Taiga-NoteCommit";
 
 pub const TRANSACTION_BINDING_HASH_PERSONALIZATION: &[u8; 16] = b"TxBindingSigHash";
 
+pub const PRF_EXPAND_PERSONALIZATION: &[u8; 16] = b"Taiga_ExpandSeed";
+pub const PRF_EXPAND_PSI: u8 = 0;
+pub const PRF_EXPAND_RCM: u8 = 1;
+
 /// Commitment merkle tree depth
 pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
 

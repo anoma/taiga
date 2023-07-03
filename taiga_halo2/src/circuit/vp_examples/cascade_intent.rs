@@ -21,7 +21,7 @@ use crate::{
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
-    note::Note,
+    note::{Note, RandomSeed},
     nullifier::{Nullifier, NullifierKeyCom},
     proof::Proof,
     vp_vk::ValidityPredicateVerifyingKey,
@@ -204,8 +204,7 @@ pub fn create_intent_note<R: RngCore>(
 ) -> Note {
     let app_data_static =
         CascadeIntentValidityPredicateCircuit::encode_app_data_static(cascade_note_cm);
-    let rcm = pallas::Scalar::random(&mut rng);
-    let psi = pallas::Base::random(&mut rng);
+    let rseed = RandomSeed::random(&mut rng);
     Note::new(
         *COMPRESSED_CASCADE_INTENT_VK,
         app_data_static,
@@ -213,9 +212,8 @@ pub fn create_intent_note<R: RngCore>(
         1u64,
         nk_com,
         rho,
-        psi,
-        rcm,
         false,
+        rseed,
     )
 }
 

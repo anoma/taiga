@@ -164,14 +164,14 @@ pub fn check_input_note(
     let psi = assign_free_advice(
         layouter.namespace(|| "witness psi_input"),
         advices[0],
-        Value::known(input_note.psi),
+        Value::known(input_note.get_psi()),
     )?;
 
     // Witness rcm
     let rcm = ScalarFixed::new(
         ecc_chip.clone(),
         layouter.namespace(|| "rcm"),
-        Value::known(input_note.rcm),
+        Value::known(input_note.get_rcm()),
     )?;
 
     // Witness is_merkle_checked
@@ -296,14 +296,14 @@ pub fn check_output_note(
     let rcm = ScalarFixed::new(
         ecc_chip.clone(),
         layouter.namespace(|| "rcm"),
-        Value::known(output_note.rcm),
+        Value::known(output_note.get_rcm()),
     )?;
 
     // Witness psi
     let psi = assign_free_advice(
         layouter.namespace(|| "witness psi_output"),
         advices[0],
-        Value::known(output_note.psi),
+        Value::known(output_note.get_psi()),
     )?;
 
     // Witness is_merkle_checked

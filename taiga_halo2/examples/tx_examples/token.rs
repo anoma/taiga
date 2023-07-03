@@ -13,7 +13,7 @@ use taiga_halo2::{
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::MerklePath,
-    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
+    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
     nullifier::{Nullifier, NullifierDerivingKey, NullifierKeyCom},
     shielded_ptx::ShieldedPartialTransaction,
 };
@@ -28,8 +28,7 @@ pub fn create_random_token_note<R: RngCore>(
 ) -> Note {
     let app_data_static = transfrom_token_name_to_token_property(name);
     let app_data_dynamic = auth.to_app_data_dynamic();
-    let rcm = pallas::Scalar::random(&mut rng);
-    let psi = pallas::Base::random(&mut rng);
+    let rseed = RandomSeed::random(&mut rng);
     Note::new(
         *COMPRESSED_TOKEN_VK,
         app_data_static,
@@ -37,9 +36,8 @@ pub fn create_random_token_note<R: RngCore>(
         value,
         nk_com,
         rho,
-        psi,
-        rcm,
         true,
+        rseed,
     )
 }
 
