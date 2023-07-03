@@ -9,8 +9,8 @@ use crate::circuit::{
     vp_circuit::{InputNoteVariables, NoteVariables, OutputNoteVariables},
 };
 use crate::constant::{
-    BaseGenerator, NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentFixedBasesFull,
-    NoteCommitmentHashDomain, POSEIDON_TO_CURVE_INPUT_LEN,
+    BaseGenerator, NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases,
+    TaigaFixedBasesFull, POSEIDON_TO_CURVE_INPUT_LEN,
 };
 use crate::note::Note;
 use crate::utils::poseidon_to_curve;
@@ -39,11 +39,11 @@ pub fn nullifier_circuit(
     mut layouter: impl Layouter<pallas::Base>,
     poseidon_chip: PoseidonChip<pallas::Base, 3, 2>,
     add_chip: AddChip<pallas::Base>,
-    ecc_chip: EccChip<NoteCommitmentFixedBases>,
+    ecc_chip: EccChip<TaigaFixedBases>,
     nk: AssignedCell<pallas::Base, pallas::Base>,
     rho: AssignedCell<pallas::Base, pallas::Base>,
     psi: AssignedCell<pallas::Base, pallas::Base>,
-    cm: &Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
+    cm: &Point<pallas::Affine, EccChip<TaigaFixedBases>>,
 ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
     let poseidon_message = [nk, rho];
     let poseidon_hasher =
@@ -78,11 +78,11 @@ pub fn check_input_note(
     mut layouter: impl Layouter<pallas::Base>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
-    ecc_chip: EccChip<NoteCommitmentFixedBases>,
+    ecc_chip: EccChip<TaigaFixedBases>,
     sinsemilla_chip: SinsemillaChip<
         NoteCommitmentHashDomain,
         NoteCommitmentDomain,
-        NoteCommitmentFixedBases,
+        TaigaFixedBases,
     >,
     note_commit_chip: NoteCommitmentChip,
     // PoseidonChip can not be cloned, use PoseidonConfig temporarily
@@ -236,11 +236,11 @@ pub fn check_output_note(
     mut layouter: impl Layouter<pallas::Base>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
-    ecc_chip: EccChip<NoteCommitmentFixedBases>,
+    ecc_chip: EccChip<TaigaFixedBases>,
     sinsemilla_chip: SinsemillaChip<
         NoteCommitmentHashDomain,
         NoteCommitmentDomain,
-        NoteCommitmentFixedBases,
+        TaigaFixedBases,
     >,
     note_commit_chip: NoteCommitmentChip,
     // PoseidonChip can not be cloned, use PoseidonConfig temporarily
@@ -351,10 +351,10 @@ pub fn check_output_note(
 pub fn derive_value_base(
     mut layouter: impl Layouter<pallas::Base>,
     hash_to_curve_config: HashToCurveConfig,
-    ecc_chip: EccChip<NoteCommitmentFixedBases>,
+    ecc_chip: EccChip<TaigaFixedBases>,
     app_vk: AssignedCell<pallas::Base, pallas::Base>,
     app_data_static: AssignedCell<pallas::Base, pallas::Base>,
-) -> Result<NonIdentityPoint<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
+) -> Result<NonIdentityPoint<pallas::Affine, EccChip<TaigaFixedBases>>, Error> {
     let point = hash_to_curve_circuit(
         layouter.namespace(|| "hash to curve"),
         hash_to_curve_config,
@@ -385,7 +385,7 @@ pub fn derive_value_base(
 #[allow(clippy::too_many_arguments)]
 pub fn compute_value_commitment(
     mut layouter: impl Layouter<pallas::Base>,
-    ecc_chip: EccChip<NoteCommitmentFixedBases>,
+    ecc_chip: EccChip<TaigaFixedBases>,
     hash_to_curve_config: HashToCurveConfig,
     app_address_input: AssignedCell<pallas::Base, pallas::Base>,
     data_input: AssignedCell<pallas::Base, pallas::Base>,
@@ -394,7 +394,7 @@ pub fn compute_value_commitment(
     data_output: AssignedCell<pallas::Base, pallas::Base>,
     v_output: AssignedCell<pallas::Base, pallas::Base>,
     rcv: pallas::Scalar,
-) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
+) -> Result<Point<pallas::Affine, EccChip<TaigaFixedBases>>, Error> {
     // input value point
     let value_base_input = derive_value_base(
         layouter.namespace(|| "derive input value base"),
@@ -460,7 +460,7 @@ pub fn compute_value_commitment(
         Value::known(rcv),
     )?;
 
-    let blind_base = FixedPoint::from_inner(ecc_chip, NoteCommitmentFixedBasesFull);
+    let blind_base = FixedPoint::from_inner(ecc_chip, TaigaFixedBasesFull::NoteCommitmentR);
     let (blind, _) = blind_base.mul(
         layouter.namespace(|| "blind_scalar * blind_base"),
         &blind_scalar,
@@ -473,9 +473,7 @@ pub fn compute_value_commitment(
 fn test_halo2_nullifier_circuit() {
     use crate::circuit::gadgets::add::AddConfig;
     use crate::circuit::gadgets::assign_free_advice;
-    use crate::constant::{
-        NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain,
-    };
+    use crate::constant::{NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases};
     use crate::note::NoteCommitment;
     use crate::nullifier::{Nullifier, NullifierDerivingKey};
     use halo2_gadgets::{
@@ -508,13 +506,9 @@ fn test_halo2_nullifier_circuit() {
             [Column<Advice>; 10],
             PoseidonConfig<pallas::Base, 3, 2>,
             AddConfig,
-            EccConfig<NoteCommitmentFixedBases>,
+            EccConfig<TaigaFixedBases>,
             // add SinsemillaConfig to load look table, just for test
-            SinsemillaConfig<
-                NoteCommitmentHashDomain,
-                NoteCommitmentDomain,
-                NoteCommitmentFixedBases,
-            >,
+            SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, TaigaFixedBases>,
         );
         type FloorPlanner = SimpleFloorPlanner;
 
@@ -572,16 +566,12 @@ fn test_halo2_nullifier_circuit() {
 
             let add_config = AddChip::configure(meta, advices[0..2].try_into().unwrap());
 
-            let ecc_config = EccChip::<NoteCommitmentFixedBases>::configure(
-                meta,
-                advices,
-                lagrange_coeffs,
-                range_check,
-            );
+            let ecc_config =
+                EccChip::<TaigaFixedBases>::configure(meta, advices, lagrange_coeffs, range_check);
             let sinsemilla_config = SinsemillaChip::<
                 NoteCommitmentHashDomain,
                 NoteCommitmentDomain,
-                NoteCommitmentFixedBases,
+                TaigaFixedBases,
             >::configure(
                 meta,
                 advices[..5].try_into().unwrap(),
@@ -611,7 +601,7 @@ fn test_halo2_nullifier_circuit() {
             SinsemillaChip::<
                 NoteCommitmentHashDomain,
                 NoteCommitmentDomain,
-                NoteCommitmentFixedBases,
+                TaigaFixedBases,
             >::load(sinsemilla_config, &mut layouter)?;
 
             // Witness nk

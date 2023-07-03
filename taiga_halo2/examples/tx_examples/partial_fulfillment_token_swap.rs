@@ -4,8 +4,9 @@
 /// The Solver/Bob can partially fulfill Alice's intent and return 1 "BTC" back to Alice.
 ///
 use crate::token::{create_random_token_note, create_token_swap_ptx};
+use group::Group;
 use halo2_proofs::arithmetic::Field;
-use pasta_curves::pallas;
+use pasta_curves::{group::Curve, pallas};
 use rand::{CryptoRng, RngCore};
 use taiga_halo2::{
     circuit::vp_examples::{
@@ -18,7 +19,6 @@ use taiga_halo2::{
             TokenAuthorization,
         },
     },
-    constant::NOTE_COMMIT_DOMAIN,
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::MerklePath,
     note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
@@ -230,7 +230,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
 }
 
 pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
-    let generator = NOTE_COMMIT_DOMAIN.R();
+    let generator = pallas::Point::generator().to_affine();
 
     // Alice creates the partial transaction with 5 BTC input and intent output
     let alice_auth_sk = pallas::Scalar::random(&mut rng);

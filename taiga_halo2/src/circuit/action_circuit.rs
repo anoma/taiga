@@ -6,7 +6,7 @@ use crate::circuit::merkle_circuit::{
 };
 use crate::circuit::note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig};
 use crate::constant::{
-    NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain,
+    NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases,
     ACTION_ANCHOR_INSTANCE_ROW_IDX, ACTION_NET_VALUE_CM_X_INSTANCE_ROW_IDX,
     ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX, ACTION_NF_INSTANCE_ROW_IDX,
     ACTION_OUTPUT_CM_INSTANCE_ROW_IDX, TAIGA_COMMITMENT_TREE_DEPTH,
@@ -117,11 +117,10 @@ impl Circuit<pallas::Base> for ActionCircuit {
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<(), Error> {
         // Load the Sinsemilla generator lookup table used by the whole circuit.
-        SinsemillaChip::<
-            NoteCommitmentHashDomain,
-            NoteCommitmentDomain,
-            NoteCommitmentFixedBases,
-        >::load(config.note_config.sinsemilla_config.clone(), &mut layouter)?;
+        SinsemillaChip::<NoteCommitmentHashDomain, NoteCommitmentDomain, TaigaFixedBases>::load(
+            config.note_config.sinsemilla_config.clone(),
+            &mut layouter,
+        )?;
 
         // Construct a Sinsemilla chip
         let sinsemilla_chip =

@@ -2,7 +2,7 @@ use crate::circuit::gadgets::{
     add::{AddChip, AddInstructions},
     assign_free_constant,
 };
-use crate::constant::{BaseGenerator, NoteCommitmentFixedBases, POSEIDON_RATE, POSEIDON_WIDTH};
+use crate::constant::{BaseGenerator, TaigaFixedBases, POSEIDON_RATE, POSEIDON_WIDTH};
 use ff::PrimeField;
 use halo2_gadgets::{
     ecc::{chip::EccChip, FixedPointBaseField, NonIdentityPoint, Point, ScalarVar},
@@ -21,7 +21,7 @@ use pasta_curves::pallas;
 pub struct NoteEncryptionResult {
     pub cipher: Vec<AssignedCell<pallas::Base, pallas::Base>>,
     pub nonce: AssignedCell<pallas::Base, pallas::Base>,
-    pub sender_pk: Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
+    pub sender_pk: Point<pallas::Affine, EccChip<TaigaFixedBases>>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -30,10 +30,10 @@ pub fn note_encryption_gadget(
     advice: Column<Advice>,
     poseidon_config: PoseidonConfig<pallas::Base, POSEIDON_WIDTH, POSEIDON_RATE>,
     add_chip: AddChip<pallas::Base>,
-    ecc_chip: EccChip<NoteCommitmentFixedBases>,
+    ecc_chip: EccChip<TaigaFixedBases>,
     nonce: AssignedCell<pallas::Base, pallas::Base>,
     sender_sk: AssignedCell<pallas::Base, pallas::Base>,
-    rcv_pk: NonIdentityPoint<pallas::Affine, EccChip<NoteCommitmentFixedBases>>,
+    rcv_pk: NonIdentityPoint<pallas::Affine, EccChip<TaigaFixedBases>>,
     message: &Vec<AssignedCell<pallas::Base, pallas::Base>>,
 ) -> Result<NoteEncryptionResult, Error> {
     // Compute symmetric secret key
@@ -121,7 +121,7 @@ fn test_halo2_note_encryption_circuit() {
     use crate::circuit::gadgets::add::AddConfig;
     use crate::circuit::gadgets::assign_free_advice;
     use crate::constant::{
-        NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentHashDomain, SETUP_PARAMS_MAP,
+        NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases, SETUP_PARAMS_MAP,
         VP_CIRCUIT_PARAMS_SIZE,
     };
     use crate::note_encryption::{NoteCipher, SecretKey};
@@ -159,13 +159,9 @@ fn test_halo2_note_encryption_circuit() {
             [Column<Advice>; 10],
             PoseidonConfig<pallas::Base, 3, 2>,
             AddConfig,
-            EccConfig<NoteCommitmentFixedBases>,
+            EccConfig<TaigaFixedBases>,
             // add SinsemillaConfig to load look table, just for test
-            SinsemillaConfig<
-                NoteCommitmentHashDomain,
-                NoteCommitmentDomain,
-                NoteCommitmentFixedBases,
-            >,
+            SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, TaigaFixedBases>,
         );
         type FloorPlanner = SimpleFloorPlanner;
 
@@ -223,16 +219,12 @@ fn test_halo2_note_encryption_circuit() {
 
             let add_config = AddChip::configure(meta, advices[0..2].try_into().unwrap());
 
-            let ecc_config = EccChip::<NoteCommitmentFixedBases>::configure(
-                meta,
-                advices,
-                lagrange_coeffs,
-                range_check,
-            );
+            let ecc_config =
+                EccChip::<TaigaFixedBases>::configure(meta, advices, lagrange_coeffs, range_check);
             let sinsemilla_config = SinsemillaChip::<
                 NoteCommitmentHashDomain,
                 NoteCommitmentDomain,
-                NoteCommitmentFixedBases,
+                TaigaFixedBases,
             >::configure(
                 meta,
                 advices[..5].try_into().unwrap(),
@@ -261,7 +253,7 @@ fn test_halo2_note_encryption_circuit() {
             SinsemillaChip::<
                 NoteCommitmentHashDomain,
                 NoteCommitmentDomain,
-                NoteCommitmentFixedBases,
+                TaigaFixedBases,
             >::load(sinsemilla_config, &mut layouter)?;
 
             let nonce = assign_free_advice(

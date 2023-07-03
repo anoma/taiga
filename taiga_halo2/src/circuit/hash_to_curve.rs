@@ -1,5 +1,5 @@
 use crate::constant::{
-    NoteCommitmentFixedBases, POSEIDON_TO_CURVE_INPUT_LEN, POSEIDON_TO_FIELD_U_0_POSTFIX,
+    TaigaFixedBases, POSEIDON_TO_CURVE_INPUT_LEN, POSEIDON_TO_FIELD_U_0_POSTFIX,
     POSEIDON_TO_FIELD_U_1_POSTFIX,
 };
 use halo2_gadgets::{
@@ -60,9 +60,9 @@ use crate::circuit::gadgets::poseidon_hash::poseidon_hash_gadget;
 pub fn hash_to_curve_circuit(
     mut layouter: impl Layouter<pallas::Base>,
     config: HashToCurveConfig,
-    ecc_chip: EccChip<NoteCommitmentFixedBases>,
+    ecc_chip: EccChip<TaigaFixedBases>,
     messages: &[AssignedCell<pallas::Base, pallas::Base>],
-) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
+) -> Result<Point<pallas::Affine, EccChip<TaigaFixedBases>>, Error> {
     // hash to u_0
     let u_0 = {
         let u_0_postfix: Vec<AssignedCell<pallas::Base, pallas::Base>> =
@@ -250,7 +250,7 @@ fn test_hash_to_curve_circuit() {
         type Config = (
             [Column<Advice>; 10],
             HashToCurveConfig,
-            EccConfig<NoteCommitmentFixedBases>,
+            EccConfig<TaigaFixedBases>,
         );
         type FloorPlanner = SimpleFloorPlanner;
 
@@ -297,12 +297,8 @@ fn test_hash_to_curve_circuit() {
 
             let range_check = LookupRangeCheckConfig::configure(meta, advices[9], table_idx);
 
-            let ecc_config = EccChip::<NoteCommitmentFixedBases>::configure(
-                meta,
-                advices,
-                lagrange_coeffs,
-                range_check,
-            );
+            let ecc_config =
+                EccChip::<TaigaFixedBases>::configure(meta, advices, lagrange_coeffs, range_check);
 
             (advices, hash_to_curve_config, ecc_config)
         }

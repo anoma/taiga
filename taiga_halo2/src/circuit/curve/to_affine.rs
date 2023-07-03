@@ -10,7 +10,7 @@ use halo2_proofs::{
 };
 use pasta_curves::group::Curve;
 
-use crate::constant::NoteCommitmentFixedBases;
+use crate::constant::TaigaFixedBases;
 use pasta_curves::pallas;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -82,13 +82,13 @@ impl ToAffineConfig {
 
     pub fn assign_region(
         &self,
-        ecc_chip: EccChip<NoteCommitmentFixedBases>,
+        ecc_chip: EccChip<TaigaFixedBases>,
         x: &AssignedCell<pallas::Base, pallas::Base>,
         y: &AssignedCell<pallas::Base, pallas::Base>,
         z: &AssignedCell<pallas::Base, pallas::Base>,
         offset: usize,
         region: &mut Region<'_, pallas::Base>,
-    ) -> Result<Point<pallas::Affine, EccChip<NoteCommitmentFixedBases>>, Error> {
+    ) -> Result<Point<pallas::Affine, EccChip<TaigaFixedBases>>, Error> {
         // Enable `q_to_affine` selector
         self.q_to_affine.enable(region, offset)?;
 
@@ -150,7 +150,7 @@ fn test_to_affine_circuit() {
         type Config = (
             [Column<Advice>; 10],
             ToAffineConfig,
-            EccConfig<NoteCommitmentFixedBases>,
+            EccConfig<TaigaFixedBases>,
         );
         type FloorPlanner = SimpleFloorPlanner;
 
@@ -189,12 +189,8 @@ fn test_to_affine_circuit() {
 
             let to_affine_config =
                 ToAffineConfig::configure(meta, advices[0], advices[1], advices[2]);
-            let ecc_config = EccChip::<NoteCommitmentFixedBases>::configure(
-                meta,
-                advices,
-                lagrange_coeffs,
-                range_check,
-            );
+            let ecc_config =
+                EccChip::<TaigaFixedBases>::configure(meta, advices, lagrange_coeffs, range_check);
             (advices, to_affine_config, ecc_config)
         }
 

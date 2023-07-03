@@ -16,8 +16,7 @@ use crate::{
         sub::{SubChip, SubConfig},
     },
     constant::{
-        NoteCommitmentDomain, NoteCommitmentFixedBases, NoteCommitmentFixedBasesFull,
-        NoteCommitmentHashDomain,
+        NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases, TaigaFixedBasesFull,
     },
 };
 use halo2_gadgets::{
@@ -37,10 +36,10 @@ pub struct SchnorrConfig {
     add_config: AddConfig,
     sub_config: SubConfig,
     mul_config: MulConfig,
-    ecc_config: EccConfig<NoteCommitmentFixedBases>, // TODO: Maybe replace
+    ecc_config: EccConfig<TaigaFixedBases>, // TODO: Maybe replace
     poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
     sinsemilla_config:
-        SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, NoteCommitmentFixedBases>,
+        SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, TaigaFixedBases>,
 }
 
 impl SchnorrConfig {
@@ -56,7 +55,7 @@ impl SchnorrConfig {
         MulChip::construct(self.mul_config.clone())
     }
 
-    pub(super) fn ecc_chip(&self) -> EccChip<NoteCommitmentFixedBases> {
+    pub(super) fn ecc_chip(&self) -> EccChip<TaigaFixedBases> {
         EccChip::construct(self.ecc_config.clone())
     }
 
@@ -133,7 +132,7 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         let sinsemilla_config = SinsemillaChip::<
             NoteCommitmentHashDomain,
             NoteCommitmentDomain,
-            NoteCommitmentFixedBases,
+            TaigaFixedBases,
         >::configure(
             meta,
             advices[..5].try_into().unwrap(),
@@ -143,12 +142,8 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
             range_check,
         );
 
-        let ecc_config = EccChip::<NoteCommitmentFixedBases>::configure(
-            meta,
-            advices,
-            lagrange_coeffs,
-            range_check,
-        );
+        let ecc_config =
+            EccChip::<TaigaFixedBases>::configure(meta, advices, lagrange_coeffs, range_check);
 
         // Instance column used for public inputs
         let primary = meta.instance_column();
@@ -210,11 +205,10 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<(), plonk::Error> {
-        SinsemillaChip::<
-                NoteCommitmentHashDomain,
-                NoteCommitmentDomain,
-                NoteCommitmentFixedBases,
-            >::load(config.sinsemilla_config, &mut layouter)?;
+        SinsemillaChip::<NoteCommitmentHashDomain, NoteCommitmentDomain, TaigaFixedBases>::load(
+            config.sinsemilla_config,
+            &mut layouter,
+        )?;
         // We implement the verification algorithm first
         // and assume that the signature is given
         // Construct an ECC chip
@@ -257,7 +251,8 @@ impl plonk::Circuit<pallas::Base> for SchnorrCircuit {
 
         // Verify: s*G = R + Hash(r||P||m)*P
         // s*G
-        let generator = FixedPoint::from_inner(ecc_chip.clone(), NoteCommitmentFixedBasesFull);
+        let generator =
+            FixedPoint::from_inner(ecc_chip.clone(), TaigaFixedBasesFull::NoteCommitmentR);
         let (sG, _) = generator.mul(layouter.namespace(|| "s_scalar * generator"), &s_scalar)?;
 
         // Hash(r||P||m)

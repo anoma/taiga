@@ -4,17 +4,17 @@
 /// Carol has 15 "XAN" and wants 5 BTC""
 ///
 use crate::token::create_token_swap_ptx;
+use group::Group;
 use halo2_proofs::arithmetic::Field;
-use pasta_curves::pallas;
+use pasta_curves::{group::Curve, pallas};
 use rand::{CryptoRng, RngCore};
 use taiga_halo2::{
-    constant::NOTE_COMMIT_DOMAIN,
     nullifier::NullifierKeyCom,
     transaction::{ShieldedPartialTxBundle, Transaction},
 };
 
 pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
-    let generator = NOTE_COMMIT_DOMAIN.R();
+    let generator = pallas::Point::generator().to_affine();
 
     // Alice creates the partial transaction
     let alice_auth_sk = pallas::Scalar::random(&mut rng);
