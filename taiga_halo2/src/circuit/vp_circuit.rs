@@ -88,7 +88,7 @@ impl BorshDeserialize for VPVerifyingInfo {
         // TODO: Read vk
         use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
         let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
-        let vk = VerifyingKey::read::<_, TrivialValidityPredicateCircuit>(buf, &params)?;
+        let vk = VerifyingKey::read::<_, TrivialValidityPredicateCircuit>(buf, params)?;
         // Read proof
         let proof = Proof::deserialize(buf)?;
         // Read instance

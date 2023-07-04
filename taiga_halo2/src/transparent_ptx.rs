@@ -1,5 +1,5 @@
 use crate::{
-    error::TransactionError, executable::Executable, note::NoteCommitment, nullifier::Nullifier,
+    error::TransactionError, executable::Executable, nullifier::Nullifier,
     value_commitment::ValueCommitment,
 };
 use pasta_curves::pallas;
@@ -20,7 +20,7 @@ impl Executable for TransparentPartialTransaction {
         unimplemented!()
     }
 
-    fn get_output_cms(&self) -> Vec<NoteCommitment> {
+    fn get_output_cms(&self) -> Vec<pallas::Base> {
         unimplemented!()
     }
 

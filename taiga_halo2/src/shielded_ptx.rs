@@ -6,10 +6,11 @@ use crate::constant::{
 };
 use crate::error::TransactionError;
 use crate::executable::Executable;
-use crate::note::{InputNoteProvingInfo, NoteCommitment, OutputNoteProvingInfo};
+use crate::note::{InputNoteProvingInfo, OutputNoteProvingInfo};
 use crate::nullifier::Nullifier;
 use crate::proof::Proof;
 use crate::value_commitment::ValueCommitment;
+use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_proofs::plonk::Error;
 use pasta_curves::pallas;
 use rand::RngCore;
@@ -21,13 +22,13 @@ pub struct ShieldedPartialTransaction {
     outputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct ActionVerifyingInfo {
     action_proof: Proof,
     action_instance: ActionInstance,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct NoteVPVerifyingInfoSet {
     app_vp_verifying_info: VPVerifyingInfo,
     app_dynamic_vp_verifying_info: Vec<VPVerifyingInfo>,
@@ -138,8 +139,8 @@ impl ShieldedPartialTransaction {
         for vp_info in self.outputs.iter() {
             for cms in vp_info.get_note_commitments().iter() {
                 // Check the vp actually uses the output notes from action circuits.
-                if !((action_cms[0].get_x() == cms[0] && action_cms[1].get_x() == cms[1])
-                    || (action_cms[0].get_x() == cms[1] && action_cms[1].get_x() == cms[0]))
+                if !((action_cms[0] == cms[0] && action_cms[1] == cms[1])
+                    || (action_cms[0] == cms[1] && action_cms[1] == cms[0]))
                 {
                     return Err(TransactionError::InconsistentOutputNoteCommitment);
                 }
@@ -156,7 +157,7 @@ impl ShieldedPartialTransaction {
             }
 
             // Check the owned_note_id that vp uses is consistent with the cm from the action circuit
-            if owned_note_id != action_cm.get_x() {
+            if owned_note_id != *action_cm {
                 return Err(TransactionError::InconsistentOwnedNotePubID);
             }
         }
@@ -179,10 +180,10 @@ impl Executable for ShieldedPartialTransaction {
             .collect()
     }
 
-    fn get_output_cms(&self) -> Vec<NoteCommitment> {
+    fn get_output_cms(&self) -> Vec<pallas::Base> {
         self.actions
             .iter()
-            .map(|action| action.action_instance.cm)
+            .map(|action| action.action_instance.cm_x)
             .collect()
     }
 
