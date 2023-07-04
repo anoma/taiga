@@ -16,7 +16,10 @@ use crate::{
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use bincode::error::DecodeError;
+use borsh::{BorshDeserialize, BorshSerialize};
+use byteorder::{ReadBytesExt, WriteBytesExt};
 use dyn_clone::{clone_trait_object, DynClone};
+use ff::PrimeField;
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
     circuit::{AssignedCell, Layouter, Value},
@@ -27,6 +30,7 @@ use pasta_curves::{pallas, vesta};
 use rand::rngs::OsRng;
 use std::collections::HashMap;
 use std::fs::File;
+use std::io;
 use std::path::PathBuf;
 use vamp_ir::halo2::synth::{make_constant, Halo2Module};
 use vamp_ir::util::read_inputs_from_file;
@@ -60,6 +64,48 @@ impl VPVerifyingInfo {
 
     pub fn get_owned_note_pub_id(&self) -> pallas::Base {
         self.instance[VP_CIRCUIT_OWNED_NOTE_PUB_ID_INSTANCE_IDX]
+    }
+}
+
+impl BorshSerialize for VPVerifyingInfo {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
+        // Write vk
+        self.vk.write(writer)?;
+        // Write proof
+        self.proof.serialize(writer)?;
+        // Write instance
+        assert!(self.instance.len() < 256);
+        writer.write_u8(self.instance.len() as u8)?;
+        for ele in self.instance.iter() {
+            writer.write_all(&ele.to_repr())?;
+        }
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for VPVerifyingInfo {
+    fn deserialize(buf: &mut &[u8]) -> borsh::maybestd::io::Result<Self> {
+        // TODO: Read vk
+        use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
+        let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
+        let vk = VerifyingKey::read::<_, TrivialValidityPredicateCircuit>(buf, &params)?;
+        // Read proof
+        let proof = Proof::deserialize(buf)?;
+        // Read instance
+        let instance_len = buf.read_u8()?;
+        let instance: Vec<_> = (0..instance_len)
+            .map(|_| {
+                let bytes = <[u8; 32]>::deserialize(buf)?;
+                Option::from(pallas::Base::from_repr(bytes)).ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidData, "instance not in field")
+                })
+            })
+            .collect::<Result<_, _>>()?;
+        Ok(VPVerifyingInfo {
+            vk,
+            proof,
+            instance,
+        })
     }
 }
 
