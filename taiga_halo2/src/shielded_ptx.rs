@@ -202,6 +202,42 @@ impl Executable for ShieldedPartialTransaction {
     }
 }
 
+impl BorshSerialize for ShieldedPartialTransaction {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
+        for action in self.actions.iter() {
+            action.serialize(writer)?;
+        }
+
+        for input in self.inputs.iter() {
+            input.serialize(writer)?;
+        }
+
+        for output in self.outputs.iter() {
+            output.serialize(writer)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for ShieldedPartialTransaction {
+    fn deserialize(buf: &mut &[u8]) -> borsh::maybestd::io::Result<Self> {
+        let actions: Vec<_> = (0..NUM_NOTE)
+            .map(|_| ActionVerifyingInfo::deserialize(buf))
+            .collect::<Result<_, _>>()?;
+        let inputs: Vec<_> = (0..NUM_NOTE)
+            .map(|_| NoteVPVerifyingInfoSet::deserialize(buf))
+            .collect::<Result<_, _>>()?;
+        let outputs: Vec<_> = (0..NUM_NOTE)
+            .map(|_| NoteVPVerifyingInfoSet::deserialize(buf))
+            .collect::<Result<_, _>>()?;
+        Ok(ShieldedPartialTransaction {
+            actions: actions.try_into().unwrap(),
+            inputs: inputs.try_into().unwrap(),
+            outputs: outputs.try_into().unwrap(),
+        })
+    }
+}
 impl ActionVerifyingInfo {
     pub fn create<R: RngCore>(action_info: ActionInfo, mut rng: R) -> Result<Self, Error> {
         let (action_instance, circuit) = action_info.build();

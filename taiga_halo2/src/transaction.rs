@@ -7,13 +7,14 @@ use crate::shielded_ptx::ShieldedPartialTransaction;
 use crate::transparent_ptx::{OutputResource, TransparentPartialTransaction};
 use crate::value_commitment::ValueCommitment;
 use blake2b_simd::Params as Blake2bParams;
+use borsh::{BorshDeserialize, BorshSerialize};
 use pasta_curves::{
     group::{ff::PrimeField, Group},
     pallas,
 };
 use rand::{CryptoRng, RngCore};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct Transaction {
     // TODO: Other parameters to be added.
     shielded_ptx_bundle: Option<ShieldedPartialTxBundle>,
@@ -22,13 +23,13 @@ pub struct Transaction {
     signature: InProgressBindingSignature,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub enum InProgressBindingSignature {
     Authorized(BindingSignature),
     Unauthorized(BindingSigningKey),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct ShieldedPartialTxBundle {
     partial_txs: Vec<ShieldedPartialTransaction>,
 }
@@ -40,7 +41,7 @@ pub struct ShieldedResult {
     output_cms: Vec<pallas::Base>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct TransparentPartialTxBundle {
     partial_txs: Vec<TransparentPartialTransaction>,
 }
