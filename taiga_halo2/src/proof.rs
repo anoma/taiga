@@ -1,3 +1,4 @@
+use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_proofs::{
     plonk::{self, Circuit, ProvingKey, SingleVerifier, VerifyingKey},
     poly::commitment::Params,
@@ -6,7 +7,7 @@ use halo2_proofs::{
 use pasta_curves::{pallas, vesta};
 use rand::RngCore;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
 pub struct Proof(Vec<u8>);
 
 impl Proof {
