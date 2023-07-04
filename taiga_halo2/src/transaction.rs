@@ -34,7 +34,7 @@ pub struct ShieldedPartialTxBundle {
     partial_txs: Vec<ShieldedPartialTransaction>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShieldedResult {
     anchors: Vec<pallas::Base>,
     nullifiers: Vec<Nullifier>,
@@ -353,5 +353,10 @@ fn test_halo2_transaction() {
         transparent_ptx_bundle,
         r_vec,
     );
-    tx.execute().unwrap();
+    let (shielded_ret, _) = tx.execute().unwrap();
+
+    let borsh = tx.try_to_vec().unwrap();
+    let de_tx: Transaction = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
+    let (de_shielded_ret, _) = de_tx.execute().unwrap();
+    assert_eq!(shielded_ret, de_shielded_ret);
 }
