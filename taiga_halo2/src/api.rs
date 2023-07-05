@@ -7,6 +7,7 @@ use rand::rngs::OsRng;
 use rand::RngCore;
 
 use crate::circuit::vp_examples::token::TokenValidityPredicateCircuit;
+use crate::shielded_ptx::NoteVPVerifyingInfoSet;
 use crate::{
     circuit::{note_circuit::NoteConfig, vp_circuit::ValidityPredicateCircuit},
     constant::NUM_NOTE,
@@ -27,6 +28,12 @@ pub struct NoteInTree {
     merkle_path: MerklePath,
     merkle_root: Node,
 }
+
+pub struct PartialTransaction {
+    inputs: [NoteVPVerifyingInfoSet; 2],
+    outputs: [NoteVPVerifyingInfoSet; 2],
+}
+
 pub trait APIContext {
     fn retrieve_decrypted_note(note_comm: NoteCommitment) -> Result<Note, APIError>;
     fn retrieve_note_type(&self, name: &str) -> Option<ValueBase>;
@@ -38,7 +45,8 @@ pub trait APIContext {
     fn create_ptx(
         input_proving_info: [InputNoteProvingInfo; 2],
         output_proving_info: [OutputNoteProvingInfo; 2],
-    ) -> Result<(), APIError>;
+    ) -> Result<PartialTransaction, APIError>;
+    fn finalize_tx(partial_transactions: Vec<PartialTransaction>) -> Result<(), APIError>;
 }
 
 struct VPCircuit {}
@@ -76,6 +84,10 @@ impl APIContext for TestContext {
         input_proving_info: [InputNoteProvingInfo; 2],
         output_proving_info: [OutputNoteProvingInfo; 2],
     ) -> Result<(), APIError> {
+        todo!()
+    }
+
+    fn finalize_tx(partial_transactions: Vec<PartialTransaction>) -> Result<(), APIError> {
         todo!()
     }
 }
