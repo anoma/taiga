@@ -30,11 +30,10 @@ pub struct NoteInTree {
 pub trait APIContext {
     fn retrieve_decrypted_note(note_comm: NoteCommitment) -> Result<Note, APIError>;
     fn retrieve_note_type(&self, name: &str) -> Option<ValueBase>;
-    fn retrieve_merkle_tree() -> Result<MerkleTreeLeafs, APIError>;
     fn retrieve_owned_notes(
+        &self,
         note_type: ValueBase,
         sk: pallas::Scalar,
-        merkle_tree_leaves: MerkleTreeLeafs,
     ) -> Result<Vec<NoteInTree>, APIError>;
     fn create_ptx(
         input_proving_info: [InputNoteProvingInfo; 2],
@@ -44,11 +43,13 @@ pub trait APIContext {
 
 struct VPCircuit {}
 
-// Does the note_directory need to be generic on the circuit type,
-// or do we expect to return a single impl of ValidityPredicateCircuit?
+/// An APIContext that with in-memory storage
 struct TestContext {
     note_directory: HashMap<String, (ValueBase, VPCircuit, Fp)>,
+    // Does the note_directory need to be generic on the circuit type,
+    // or do we expect to return a single impl of ValidityPredicateCircuit?
     decrypted_notes: HashMap<NoteCommitment, NoteCipher>,
+    merkle_tree_leafs: MerkleTreeLeafs,
 }
 
 impl APIContext for TestContext {
@@ -62,16 +63,10 @@ impl APIContext for TestContext {
         Some(note_type.clone())
     }
 
-    fn retrieve_merkle_tree() -> Result<MerkleTreeLeafs, APIError> {
-        // Construct Merkle Tree
-        // Insert banana, apple, pear, grapefruit
-        Err(APIError::GenericError)
-    }
-
     fn retrieve_owned_notes(
+        &self,
         note_type: ValueBase,
         sk: pallas::Scalar,
-        merkle_tree_leaves: MerkleTreeLeafs,
     ) -> Result<Vec<NoteInTree>, APIError> {
         // TODO: Try to decrypt all note commitments in the merkle_tree_leaves
         Err(APIError::GenericError)
