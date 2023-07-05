@@ -2,63 +2,88 @@ use std::collections::HashMap;
 
 use ff::Field;
 use halo2_proofs::{circuit::Value, poly::commitment::Params};
-use pasta_curves::pallas;
+use pasta_curves::{pallas, Fp};
+use rand::rngs::OsRng;
+use rand::RngCore;
 
-use crate::{note::{NoteCommitment, Note, ValueBase, InputNoteProvingInfo, OutputNoteProvingInfo}, merkle_tree::{MerklePath, Node, MerkleTreeLeafs}, circuit::{vp_circuit::ValidityPredicateCircuit, note_circuit::NoteConfig}, vp_circuit_impl, constant::NUM_NOTE, note_encryption::NoteCipher};
+use crate::circuit::vp_examples::token::TokenValidityPredicateCircuit;
+use crate::{
+    circuit::{note_circuit::NoteConfig, vp_circuit::ValidityPredicateCircuit},
+    constant::NUM_NOTE,
+    merkle_tree::{MerklePath, MerkleTreeLeafs, Node},
+    note::{InputNoteProvingInfo, Note, NoteCommitment, OutputNoteProvingInfo, ValueBase},
+    note_encryption::NoteCipher,
+    vp_circuit_impl,
+};
 
-
-enum APIError {
+pub enum APIError {
     GenericError,
-    NoteDecryptionError
+    NoteDecryptionError,
 }
 
-struct NoteInTree {
+pub struct NoteInTree {
     note: Note,
     note_cm: NoteCommitment,
     merkle_path: MerklePath,
-    merkle_root: Node
+    merkle_root: Node,
 }
 pub trait APIContext {
-    type EncryptedNotesStorage;
-    type NoteTypeDirectory;
-
-    pub fn retrieve_note_type_directory() -> Result<NoteTypeDirectory, APIError>;
-    pub fn retrieve_decrypted_note(note_comm: NoteCommitment) -> Result<Note, APIError>;
-    pub fn retrieve_note_type(name: string, directory: NoteTypeDirectory) -> Option<ValueBase>;
-    pub fn retrieve_merkle_tree() -> Result<MerkleTreeLeafs, APIError>;
-    pub fn retrieve_owned_notes() -> Result<vec<NoteInTree>, APIError>;
-    pub fn create_ptx(input_proving_info: [InputNoteProvingInfo; 2], output_proving_info: [OutputNoteProvingInfo; 2]) -> Result<(), APIError>;
+    fn retrieve_decrypted_note(note_comm: NoteCommitment) -> Result<Note, APIError>;
+    fn retrieve_note_type(&self, name: &str) -> Option<ValueBase>;
+    fn retrieve_merkle_tree() -> Result<MerkleTreeLeafs, APIError>;
+    fn retrieve_owned_notes(
+        note_type: ValueBase,
+        sk: pallas::Scalar,
+        merkle_tree_leaves: MerkleTreeLeafs,
+    ) -> Result<Vec<NoteInTree>, APIError>;
+    fn create_ptx(
+        input_proving_info: [InputNoteProvingInfo; 2],
+        output_proving_info: [OutputNoteProvingInfo; 2],
+    ) -> Result<(), APIError>;
 }
 
-struct TestContext;
+struct VPCircuit {}
+
+// Does the note_directory need to be generic on the circuit type,
+// or do we expect to return a single impl of ValidityPredicateCircuit?
+struct TestContext {
+    note_directory: HashMap<String, (ValueBase, VPCircuit, Fp)>,
+    decrypted_notes: HashMap<NoteCommitment, NoteCipher>,
+}
 
 impl APIContext for TestContext {
-    type EncryptedNotesStorage = HashMap<NoteCommitment, NoteCipher>;
-    type NoteTypeDirectory = HashMap<string, (ValueBase, ValidityPredicateCircuit, Params<pallas::Base>)>;
-    fn retrieve_note_type_directory() -> Result<NoteTypeDirectory, APIError> {
-        // Construct directory
-        let directory = NoteTypeDirectory::new();
-        OK(directory)
+    fn retrieve_decrypted_note(note_comm: NoteCommitment) -> Result<Note, APIError> {
+        todo!()
     }
-    
+
+    fn retrieve_note_type(&self, name: &str) -> Option<ValueBase> {
+        let (note_type, circuit, params) = self.note_directory.get(name).unwrap();
+        // Maybe check that the value base corresponds to the circuit
+        Some(note_type.clone())
+    }
+
     fn retrieve_merkle_tree() -> Result<MerkleTreeLeafs, APIError> {
         // Construct Merkle Tree
         // Insert banana, apple, pear, grapefruit
         Err(APIError::GenericError)
     }
-    
-    fn retrieve_note_type(name: string, directory: NoteTypeDirectory) -> Option<ValueBase> {
-        let (note_type, circuit, params) = directory.get(name).unwrap();
-        // Maybe check that the value base corresponds to the circuit
-        Some(note_type)
-    }
-    
-    fn retrieve_owned_notes(note_type: ValueBase, sk: pallas::Scalar, merkle_tree_leaves: MerkleTreeLeafs) -> Result<vec<(NoteCommitment, Note, MerklePath, Node)>, APIError> {
+
+    fn retrieve_owned_notes(
+        note_type: ValueBase,
+        sk: pallas::Scalar,
+        merkle_tree_leaves: MerkleTreeLeafs,
+    ) -> Result<Vec<NoteInTree>, APIError> {
         // TODO: Try to decrypt all note commitments in the merkle_tree_leaves
         Err(APIError::GenericError)
     }
-}
 
+    fn create_ptx(
+        input_proving_info: [InputNoteProvingInfo; 2],
+        output_proving_info: [OutputNoteProvingInfo; 2],
+    ) -> Result<(), APIError> {
+        todo!()
+    }
+}
 
 pub fn main() {
     // Alice keys
@@ -73,5 +98,3 @@ pub fn main() {
     // - retrieve_my_notes
     // Find what she wants
 }
-
-

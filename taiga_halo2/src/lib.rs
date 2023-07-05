@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 #![allow(clippy::large_enum_variant)]
 
-pub mod api;
 pub mod action;
+pub mod api;
 pub mod binding_signature;
 pub mod circuit;
 pub mod constant;
