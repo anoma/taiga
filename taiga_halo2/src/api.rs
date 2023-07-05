@@ -30,8 +30,8 @@ pub struct NoteInTree {
 }
 
 pub struct PartialTransaction {
-    inputs: [NoteVPVerifyingInfoSet; 2],
-    outputs: [NoteVPVerifyingInfoSet; 2],
+    input_proving_info: [InputNoteProvingInfo; 2],
+    output_proving_info: [OutputNoteProvingInfo; 2]
 }
 
 pub trait APIContext {
@@ -43,8 +43,7 @@ pub trait APIContext {
         sk: pallas::Scalar,
     ) -> Result<Vec<NoteInTree>, APIError>;
     fn create_ptx(
-        input_proving_info: [InputNoteProvingInfo; 2],
-        output_proving_info: [OutputNoteProvingInfo; 2],
+        PartialTransaction,
     ) -> Result<PartialTransaction, APIError>;
     fn finalize_tx(partial_transactions: Vec<PartialTransaction>) -> Result<(), APIError>;
 }
@@ -81,9 +80,8 @@ impl APIContext for TestContext {
     }
 
     fn create_ptx(
-        input_proving_info: [InputNoteProvingInfo; 2],
-        output_proving_info: [OutputNoteProvingInfo; 2],
-    ) -> Result<(), APIError> {
+        partial_transaction: PartialTransaction,
+    ) -> Result<PartialTransaction, APIError> {
         todo!()
     }
 
