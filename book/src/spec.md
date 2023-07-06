@@ -34,11 +34,20 @@ Note is an immutable particle of the application state.
 |`v`|${0..2^{64} - 1}$|The quantity of fungible value|
 |`cm_nk`||Commitment to the nullifier key that will be used to derive the note's nullifier|
 |`ρ`|$\mathbb{F}_p$|An old nullifier from the same Action description (see Orchard)|
-|`ψ`|$\mathbb{F}_p$|The prf output of `ρ` and `rcm_note` (see Orchard)|
+|`ψ`|$\mathbb{F}_p$|$ψ = PRF^{ψ}(0, rseed, ρ)$|
 |`is_merkle_checked`|bool|Dummy note flag. It indicates whether the note's commitment Merkle path should be checked when spending the note.|
-|`rcm_note`|${0..2^{255} - 1}$|A random commitment trapdoor|
+|`rcm_note`|${0..2^{255} - 1}$|A random commitment trapdoor $rcm\_note = PRF^{\texttt{rcm\_note}}(1, rseed, ρ)$|
 
 Note: the value size cannot be bigger or close to the curve's scalar field size (to avoid overflowing) but besides that there are no strict reasons for choosing 64. We can use more notes to express a value that doesn't fit in one note (splitting the value into limbs). Having bigger value size requires fewer notes to express such a value and is more efficient. For example, a value size of 128 bits would require two times less notes to express a maximum value
+
+#### Derivation of random parameters
+
+The note contains two randomness parameters:
+- `rcm_note` is used as a commitment randomness
+- `ψ` provides additional randomness for the nullifier derivation
+
+Both fields are derived from a parameter `rseed`.
+A note is created from a freshly derived `rseed` parameter, but only `rcm_note` and `ψ` go to the note commitment and are verifiably encrypted. The transmitted note is reconstructed from `rcm_note` and `ψ` parameters. Currently circuits don't check if `rcm_note` and `ψ` are derived from `rseed`.
 
 #### Application-related fields
 
@@ -54,7 +63,7 @@ Each note has three fields with application data.
 
 Value base is used to distinguish note types. Notes with different value bases have different note types. The value base of a note is derived from two application-related fields: `cm_app_vk` and `app_data_static`.
 
-$VB = PRF^{vb}(cm_{app\_vk}, app\_data\_static)$
+$VB = PRF^{vb}(cm_{\texttt{app\_vk}}, \texttt{app\_data\_static})$
 
 #### Value commitment
 
@@ -94,7 +103,7 @@ Note nullifiers are stored in a global nullifier set. Adding a note's nullifier 
 |`nf`|$\mathbb F_p$|$nf = \mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm)$
 |`nk` | $\mathbb F_p$ | the nullifier deriving key|
 |`ρ`| $\mathbb{F}_p$ | an old nullifier|
-|`ψ`| $\mathbb{F}_p$ | $PRF_{rcm\_note}(ρ)$ -- should it be the same as in zcash?|
+|`ψ`| $\mathbb{F}_p$ | additional nullifier randomness|
 |`cm` | outer curve point| note commitment |
 |`K`|outer curve point| a fixed base generator of the inner curve|
 |`Extract` | $(\mathbb F_p$, $\mathbb F_p) \rightarrow \mathbb F_p$ | the $x$ coordinate of an (inner curve) point|
@@ -125,7 +134,7 @@ $sk = DH(pub_{recv}, priv_{send})$
 
 $ce = Encrypt(note, sk)$
 
-Not all of the note fields require to be encrypted (e.g. note commitment), and the encrypted fields may vary depending on the application.
+Not all of the note fields require to be encrypted (e.g. note commitment), and the encrypted fields may vary depending on the application. To make sure it is flexible enough, the encryption check is performed in VP circuits.
 
 ### 2.6 Dummy notes
 In Taiga, note's value doesn't define if the note is dummy or not, unlike some other systems. Dummy notes can have non-zero value and are marked explicitly as dummy by setting `is_merkle_checked = false` meaning that for dummy notes the commitment's Merkle path is not checked when spending the note. Non-zero value dummy notes are handy for carrying additional constraints (e.g. intents) and balancing transactions.
@@ -157,11 +166,11 @@ Note: opening of a parameter is every field used to derive the parameter
     - If `is_merkle_checked = true`, check that the note is a valid note in `rt`: there is a path in Merkle tree with root `rt` to a note commitment `cm` that opens to `note`
     - Nullifier integrity: $nf = DeriveNullier_{nk}(note)$.
     - Application VP integrity: $cm_{vp} = VPCommit(cm_{app\_vk}, rcm_{vp})$
-    - Value base integrity: $vb = PRF^{vb}(cm_{app\_vk}, app\_data\_static)$
+    - Value base integrity: $vb = PRF^{vb}(cm_{app\_vk}, \texttt{app\_data\_static})$
 - For output note:
     - Commitment integrity(output note only): $cm = NoteCom(note, rcm_{note})$
-    - Application VP integrity: $cm_{vp} = VPCommit(cm_{app\_vk}, rcm_{vp})$
-    - Value base integrity: $vb = PRF^{vb}(cm_{app\_vk}, app\_data\_static)$
+    - Application VP integrity: $cm_{vp} = VPCommit(cm_{\texttt{app\_vk}}, rcm_{vp})$
+    - Value base integrity: $vb = PRF^{vb}(cm_{app\_vk}, \texttt{app\_data\_static})$
 - Value commitment integrity: $cv = ValueCommit(v_{in}, v_{out}, VB_{in}, VB_{out}, rcv)$
 
 Note: unlike MASP, the value base in Taiga is not used to compute note's commitment and the Action circuit doesn't take `vb` as private input but computes it from the note fields, and it is checked for both input and output notes.
@@ -174,11 +183,14 @@ Public inputs (`x`):
 - $nf_1, …, nf_n$ - input note nullifiers
 - $cm_1, …, cm_n$ - output note commitments
 - $ce_1, …, ce_n$ - encrypted output notes
+- custom public inputs
 
 Private inputs (`w`):
 - $note^{old}_1, …, note^{old}_m$ - input notes openings
 - $note^{new}_1, …, note^{new}_n$ - output notes openings
 - custom private inputs
+
+Each validity predicate has a fixed number of public inputs and unlimited amount of private inputs. Currently, the allowed number of public inputs is limited to `20`. 
 
 #### Checks
 As opening of the notes are private parameters, to make sure that notes that the VP received indeed the ones that correspond to the public parameters, VP must check:
@@ -222,9 +234,11 @@ Certain applications might allow to create more value from less input value, whi
 |Function|Instantiation|Domain/Range|Description|
 |-|-|-|-|
 |$PRF^{nf}$|Poseidon|$\mathrm{F}_p \times \mathrm{F}_p \rightarrow \mathrm{F}_p$|$PRF^{nf}_{nk}(ρ) = Poseidon(nk, \rho)$|
-|$PRF^{nk}$|Blake2s|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|$PRF^{nk}_{r}(PERSONALIZATION\_{NK}) = Blake2s(PERSONALIZATION\_{NK}, r)$| Used to derive `nk`; currently not implemented
-|$PRF^{vb}$|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$PRF^{vb} = hash\_to\_curve(Poseidon(app\_vk, app\_data\_static))$
-|`NKCommit`|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|$NKCommit(nk) = Poseidon(nk, user_derived_key)$; used to protect `nk` stored in a note. `user_derived_key` is currently not used
+|$PRF^{nk}$|Blake2s|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|$PRF^{nk}_{r}(\texttt{PERSONALIZATION\_{NK}}) = Blake2s(\texttt{PERSONALIZATION\_{NK}}, r)$| Used to derive `nk`; currently not implemented
+|$PRF^{vb}$|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$PRF^{vb} = hash\_to\_curve(Poseidon(app\_vk, \texttt{app\_data\_static}))$
+|$PRF^{\texttt{rcm\_note}}$|Blake2b|$ \mathrm{F}_p \times \mathrm{F}_p \times \mathrm{F}_p \rightarrow \mathrm{F}_p$|Used to derive note commitment randomness|
+|$PRF^{ψ}$|Blake2b|$\mathrm{F}_p \times \mathrm{F}_p \times \mathrm{F}_p \rightarrow \mathrm{F}_p$|Used to derive ψ|
+|`NKCommit`|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|$NKCommit(nk) = Poseidon(nk,\texttt{user\_derived\_key})$; used to protect `nk` stored in a note. `user_derived_key` is currently not used
 |`NoteCommit`|[Sincemilla](https://zcash.github.io/halo2/design/gadgets/sinsemilla.html)|$\mathrm{F}_p \rightarrow \mathrm{F}_p \times \mathrm{F}_p$|
 |`ValueCommit`|Pedersen with variable value base|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$cv = [v_i] * VB_i - [v_o] * VB_o + [r]R$
 |`VPCommit`|Blake2s||Efficient over both $\mathrm{F}_p$ and $\mathrm{F}_q$
@@ -304,3 +318,12 @@ A valid Taiga transaction `tx` induces a state change as follows:
 1. For each `cm` with associated `ce`: $MT.add(cm, ce)$
     - `rt` is not updated for operation
 1. Re-compute `rt` of $MT$
+
+8. Communication between the shielded and transparent pools
+State transitions that do not preserve privacy are called *transparent*. Assuming that the system allows both transparent and shielded state transitions, we say that all of the valid notes created as a result of shielded state transitions form a *shielded pool* and the valid notes created as a result of transparent state transitions form a *transparent pool*. The action of moving data from transparent to shielded pool is called *shielding*, the opposite is called *unshielding*. Shielding (or unshielding) is done by destroying notes in one pool and creating the corresponding notes in the other. *Balancing value* $v^{balance}$ indicates the data move between the pools:
+
+- $v^{balance} = 0$ if the current transaction doesn't move data between pools
+- $v^{balance} < 0$ refers to the value moved from the transparent to the shielded pool
+- $v^{balance} > 0$ refers to the value moved from the shielded to the transparent pool
+
+The difference between total input value and total output value of a proposed transaction is checked against the balancing value with the help of the binding signature.
