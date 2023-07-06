@@ -197,6 +197,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
 
     // Create the output note proving info
     let bought_note_proving_info = generate_output_token_note_proving_info(
+        &mut rng,
         bought_note,
         buy.name,
         output_auth,
@@ -214,6 +215,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
 
     // Create the returned note proving info
     let returned_note_proving_info = generate_output_token_note_proving_info(
+        &mut rng,
         returned_note,
         sell.name,
         output_auth,

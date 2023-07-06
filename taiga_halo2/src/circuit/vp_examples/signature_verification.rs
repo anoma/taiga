@@ -1,7 +1,7 @@
 use crate::{
     circuit::{
         gadgets::{
-            assign_free_advice, assign_free_constant,
+            assign_free_advice,
             poseidon_hash::poseidon_hash_gadget,
             target_note_variable::{get_owned_note_variable, GetOwnedNoteVariableConfig},
         },
@@ -10,6 +10,7 @@ use crate::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
+        vp_examples::receiver_vp::COMPRESSED_RECEIVER_VK,
     },
     constant::{TaigaFixedBasesFull, NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
@@ -94,9 +95,9 @@ pub struct SignatureVerificationValidityPredicateCircuit {
     pub owned_note_pub_id: pallas::Base,
     pub input_notes: [Note; NUM_NOTE],
     pub output_notes: [Note; NUM_NOTE],
-    // The compressed verifying_key and the pk are encoded in app_data_dynamic
-    pub verifying_key: pallas::Base,
+    pub vp_vk: pallas::Base,
     pub signature: SchnorrSignature,
+    pub receiver_vp_vk: pallas::Base,
 }
 
 #[derive(Clone, Debug)]
@@ -138,15 +139,17 @@ impl SignatureVerificationValidityPredicateCircuit {
         owned_note_pub_id: pallas::Base,
         input_notes: [Note; NUM_NOTE],
         output_notes: [Note; NUM_NOTE],
-        verifying_key: pallas::Base,
+        vp_vk: pallas::Base,
         signature: SchnorrSignature,
+        receiver_vp_vk: pallas::Base,
     ) -> Self {
         Self {
             owned_note_pub_id,
             input_notes,
             output_notes,
-            verifying_key,
+            vp_vk,
             signature,
+            receiver_vp_vk,
         }
     }
 
@@ -155,8 +158,9 @@ impl SignatureVerificationValidityPredicateCircuit {
         owned_note_pub_id: pallas::Base,
         input_notes: [Note; NUM_NOTE],
         output_notes: [Note; NUM_NOTE],
-        verifying_key: pallas::Base,
+        vp_vk: pallas::Base,
         sk: pallas::Scalar,
+        receiver_vp_vk: pallas::Base,
     ) -> Self {
         assert_eq!(NUM_NOTE, 2);
         let mut message = vec![];
@@ -174,8 +178,9 @@ impl SignatureVerificationValidityPredicateCircuit {
             owned_note_pub_id,
             input_notes,
             output_notes,
-            verifying_key,
+            vp_vk,
             signature,
+            receiver_vp_vk,
         }
     }
 
@@ -197,6 +202,7 @@ impl SignatureVerificationValidityPredicateCircuit {
             output_notes,
             auth_vk,
             sk,
+            *COMPRESSED_RECEIVER_VK,
         )
     }
 }
@@ -246,22 +252,22 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
             &basic_variables.get_app_data_dynamic_searchable_pairs(),
         )?;
 
-        let vk = assign_free_advice(
-            layouter.namespace(|| "witness vk"),
+        let auth_vp_vk = assign_free_advice(
+            layouter.namespace(|| "witness auth vp vk"),
             config.advices[0],
-            Value::known(self.verifying_key),
+            Value::known(self.vp_vk),
         )?;
-        let padding_zero = assign_free_constant(
-            layouter.namespace(|| "zero"),
+        let receiver_vp_vk = assign_free_advice(
+            layouter.namespace(|| "witness receiver vp vk"),
             config.advices[0],
-            pallas::Base::zero(),
+            Value::known(self.receiver_vp_vk),
         )?;
 
         // Decode the app_data_dynamic, and check the app_data_dynamic encoding
         let encoded_app_data_dynamic = poseidon_hash_gadget(
             config.get_note_config().poseidon_config,
             layouter.namespace(|| "app_data_dynamic encoding"),
-            [pk.inner().x(), pk.inner().y(), vk, padding_zero],
+            [pk.inner().x(), pk.inner().y(), auth_vp_vk, receiver_vp_vk],
         )?;
 
         layouter.assign_region(
