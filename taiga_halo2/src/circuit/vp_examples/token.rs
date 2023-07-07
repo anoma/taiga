@@ -1,14 +1,13 @@
 use crate::{
     circuit::{
         gadgets::{
-            assign_free_advice, assign_free_constant,
-            poseidon_hash::poseidon_hash_gadget,
-            target_note_variable::{get_owned_note_variable, GetOwnedNoteVariableConfig},
+            assign_free_advice, assign_free_constant, poseidon_hash::poseidon_hash_gadget,
+            target_note_variable::get_owned_note_variable,
         },
-        note_circuit::NoteConfig,
         vp_circuit::{
-            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
+            BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
+            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
+            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
         vp_examples::receiver_vp::{ReceiverValidityPredicateCircuit, COMPRESSED_RECEIVER_VK},
         vp_examples::signature_verification::{
@@ -27,7 +26,7 @@ use group::{Curve, Group};
 use halo2_gadgets::ecc::{chip::EccChip, NonIdentityPoint};
 use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
-    plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
+    plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
 use lazy_static::lazy_static;
 use pasta_curves::arithmetic::CurveAffine;
@@ -72,14 +71,6 @@ pub struct TokenAuthorization {
     pub vk: pallas::Base,
 }
 
-#[derive(Clone, Debug)]
-pub struct TokenValidityPredicateConfig {
-    note_conifg: NoteConfig,
-    advices: [Column<Advice>; 10],
-    instances: Column<Instance>,
-    get_owned_note_variable_config: GetOwnedNoteVariableConfig,
-}
-
 impl Default for TokenAuthorization {
     fn default() -> Self {
         Self {
@@ -98,32 +89,6 @@ impl Default for TokenValidityPredicateCircuit {
             token_name: "Token_name".to_string(),
             auth: TokenAuthorization::default(),
             receiver_vp_vk: pallas::Base::zero(),
-        }
-    }
-}
-
-impl ValidityPredicateConfig for TokenValidityPredicateConfig {
-    fn get_note_config(&self) -> NoteConfig {
-        self.note_conifg.clone()
-    }
-
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
-        let note_conifg = Self::configure_note(meta);
-
-        let advices = note_conifg.advices;
-        let instances = note_conifg.instances;
-
-        let get_owned_note_variable_config = GetOwnedNoteVariableConfig::configure(
-            meta,
-            advices[0],
-            [advices[1], advices[2], advices[3], advices[4]],
-        );
-
-        Self {
-            note_conifg,
-            advices,
-            instances,
-            get_owned_note_variable_config,
         }
     }
 }
@@ -168,7 +133,7 @@ impl ValidityPredicateInfo for TokenValidityPredicateCircuit {
 }
 
 impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
-    type VPConfig = TokenValidityPredicateConfig;
+    type VPConfig = GeneralVerificationValidityPredicateConfig;
     // Add custom constraints
     fn custom_constraints(
         &self,

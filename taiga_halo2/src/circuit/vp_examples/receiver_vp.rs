@@ -1,16 +1,14 @@
 use crate::{
     circuit::{
         gadgets::{
-            add::{AddChip, AddConfig},
-            assign_free_advice,
-            poseidon_hash::poseidon_hash_gadget,
-            target_note_variable::{get_owned_note_variable, GetOwnedNoteVariableConfig},
+            add::AddChip, assign_free_advice, poseidon_hash::poseidon_hash_gadget,
+            target_note_variable::get_owned_note_variable,
         },
-        note_circuit::NoteConfig,
         note_encryption_circuit::note_encryption_gadget,
         vp_circuit::{
-            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
+            BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
+            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
+            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
         vp_examples::signature_verification::COMPRESSED_TOKEN_AUTH_VK,
     },
@@ -29,7 +27,7 @@ use halo2_gadgets::ecc::{chip::EccChip, NonIdentityPoint};
 use halo2_proofs::{
     arithmetic::CurveAffine,
     circuit::{floor_planner, Layouter, Value},
-    plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
+    plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
 use lazy_static::lazy_static;
 use pasta_curves::pallas;
@@ -67,45 +65,6 @@ impl Default for ReceiverValidityPredicateCircuit {
             sk: pallas::Base::zero(),
             rcv_pk: pallas::Point::generator(),
             auth_vp_vk: pallas::Base::zero(),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct ReceiverValidityPredicateConfig {
-    note_conifg: NoteConfig,
-    advices: [Column<Advice>; 10],
-    instances: Column<Instance>,
-    add_config: AddConfig,
-    get_owned_note_variable_config: GetOwnedNoteVariableConfig,
-}
-
-impl ValidityPredicateConfig for ReceiverValidityPredicateConfig {
-    fn get_note_config(&self) -> NoteConfig {
-        self.note_conifg.clone()
-    }
-
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
-        let note_conifg = Self::configure_note(meta);
-
-        let advices = note_conifg.advices;
-        let instances = note_conifg.instances;
-
-        // configure custom config here
-        let add_config = note_conifg.add_config.clone();
-
-        let get_owned_note_variable_config = GetOwnedNoteVariableConfig::configure(
-            meta,
-            advices[0],
-            [advices[1], advices[2], advices[3], advices[4]],
-        );
-
-        Self {
-            note_conifg,
-            advices,
-            instances,
-            add_config,
-            get_owned_note_variable_config,
         }
     }
 }
@@ -195,7 +154,7 @@ impl ValidityPredicateInfo for ReceiverValidityPredicateCircuit {
 }
 
 impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
-    type VPConfig = ReceiverValidityPredicateConfig;
+    type VPConfig = GeneralVerificationValidityPredicateConfig;
     // Add custom constraints
     fn custom_constraints(
         &self,
