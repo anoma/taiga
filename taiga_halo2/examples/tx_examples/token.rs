@@ -8,7 +8,7 @@ use taiga_halo2::{
         signature_verification::COMPRESSED_TOKEN_AUTH_VK,
         token::{
             generate_input_token_note_proving_info, generate_output_token_note_proving_info,
-            transfrom_token_name_to_token_property, TokenAuthorization, COMPRESSED_TOKEN_VK,
+            transfrom_token_name_to_token_property, TokenAuthorization, COMPRESSED_TOKEN_VK, create_token_note,
         },
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
@@ -26,19 +26,8 @@ pub fn create_random_token_note<R: RngCore>(
     nk_com: NullifierKeyCom,
     auth: &TokenAuthorization,
 ) -> Note {
-    let app_data_static = transfrom_token_name_to_token_property(name);
-    let app_data_dynamic = auth.to_app_data_dynamic();
     let rseed = RandomSeed::random(&mut rng);
-    Note::new(
-        *COMPRESSED_TOKEN_VK,
-        app_data_static,
-        app_data_dynamic,
-        value,
-        nk_com,
-        rho,
-        true,
-        rseed,
-    )
+    create_token_note(name, value, rho, nk_com, auth, rseed)
 }
 
 #[allow(clippy::too_many_arguments)]

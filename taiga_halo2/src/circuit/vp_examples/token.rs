@@ -17,10 +17,10 @@ use crate::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     merkle_tree::MerklePath,
-    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
+    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
     proof::Proof,
     utils::poseidon_hash_n,
-    vp_vk::ValidityPredicateVerifyingKey,
+    vp_vk::ValidityPredicateVerifyingKey, nullifier::{Nullifier, NullifierKeyCom},
 };
 use ff::Field;
 use group::{Curve, Group};
@@ -374,6 +374,27 @@ pub fn generate_output_token_note_proving_info<R: RngCore>(
     OutputNoteProvingInfo::new(output_note, Box::new(token_vp), vec![Box::new(receiver_vp)])
 }
 
+pub fn create_token_note<R: RngCore>(
+    name: &str,
+    value: u64,
+    rho: Nullifier,
+    nk_com: NullifierKeyCom,
+    auth: &TokenAuthorization,
+    rseed: RandomSeed
+) -> Note {
+    let app_data_static = transfrom_token_name_to_token_property(name);
+    let app_data_dynamic = auth.to_app_data_dynamic();
+    Note::new(
+        *COMPRESSED_TOKEN_VK,
+        app_data_static,
+        app_data_dynamic,
+        value,
+        nk_com,
+        rho,
+        true,
+        rseed,
+    )
+}
 #[test]
 fn test_halo2_token_vp_circuit() {
     use halo2_proofs::dev::MockProver;

@@ -374,6 +374,8 @@ pub fn create_intent_note<R: RngCore>(
     )
 }
 
+
+
 #[test]
 fn test_halo2_or_relation_intent_vp_circuit() {
     use halo2_proofs::dev::MockProver;
