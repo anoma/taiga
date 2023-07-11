@@ -23,7 +23,7 @@ use pasta_curves::{
     pallas,
 };
 use rand::{Rng, RngCore};
-use std::io;
+use std::{io, hash::{Hash, Hasher}};
 
 /// A commitment to a note.
 #[derive(Copy, Debug, Clone)]
@@ -403,6 +403,13 @@ impl ValueBase {
     pub fn derive_value_base(&self) -> pallas::Point {
         let inputs = [self.app_vk, self.app_data_static];
         poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&inputs)
+    }
+}
+
+impl Hash for ValueBase {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.app_vk.to_repr().as_ref().hash(state);
+        self.app_data_static.to_repr().as_ref().hash(state);
     }
 }
 
