@@ -23,7 +23,6 @@ use crate::{
     proof::Proof,
     vp_vk::ValidityPredicateVerifyingKey,
 };
-use bincode::error::DecodeError;
 use borsh::{BorshDeserialize, BorshSerialize};
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use dyn_clone::{clone_trait_object, DynClone};
@@ -37,14 +36,17 @@ use halo2_proofs::{
     },
     poly::commitment::Params,
 };
-use pasta_curves::{pallas, vesta};
+use pasta_curves::{pallas, vesta, EqAffine, Fp};
 use rand::rngs::OsRng;
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs;
 use std::io;
 use std::path::PathBuf;
-use vamp_ir::halo2::synth::{make_constant, Halo2Module};
-use vamp_ir::util::read_inputs_from_file;
+use std::rc::Rc;
+use vamp_ir::ast::Module;
+use vamp_ir::halo2::synth::{make_constant, Halo2Module, PrimeFieldOps};
+use vamp_ir::transform::compile;
+use vamp_ir::util::{read_inputs_from_file, Config};
 
 #[derive(Debug, Clone)]
 pub struct VPVerifyingInfo {
@@ -698,16 +700,18 @@ pub struct VampIRValidityPredicateCircuit {
 }
 
 impl VampIRValidityPredicateCircuit {
-    pub fn from_vamp_ir_circuit(vamp_ir_circuit_file: &PathBuf, inputs_file: &PathBuf) -> Self {
-        let mut circuit_file =
-            File::open(vamp_ir_circuit_file).expect("unable to load circuit file");
-        // let mut circuit: Halo2Module<pallas::Base> =
-        //     bincode::decode_from_std_read(&mut circuit_file, bincode::config::standard())
-        //         .expect("unable to load circuit file");
-        let HaloCircuitData {
-            params,
-            mut circuit,
-        } = HaloCircuitData::read(&mut circuit_file).unwrap();
+    pub fn from_vamp_ir_file(vamp_ir_file: &PathBuf, inputs_file: &PathBuf) -> Self {
+        let config = Config { quiet: true };
+        let vamp_ir_source = fs::read_to_string(vamp_ir_file).expect("cannot read vamp-ir file");
+        let parsed_vamp_ir_module = Module::parse(&vamp_ir_source).unwrap();
+        let vamp_ir_module = compile(
+            parsed_vamp_ir_module,
+            &PrimeFieldOps::<Fp>::default(),
+            &config,
+        );
+        let mut circuit = Halo2Module::<Fp>::new(Rc::new(vamp_ir_module));
+        let params: Params<EqAffine> = Params::new(circuit.k);
+
         let var_assignments_ints = read_inputs_from_file(&circuit.module, inputs_file);
         let mut var_assignments = HashMap::new();
         for (k, v) in var_assignments_ints {
@@ -736,7 +740,6 @@ impl VampIRValidityPredicateCircuit {
 impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
     fn get_verifying_info(&self) -> VPVerifyingInfo {
         let mut rng = OsRng;
-        // let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
         let vk = keygen_vk(&self.params, &self.circuit).expect("keygen_vk should not fail");
         let pk =
             keygen_pk(&self.params, vk.clone(), &self.circuit).expect("keygen_pk should not fail");
@@ -756,37 +759,17 @@ impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
     }
 
     fn get_vp_vk(&self) -> ValidityPredicateVerifyingKey {
-        // let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
         let vk = keygen_vk(&self.params, &self.circuit).expect("keygen_vk should not fail");
         ValidityPredicateVerifyingKey::from_vk(vk)
     }
 }
 
-// TODO: We won't need the HaloCircuitData when we can import the circuit from vamp_ir.
-struct HaloCircuitData {
-    params: Params<vesta::Affine>,
-    circuit: Halo2Module<pallas::Base>,
-}
-
-impl HaloCircuitData {
-    fn read<R>(mut reader: R) -> Result<Self, DecodeError>
-    where
-        R: std::io::Read,
-    {
-        let params = Params::<vesta::Affine>::read(&mut reader)
-            .map_err(|x| DecodeError::OtherString(x.to_string()))?;
-        let circuit: Halo2Module<pallas::Base> =
-            bincode::decode_from_std_read(&mut reader, bincode::config::standard())?;
-        Ok(Self { params, circuit })
-    }
-}
-
 #[test]
-fn test_create_vp_from_vamp_ir_circuit() {
-    let vamp_ir_circuit_file = PathBuf::from("./src/circuit/vamp_ir_circuits/pyth.halo2");
+fn test_create_vp_from_vamp_ir_file() {
+    let vamp_ir_circuit_file = PathBuf::from("./src/circuit/vamp_ir_circuits/pyth.pir");
     let inputs_file = PathBuf::from("./src/circuit/vamp_ir_circuits/pyth.inputs");
     let vp_circuit =
-        VampIRValidityPredicateCircuit::from_vamp_ir_circuit(&vamp_ir_circuit_file, &inputs_file);
+        VampIRValidityPredicateCircuit::from_vamp_ir_file(&vamp_ir_circuit_file, &inputs_file);
 
     // generate proof and instance
     let vp_info = vp_circuit.get_verifying_info();
