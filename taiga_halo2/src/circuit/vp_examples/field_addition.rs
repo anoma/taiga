@@ -1,13 +1,13 @@
 use crate::{
     circuit::{
         gadgets::{
-            add::{AddChip, AddConfig, AddInstructions},
+            add::{AddChip, AddInstructions},
             assign_free_advice,
         },
-        note_circuit::NoteConfig,
         vp_circuit::{
-            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
+            BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
+            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
+            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX},
@@ -18,7 +18,7 @@ use crate::{
 use halo2_proofs::{
     arithmetic::Field,
     circuit::{floor_planner, Layouter, Value},
-    plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
+    plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
@@ -32,37 +32,6 @@ struct FieldAdditionValidityPredicateCircuit {
     output_notes: [Note; NUM_NOTE],
     a: pallas::Base,
     b: pallas::Base,
-}
-
-#[derive(Clone, Debug)]
-struct FieldAdditionValidityPredicateConfig {
-    note_conifg: NoteConfig,
-    advices: [Column<Advice>; 10],
-    instances: Column<Instance>,
-    add_config: AddConfig,
-}
-
-impl ValidityPredicateConfig for FieldAdditionValidityPredicateConfig {
-    fn get_note_config(&self) -> NoteConfig {
-        self.note_conifg.clone()
-    }
-
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
-        let note_conifg = Self::configure_note(meta);
-
-        let advices = note_conifg.advices;
-        let instances = note_conifg.instances;
-
-        // configure custom config here
-        let add_config = note_conifg.add_config.clone();
-
-        Self {
-            note_conifg,
-            advices,
-            instances,
-            add_config,
-        }
-    }
 }
 
 impl FieldAdditionValidityPredicateCircuit {
@@ -105,7 +74,7 @@ impl ValidityPredicateInfo for FieldAdditionValidityPredicateCircuit {
 }
 
 impl ValidityPredicateCircuit for FieldAdditionValidityPredicateCircuit {
-    type VPConfig = FieldAdditionValidityPredicateConfig;
+    type VPConfig = GeneralVerificationValidityPredicateConfig;
     // Add custom constraints
     // Note: the trivial vp doesn't constrain on input_note_variables and output_note_variables
     fn custom_constraints(

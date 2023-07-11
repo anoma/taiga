@@ -1,15 +1,15 @@
 use crate::{
     circuit::{
         gadgets::{
-            assign_free_advice, assign_free_constant,
-            poseidon_hash::poseidon_hash_gadget,
-            target_note_variable::{get_owned_note_variable, GetOwnedNoteVariableConfig},
+            assign_free_advice, assign_free_constant, poseidon_hash::poseidon_hash_gadget,
+            target_note_variable::get_owned_note_variable,
         },
-        note_circuit::NoteConfig,
         vp_circuit::{
-            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
+            BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
+            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
+            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
+        vp_examples::receiver_vp::{ReceiverValidityPredicateCircuit, COMPRESSED_RECEIVER_VK},
         vp_examples::signature_verification::{
             SignatureVerificationValidityPredicateCircuit, COMPRESSED_TOKEN_AUTH_VK,
         },
@@ -21,17 +21,17 @@ use crate::{
     utils::poseidon_hash_n,
     vp_vk::ValidityPredicateVerifyingKey,
 };
+use ff::Field;
 use group::{Curve, Group};
 use halo2_gadgets::ecc::{chip::EccChip, NonIdentityPoint};
 use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
-    plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
+    plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
 use lazy_static::lazy_static;
 use pasta_curves::arithmetic::CurveAffine;
 use pasta_curves::{group::ff::PrimeField, pallas};
-use rand::rngs::OsRng;
-use rand::RngCore;
+use rand::{rngs::OsRng, Rng, RngCore};
 
 lazy_static! {
     pub static ref TOKEN_VK: ValidityPredicateVerifyingKey =
@@ -62,20 +62,13 @@ pub struct TokenValidityPredicateCircuit {
     pub token_name: String,
     // The auth goes to app_data_dynamic and defines how to consume and create the note.
     pub auth: TokenAuthorization,
+    pub receiver_vp_vk: pallas::Base,
 }
 
 #[derive(Clone, Debug, Copy)]
 pub struct TokenAuthorization {
     pub pk: pallas::Point,
     pub vk: pallas::Base,
-}
-
-#[derive(Clone, Debug)]
-pub struct TokenValidityPredicateConfig {
-    note_conifg: NoteConfig,
-    advices: [Column<Advice>; 10],
-    instances: Column<Instance>,
-    get_owned_note_variable_config: GetOwnedNoteVariableConfig,
 }
 
 impl Default for TokenAuthorization {
@@ -95,32 +88,7 @@ impl Default for TokenValidityPredicateCircuit {
             output_notes: [(); NUM_NOTE].map(|_| Note::default()),
             token_name: "Token_name".to_string(),
             auth: TokenAuthorization::default(),
-        }
-    }
-}
-
-impl ValidityPredicateConfig for TokenValidityPredicateConfig {
-    fn get_note_config(&self) -> NoteConfig {
-        self.note_conifg.clone()
-    }
-
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
-        let note_conifg = Self::configure_note(meta);
-
-        let advices = note_conifg.advices;
-        let instances = note_conifg.instances;
-
-        let get_owned_note_variable_config = GetOwnedNoteVariableConfig::configure(
-            meta,
-            advices[0],
-            [advices[1], advices[2], advices[3], advices[4]],
-        );
-
-        Self {
-            note_conifg,
-            advices,
-            instances,
-            get_owned_note_variable_config,
+            receiver_vp_vk: pallas::Base::zero(),
         }
     }
 }
@@ -141,6 +109,7 @@ impl TokenValidityPredicateCircuit {
             output_notes,
             token_name,
             auth,
+            receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
         }
     }
 }
@@ -164,7 +133,7 @@ impl ValidityPredicateInfo for TokenValidityPredicateCircuit {
 }
 
 impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
-    type VPConfig = TokenValidityPredicateConfig;
+    type VPConfig = GeneralVerificationValidityPredicateConfig;
     // Add custom constraints
     fn custom_constraints(
         &self,
@@ -205,8 +174,8 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             Value::known(self.auth.pk.to_affine()),
         )?;
 
-        let vk = assign_free_advice(
-            layouter.namespace(|| "witness vk"),
+        let auth_vp_vk = assign_free_advice(
+            layouter.namespace(|| "witness auth vp vk"),
             config.advices[0],
             Value::known(self.auth.vk),
         )?;
@@ -219,17 +188,17 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             &basic_variables.get_app_data_dynamic_searchable_pairs(),
         )?;
 
-        let padding_zero = assign_free_constant(
-            layouter.namespace(|| "zero"),
+        let receiver_vp_vk = assign_free_advice(
+            layouter.namespace(|| "witness receiver vp vk"),
             config.advices[0],
-            pallas::Base::zero(),
+            Value::known(self.receiver_vp_vk),
         )?;
 
         // Decode the app_data_dynamic, and check the app_data_dynamic encoding
         let encoded_app_data_dynamic = poseidon_hash_gadget(
             config.get_note_config().poseidon_config,
             layouter.namespace(|| "app_data_dynamic encoding"),
-            [pk.inner().x(), pk.inner().y(), vk, padding_zero],
+            [pk.inner().x(), pk.inner().y(), auth_vp_vk, receiver_vp_vk],
         )?;
 
         layouter.assign_region(
@@ -256,7 +225,8 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             |mut region| region.constrain_equal(is_merkle_checked.cell(), constant_one.cell()),
         )?;
 
-        // TODO: add authorization vp commitment
+        // TODO: add the sender(authorization method included) vp commitment if it's an input note;
+        // Add the receiver(note encryption constraints included) vp commitment if it's an output note.
 
         Ok(())
     }
@@ -278,7 +248,12 @@ impl TokenAuthorization {
 
     pub fn to_app_data_dynamic(&self) -> pallas::Base {
         let pk_coord = self.pk.to_affine().coordinates().unwrap();
-        poseidon_hash_n::<4>([*pk_coord.x(), *pk_coord.y(), self.vk, pallas::Base::zero()])
+        poseidon_hash_n::<4>([
+            *pk_coord.x(),
+            *pk_coord.y(),
+            self.vk,
+            *COMPRESSED_RECEIVER_VK,
+        ])
     }
 
     pub fn from_sk_vk(sk: &pallas::Scalar, vk: &pallas::Base) -> Self {
@@ -307,6 +282,7 @@ pub fn generate_input_token_note_proving_info<R: RngCore>(
         output_notes,
         token_name,
         auth,
+        receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
     };
 
     // token auth VP
@@ -317,6 +293,7 @@ pub fn generate_input_token_note_proving_info<R: RngCore>(
         output_notes,
         auth.vk,
         auth_sk,
+        *COMPRESSED_RECEIVER_VK,
     );
 
     // input note proving info
@@ -328,23 +305,38 @@ pub fn generate_input_token_note_proving_info<R: RngCore>(
     )
 }
 
-pub fn generate_output_token_note_proving_info(
+pub fn generate_output_token_note_proving_info<R: RngCore>(
+    mut rng: R,
     output_note: Note,
     token_name: String,
     auth: TokenAuthorization,
     input_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
 ) -> OutputNoteProvingInfo {
+    let owned_note_pub_id = output_note.commitment().get_x();
     // token VP
     let token_vp = TokenValidityPredicateCircuit {
-        owned_note_pub_id: output_note.commitment().get_x(),
+        owned_note_pub_id,
         input_notes,
         output_notes,
         token_name,
         auth,
+        receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
     };
 
-    OutputNoteProvingInfo::new(output_note, Box::new(token_vp), vec![])
+    // receiver VP
+    let receiver_vp = ReceiverValidityPredicateCircuit {
+        owned_note_pub_id,
+        input_notes,
+        output_notes,
+        vp_vk: *COMPRESSED_RECEIVER_VK,
+        nonce: pallas::Base::from_u128(rng.gen()),
+        sk: pallas::Base::random(&mut rng),
+        rcv_pk: auth.pk,
+        auth_vp_vk: *COMPRESSED_TOKEN_AUTH_VK,
+    };
+
+    OutputNoteProvingInfo::new(output_note, Box::new(token_vp), vec![Box::new(receiver_vp)])
 }
 
 #[test]

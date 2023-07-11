@@ -1,10 +1,7 @@
 use crate::{
-    circuit::{
-        note_circuit::NoteConfig,
-        vp_circuit::{
-            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
-        },
+    circuit::vp_circuit::{
+        GeneralVerificationValidityPredicateConfig, VPVerifyingInfo, ValidityPredicateCircuit,
+        ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
@@ -23,9 +20,9 @@ use rand::RngCore;
 
 pub mod cascade_intent;
 mod field_addition;
-mod note_encryption_example;
 pub mod or_relation_intent;
 pub mod partial_fulfillment_intent;
+pub mod receiver_vp;
 pub mod signature_verification;
 pub mod token;
 
@@ -41,22 +38,6 @@ pub struct TrivialValidityPredicateCircuit {
     pub owned_note_pub_id: pallas::Base,
     pub input_notes: [Note; NUM_NOTE],
     pub output_notes: [Note; NUM_NOTE],
-}
-
-#[derive(Clone, Debug)]
-pub struct DummyValidityPredicateConfig {
-    note_conifg: NoteConfig,
-}
-
-impl ValidityPredicateConfig for DummyValidityPredicateConfig {
-    fn get_note_config(&self) -> NoteConfig {
-        self.note_conifg.clone()
-    }
-
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
-        let note_conifg = Self::configure_note(meta);
-        Self { note_conifg }
-    }
 }
 
 impl TrivialValidityPredicateCircuit {
@@ -91,7 +72,7 @@ impl ValidityPredicateInfo for TrivialValidityPredicateCircuit {
 }
 
 impl ValidityPredicateCircuit for TrivialValidityPredicateCircuit {
-    type VPConfig = DummyValidityPredicateConfig;
+    type VPConfig = GeneralVerificationValidityPredicateConfig;
 }
 
 vp_circuit_impl!(TrivialValidityPredicateCircuit);

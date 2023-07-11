@@ -1,12 +1,14 @@
 use crate::circuit::gadgets::add::{AddChip, AddConfig};
-use crate::constant::{NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases};
+use crate::constant::{
+    BaseFieldGenerators, NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases,
+};
 use halo2_gadgets::{
     ecc::chip::EccConfig,
-    ecc::{chip::EccChip, Point, ScalarFixed},
+    ecc::{chip::EccChip, FixedPointBaseField, Point},
     poseidon::{primitives as poseidon, Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig},
     sinsemilla::{
         chip::{SinsemillaChip, SinsemillaConfig},
-        CommitDomain, Message, MessagePiece,
+        CommitDomains, HashDomain, Message, MessagePiece,
     },
     utilities::{bool_check, lookup_range_check::LookupRangeCheckConfig, RangeConstrained},
 };
@@ -476,7 +478,7 @@ pub fn note_commitment_gadget(
     rho: AssignedCell<pallas::Base, pallas::Base>,
     psi: AssignedCell<pallas::Base, pallas::Base>,
     value: AssignedCell<pallas::Base, pallas::Base>,
-    rcm: ScalarFixed<pallas::Affine, EccChip<TaigaFixedBases>>,
+    rcm: AssignedCell<pallas::Base, pallas::Base>,
     is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<Point<pallas::Affine, EccChip<TaigaFixedBases>>, Error> {
     let lookup_config = chip.config().lookup_config();
@@ -548,7 +550,7 @@ pub fn note_commitment_gadget(
     )?;
 
     // cm = NoteCommit^rcm(address || app_vp || app_data_static || rho || psi || is_merkle_checked || value)
-    let (cm, _zs) = {
+    let cm = {
         let message = Message::from_pieces(
             chip.clone(),
             vec![
@@ -562,12 +564,13 @@ pub fn note_commitment_gadget(
                 c.clone(),
             ],
         );
-        let domain = CommitDomain::new(chip, ecc_chip, &NoteCommitmentDomain);
-        domain.commit(
-            layouter.namespace(|| "Process NoteCommit inputs"),
-            message,
-            rcm,
-        )?
+        let hash_domain =
+            HashDomain::new(chip, ecc_chip.clone(), &NoteCommitmentDomain.hash_domain());
+        let (p, _) = hash_domain.hash_to_point(layouter.namespace(|| "hash to point"), message)?;
+        let blind_base =
+            FixedPointBaseField::from_inner(ecc_chip, BaseFieldGenerators::NoteCommitmentR);
+        let blind = blind_base.mul(layouter.namespace(|| "[r] R"), rcm)?;
+        p.add(layouter.namespace(|| "M + [r] R"), &blind)?
     };
 
     // assign values
@@ -706,7 +709,7 @@ fn test_halo2_note_commitment_circuit() {
     use halo2_gadgets::{
         ecc::{
             chip::{EccChip, EccConfig},
-            NonIdentityPoint, ScalarFixed,
+            NonIdentityPoint,
         },
         sinsemilla::chip::SinsemillaChip,
         utilities::lookup_range_check::LookupRangeCheckConfig,
@@ -879,9 +882,9 @@ fn test_halo2_note_commitment_circuit() {
                 Value::known(note.get_psi()),
             )?;
 
-            let rcm = ScalarFixed::new(
-                ecc_chip.clone(),
-                layouter.namespace(|| "rcm"),
+            let rcm = assign_free_advice(
+                layouter.namespace(|| "witness rcm"),
+                note_commit_config.advices[0],
                 Value::known(note.get_rcm()),
             )?;
 

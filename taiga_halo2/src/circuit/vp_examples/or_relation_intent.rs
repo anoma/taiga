@@ -6,18 +6,13 @@ use crate::{
     circuit::{
         gadgets::{
             assign_free_advice, assign_free_constant,
-            conditional_equal::ConditionalEqualConfig,
-            extended_or_relation::ExtendedOrRelationConfig,
             poseidon_hash::poseidon_hash_gadget,
-            target_note_variable::{
-                get_is_input_note_flag, get_owned_note_variable, GetIsInputNoteFlagConfig,
-                GetOwnedNoteVariableConfig,
-            },
+            target_note_variable::{get_is_input_note_flag, get_owned_note_variable},
         },
-        note_circuit::NoteConfig,
         vp_circuit::{
-            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
+            BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
+            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
+            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
         vp_examples::token::{
             transfrom_token_name_to_token_property, COMPRESSED_TOKEN_VK, TOKEN_VK,
@@ -33,7 +28,7 @@ use crate::{
 use halo2_proofs::{
     arithmetic::Field,
     circuit::{floor_planner, Layouter, Value},
-    plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
+    plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
 use lazy_static::lazy_static;
 use pasta_curves::pallas;
@@ -63,54 +58,6 @@ pub struct OrRelationIntentValidityPredicateCircuit {
     pub condition1: Condition,
     pub condition2: Condition,
     pub receiver_address: pallas::Base,
-}
-
-#[derive(Clone, Debug)]
-pub struct OrRelationIntentValidityPredicateConfig {
-    note_conifg: NoteConfig,
-    advices: [Column<Advice>; 10],
-    instances: Column<Instance>,
-    get_is_input_note_flag_config: GetIsInputNoteFlagConfig,
-    get_owned_note_variable_config: GetOwnedNoteVariableConfig,
-    conditional_equal_config: ConditionalEqualConfig,
-    extended_or_relation_config: ExtendedOrRelationConfig,
-}
-
-impl ValidityPredicateConfig for OrRelationIntentValidityPredicateConfig {
-    fn get_note_config(&self) -> NoteConfig {
-        self.note_conifg.clone()
-    }
-
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
-        let note_conifg = Self::configure_note(meta);
-
-        let advices = note_conifg.advices;
-        let instances = note_conifg.instances;
-
-        let get_owned_note_variable_config = GetOwnedNoteVariableConfig::configure(
-            meta,
-            advices[0],
-            [advices[1], advices[2], advices[3], advices[4]],
-        );
-
-        let get_is_input_note_flag_config =
-            GetIsInputNoteFlagConfig::configure(meta, advices[0], advices[1], advices[2]);
-
-        let extended_or_relation_config =
-            ExtendedOrRelationConfig::configure(meta, [advices[0], advices[1], advices[2]]);
-
-        let conditional_equal_config =
-            ConditionalEqualConfig::configure(meta, [advices[0], advices[1], advices[2]]);
-        Self {
-            note_conifg,
-            advices,
-            instances,
-            get_is_input_note_flag_config,
-            get_owned_note_variable_config,
-            extended_or_relation_config,
-            conditional_equal_config,
-        }
-    }
 }
 
 impl OrRelationIntentValidityPredicateCircuit {
@@ -194,7 +141,7 @@ impl ValidityPredicateInfo for OrRelationIntentValidityPredicateCircuit {
 }
 
 impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
-    type VPConfig = OrRelationIntentValidityPredicateConfig;
+    type VPConfig = GeneralVerificationValidityPredicateConfig;
     // Add custom constraints
     fn custom_constraints(
         &self,

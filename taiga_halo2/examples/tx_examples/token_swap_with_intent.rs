@@ -198,6 +198,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
 
     // Create the output note proving info
     let output_note_proving_info = generate_output_token_note_proving_info(
+        &mut rng,
         output_note,
         output_token.to_string(),
         output_auth,

@@ -9,7 +9,7 @@ use crate::{
     },
     merkle_tree::{MerklePath, Node, LR},
     nullifier::{Nullifier, NullifierDerivingKey, NullifierKeyCom},
-    utils::{extract_p, poseidon_hash, poseidon_to_curve},
+    utils::{extract_p, mod_r_p, poseidon_hash, poseidon_to_curve},
 };
 use bitvec::{array::BitArray, order::Lsb0};
 use blake2b_simd::Params as Blake2bParams;
@@ -65,7 +65,7 @@ pub struct Note {
     /// psi is to derive the nullifier
     pub psi: pallas::Base,
     /// rcm is the trapdoor of the note commitment
-    pub rcm: pallas::Scalar,
+    pub rcm: pallas::Base,
     /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of input note will be checked in ActionProof.
     pub is_merkle_checked: bool,
 }
@@ -133,7 +133,7 @@ impl Note {
         rho: Nullifier,
         is_merkle_checked: bool,
         psi: pallas::Base,
-        rcm: pallas::Scalar,
+        rcm: pallas::Base,
     ) -> Self {
         let note_type = ValueBase::new(app_vk, app_data_static);
         Self {
@@ -148,18 +148,32 @@ impl Note {
         }
     }
 
+    // TODO: remove it when optimizing the tests
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        Self::dummy_from_rho(rng, rho)
+        Self::dummy_input(&mut rng)
     }
 
-    pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
+    pub fn dummy_input<R: RngCore>(mut rng: R) -> Self {
+        let rho = Nullifier::new(pallas::Base::random(&mut rng));
+        let nk_com = NullifierKeyCom::rand(&mut rng);
+        Self::dummy_from_parts(rng, rho, nk_com)
+    }
+
+    pub fn dummy_output<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
+        let nk_com = NullifierKeyCom::from_closed(pallas::Base::random(&mut rng));
+        Self::dummy_from_parts(rng, rho, nk_com)
+    }
+
+    pub fn dummy_from_parts<R: RngCore>(
+        mut rng: R,
+        rho: Nullifier,
+        nk_com: NullifierKeyCom,
+    ) -> Self {
         let app_vk = pallas::Base::random(&mut rng);
         let app_data_static = pallas::Base::random(&mut rng);
         let note_type = ValueBase::new(app_vk, app_data_static);
         let app_data_dynamic = pallas::Base::zero();
         let value: u64 = rng.gen();
-        let nk_com = NullifierKeyCom::rand(&mut rng);
         let rseed = RandomSeed::random(&mut rng);
         Self {
             note_type,
@@ -179,16 +193,15 @@ impl Note {
         let note_type = ValueBase::new(app_vk, app_data_static);
         let app_data_dynamic = pallas::Base::zero();
         let nk_com = NullifierKeyCom::rand(&mut rng);
-        let rcm = pallas::Scalar::random(&mut rng);
-        let psi = pallas::Base::random(&mut rng);
+        let rseed = RandomSeed::random(&mut rng);
         Self {
             note_type,
             app_data_dynamic,
             value: 0,
             nk_com,
             rho,
-            psi,
-            rcm,
+            psi: rseed.get_psi(&rho),
+            rcm: rseed.get_rcm(&rho),
             is_merkle_checked: false,
         }
     }
@@ -235,7 +248,7 @@ impl Note {
                             .iter()
                             .by_vals(),
                     ),
-                &self.get_rcm(),
+                &mod_r_p(self.get_rcm()),
             )
             .unwrap();
         NoteCommitment(ret)
@@ -280,7 +293,7 @@ impl Note {
         self.psi
     }
 
-    pub fn get_rcm(&self) -> pallas::Scalar {
+    pub fn get_rcm(&self) -> pallas::Base {
         self.rcm
     }
 }
@@ -359,7 +372,7 @@ impl BorshDeserialize for Note {
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "psi not in field"))?;
         // Read rcm
         let rcm_bytes = <[u8; 32]>::deserialize(buf)?;
-        let rcm = Option::from(pallas::Scalar::from_repr(rcm_bytes))
+        let rcm = Option::from(pallas::Base::from_repr(rcm_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "rcm not in field"))?;
         // Read is_merkle_checked
         let is_merkle_checked_byte = buf.read_u8()?;
@@ -416,7 +429,7 @@ impl RandomSeed {
         pallas::Base::from_uniform_bytes(&psi_bytes)
     }
 
-    pub fn get_rcm(&self, rho: &Nullifier) -> pallas::Scalar {
+    pub fn get_rcm(&self, rho: &Nullifier) -> pallas::Base {
         let mut h = Blake2bParams::new()
             .hash_length(64)
             .personal(PRF_EXPAND_PERSONALIZATION)
@@ -425,7 +438,7 @@ impl RandomSeed {
         h.update(&self.0);
         h.update(&rho.to_bytes());
         let rcm_bytes = *h.finalize().as_array();
-        pallas::Scalar::from_uniform_bytes(&rcm_bytes)
+        pallas::Base::from_uniform_bytes(&rcm_bytes)
     }
 }
 
@@ -489,7 +502,7 @@ impl OutputNoteProvingInfo {
 
     // TODO: move it to test mod
     pub fn dummy<R: RngCore>(mut rng: R, nf: Nullifier) -> Self {
-        let note = Note::dummy_from_rho(&mut rng, nf);
+        let note = Note::dummy_output(&mut rng, nf);
         let app_vp_verifying_info = Box::new(TrivialValidityPredicateCircuit::dummy(&mut rng));
         let app_vp_verifying_info_dynamic = vec![];
         Self {
@@ -537,12 +550,12 @@ fn note_serialization_test() {
         assert_eq!(input_note, de_note);
     }
 
-    // let output_note = Note::dummy_output(&mut rng, input_note.rho);
-    // {
-    //     // BorshSerialize
-    //     let borsh = input_note.try_to_vec().unwrap();
-    //     // BorshDeserialize
-    //     let de_note: Note = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
-    //     assert_eq!(output_note, de_note);
-    // }
+    let output_note = Note::dummy_output(&mut rng, input_note.rho);
+    {
+        // BorshSerialize
+        let borsh = output_note.try_to_vec().unwrap();
+        // BorshDeserialize
+        let de_note: Note = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
+        assert_eq!(output_note, de_note);
+    }
 }

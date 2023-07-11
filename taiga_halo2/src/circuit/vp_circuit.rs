@@ -1,6 +1,14 @@
 use crate::{
     circuit::{
-        gadgets::{add::AddChip, assign_free_advice},
+        gadgets::{
+            add::{AddChip, AddConfig},
+            assign_free_advice,
+            conditional_equal::ConditionalEqualConfig,
+            extended_or_relation::ExtendedOrRelationConfig,
+            mul::{MulChip, MulConfig},
+            sub::{SubChip, SubConfig},
+            target_note_variable::{GetIsInputNoteFlagConfig, GetOwnedNoteVariableConfig},
+        },
         integrity::{check_input_note, check_output_note},
         note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig},
     },
@@ -23,7 +31,10 @@ use ff::PrimeField;
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
     circuit::{AssignedCell, Layouter, Value},
-    plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error, VerifyingKey},
+    plonk::{
+        keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance,
+        VerifyingKey,
+    },
     poly::commitment::Params,
 };
 use pasta_curves::{pallas, vesta};
@@ -135,6 +146,65 @@ pub trait ValidityPredicateConfig {
     }
     fn get_note_config(&self) -> NoteConfig;
     fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self;
+}
+
+#[derive(Clone, Debug)]
+pub struct GeneralVerificationValidityPredicateConfig {
+    pub note_conifg: NoteConfig,
+    pub advices: [Column<Advice>; 10],
+    pub instances: Column<Instance>,
+    pub get_is_input_note_flag_config: GetIsInputNoteFlagConfig,
+    pub get_owned_note_variable_config: GetOwnedNoteVariableConfig,
+    pub conditional_equal_config: ConditionalEqualConfig,
+    pub extended_or_relation_config: ExtendedOrRelationConfig,
+    pub add_config: AddConfig,
+    pub sub_config: SubConfig,
+    pub mul_config: MulConfig,
+}
+
+impl ValidityPredicateConfig for GeneralVerificationValidityPredicateConfig {
+    fn get_note_config(&self) -> NoteConfig {
+        self.note_conifg.clone()
+    }
+
+    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
+        let note_conifg = Self::configure_note(meta);
+
+        let advices = note_conifg.advices;
+        let instances = note_conifg.instances;
+
+        let get_owned_note_variable_config = GetOwnedNoteVariableConfig::configure(
+            meta,
+            advices[0],
+            [advices[1], advices[2], advices[3], advices[4]],
+        );
+
+        let get_is_input_note_flag_config =
+            GetIsInputNoteFlagConfig::configure(meta, advices[0], advices[1], advices[2]);
+
+        let conditional_equal_config =
+            ConditionalEqualConfig::configure(meta, [advices[0], advices[1], advices[2]]);
+
+        let add_config = note_conifg.add_config.clone();
+        let sub_config = SubChip::configure(meta, [advices[0], advices[1]]);
+        let mul_config = MulChip::configure(meta, [advices[0], advices[1]]);
+
+        let extended_or_relation_config =
+            ExtendedOrRelationConfig::configure(meta, [advices[0], advices[1], advices[2]]);
+
+        Self {
+            note_conifg,
+            advices,
+            instances,
+            get_is_input_note_flag_config,
+            get_owned_note_variable_config,
+            conditional_equal_config,
+            extended_or_relation_config,
+            add_config,
+            sub_config,
+            mul_config,
+        }
+    }
 }
 
 pub trait ValidityPredicateInfo {
@@ -287,6 +357,10 @@ pub struct NoteVariables {
     pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
     pub app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
+    pub rho: AssignedCell<pallas::Base, pallas::Base>,
+    pub nk_com: AssignedCell<pallas::Base, pallas::Base>,
+    pub psi: AssignedCell<pallas::Base, pallas::Base>,
+    pub rcm: AssignedCell<pallas::Base, pallas::Base>,
 }
 
 // Variables in the input note
@@ -461,6 +535,94 @@ impl BasicValidityPredicateVariables {
             .map(|variables| NoteSearchableVariablePair {
                 src_variable: variables.cm_x.clone(),
                 target_variable: variables.note_variables.app_data_dynamic.clone(),
+            })
+            .collect();
+        input_note_pairs.extend(output_note_pairs);
+        input_note_pairs.try_into().unwrap()
+    }
+
+    pub fn get_rho_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+        let mut input_note_pairs: Vec<_> = self
+            .input_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.nf.clone(),
+                target_variable: variables.note_variables.rho.clone(),
+            })
+            .collect();
+
+        let output_note_pairs: Vec<_> = self
+            .output_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.cm_x.clone(),
+                target_variable: variables.note_variables.rho.clone(),
+            })
+            .collect();
+        input_note_pairs.extend(output_note_pairs);
+        input_note_pairs.try_into().unwrap()
+    }
+
+    pub fn get_nk_com_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+        let mut input_note_pairs: Vec<_> = self
+            .input_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.nf.clone(),
+                target_variable: variables.note_variables.nk_com.clone(),
+            })
+            .collect();
+
+        let output_note_pairs: Vec<_> = self
+            .output_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.cm_x.clone(),
+                target_variable: variables.note_variables.nk_com.clone(),
+            })
+            .collect();
+        input_note_pairs.extend(output_note_pairs);
+        input_note_pairs.try_into().unwrap()
+    }
+
+    pub fn get_psi_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+        let mut input_note_pairs: Vec<_> = self
+            .input_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.nf.clone(),
+                target_variable: variables.note_variables.psi.clone(),
+            })
+            .collect();
+
+        let output_note_pairs: Vec<_> = self
+            .output_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.cm_x.clone(),
+                target_variable: variables.note_variables.psi.clone(),
+            })
+            .collect();
+        input_note_pairs.extend(output_note_pairs);
+        input_note_pairs.try_into().unwrap()
+    }
+
+    pub fn get_rcm_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+        let mut input_note_pairs: Vec<_> = self
+            .input_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.nf.clone(),
+                target_variable: variables.note_variables.rcm.clone(),
+            })
+            .collect();
+
+        let output_note_pairs: Vec<_> = self
+            .output_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.cm_x.clone(),
+                target_variable: variables.note_variables.rcm.clone(),
             })
             .collect();
         input_note_pairs.extend(output_note_pairs);
