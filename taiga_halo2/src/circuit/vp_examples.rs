@@ -1,10 +1,7 @@
 use crate::{
-    circuit::{
-        note_circuit::NoteConfig,
-        vp_circuit::{
-            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
-        },
+    circuit::vp_circuit::{
+        GeneralVerificationValidityPredicateConfig, VPVerifyingInfo, ValidityPredicateCircuit,
+        ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
@@ -43,22 +40,6 @@ pub struct TrivialValidityPredicateCircuit {
     pub output_notes: [Note; NUM_NOTE],
 }
 
-#[derive(Clone, Debug)]
-pub struct DummyValidityPredicateConfig {
-    note_conifg: NoteConfig,
-}
-
-impl ValidityPredicateConfig for DummyValidityPredicateConfig {
-    fn get_note_config(&self) -> NoteConfig {
-        self.note_conifg.clone()
-    }
-
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
-        let note_conifg = Self::configure_note(meta);
-        Self { note_conifg }
-    }
-}
-
 impl TrivialValidityPredicateCircuit {
     pub fn dummy<R: RngCore>(mut rng: R) -> Self {
         let owned_note_pub_id = pallas::Base::zero();
@@ -91,7 +72,7 @@ impl ValidityPredicateInfo for TrivialValidityPredicateCircuit {
 }
 
 impl ValidityPredicateCircuit for TrivialValidityPredicateCircuit {
-    type VPConfig = DummyValidityPredicateConfig;
+    type VPConfig = GeneralVerificationValidityPredicateConfig;
 }
 
 vp_circuit_impl!(TrivialValidityPredicateCircuit);

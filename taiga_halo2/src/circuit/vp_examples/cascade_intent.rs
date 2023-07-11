@@ -8,16 +8,12 @@ use crate::{
     circuit::{
         gadgets::{
             assign_free_advice,
-            conditional_equal::ConditionalEqualConfig,
-            target_note_variable::{
-                get_is_input_note_flag, get_owned_note_variable, GetIsInputNoteFlagConfig,
-                GetOwnedNoteVariableConfig,
-            },
+            target_note_variable::{get_is_input_note_flag, get_owned_note_variable},
         },
-        note_circuit::NoteConfig,
         vp_circuit::{
-            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
+            BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
+            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
+            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
@@ -29,7 +25,7 @@ use crate::{
 use halo2_proofs::{
     arithmetic::Field,
     circuit::{floor_planner, Layouter, Value},
-    plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
+    plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
 use lazy_static::lazy_static;
 use pasta_curves::pallas;
@@ -50,49 +46,6 @@ pub struct CascadeIntentValidityPredicateCircuit {
     pub output_notes: [Note; NUM_NOTE],
     // use the note commitment to identify the note.
     pub cascade_note_cm: pallas::Base,
-}
-
-#[derive(Clone, Debug)]
-pub struct CascadeIntentValidityPredicateConfig {
-    note_conifg: NoteConfig,
-    advices: [Column<Advice>; 10],
-    instances: Column<Instance>,
-    get_is_input_note_flag_config: GetIsInputNoteFlagConfig,
-    get_owned_note_variable_config: GetOwnedNoteVariableConfig,
-    conditional_equal_config: ConditionalEqualConfig,
-}
-
-impl ValidityPredicateConfig for CascadeIntentValidityPredicateConfig {
-    fn get_note_config(&self) -> NoteConfig {
-        self.note_conifg.clone()
-    }
-
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
-        let note_conifg = Self::configure_note(meta);
-
-        let advices = note_conifg.advices;
-        let instances = note_conifg.instances;
-
-        let get_owned_note_variable_config = GetOwnedNoteVariableConfig::configure(
-            meta,
-            advices[0],
-            [advices[1], advices[2], advices[3], advices[4]],
-        );
-
-        let get_is_input_note_flag_config =
-            GetIsInputNoteFlagConfig::configure(meta, advices[0], advices[1], advices[2]);
-
-        let conditional_equal_config =
-            ConditionalEqualConfig::configure(meta, [advices[0], advices[1], advices[2]]);
-        Self {
-            note_conifg,
-            advices,
-            instances,
-            get_is_input_note_flag_config,
-            get_owned_note_variable_config,
-            conditional_equal_config,
-        }
-    }
 }
 
 impl CascadeIntentValidityPredicateCircuit {
@@ -138,7 +91,7 @@ impl ValidityPredicateInfo for CascadeIntentValidityPredicateCircuit {
 }
 
 impl ValidityPredicateCircuit for CascadeIntentValidityPredicateCircuit {
-    type VPConfig = CascadeIntentValidityPredicateConfig;
+    type VPConfig = GeneralVerificationValidityPredicateConfig;
     // Add custom constraints
     fn custom_constraints(
         &self,

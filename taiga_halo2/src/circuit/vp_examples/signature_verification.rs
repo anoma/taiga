@@ -1,14 +1,13 @@
 use crate::{
     circuit::{
         gadgets::{
-            assign_free_advice,
-            poseidon_hash::poseidon_hash_gadget,
-            target_note_variable::{get_owned_note_variable, GetOwnedNoteVariableConfig},
+            assign_free_advice, poseidon_hash::poseidon_hash_gadget,
+            target_note_variable::get_owned_note_variable,
         },
-        note_circuit::NoteConfig,
         vp_circuit::{
-            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
+            BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
+            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
+            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
         vp_examples::receiver_vp::COMPRESSED_RECEIVER_VK,
     },
@@ -22,7 +21,7 @@ use halo2_gadgets::ecc::{chip::EccChip, FixedPoint, NonIdentityPoint, ScalarFixe
 use halo2_proofs::{
     arithmetic::Field,
     circuit::{floor_planner, Layouter, Value},
-    plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
+    plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
 use lazy_static::lazy_static;
 use pasta_curves::{
@@ -98,40 +97,6 @@ pub struct SignatureVerificationValidityPredicateCircuit {
     pub vp_vk: pallas::Base,
     pub signature: SchnorrSignature,
     pub receiver_vp_vk: pallas::Base,
-}
-
-#[derive(Clone, Debug)]
-pub struct SignatureVerificationValidityPredicateConfig {
-    note_conifg: NoteConfig,
-    advices: [Column<Advice>; 10],
-    instances: Column<Instance>,
-    get_owned_note_variable_config: GetOwnedNoteVariableConfig,
-}
-
-impl ValidityPredicateConfig for SignatureVerificationValidityPredicateConfig {
-    fn get_note_config(&self) -> NoteConfig {
-        self.note_conifg.clone()
-    }
-
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
-        let note_conifg = Self::configure_note(meta);
-
-        let advices = note_conifg.advices;
-        let instances = note_conifg.instances;
-
-        let get_owned_note_variable_config = GetOwnedNoteVariableConfig::configure(
-            meta,
-            advices[0],
-            [advices[1], advices[2], advices[3], advices[4]],
-        );
-
-        Self {
-            note_conifg,
-            advices,
-            instances,
-            get_owned_note_variable_config,
-        }
-    }
 }
 
 impl SignatureVerificationValidityPredicateCircuit {
@@ -226,7 +191,7 @@ impl ValidityPredicateInfo for SignatureVerificationValidityPredicateCircuit {
 }
 
 impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit {
-    type VPConfig = SignatureVerificationValidityPredicateConfig;
+    type VPConfig = GeneralVerificationValidityPredicateConfig;
     // Add custom constraints
     fn custom_constraints(
         &self,
