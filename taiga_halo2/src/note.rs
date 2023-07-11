@@ -23,7 +23,10 @@ use pasta_curves::{
     pallas,
 };
 use rand::{Rng, RngCore};
-use std::{io, hash::{Hash, Hasher}};
+use std::{
+    hash::{Hash, Hasher},
+    io,
+};
 
 /// A commitment to a note.
 #[derive(Copy, Debug, Clone)]
