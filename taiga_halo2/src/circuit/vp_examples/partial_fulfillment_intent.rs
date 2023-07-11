@@ -22,7 +22,7 @@ use crate::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::{Note, RandomSeed},
-    nullifier::{Nullifier, NullifierKeyCom},
+    nullifier::{Nullifier, NullifierKey},
     proof::Proof,
     utils::poseidon_hash_n,
     vp_vk::ValidityPredicateVerifyingKey,
@@ -96,8 +96,8 @@ impl PartialFulfillmentIntentValidityPredicateCircuit {
         let receiver_address = output_notes[0].get_address();
 
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        let nk_com = NullifierKeyCom::rand(&mut rng);
-        let intent_note = create_intent_note(&mut rng, &sell, &buy, receiver_address, rho, nk_com);
+        let nk = NullifierKey::random(&mut rng);
+        let intent_note = create_intent_note(&mut rng, &sell, &buy, receiver_address, rho, nk);
         let padding_input_note = Note::dummy(&mut rng);
         let input_notes = [intent_note, padding_input_note];
         Self {
@@ -447,7 +447,7 @@ pub fn create_intent_note<R: RngCore>(
     buy: &Token,
     receiver_address: pallas::Base,
     rho: Nullifier,
-    nk_com: NullifierKeyCom,
+    nk: NullifierKey,
 ) -> Note {
     let app_data_static = PartialFulfillmentIntentValidityPredicateCircuit::encode_app_data_static(
         sell,
@@ -460,7 +460,7 @@ pub fn create_intent_note<R: RngCore>(
         app_data_static,
         pallas::Base::zero(),
         1u64,
-        nk_com,
+        nk,
         rho,
         false,
         rseed,
@@ -490,8 +490,8 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
     sold_note.value = sell.value;
     let receiver_address = sold_note.get_address();
     let rho = Nullifier::new(pallas::Base::random(&mut rng));
-    let nk_com = NullifierKeyCom::rand(&mut rng);
-    let intent_note = create_intent_note(&mut rng, &sell, &buy, receiver_address, rho, nk_com);
+    let nk = NullifierKey::random(&mut rng);
+    let intent_note = create_intent_note(&mut rng, &sell, &buy, receiver_address, rho, nk);
     // Creating intent test
     {
         let input_notes = [sold_note, dummy_note];
@@ -519,7 +519,7 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
             bought_note.note_type.app_data_static =
                 transfrom_token_name_to_token_property(&buy.name);
             bought_note.app_data_dynamic = sold_note.app_data_dynamic;
-            bought_note.nk_com = sold_note.nk_com;
+            bought_note.nk = sold_note.nk;
 
             // full fulfillment
             {

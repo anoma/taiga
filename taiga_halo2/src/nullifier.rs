@@ -1,7 +1,7 @@
 use crate::constant::GENERATOR;
 use crate::{
     note::NoteCommitment,
-    utils::{extract_p, mod_r_p, poseidon_hash, prf_nf},
+    utils::{extract_p, mod_r_p, prf_nf},
 };
 use halo2_proofs::arithmetic::Field;
 use pasta_curves::group::cofactor::CofactorCurveAffine;
@@ -14,14 +14,12 @@ use subtle::CtOption;
 #[derive(Copy, Debug, Clone, PartialEq, Eq)]
 pub struct Nullifier(pallas::Base);
 
-// TODO: remove it
+/// The NullifierKey is to derive the Nullifier
 #[derive(Copy, Debug, Clone, PartialEq, Eq)]
-pub struct NullifierDerivingKey(pallas::Base);
-
-#[derive(Copy, Debug, Clone, PartialEq, Eq)]
-pub enum NullifierKeyCom {
+pub enum NullifierKey {
+    // The closed NullifierKey is the commitment of open NullifierKey: `closed_nk = Com(open_nk, 0)`
     Closed(pallas::Base),
-    Open(NullifierDerivingKey),
+    Open(pallas::Base),
 }
 
 impl Nullifier {
@@ -32,17 +30,23 @@ impl Nullifier {
 
     // cm is a point
     // $nf =Extract_P([PRF_{nk}(\rho) + \psi \ mod \ q] * K + cm)$
-    pub fn derive_native(
-        nk: &NullifierDerivingKey,
+    pub fn derive(
+        nk: &NullifierKey,
         rho: &pallas::Base,
         psi: &pallas::Base,
         cm: &NoteCommitment,
-    ) -> Self {
-        let k = GENERATOR.to_curve();
+    ) -> Option<Self> {
+        match nk {
+            NullifierKey::Closed(_) => None,
+            NullifierKey::Open(nk) => {
+                let k = GENERATOR.to_curve();
 
-        Nullifier(extract_p(
-            &(k * mod_r_p(nk.compute_nf(*rho) + psi) + cm.inner()),
-        ))
+                let nf = Nullifier(extract_p(
+                    &(k * mod_r_p(prf_nf(*nk, *rho) + psi) + cm.inner()),
+                ));
+                Some(nf)
+            }
+        }
     }
 
     pub fn inner(&self) -> pallas::Base {
@@ -64,75 +68,42 @@ impl Default for Nullifier {
     }
 }
 
-impl NullifierDerivingKey {
-    pub fn new(nk: pallas::Base) -> Self {
-        Self(nk)
+impl NullifierKey {
+    pub fn random<R: RngCore>(mut rng: R) -> Self {
+        NullifierKey::Open(pallas::Base::random(&mut rng))
     }
 
-    pub fn rand(rng: &mut impl RngCore) -> Self {
-        Self(pallas::Base::random(rng))
+    /// Creates an open NullifierKey.
+    pub fn from_open(nk: pallas::Base) -> Self {
+        NullifierKey::Open(nk)
     }
 
-    pub fn compute_nf(&self, rho: pallas::Base) -> pallas::Base {
-        prf_nf(self.0, rho)
-    }
-
-    pub fn inner(&self) -> pallas::Base {
-        self.0
-    }
-
-    pub fn to_bytes(&self) -> [u8; 32] {
-        self.0.to_repr()
-    }
-
-    pub fn from_bytes(bytes: [u8; 32]) -> CtOption<Self> {
-        pallas::Base::from_repr(bytes).map(NullifierDerivingKey)
-    }
-}
-
-impl Default for NullifierDerivingKey {
-    fn default() -> NullifierDerivingKey {
-        NullifierDerivingKey(pallas::Base::one())
-    }
-}
-
-impl NullifierKeyCom {
-    pub fn rand(rng: &mut impl RngCore) -> Self {
-        NullifierKeyCom::Open(NullifierDerivingKey::rand(rng))
-    }
-
-    /// Creates an open NullifierKeyCom.
-    pub fn from_open(nk: NullifierDerivingKey) -> Self {
-        NullifierKeyCom::Open(nk)
-    }
-
-    /// Creates a closed NullifierKeyCom.
+    /// Creates a closed NullifierKey.
     pub fn from_closed(x: pallas::Base) -> Self {
-        NullifierKeyCom::Closed(x)
+        NullifierKey::Closed(x)
     }
 
-    pub fn get_nk(&self) -> Option<NullifierDerivingKey> {
+    pub fn get_open_nk(&self) -> Option<pallas::Base> {
         match self {
-            NullifierKeyCom::Open(nk) => Some(*nk),
+            NullifierKey::Open(nk) => Some(*nk),
             _ => None,
         }
     }
 
-    pub fn get_nk_com(&self) -> pallas::Base {
+    pub fn get_closed_nk(&self) -> pallas::Base {
         match self {
-            NullifierKeyCom::Closed(v) => *v,
-            NullifierKeyCom::Open(nk) => {
+            NullifierKey::Closed(v) => *v,
+            NullifierKey::Open(nk) => {
                 // Com(nk, zero), use poseidon hash as Com.
-                // TODO: use a fixed zero temporarily, we can add a user related key later(like note encryption keys)
-                poseidon_hash(nk.inner(), pallas::Base::zero())
+                prf_nf(*nk, pallas::Base::zero())
             }
         }
     }
 }
 
-impl Default for NullifierKeyCom {
-    fn default() -> NullifierKeyCom {
-        let nk = NullifierDerivingKey::default();
-        NullifierKeyCom::from_open(nk)
+impl Default for NullifierKey {
+    fn default() -> NullifierKey {
+        let nk = pallas::Base::default();
+        NullifierKey::from_open(nk)
     }
 }

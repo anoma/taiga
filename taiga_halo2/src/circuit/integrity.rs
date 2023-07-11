@@ -94,11 +94,11 @@ pub fn check_input_note(
 ) -> Result<InputNoteVariables, Error> {
     // Check input note user integrity: address = Com_r(Com_r(nk, zero), app_data_dynamic)
     // Witness nk
-    let nk = input_note.get_nk().unwrap();
+    let nk = input_note.get_nk().get_open_nk().unwrap();
     let nk_var = assign_free_advice(
         layouter.namespace(|| "witness nk"),
         advices[0],
-        Value::known(nk.inner()),
+        Value::known(nk),
     )?;
 
     let zero_constant = assign_free_constant(
@@ -254,7 +254,7 @@ pub fn check_output_note(
     let nk_com = assign_free_advice(
         layouter.namespace(|| "witness nk_com"),
         advices[0],
-        Value::known(output_note.nk_com.get_nk_com()),
+        Value::known(output_note.get_nk().get_closed_nk()),
     )?;
 
     // Witness app_data_dynamic
@@ -479,7 +479,7 @@ fn test_halo2_nullifier_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use crate::constant::{NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases};
     use crate::note::NoteCommitment;
-    use crate::nullifier::{Nullifier, NullifierDerivingKey};
+    use crate::nullifier::{Nullifier, NullifierKey};
     use halo2_gadgets::{
         ecc::chip::EccConfig,
         poseidon::{
@@ -498,7 +498,7 @@ fn test_halo2_nullifier_circuit() {
 
     #[derive(Default)]
     struct MyCircuit {
-        nk: NullifierDerivingKey,
+        nk: NullifierKey,
         rho: pallas::Base,
         psi: pallas::Base,
         cm: NoteCommitment,
@@ -612,7 +612,7 @@ fn test_halo2_nullifier_circuit() {
             let nk = assign_free_advice(
                 layouter.namespace(|| "witness nk"),
                 advices[0],
-                Value::known(self.nk.inner()),
+                Value::known(self.nk.get_open_nk().unwrap()),
             )?;
 
             // Witness rho
@@ -648,7 +648,9 @@ fn test_halo2_nullifier_circuit() {
             )?;
 
             let expect_nf = {
-                let nf = Nullifier::derive_native(&self.nk, &self.rho, &self.psi, &self.cm).inner();
+                let nf = Nullifier::derive(&self.nk, &self.rho, &self.psi, &self.cm)
+                    .unwrap()
+                    .inner();
                 assign_free_advice(
                     layouter.namespace(|| "witness nf"),
                     advices[0],
@@ -665,7 +667,7 @@ fn test_halo2_nullifier_circuit() {
 
     let mut rng = OsRng;
     let circuit = MyCircuit {
-        nk: NullifierDerivingKey::rand(&mut rng),
+        nk: NullifierKey::random(&mut rng),
         rho: pallas::Base::random(&mut rng),
         psi: pallas::Base::random(&mut rng),
         cm: NoteCommitment::default(),

@@ -147,7 +147,7 @@ mod tests {
         let app_data_dynamic = pallas::Base::zero();
 
         let value: u64 = 0;
-        let nk_com = NullifierKeyCom::default();
+        let nk = NullifierKey::random(&mut rng);
         let rseed = RandomSeed::random(&mut rng);
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
         Note::new(
@@ -155,7 +155,7 @@ mod tests {
             app_data_static,
             app_data_dynamic,
             value,
-            nk_com,
+            nk,
             rho,
             true,
             rseed,
