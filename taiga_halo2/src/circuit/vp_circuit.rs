@@ -1,3 +1,4 @@
+use crate::circuit::vamp_ir_utils::{get_circuit_assignments, parse, VariableAssignmentError};
 use crate::{
     circuit::{
         gadgets::{
@@ -699,7 +700,58 @@ pub struct VampIRValidityPredicateCircuit {
     pub instances: Vec<pallas::Base>,
 }
 
+#[derive(Debug)]
+pub enum VampIRCircuitError {
+    MissingAssignment(String),
+    SourceParsingError(String),
+}
+
+impl VampIRCircuitError {
+    fn from_variable_assignment_error(error: VariableAssignmentError) -> Self {
+        match error {
+            VariableAssignmentError::MissingAssignment(s) => {
+                VampIRCircuitError::MissingAssignment(s)
+            }
+        }
+    }
+}
+
 impl VampIRValidityPredicateCircuit {
+    pub fn from_vamp_ir_source(
+        vamp_ir_source: &str,
+        named_field_assignments: HashMap<String, Fp>,
+    ) -> Result<Self, VampIRCircuitError> {
+        let config = Config { quiet: true };
+        let parsed_vamp_ir_module =
+            parse(vamp_ir_source).map_err(VampIRCircuitError::SourceParsingError)?;
+        let vamp_ir_module = compile(
+            parsed_vamp_ir_module,
+            &PrimeFieldOps::<Fp>::default(),
+            &config,
+        );
+        let mut circuit = Halo2Module::<Fp>::new(Rc::new(vamp_ir_module));
+        let params = Params::new(circuit.k);
+        let field_assignments = get_circuit_assignments(&circuit.module, &named_field_assignments)
+            .map_err(VampIRCircuitError::from_variable_assignment_error)?;
+
+        // Populate variable definitions
+        circuit.populate_variables(field_assignments.clone());
+
+        // Get public inputs Fp
+        let instances = circuit
+            .module
+            .pubs
+            .iter()
+            .map(|inst| field_assignments[&inst.id])
+            .collect::<Vec<pallas::Base>>();
+
+        Ok(Self {
+            params,
+            circuit,
+            instances,
+        })
+    }
+
     pub fn from_vamp_ir_file(vamp_ir_file: &PathBuf, inputs_file: &PathBuf) -> Self {
         let config = Config { quiet: true };
         let vamp_ir_source = fs::read_to_string(vamp_ir_file).expect("cannot read vamp-ir file");
@@ -764,20 +816,88 @@ impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
     }
 }
 
-#[test]
-fn test_create_vp_from_vamp_ir_file() {
-    let vamp_ir_circuit_file = PathBuf::from("./src/circuit/vamp_ir_circuits/pyth.pir");
-    let inputs_file = PathBuf::from("./src/circuit/vamp_ir_circuits/pyth.inputs");
-    let vp_circuit =
-        VampIRValidityPredicateCircuit::from_vamp_ir_file(&vamp_ir_circuit_file, &inputs_file);
+#[cfg(test)]
+mod tests {
+    use crate::circuit::vp_circuit::{
+        ValidityPredicateVerifyingInfo, VampIRValidityPredicateCircuit,
+    };
+    use num_bigint::BigInt;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use vamp_ir::halo2::synth::make_constant;
 
-    // generate proof and instance
-    let vp_info = vp_circuit.get_verifying_info();
+    #[test]
+    fn test_create_vp_from_vamp_ir_file() {
+        let vamp_ir_circuit_file = PathBuf::from("./src/circuit/vamp_ir_circuits/pyth.pir");
+        let inputs_file = PathBuf::from("./src/circuit/vamp_ir_circuits/pyth.inputs");
+        let vp_circuit =
+            VampIRValidityPredicateCircuit::from_vamp_ir_file(&vamp_ir_circuit_file, &inputs_file);
 
-    // verify the proof
-    // TODO: use the vp_info.verify() instead. vp_info.verify() doesn't work now because it uses the fixed VP_CIRCUIT_PARAMS_SIZE params.
-    vp_info
-        .proof
-        .verify(&vp_info.vk, &vp_circuit.params, &[&vp_info.instance])
-        .unwrap();
+        // generate proof and instance
+        let vp_info = vp_circuit.get_verifying_info();
+
+        // verify the proof
+        // TODO: use the vp_info.verify() instead. vp_info.verify() doesn't work now because it uses the fixed VP_CIRCUIT_PARAMS_SIZE params.
+        vp_info
+            .proof
+            .verify(&vp_info.vk, &vp_circuit.params, &[&vp_info.instance])
+            .unwrap();
+    }
+
+    #[test]
+    fn test_create_vp_from_invalid_vamp_ir_file() {
+        let invalid_vamp_ir_source =
+            VampIRValidityPredicateCircuit::from_vamp_ir_source("{aaxxx", HashMap::new());
+        assert!(invalid_vamp_ir_source.is_err());
+    }
+
+    #[test]
+    fn test_create_vp_with_missing_assignment() {
+        let missing_x_assignment =
+            VampIRValidityPredicateCircuit::from_vamp_ir_source("x = 1;", HashMap::new());
+        assert!(missing_x_assignment.is_err());
+    }
+
+    #[test]
+    fn test_create_vp_with_no_assignment() {
+        let zero_constraint =
+            VampIRValidityPredicateCircuit::from_vamp_ir_source("0;", HashMap::new());
+        assert!(zero_constraint.is_ok());
+    }
+
+    #[test]
+    fn test_create_vp_with_valid_assignment() {
+        let x_assignment_circuit = VampIRValidityPredicateCircuit::from_vamp_ir_source(
+            "x = 1;",
+            HashMap::from([(String::from("x"), make_constant(BigInt::from(1)))]),
+        );
+
+        assert!(x_assignment_circuit.is_ok());
+
+        let vp_circuit = x_assignment_circuit.unwrap();
+        let vp_info = vp_circuit.get_verifying_info();
+
+        assert!(vp_info
+            .proof
+            .verify(&vp_info.vk, &vp_circuit.params, &[&vp_info.instance])
+            .is_ok());
+    }
+
+    #[test]
+    fn test_create_vp_with_invalid_assignment() {
+        let x_assignment_circuit = VampIRValidityPredicateCircuit::from_vamp_ir_source(
+            "x = 1;",
+            HashMap::from([(String::from("x"), make_constant(BigInt::from(0)))]),
+        );
+
+        assert!(x_assignment_circuit.is_ok());
+
+        let vp_circuit = x_assignment_circuit.unwrap();
+        let vp_info = vp_circuit.get_verifying_info();
+
+        assert!(vp_info
+            .proof
+            .verify(&vp_info.vk, &vp_circuit.params, &[&vp_info.instance])
+            .is_err());
+    }
 }

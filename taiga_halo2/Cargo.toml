@@ -20,6 +20,7 @@ vamp-ir = { git = "https://github.com/anoma/vamp-ir.git", rev = "6d401f8a4799517
 bincode = "2.0.0-rc.1"
 borsh = {version = "0.9", features = ["const-generics"]}
 byteorder = "1"
+num-bigint = "0.4.3"
 
 [dev-dependencies]
 criterion = "0.3"
