@@ -1,10 +1,11 @@
 use crate::{
-    error::TransactionError, executable::Executable, note::NoteCommitment, nullifier::Nullifier,
+    error::TransactionError, executable::Executable, nullifier::Nullifier,
     value_commitment::ValueCommitment,
 };
+use borsh::{BorshDeserialize, BorshSerialize};
 use pasta_curves::pallas;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct TransparentPartialTransaction {
     pub inputs: Vec<InputResource>,
     pub outputs: Vec<OutputResource>,
@@ -20,7 +21,7 @@ impl Executable for TransparentPartialTransaction {
         unimplemented!()
     }
 
-    fn get_output_cms(&self) -> Vec<NoteCommitment> {
+    fn get_output_cms(&self) -> Vec<pallas::Base> {
         unimplemented!()
     }
 
@@ -33,7 +34,7 @@ impl Executable for TransparentPartialTransaction {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct InputResource {
     pub resource_logic: ResourceLogic,
     pub prefix: ContentHash,
@@ -42,21 +43,21 @@ pub struct InputResource {
     pub resource_data_dynamic: ResourceDataDynamic,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct OutputResource {
     pub resource_logic: ResourceLogic,
     pub resource_data_static: ResourceDataStatic,
     pub resource_data_dynamic: ResourceDataDynamic,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct ResourceLogic {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct ContentHash {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct ResourceDataStatic {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct ResourceDataDynamic {}

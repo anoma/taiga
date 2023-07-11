@@ -18,6 +18,8 @@ dyn-clone = "1.0"
 reddsa = "0.5"
 vamp-ir = { git = "https://github.com/anoma/vamp-ir.git", rev = "778d5b53548cae5a2776c3bfd01fa9afa4543470"}
 bincode = "2.0.0-rc.1"
+borsh = {version = "0.9", features = ["const-generics"]}
+byteorder = "1"
 
 [dev-dependencies]
 criterion = "0.3"

@@ -6,10 +6,11 @@ use crate::constant::{
 };
 use crate::error::TransactionError;
 use crate::executable::Executable;
-use crate::note::{InputNoteProvingInfo, NoteCommitment, OutputNoteProvingInfo};
+use crate::note::{InputNoteProvingInfo, OutputNoteProvingInfo};
 use crate::nullifier::Nullifier;
 use crate::proof::Proof;
 use crate::value_commitment::ValueCommitment;
+use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_proofs::plonk::Error;
 use pasta_curves::pallas;
 use rand::RngCore;
@@ -21,13 +22,13 @@ pub struct ShieldedPartialTransaction {
     outputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct ActionVerifyingInfo {
     action_proof: Proof,
     action_instance: ActionInstance,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct NoteVPVerifyingInfoSet {
     app_vp_verifying_info: VPVerifyingInfo,
     app_dynamic_vp_verifying_info: Vec<VPVerifyingInfo>,
@@ -138,8 +139,8 @@ impl ShieldedPartialTransaction {
         for vp_info in self.outputs.iter() {
             for cms in vp_info.get_note_commitments().iter() {
                 // Check the vp actually uses the output notes from action circuits.
-                if !((action_cms[0].get_x() == cms[0] && action_cms[1].get_x() == cms[1])
-                    || (action_cms[0].get_x() == cms[1] && action_cms[1].get_x() == cms[0]))
+                if !((action_cms[0] == cms[0] && action_cms[1] == cms[1])
+                    || (action_cms[0] == cms[1] && action_cms[1] == cms[0]))
                 {
                     return Err(TransactionError::InconsistentOutputNoteCommitment);
                 }
@@ -156,7 +157,7 @@ impl ShieldedPartialTransaction {
             }
 
             // Check the owned_note_id that vp uses is consistent with the cm from the action circuit
-            if owned_note_id != action_cm.get_x() {
+            if owned_note_id != *action_cm {
                 return Err(TransactionError::InconsistentOwnedNotePubID);
             }
         }
@@ -179,10 +180,10 @@ impl Executable for ShieldedPartialTransaction {
             .collect()
     }
 
-    fn get_output_cms(&self) -> Vec<NoteCommitment> {
+    fn get_output_cms(&self) -> Vec<pallas::Base> {
         self.actions
             .iter()
-            .map(|action| action.action_instance.cm)
+            .map(|action| action.action_instance.cm_x)
             .collect()
     }
 
@@ -201,6 +202,42 @@ impl Executable for ShieldedPartialTransaction {
     }
 }
 
+impl BorshSerialize for ShieldedPartialTransaction {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
+        for action in self.actions.iter() {
+            action.serialize(writer)?;
+        }
+
+        for input in self.inputs.iter() {
+            input.serialize(writer)?;
+        }
+
+        for output in self.outputs.iter() {
+            output.serialize(writer)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for ShieldedPartialTransaction {
+    fn deserialize(buf: &mut &[u8]) -> borsh::maybestd::io::Result<Self> {
+        let actions: Vec<_> = (0..NUM_NOTE)
+            .map(|_| ActionVerifyingInfo::deserialize(buf))
+            .collect::<Result<_, _>>()?;
+        let inputs: Vec<_> = (0..NUM_NOTE)
+            .map(|_| NoteVPVerifyingInfoSet::deserialize(buf))
+            .collect::<Result<_, _>>()?;
+        let outputs: Vec<_> = (0..NUM_NOTE)
+            .map(|_| NoteVPVerifyingInfoSet::deserialize(buf))
+            .collect::<Result<_, _>>()?;
+        Ok(ShieldedPartialTransaction {
+            actions: actions.try_into().unwrap(),
+            inputs: inputs.try_into().unwrap(),
+            outputs: outputs.try_into().unwrap(),
+        })
+    }
+}
 impl ActionVerifyingInfo {
     pub fn create<R: RngCore>(action_info: ActionInfo, mut rng: R) -> Result<Self, Error> {
         let (action_instance, circuit) = action_info.build();

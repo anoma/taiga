@@ -13,14 +13,17 @@ use crate::{
 };
 use bitvec::{array::BitArray, order::Lsb0};
 use blake2b_simd::Params as Blake2bParams;
+use borsh::{BorshDeserialize, BorshSerialize};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use core::iter;
-use ff::FromUniformBytes;
+use ff::{FromUniformBytes, PrimeField};
 use halo2_proofs::arithmetic::Field;
 use pasta_curves::{
     group::{ff::PrimeFieldBits, Group, GroupEncoding},
     pallas,
 };
 use rand::{Rng, RngCore};
+use std::io;
 
 /// A commitment to a note.
 #[derive(Copy, Debug, Clone)]
@@ -295,6 +298,100 @@ impl Note {
     }
 }
 
+impl BorshSerialize for Note {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
+        // Write app_vk
+        writer.write_all(&self.note_type.app_vk.to_repr())?;
+        // Write app_data_static
+        writer.write_all(&self.note_type.app_data_static.to_repr())?;
+        // Write app_data_dynamic
+        writer.write_all(&self.app_data_dynamic.to_repr())?;
+        // Write note value
+        writer.write_u64::<LittleEndian>(self.value)?;
+        // Write nk_com
+        match self.nk_com {
+            NullifierKeyCom::Closed(nk_com) => {
+                writer.write_u8(1)?;
+                writer.write_all(&nk_com.to_repr())
+            }
+            NullifierKeyCom::Open(nk) => {
+                writer.write_u8(2)?;
+                writer.write_all(&nk.to_bytes())
+            }
+        }?;
+        // Write rho
+        writer.write_all(&self.rho.to_bytes())?;
+        // Write psi
+        writer.write_all(&self.psi.to_repr())?;
+        // Write rcm
+        writer.write_all(&self.rcm.to_repr())?;
+        // Write is_merkle_checked
+        writer.write_u8(if self.is_merkle_checked { 1 } else { 0 })?;
+
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for Note {
+    fn deserialize(buf: &mut &[u8]) -> borsh::maybestd::io::Result<Self> {
+        // Read app_vk
+        let app_vk_bytes = <[u8; 32]>::deserialize(buf)?;
+        let app_vk = Option::from(pallas::Base::from_repr(app_vk_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "app_vk not in field"))?;
+        // Read app_data_static
+        let app_data_static_bytes = <[u8; 32]>::deserialize(buf)?;
+        let app_data_static = Option::from(pallas::Base::from_repr(app_data_static_bytes))
+            .ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidData, "app_data_static not in field")
+            })?;
+        // Read app_data_dynamic
+        let app_data_dynamic_bytes = <[u8; 32]>::deserialize(buf)?;
+        let app_data_dynamic = Option::from(pallas::Base::from_repr(app_data_dynamic_bytes))
+            .ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidData, "app_data_dynamic not in field")
+            })?;
+        // Read note value
+        let value = buf.read_u64::<LittleEndian>()?;
+        // Read nk_com
+        let nk_com_type = buf.read_u8()?;
+        let nk_com_bytes = <[u8; 32]>::deserialize(buf)?;
+        let nk_com = Option::from(pallas::Base::from_repr(nk_com_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "nk_com not in field"))?;
+        let nk_com = if nk_com_type == 0x01 {
+            NullifierKeyCom::from_closed(nk_com)
+        } else {
+            NullifierKeyCom::from_open(NullifierDerivingKey::new(nk_com))
+        };
+        // Read rho
+        let rho_bytes = <[u8; 32]>::deserialize(buf)?;
+        let rho = Option::from(Nullifier::from_bytes(rho_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "rho not in field"))?;
+        // Read psi
+        let psi_bytes = <[u8; 32]>::deserialize(buf)?;
+        let psi = Option::from(pallas::Base::from_repr(psi_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "psi not in field"))?;
+        // Read rcm
+        let rcm_bytes = <[u8; 32]>::deserialize(buf)?;
+        let rcm = Option::from(pallas::Base::from_repr(rcm_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "rcm not in field"))?;
+        // Read is_merkle_checked
+        let is_merkle_checked_byte = buf.read_u8()?;
+        let is_merkle_checked = is_merkle_checked_byte == 0x01;
+        // Construct note
+        Ok(Note::from_full(
+            app_vk,
+            app_data_static,
+            app_data_dynamic,
+            value,
+            nk_com,
+            rho,
+            is_merkle_checked,
+            psi,
+            rcm,
+        ))
+    }
+}
+
 impl ValueBase {
     pub fn new(vk: pallas::Base, data: pallas::Base) -> Self {
         Self {
@@ -436,5 +533,29 @@ impl OutputNoteProvingInfo {
             output_notes,
         });
         OutputNoteProvingInfo::new(padding_note, trivail_vp, vec![])
+    }
+}
+
+#[test]
+fn note_serialization_test() {
+    use rand::rngs::OsRng;
+    let mut rng = OsRng;
+
+    let input_note = Note::dummy(&mut rng);
+    {
+        // BorshSerialize
+        let borsh = input_note.try_to_vec().unwrap();
+        // BorshDeserialize
+        let de_note: Note = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
+        assert_eq!(input_note, de_note);
+    }
+
+    let output_note = Note::dummy_output(&mut rng, input_note.rho);
+    {
+        // BorshSerialize
+        let borsh = output_note.try_to_vec().unwrap();
+        // BorshDeserialize
+        let de_note: Note = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
+        assert_eq!(output_note, de_note);
     }
 }

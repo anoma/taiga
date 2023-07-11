@@ -8,11 +8,13 @@ use pasta_curves::group::cofactor::CofactorCurveAffine;
 use pasta_curves::group::ff::PrimeField;
 use pasta_curves::pallas;
 use rand::RngCore;
+use subtle::CtOption;
 
 /// The unique nullifier.
 #[derive(Copy, Debug, Clone, PartialEq, Eq)]
 pub struct Nullifier(pallas::Base);
 
+// TODO: remove it
 #[derive(Copy, Debug, Clone, PartialEq, Eq)]
 pub struct NullifierDerivingKey(pallas::Base);
 
@@ -50,6 +52,10 @@ impl Nullifier {
     pub fn to_bytes(&self) -> [u8; 32] {
         self.0.to_repr()
     }
+
+    pub fn from_bytes(bytes: [u8; 32]) -> CtOption<Self> {
+        pallas::Base::from_repr(bytes).map(Nullifier)
+    }
 }
 
 impl Default for Nullifier {
@@ -73,6 +79,14 @@ impl NullifierDerivingKey {
 
     pub fn inner(&self) -> pallas::Base {
         self.0
+    }
+
+    pub fn to_bytes(&self) -> [u8; 32] {
+        self.0.to_repr()
+    }
+
+    pub fn from_bytes(bytes: [u8; 32]) -> CtOption<Self> {
+        pallas::Base::from_repr(bytes).map(NullifierDerivingKey)
     }
 }
 

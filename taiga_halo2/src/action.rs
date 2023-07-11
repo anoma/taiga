@@ -2,13 +2,16 @@ use crate::{
     circuit::action_circuit::ActionCircuit,
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::MerklePath,
-    note::{InputNoteProvingInfo, Note, NoteCommitment, OutputNoteProvingInfo},
+    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
     nullifier::Nullifier,
     value_commitment::ValueCommitment,
 };
+use borsh::{BorshDeserialize, BorshSerialize};
+use ff::PrimeField;
 use halo2_proofs::arithmetic::Field;
 use pasta_curves::pallas;
 use rand::RngCore;
+use std::io;
 
 /// The action result used in transaction.
 #[derive(Copy, Debug, Clone)]
@@ -18,7 +21,7 @@ pub struct ActionInstance {
     /// The nullifier of input note.
     pub nf: Nullifier,
     /// The commitment of the output note.
-    pub cm: NoteCommitment,
+    pub cm_x: pallas::Base,
     /// net value commitment
     pub cv_net: ValueCommitment,
     // TODO: The EncryptedNote.
@@ -38,10 +41,44 @@ impl ActionInstance {
         vec![
             self.nf.inner(),
             self.anchor,
-            self.cm.get_x(),
+            self.cm_x,
             self.cv_net.get_x(),
             self.cv_net.get_y(),
         ]
+    }
+}
+
+impl BorshSerialize for ActionInstance {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
+        writer.write_all(&self.anchor.to_repr())?;
+        writer.write_all(&self.nf.to_bytes())?;
+        writer.write_all(&self.cm_x.to_repr())?;
+        writer.write_all(&self.cv_net.to_bytes())?;
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for ActionInstance {
+    fn deserialize(buf: &mut &[u8]) -> borsh::maybestd::io::Result<Self> {
+        let anchor_bytes = <[u8; 32]>::deserialize(buf)?;
+        let anchor = Option::from(pallas::Base::from_repr(anchor_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "anchor not in field"))?;
+        let nf_bytes = <[u8; 32]>::deserialize(buf)?;
+        let nf = Option::from(Nullifier::from_bytes(nf_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "nf not in field"))?;
+        let cm_x_bytes = <[u8; 32]>::deserialize(buf)?;
+        let cm_x = Option::from(pallas::Base::from_repr(cm_x_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "cm_x not in field"))?;
+        let cv_net_bytes = <[u8; 32]>::deserialize(buf)?;
+        let cv_net = Option::from(ValueCommitment::from_bytes(cv_net_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "cv_net not in field"))?;
+
+        Ok(ActionInstance {
+            anchor,
+            nf,
+            cm_x,
+            cv_net,
+        })
     }
 }
 
@@ -84,12 +121,12 @@ impl ActionInfo {
             "The nf of input note should be equal to the rho of output note"
         );
 
-        let output_cm = self.output.note.commitment();
+        let cm_x = self.output.note.commitment().get_x();
 
         let cv_net = ValueCommitment::new(&self.input.note, &self.output.note, &self.rcv);
         let action = ActionInstance {
             nf,
-            cm: output_cm,
+            cm_x,
             anchor: self.input.root,
             cv_net,
         };
