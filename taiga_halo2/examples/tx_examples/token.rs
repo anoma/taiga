@@ -14,7 +14,7 @@ use taiga_halo2::{
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::MerklePath,
     note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
-    nullifier::{Nullifier, NullifierDerivingKey, NullifierKeyCom},
+    nullifier::{Nullifier, NullifierKeyContainer},
     shielded_ptx::ShieldedPartialTransaction,
 };
 
@@ -23,7 +23,7 @@ pub fn create_random_token_note<R: RngCore>(
     name: &str,
     value: u64,
     rho: Nullifier,
-    nk_com: NullifierKeyCom,
+    nk_container: NullifierKeyContainer,
     auth: &TokenAuthorization,
 ) -> Note {
     let app_data_static = transfrom_token_name_to_token_property(name);
@@ -34,7 +34,7 @@ pub fn create_random_token_note<R: RngCore>(
         app_data_static,
         app_data_dynamic,
         value,
-        nk_com,
+        nk_container,
         rho,
         true,
         rseed,
@@ -47,30 +47,28 @@ pub fn create_token_swap_ptx<R: RngCore>(
     input_token: &str,
     input_value: u64,
     input_auth_sk: pallas::Scalar,
-    input_nk: NullifierDerivingKey, // NullifierKeyCom::Open
+    input_nk: NullifierKeyContainer, // NullifierKeyContainer::Key
     output_token: &str,
     output_value: u64,
     output_auth_pk: pallas::Point,
-    output_nk_com: pallas::Base, // NullifierKeyCom::Closed
+    output_nk_com: NullifierKeyContainer, // NullifierKeyContainer::Commitment
 ) -> (ShieldedPartialTransaction, pallas::Scalar) {
     let input_auth = TokenAuthorization::from_sk_vk(&input_auth_sk, &COMPRESSED_TOKEN_AUTH_VK);
 
     // input note
     let rho = Nullifier::new(pallas::Base::random(&mut rng));
-    let input_nk_com = NullifierKeyCom::from_open(input_nk);
     let input_note = create_random_token_note(
         &mut rng,
         input_token,
         input_value,
         rho,
-        input_nk_com,
+        input_nk,
         &input_auth,
     );
 
     // output note
     let input_note_nf = input_note.get_nf().unwrap();
     let output_auth = TokenAuthorization::new(output_auth_pk, *COMPRESSED_TOKEN_AUTH_VK);
-    let output_nk_com = NullifierKeyCom::from_closed(output_nk_com);
     let output_note = create_random_token_note(
         &mut rng,
         output_token,

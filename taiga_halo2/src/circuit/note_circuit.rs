@@ -705,7 +705,7 @@ impl NoteChip {
 fn test_halo2_note_commitment_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use crate::note::{Note, RandomSeed};
-    use crate::nullifier::{Nullifier, NullifierKeyCom};
+    use crate::nullifier::{Nullifier, NullifierKeyContainer};
     use halo2_gadgets::{
         ecc::{
             chip::{EccChip, EccConfig},
@@ -729,7 +729,7 @@ fn test_halo2_note_commitment_circuit() {
         app_data_static: pallas::Base,
         app_data_dynamic: pallas::Base,
         value: u64,
-        nk_com: NullifierKeyCom,
+        nk: NullifierKeyContainer,
         rho: Nullifier,
         is_merkle_checked: bool,
         rseed: RandomSeed,
@@ -822,7 +822,7 @@ fn test_halo2_note_commitment_circuit() {
                 self.app_data_static,
                 self.app_data_dynamic,
                 self.value,
-                self.nk_com,
+                self.nk,
                 self.rho,
                 self.is_merkle_checked,
                 self.rseed,
@@ -929,7 +929,7 @@ fn test_halo2_note_commitment_circuit() {
             app_data_static: pallas::Base::random(&mut rng),
             app_data_dynamic: pallas::Base::random(&mut rng),
             value: rng.next_u64(),
-            nk_com: NullifierKeyCom::rand(&mut rng),
+            nk: NullifierKeyContainer::random_key(&mut rng),
             rho: Nullifier::default(),
             is_merkle_checked: false,
             rseed: RandomSeed::random(&mut rng),
@@ -946,7 +946,7 @@ fn test_halo2_note_commitment_circuit() {
             app_data_static: pallas::Base::random(&mut rng),
             app_data_dynamic: pallas::Base::random(&mut rng),
             value: rng.next_u64(),
-            nk_com: NullifierKeyCom::rand(&mut rng),
+            nk: NullifierKeyContainer::random_key(&mut rng),
             rho: Nullifier::default(),
             is_merkle_checked: true,
             rseed: RandomSeed::random(&mut rng),
