@@ -2,19 +2,19 @@ use crate::binding_signature::{BindingSignature, BindingSigningKey, BindingVerif
 use crate::constant::TRANSACTION_BINDING_HASH_PERSONALIZATION;
 use crate::error::TransactionError;
 use crate::executable::Executable;
-use crate::note::NoteCommitment;
 use crate::nullifier::Nullifier;
 use crate::shielded_ptx::ShieldedPartialTransaction;
 use crate::transparent_ptx::{OutputResource, TransparentPartialTransaction};
 use crate::value_commitment::ValueCommitment;
 use blake2b_simd::Params as Blake2bParams;
+use borsh::{BorshDeserialize, BorshSerialize};
 use pasta_curves::{
     group::{ff::PrimeField, Group},
     pallas,
 };
 use rand::{CryptoRng, RngCore};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct Transaction {
     // TODO: Other parameters to be added.
     shielded_ptx_bundle: Option<ShieldedPartialTxBundle>,
@@ -23,25 +23,25 @@ pub struct Transaction {
     signature: InProgressBindingSignature,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub enum InProgressBindingSignature {
     Authorized(BindingSignature),
     Unauthorized(BindingSigningKey),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct ShieldedPartialTxBundle {
     partial_txs: Vec<ShieldedPartialTransaction>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShieldedResult {
     anchors: Vec<pallas::Base>,
     nullifiers: Vec<Nullifier>,
-    output_cms: Vec<NoteCommitment>,
+    output_cms: Vec<pallas::Base>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct TransparentPartialTxBundle {
     partial_txs: Vec<TransparentPartialTransaction>,
 }
@@ -167,8 +167,8 @@ impl Transaction {
             bundle.get_nullifiers().iter().for_each(|nf| {
                 h.update(&nf.to_bytes());
             });
-            bundle.get_output_cms().iter().for_each(|cm| {
-                h.update(&cm.to_bytes());
+            bundle.get_output_cms().iter().for_each(|cm_x| {
+                h.update(&cm_x.to_repr());
             });
             bundle.get_value_commitments().iter().for_each(|vc| {
                 h.update(&vc.to_bytes());
@@ -184,7 +184,7 @@ impl Transaction {
                 h.update(&nf.to_bytes());
             });
             bundle.get_output_cms().iter().for_each(|cm| {
-                h.update(&cm.to_bytes());
+                h.update(&cm.to_repr());
             });
             bundle.get_value_commitments().iter().for_each(|vc| {
                 h.update(&vc.to_bytes());
@@ -241,7 +241,7 @@ impl ShieldedPartialTxBundle {
             .collect()
     }
 
-    pub fn get_output_cms(&self) -> Vec<NoteCommitment> {
+    pub fn get_output_cms(&self) -> Vec<pallas::Base> {
         self.partial_txs
             .iter()
             .flat_map(|ptx| ptx.get_output_cms())
@@ -302,7 +302,7 @@ impl TransparentPartialTxBundle {
             .collect()
     }
 
-    pub fn get_output_cms(&self) -> Vec<NoteCommitment> {
+    pub fn get_output_cms(&self) -> Vec<pallas::Base> {
         self.partial_txs
             .iter()
             .flat_map(|ptx| ptx.get_output_cms())
@@ -353,5 +353,10 @@ fn test_halo2_transaction() {
         transparent_ptx_bundle,
         r_vec,
     );
-    tx.execute().unwrap();
+    let (shielded_ret, _) = tx.execute().unwrap();
+
+    let borsh = tx.try_to_vec().unwrap();
+    let de_tx: Transaction = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
+    let (de_shielded_ret, _) = de_tx.execute().unwrap();
+    assert_eq!(shielded_ret, de_shielded_ret);
 }

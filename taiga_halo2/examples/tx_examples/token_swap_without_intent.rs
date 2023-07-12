@@ -9,7 +9,7 @@ use halo2_proofs::arithmetic::Field;
 use pasta_curves::{group::Curve, pallas};
 use rand::{CryptoRng, RngCore};
 use taiga_halo2::{
-    nullifier::NullifierKeyCom,
+    nullifier::NullifierKeyContainer,
     transaction::{ShieldedPartialTxBundle, Transaction},
 };
 
@@ -19,8 +19,7 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
     // Alice creates the partial transaction
     let alice_auth_sk = pallas::Scalar::random(&mut rng);
     let alice_auth_pk = generator * alice_auth_sk;
-    let alice_nk_com = NullifierKeyCom::rand(&mut rng);
-    let alice_nk = alice_nk_com.get_nk().unwrap();
+    let alice_nk = NullifierKeyContainer::random_key(&mut rng);
 
     let (alice_ptx, alice_r) = create_token_swap_ptx(
         &mut rng,
@@ -31,14 +30,13 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
         "eth",
         10,
         alice_auth_pk,
-        alice_nk_com.get_nk_com(),
+        alice_nk.to_commitment(),
     );
 
     // Bob creates the partial transaction
     let bob_auth_sk = pallas::Scalar::random(&mut rng);
     let bob_auth_pk = generator * bob_auth_sk;
-    let bob_nk_com = NullifierKeyCom::rand(&mut rng);
-    let bob_nk = bob_nk_com.get_nk().unwrap();
+    let bob_nk = NullifierKeyContainer::random_key(&mut rng);
 
     let (bob_ptx, bob_r) = create_token_swap_ptx(
         &mut rng,
@@ -49,14 +47,13 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
         "xan",
         15,
         bob_auth_pk,
-        bob_nk_com.get_nk_com(),
+        bob_nk.to_commitment(),
     );
 
     // Carol creates the partial transaction
     let carol_auth_sk = pallas::Scalar::random(&mut rng);
     let carol_auth_pk = generator * carol_auth_sk;
-    let carol_nk_com = NullifierKeyCom::rand(&mut rng);
-    let carol_nk = carol_nk_com.get_nk().unwrap();
+    let carol_nk = NullifierKeyContainer::random_key(&mut rng);
 
     let (carol_ptx, carol_r) = create_token_swap_ptx(
         &mut rng,
@@ -67,7 +64,7 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
         "btc",
         5,
         carol_auth_pk,
-        carol_nk_com.get_nk_com(),
+        carol_nk.to_commitment(),
     );
 
     // Solver creates the final transaction

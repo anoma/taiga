@@ -1,9 +1,11 @@
 use crate::constant::NOTE_COMMITMENT_R_GENERATOR;
+use borsh::{BorshDeserialize, BorshSerialize};
 use pasta_curves::group::cofactor::CofactorCurveAffine;
 use pasta_curves::group::{ff::PrimeField, GroupEncoding};
 use pasta_curves::pallas;
 use rand::{CryptoRng, RngCore};
 use reddsa::{private, Error, SigType, Signature, SigningKey, VerificationKey};
+use std::io;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum TaigaBinding {}
@@ -35,6 +37,30 @@ pub struct BindingSigningKey(SigningKey<TaigaBinding>);
 #[derive(Clone, Debug, PartialEq)]
 pub struct BindingVerificationKey(VerificationKey<TaigaBinding>);
 
+impl BindingSignature {
+    pub fn to_bytes(&self) -> [u8; 64] {
+        self.0.into()
+    }
+
+    pub fn from_bytes(bytes: [u8; 64]) -> Self {
+        let sig = Signature::<TaigaBinding>::from(bytes);
+        Self(sig)
+    }
+}
+
+impl BorshSerialize for BindingSignature {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
+        writer.write_all(&self.to_bytes())
+    }
+}
+
+impl BorshDeserialize for BindingSignature {
+    fn deserialize(buf: &mut &[u8]) -> borsh::maybestd::io::Result<Self> {
+        let sig_bytes = <[u8; 64]>::deserialize(buf)?;
+        Ok(Self::from_bytes(sig_bytes))
+    }
+}
+
 impl BindingSigningKey {
     pub fn sign<R: RngCore + CryptoRng>(&self, rng: R, msg: &[u8]) -> BindingSignature {
         BindingSignature(self.0.sign(rng, msg))
@@ -42,6 +68,30 @@ impl BindingSigningKey {
 
     pub fn get_vk(&self) -> BindingVerificationKey {
         BindingVerificationKey(VerificationKey::from(&self.0))
+    }
+
+    pub fn to_bytes(&self) -> [u8; 32] {
+        self.0.into()
+    }
+
+    pub fn from_bytes(bytes: [u8; 32]) -> Result<Self, Error> {
+        let key = SigningKey::<TaigaBinding>::try_from(bytes)?;
+        Ok(Self(key))
+    }
+}
+
+impl BorshSerialize for BindingSigningKey {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
+        writer.write_all(&self.to_bytes())
+    }
+}
+
+impl BorshDeserialize for BindingSigningKey {
+    fn deserialize(buf: &mut &[u8]) -> borsh::maybestd::io::Result<Self> {
+        let key_bytes = <[u8; 32]>::deserialize(buf)?;
+        Self::from_bytes(key_bytes).map_err(|_| {
+            io::Error::new(io::ErrorKind::InvalidData, "BindingSigningKey not in field")
+        })
     }
 }
 

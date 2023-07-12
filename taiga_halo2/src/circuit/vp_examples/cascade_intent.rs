@@ -8,28 +8,24 @@ use crate::{
     circuit::{
         gadgets::{
             assign_free_advice,
-            conditional_equal::ConditionalEqualConfig,
-            target_note_variable::{
-                get_is_input_note_flag, get_owned_note_variable, GetIsInputNoteFlagConfig,
-                GetOwnedNoteVariableConfig,
-            },
+            target_note_variable::{get_is_input_note_flag, get_owned_note_variable},
         },
-        note_circuit::NoteConfig,
         vp_circuit::{
-            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
+            BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
+            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
+            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::{Note, RandomSeed},
-    nullifier::{Nullifier, NullifierKeyCom},
+    nullifier::{Nullifier, NullifierKeyContainer},
     proof::Proof,
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use halo2_proofs::{
     arithmetic::Field,
     circuit::{floor_planner, Layouter, Value},
-    plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
+    plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
 use lazy_static::lazy_static;
 use pasta_curves::pallas;
@@ -52,49 +48,6 @@ pub struct CascadeIntentValidityPredicateCircuit {
     pub cascade_note_cm: pallas::Base,
 }
 
-#[derive(Clone, Debug)]
-pub struct CascadeIntentValidityPredicateConfig {
-    note_conifg: NoteConfig,
-    advices: [Column<Advice>; 10],
-    instances: Column<Instance>,
-    get_is_input_note_flag_config: GetIsInputNoteFlagConfig,
-    get_owned_note_variable_config: GetOwnedNoteVariableConfig,
-    conditional_equal_config: ConditionalEqualConfig,
-}
-
-impl ValidityPredicateConfig for CascadeIntentValidityPredicateConfig {
-    fn get_note_config(&self) -> NoteConfig {
-        self.note_conifg.clone()
-    }
-
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
-        let note_conifg = Self::configure_note(meta);
-
-        let advices = note_conifg.advices;
-        let instances = note_conifg.instances;
-
-        let get_owned_note_variable_config = GetOwnedNoteVariableConfig::configure(
-            meta,
-            advices[0],
-            [advices[1], advices[2], advices[3], advices[4]],
-        );
-
-        let get_is_input_note_flag_config =
-            GetIsInputNoteFlagConfig::configure(meta, advices[0], advices[1], advices[2]);
-
-        let conditional_equal_config =
-            ConditionalEqualConfig::configure(meta, [advices[0], advices[1], advices[2]]);
-        Self {
-            note_conifg,
-            advices,
-            instances,
-            get_is_input_note_flag_config,
-            get_owned_note_variable_config,
-            conditional_equal_config,
-        }
-    }
-}
-
 impl CascadeIntentValidityPredicateCircuit {
     // We can encode at most three notes to app_data_static if needed.
     pub fn encode_app_data_static(cascade_note_cm: pallas::Base) -> pallas::Base {
@@ -107,8 +60,8 @@ impl CascadeIntentValidityPredicateCircuit {
         let cascade_input_note = Note::dummy(&mut rng);
         let cascade_note_cm = cascade_input_note.commitment().get_x();
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        let nk_com = NullifierKeyCom::rand(&mut rng);
-        let intent_note = create_intent_note(&mut rng, cascade_note_cm, rho, nk_com);
+        let nk = NullifierKeyContainer::random_key(&mut rng);
+        let intent_note = create_intent_note(&mut rng, cascade_note_cm, rho, nk);
         let input_notes = [intent_note, cascade_input_note];
         Self {
             owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
@@ -138,7 +91,7 @@ impl ValidityPredicateInfo for CascadeIntentValidityPredicateCircuit {
 }
 
 impl ValidityPredicateCircuit for CascadeIntentValidityPredicateCircuit {
-    type VPConfig = CascadeIntentValidityPredicateConfig;
+    type VPConfig = GeneralVerificationValidityPredicateConfig;
     // Add custom constraints
     fn custom_constraints(
         &self,
@@ -200,7 +153,7 @@ pub fn create_intent_note<R: RngCore>(
     mut rng: R,
     cascade_note_cm: pallas::Base,
     rho: Nullifier,
-    nk_com: NullifierKeyCom,
+    nk: NullifierKeyContainer,
 ) -> Note {
     let app_data_static =
         CascadeIntentValidityPredicateCircuit::encode_app_data_static(cascade_note_cm);
@@ -210,7 +163,7 @@ pub fn create_intent_note<R: RngCore>(
         app_data_static,
         pallas::Base::zero(),
         1u64,
-        nk_com,
+        nk,
         rho,
         false,
         rseed,

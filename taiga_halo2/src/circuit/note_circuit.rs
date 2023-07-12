@@ -1,12 +1,14 @@
 use crate::circuit::gadgets::add::{AddChip, AddConfig};
-use crate::constant::{NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases};
+use crate::constant::{
+    BaseFieldGenerators, NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases,
+};
 use halo2_gadgets::{
     ecc::chip::EccConfig,
-    ecc::{chip::EccChip, Point, ScalarFixed},
+    ecc::{chip::EccChip, FixedPointBaseField, Point},
     poseidon::{primitives as poseidon, Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig},
     sinsemilla::{
         chip::{SinsemillaChip, SinsemillaConfig},
-        CommitDomain, Message, MessagePiece,
+        CommitDomains, HashDomain, Message, MessagePiece,
     },
     utilities::{bool_check, lookup_range_check::LookupRangeCheckConfig, RangeConstrained},
 };
@@ -476,7 +478,7 @@ pub fn note_commitment_gadget(
     rho: AssignedCell<pallas::Base, pallas::Base>,
     psi: AssignedCell<pallas::Base, pallas::Base>,
     value: AssignedCell<pallas::Base, pallas::Base>,
-    rcm: ScalarFixed<pallas::Affine, EccChip<TaigaFixedBases>>,
+    rcm: AssignedCell<pallas::Base, pallas::Base>,
     is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<Point<pallas::Affine, EccChip<TaigaFixedBases>>, Error> {
     let lookup_config = chip.config().lookup_config();
@@ -548,7 +550,7 @@ pub fn note_commitment_gadget(
     )?;
 
     // cm = NoteCommit^rcm(address || app_vp || app_data_static || rho || psi || is_merkle_checked || value)
-    let (cm, _zs) = {
+    let cm = {
         let message = Message::from_pieces(
             chip.clone(),
             vec![
@@ -562,12 +564,13 @@ pub fn note_commitment_gadget(
                 c.clone(),
             ],
         );
-        let domain = CommitDomain::new(chip, ecc_chip, &NoteCommitmentDomain);
-        domain.commit(
-            layouter.namespace(|| "Process NoteCommit inputs"),
-            message,
-            rcm,
-        )?
+        let hash_domain =
+            HashDomain::new(chip, ecc_chip.clone(), &NoteCommitmentDomain.hash_domain());
+        let (p, _) = hash_domain.hash_to_point(layouter.namespace(|| "hash to point"), message)?;
+        let blind_base =
+            FixedPointBaseField::from_inner(ecc_chip, BaseFieldGenerators::NoteCommitmentR);
+        let blind = blind_base.mul(layouter.namespace(|| "[r] R"), rcm)?;
+        p.add(layouter.namespace(|| "M + [r] R"), &blind)?
     };
 
     // assign values
@@ -702,11 +705,11 @@ impl NoteChip {
 fn test_halo2_note_commitment_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use crate::note::{Note, RandomSeed};
-    use crate::nullifier::{Nullifier, NullifierKeyCom};
+    use crate::nullifier::{Nullifier, NullifierKeyContainer};
     use halo2_gadgets::{
         ecc::{
             chip::{EccChip, EccConfig},
-            NonIdentityPoint, ScalarFixed,
+            NonIdentityPoint,
         },
         sinsemilla::chip::SinsemillaChip,
         utilities::lookup_range_check::LookupRangeCheckConfig,
@@ -726,7 +729,7 @@ fn test_halo2_note_commitment_circuit() {
         app_data_static: pallas::Base,
         app_data_dynamic: pallas::Base,
         value: u64,
-        nk_com: NullifierKeyCom,
+        nk: NullifierKeyContainer,
         rho: Nullifier,
         is_merkle_checked: bool,
         rseed: RandomSeed,
@@ -819,7 +822,7 @@ fn test_halo2_note_commitment_circuit() {
                 self.app_data_static,
                 self.app_data_dynamic,
                 self.value,
-                self.nk_com,
+                self.nk,
                 self.rho,
                 self.is_merkle_checked,
                 self.rseed,
@@ -879,9 +882,9 @@ fn test_halo2_note_commitment_circuit() {
                 Value::known(note.get_psi()),
             )?;
 
-            let rcm = ScalarFixed::new(
-                ecc_chip.clone(),
-                layouter.namespace(|| "rcm"),
+            let rcm = assign_free_advice(
+                layouter.namespace(|| "witness rcm"),
+                note_commit_config.advices[0],
                 Value::known(note.get_rcm()),
             )?;
 
@@ -926,7 +929,7 @@ fn test_halo2_note_commitment_circuit() {
             app_data_static: pallas::Base::random(&mut rng),
             app_data_dynamic: pallas::Base::random(&mut rng),
             value: rng.next_u64(),
-            nk_com: NullifierKeyCom::rand(&mut rng),
+            nk: NullifierKeyContainer::random_key(&mut rng),
             rho: Nullifier::default(),
             is_merkle_checked: false,
             rseed: RandomSeed::random(&mut rng),
@@ -943,7 +946,7 @@ fn test_halo2_note_commitment_circuit() {
             app_data_static: pallas::Base::random(&mut rng),
             app_data_dynamic: pallas::Base::random(&mut rng),
             value: rng.next_u64(),
-            nk_com: NullifierKeyCom::rand(&mut rng),
+            nk: NullifierKeyContainer::random_key(&mut rng),
             rho: Nullifier::default(),
             is_merkle_checked: true,
             rseed: RandomSeed::random(&mut rng),

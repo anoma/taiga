@@ -5969,7 +5969,7 @@ pub struct TaigaFixedBases;
 impl FixedPoints<pallas::Affine> for TaigaFixedBases {
     type FullScalar = TaigaFixedBasesFull;
     type ShortScalar = Short;
-    type Base = BaseGenerator;
+    type Base = BaseFieldGenerators;
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -6003,22 +6003,34 @@ impl FixedPoint<pallas::Affine> for TaigaFixedBasesFull {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct BaseGenerator;
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum BaseFieldGenerators {
+    NoteCommitmentR,
+    BaseGenerator,
+}
 
-impl FixedPoint<pallas::Affine> for BaseGenerator {
+impl FixedPoint<pallas::Affine> for BaseFieldGenerators {
     type FixedScalarKind = BaseFieldElem;
 
     fn generator(&self) -> pallas::Affine {
-        *GENERATOR
+        match self {
+            Self::NoteCommitmentR => *NOTE_COMMITMENT_R_GENERATOR,
+            Self::BaseGenerator => *GENERATOR,
+        }
     }
 
     fn u(&self) -> Vec<[[u8; 32]; H]> {
-        GENERATOR_U.to_vec()
+        match self {
+            Self::NoteCommitmentR => R_U.to_vec(),
+            Self::BaseGenerator => GENERATOR_U.to_vec(),
+        }
     }
 
     fn z(&self) -> Vec<u64> {
-        GENERATOR_Z.to_vec()
+        match self {
+            Self::NoteCommitmentR => R_Z.to_vec(),
+            Self::BaseGenerator => GENERATOR_Z.to_vec(),
+        }
     }
 }
 

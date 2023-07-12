@@ -6,19 +6,15 @@ use crate::{
     circuit::{
         gadgets::{
             assign_free_advice, assign_free_constant,
-            conditional_equal::ConditionalEqualConfig,
-            mul::{MulChip, MulConfig, MulInstructions},
+            mul::{MulChip, MulInstructions},
             poseidon_hash::poseidon_hash_gadget,
-            sub::{SubChip, SubConfig, SubInstructions},
-            target_note_variable::{
-                get_is_input_note_flag, get_owned_note_variable, GetIsInputNoteFlagConfig,
-                GetOwnedNoteVariableConfig,
-            },
+            sub::{SubChip, SubInstructions},
+            target_note_variable::{get_is_input_note_flag, get_owned_note_variable},
         },
-        note_circuit::NoteConfig,
         vp_circuit::{
-            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
+            BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
+            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
+            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
         vp_examples::token::{
             transfrom_token_name_to_token_property, Token, COMPRESSED_TOKEN_VK, TOKEN_VK,
@@ -26,7 +22,7 @@ use crate::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::{Note, RandomSeed},
-    nullifier::{Nullifier, NullifierKeyCom},
+    nullifier::{Nullifier, NullifierKeyContainer},
     proof::Proof,
     utils::poseidon_hash_n,
     vp_vk::ValidityPredicateVerifyingKey,
@@ -34,7 +30,7 @@ use crate::{
 use halo2_proofs::{
     arithmetic::Field,
     circuit::{floor_planner, Layouter, Value},
-    plonk::{keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance},
+    plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
 use lazy_static::lazy_static;
 use pasta_curves::pallas;
@@ -57,57 +53,6 @@ pub struct PartialFulfillmentIntentValidityPredicateCircuit {
     pub buy: Token,
     // address = Com(app_data_dynamic, nk_com). From `Note::get_address`
     pub receiver_address: pallas::Base,
-}
-
-#[derive(Clone, Debug)]
-pub struct PartialFulfillmentIntentValidityPredicateConfig {
-    note_conifg: NoteConfig,
-    advices: [Column<Advice>; 10],
-    instances: Column<Instance>,
-    get_is_input_note_flag_config: GetIsInputNoteFlagConfig,
-    get_owned_note_variable_config: GetOwnedNoteVariableConfig,
-    conditional_equal_config: ConditionalEqualConfig,
-    sub_config: SubConfig,
-    mul_config: MulConfig,
-}
-
-impl ValidityPredicateConfig for PartialFulfillmentIntentValidityPredicateConfig {
-    fn get_note_config(&self) -> NoteConfig {
-        self.note_conifg.clone()
-    }
-
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
-        let note_conifg = Self::configure_note(meta);
-
-        let advices = note_conifg.advices;
-        let instances = note_conifg.instances;
-
-        let get_owned_note_variable_config = GetOwnedNoteVariableConfig::configure(
-            meta,
-            advices[0],
-            [advices[1], advices[2], advices[3], advices[4]],
-        );
-
-        let get_is_input_note_flag_config =
-            GetIsInputNoteFlagConfig::configure(meta, advices[0], advices[1], advices[2]);
-
-        let conditional_equal_config =
-            ConditionalEqualConfig::configure(meta, [advices[0], advices[1], advices[2]]);
-
-        let sub_config = SubChip::configure(meta, [advices[0], advices[1]]);
-        let mul_config = MulChip::configure(meta, [advices[0], advices[1]]);
-
-        Self {
-            note_conifg,
-            advices,
-            instances,
-            get_is_input_note_flag_config,
-            get_owned_note_variable_config,
-            conditional_equal_config,
-            sub_config,
-            mul_config,
-        }
-    }
 }
 
 impl PartialFulfillmentIntentValidityPredicateCircuit {
@@ -151,8 +96,8 @@ impl PartialFulfillmentIntentValidityPredicateCircuit {
         let receiver_address = output_notes[0].get_address();
 
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        let nk_com = NullifierKeyCom::rand(&mut rng);
-        let intent_note = create_intent_note(&mut rng, &sell, &buy, receiver_address, rho, nk_com);
+        let nk = NullifierKeyContainer::random_key(&mut rng);
+        let intent_note = create_intent_note(&mut rng, &sell, &buy, receiver_address, rho, nk);
         let padding_input_note = Note::dummy(&mut rng);
         let input_notes = [intent_note, padding_input_note];
         Self {
@@ -185,7 +130,7 @@ impl ValidityPredicateInfo for PartialFulfillmentIntentValidityPredicateCircuit 
 }
 
 impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircuit {
-    type VPConfig = PartialFulfillmentIntentValidityPredicateConfig;
+    type VPConfig = GeneralVerificationValidityPredicateConfig;
     // Add custom constraints
     fn custom_constraints(
         &self,
@@ -502,7 +447,7 @@ pub fn create_intent_note<R: RngCore>(
     buy: &Token,
     receiver_address: pallas::Base,
     rho: Nullifier,
-    nk_com: NullifierKeyCom,
+    nk: NullifierKeyContainer,
 ) -> Note {
     let app_data_static = PartialFulfillmentIntentValidityPredicateCircuit::encode_app_data_static(
         sell,
@@ -515,7 +460,7 @@ pub fn create_intent_note<R: RngCore>(
         app_data_static,
         pallas::Base::zero(),
         1u64,
-        nk_com,
+        nk,
         rho,
         false,
         rseed,
@@ -545,8 +490,8 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
     sold_note.value = sell.value;
     let receiver_address = sold_note.get_address();
     let rho = Nullifier::new(pallas::Base::random(&mut rng));
-    let nk_com = NullifierKeyCom::rand(&mut rng);
-    let intent_note = create_intent_note(&mut rng, &sell, &buy, receiver_address, rho, nk_com);
+    let nk = NullifierKeyContainer::random_key(&mut rng);
+    let intent_note = create_intent_note(&mut rng, &sell, &buy, receiver_address, rho, nk);
     // Creating intent test
     {
         let input_notes = [sold_note, dummy_note];
@@ -574,7 +519,7 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
             bought_note.note_type.app_data_static =
                 transfrom_token_name_to_token_property(&buy.name);
             bought_note.app_data_dynamic = sold_note.app_data_dynamic;
-            bought_note.nk_com = sold_note.nk_com;
+            bought_note.nk_container = sold_note.nk_container;
 
             // full fulfillment
             {

@@ -210,7 +210,7 @@ impl plonk::Circuit<pallas::Base> for SudokuCircuit {
                 layouter.namespace(|| "Poseidon init"),
             )?;
             poseidon_hasher.hash(
-                layouter.namespace(|| "Poseidon hash (nk, rho)"),
+                layouter.namespace(|| "Poseidon hash (x, y)"),
                 poseidon_message,
             )?
         };

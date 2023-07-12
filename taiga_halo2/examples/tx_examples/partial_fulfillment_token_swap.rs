@@ -22,7 +22,7 @@ use taiga_halo2::{
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::MerklePath,
     note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
-    nullifier::{Nullifier, NullifierDerivingKey, NullifierKeyCom},
+    nullifier::{Nullifier, NullifierKeyContainer},
     shielded_ptx::ShieldedPartialTransaction,
     transaction::{ShieldedPartialTxBundle, Transaction},
 };
@@ -32,11 +32,11 @@ pub fn create_token_intent_ptx<R: RngCore>(
     sell: Token,
     buy: Token,
     input_auth_sk: pallas::Scalar,
-    input_nk: NullifierDerivingKey, // NullifierKeyCom::Open
+    input_nk: NullifierKeyContainer, // NullifierKeyContainer::Key
 ) -> (
     ShieldedPartialTransaction,
     pallas::Scalar,
-    NullifierKeyCom,
+    NullifierKeyContainer,
     pallas::Base,
     Nullifier,
 ) {
@@ -44,15 +44,8 @@ pub fn create_token_intent_ptx<R: RngCore>(
 
     // input note
     let rho = Nullifier::new(pallas::Base::random(&mut rng));
-    let input_nk_com = NullifierKeyCom::from_open(input_nk);
-    let input_note = create_random_token_note(
-        &mut rng,
-        &sell.name,
-        sell.value,
-        rho,
-        input_nk_com,
-        &input_auth,
-    );
+    let input_note =
+        create_random_token_note(&mut rng, &sell.name, sell.value, rho, input_nk, &input_auth);
 
     // output intent note
     // Use the same address as that in the input note. They can be different.
@@ -64,7 +57,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
         &buy,
         receiver_address,
         input_note_nf,
-        input_nk_com,
+        input_nk,
     );
 
     // padding the zero notes
@@ -125,7 +118,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
         &mut rng,
     );
 
-    (ptx, r, input_nk_com, receiver_address, rho)
+    (ptx, r, input_nk, receiver_address, rho)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -136,7 +129,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     bought_note_value: u64,
     returned_note_value: u64,
     input_rho: Nullifier,
-    input_nk: NullifierKeyCom,
+    input_nk: NullifierKeyContainer, // NullifierKeyContainer::Key
     input_address: pallas::Base,
     output_auth_pk: pallas::Point,
 ) -> (ShieldedPartialTransaction, pallas::Scalar) {
@@ -197,6 +190,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
 
     // Create the output note proving info
     let bought_note_proving_info = generate_output_token_note_proving_info(
+        &mut rng,
         bought_note,
         buy.name,
         output_auth,
@@ -214,6 +208,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
 
     // Create the returned note proving info
     let returned_note_proving_info = generate_output_token_note_proving_info(
+        &mut rng,
         returned_note,
         sell.name,
         output_auth,
@@ -235,8 +230,7 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
     // Alice creates the partial transaction with 5 BTC input and intent output
     let alice_auth_sk = pallas::Scalar::random(&mut rng);
     let alice_auth_pk = generator * alice_auth_sk;
-    let alice_nk_com = NullifierKeyCom::rand(&mut rng);
-    let alice_nk = alice_nk_com.get_nk().unwrap();
+    let alice_nk = NullifierKeyContainer::random_key(&mut rng);
     let sell = Token {
         name: "btc".to_string(),
         value: 2u64,
@@ -251,8 +245,7 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
     // Bob creates the partial transaction with 1 DOLPHIN input and 5 BTC output
     let bob_auth_sk = pallas::Scalar::random(&mut rng);
     let bob_auth_pk = generator * bob_auth_sk;
-    let bob_nk_com = NullifierKeyCom::rand(&mut rng);
-    let bob_nk = bob_nk_com.get_nk().unwrap();
+    let bob_nk = NullifierKeyContainer::random_key(&mut rng);
 
     let (bob_ptx, bob_r) = create_token_swap_ptx(
         &mut rng,
@@ -263,7 +256,7 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
         "btc",
         1,
         bob_auth_pk,
-        bob_nk_com.get_nk_com(),
+        bob_nk.to_commitment(),
     );
 
     // Solver/Bob creates the partial transaction to consume the intent note

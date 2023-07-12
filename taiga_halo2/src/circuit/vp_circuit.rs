@@ -1,6 +1,15 @@
+use crate::circuit::vamp_ir_utils::{get_circuit_assignments, parse, VariableAssignmentError};
 use crate::{
     circuit::{
-        gadgets::{add::AddChip, assign_free_advice},
+        gadgets::{
+            add::{AddChip, AddConfig},
+            assign_free_advice,
+            conditional_equal::ConditionalEqualConfig,
+            extended_or_relation::ExtendedOrRelationConfig,
+            mul::{MulChip, MulConfig},
+            sub::{SubChip, SubConfig},
+            target_note_variable::{GetIsInputNoteFlagConfig, GetOwnedNoteVariableConfig},
+        },
         integrity::{check_input_note, check_output_note},
         note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig},
     },
@@ -15,21 +24,30 @@ use crate::{
     proof::Proof,
     vp_vk::ValidityPredicateVerifyingKey,
 };
-use bincode::error::DecodeError;
+use borsh::{BorshDeserialize, BorshSerialize};
+use byteorder::{ReadBytesExt, WriteBytesExt};
 use dyn_clone::{clone_trait_object, DynClone};
+use ff::PrimeField;
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
     circuit::{AssignedCell, Layouter, Value},
-    plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error, VerifyingKey},
+    plonk::{
+        keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance,
+        VerifyingKey,
+    },
     poly::commitment::Params,
 };
-use pasta_curves::{pallas, vesta};
+use pasta_curves::{pallas, vesta, EqAffine, Fp};
 use rand::rngs::OsRng;
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs;
+use std::io;
 use std::path::PathBuf;
-use vamp_ir::halo2::synth::{make_constant, Halo2Module};
-use vamp_ir::util::read_inputs_from_file;
+use std::rc::Rc;
+use vamp_ir::ast::Module;
+use vamp_ir::halo2::synth::{make_constant, Halo2Module, PrimeFieldOps};
+use vamp_ir::transform::compile;
+use vamp_ir::util::{read_inputs_from_file, Config};
 
 #[derive(Debug, Clone)]
 pub struct VPVerifyingInfo {
@@ -63,6 +81,48 @@ impl VPVerifyingInfo {
     }
 }
 
+impl BorshSerialize for VPVerifyingInfo {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
+        // Write vk
+        self.vk.write(writer)?;
+        // Write proof
+        self.proof.serialize(writer)?;
+        // Write instance
+        assert!(self.instance.len() < 256);
+        writer.write_u8(self.instance.len() as u8)?;
+        for ele in self.instance.iter() {
+            writer.write_all(&ele.to_repr())?;
+        }
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for VPVerifyingInfo {
+    fn deserialize(buf: &mut &[u8]) -> borsh::maybestd::io::Result<Self> {
+        // TODO: Read vk
+        use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
+        let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
+        let vk = VerifyingKey::read::<_, TrivialValidityPredicateCircuit>(buf, params)?;
+        // Read proof
+        let proof = Proof::deserialize(buf)?;
+        // Read instance
+        let instance_len = buf.read_u8()?;
+        let instance: Vec<_> = (0..instance_len)
+            .map(|_| {
+                let bytes = <[u8; 32]>::deserialize(buf)?;
+                Option::from(pallas::Base::from_repr(bytes)).ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidData, "instance not in field")
+                })
+            })
+            .collect::<Result<_, _>>()?;
+        Ok(VPVerifyingInfo {
+            vk,
+            proof,
+            instance,
+        })
+    }
+}
+
 pub trait ValidityPredicateConfig {
     fn configure_note(meta: &mut ConstraintSystem<pallas::Base>) -> NoteConfig {
         let instances = meta.instance_column();
@@ -89,6 +149,65 @@ pub trait ValidityPredicateConfig {
     }
     fn get_note_config(&self) -> NoteConfig;
     fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self;
+}
+
+#[derive(Clone, Debug)]
+pub struct GeneralVerificationValidityPredicateConfig {
+    pub note_conifg: NoteConfig,
+    pub advices: [Column<Advice>; 10],
+    pub instances: Column<Instance>,
+    pub get_is_input_note_flag_config: GetIsInputNoteFlagConfig,
+    pub get_owned_note_variable_config: GetOwnedNoteVariableConfig,
+    pub conditional_equal_config: ConditionalEqualConfig,
+    pub extended_or_relation_config: ExtendedOrRelationConfig,
+    pub add_config: AddConfig,
+    pub sub_config: SubConfig,
+    pub mul_config: MulConfig,
+}
+
+impl ValidityPredicateConfig for GeneralVerificationValidityPredicateConfig {
+    fn get_note_config(&self) -> NoteConfig {
+        self.note_conifg.clone()
+    }
+
+    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
+        let note_conifg = Self::configure_note(meta);
+
+        let advices = note_conifg.advices;
+        let instances = note_conifg.instances;
+
+        let get_owned_note_variable_config = GetOwnedNoteVariableConfig::configure(
+            meta,
+            advices[0],
+            [advices[1], advices[2], advices[3], advices[4]],
+        );
+
+        let get_is_input_note_flag_config =
+            GetIsInputNoteFlagConfig::configure(meta, advices[0], advices[1], advices[2]);
+
+        let conditional_equal_config =
+            ConditionalEqualConfig::configure(meta, [advices[0], advices[1], advices[2]]);
+
+        let add_config = note_conifg.add_config.clone();
+        let sub_config = SubChip::configure(meta, [advices[0], advices[1]]);
+        let mul_config = MulChip::configure(meta, [advices[0], advices[1]]);
+
+        let extended_or_relation_config =
+            ExtendedOrRelationConfig::configure(meta, [advices[0], advices[1], advices[2]]);
+
+        Self {
+            note_conifg,
+            advices,
+            instances,
+            get_is_input_note_flag_config,
+            get_owned_note_variable_config,
+            conditional_equal_config,
+            extended_or_relation_config,
+            add_config,
+            sub_config,
+            mul_config,
+        }
+    }
 }
 
 pub trait ValidityPredicateInfo {
@@ -241,6 +360,10 @@ pub struct NoteVariables {
     pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
     pub app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
+    pub rho: AssignedCell<pallas::Base, pallas::Base>,
+    pub nk_com: AssignedCell<pallas::Base, pallas::Base>,
+    pub psi: AssignedCell<pallas::Base, pallas::Base>,
+    pub rcm: AssignedCell<pallas::Base, pallas::Base>,
 }
 
 // Variables in the input note
@@ -420,6 +543,94 @@ impl BasicValidityPredicateVariables {
         input_note_pairs.extend(output_note_pairs);
         input_note_pairs.try_into().unwrap()
     }
+
+    pub fn get_rho_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+        let mut input_note_pairs: Vec<_> = self
+            .input_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.nf.clone(),
+                target_variable: variables.note_variables.rho.clone(),
+            })
+            .collect();
+
+        let output_note_pairs: Vec<_> = self
+            .output_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.cm_x.clone(),
+                target_variable: variables.note_variables.rho.clone(),
+            })
+            .collect();
+        input_note_pairs.extend(output_note_pairs);
+        input_note_pairs.try_into().unwrap()
+    }
+
+    pub fn get_nk_com_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+        let mut input_note_pairs: Vec<_> = self
+            .input_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.nf.clone(),
+                target_variable: variables.note_variables.nk_com.clone(),
+            })
+            .collect();
+
+        let output_note_pairs: Vec<_> = self
+            .output_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.cm_x.clone(),
+                target_variable: variables.note_variables.nk_com.clone(),
+            })
+            .collect();
+        input_note_pairs.extend(output_note_pairs);
+        input_note_pairs.try_into().unwrap()
+    }
+
+    pub fn get_psi_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+        let mut input_note_pairs: Vec<_> = self
+            .input_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.nf.clone(),
+                target_variable: variables.note_variables.psi.clone(),
+            })
+            .collect();
+
+        let output_note_pairs: Vec<_> = self
+            .output_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.cm_x.clone(),
+                target_variable: variables.note_variables.psi.clone(),
+            })
+            .collect();
+        input_note_pairs.extend(output_note_pairs);
+        input_note_pairs.try_into().unwrap()
+    }
+
+    pub fn get_rcm_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+        let mut input_note_pairs: Vec<_> = self
+            .input_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.nf.clone(),
+                target_variable: variables.note_variables.rcm.clone(),
+            })
+            .collect();
+
+        let output_note_pairs: Vec<_> = self
+            .output_note_variables
+            .iter()
+            .map(|variables| NoteSearchableVariablePair {
+                src_variable: variables.cm_x.clone(),
+                target_variable: variables.note_variables.rcm.clone(),
+            })
+            .collect();
+        input_note_pairs.extend(output_note_pairs);
+        input_note_pairs.try_into().unwrap()
+    }
 }
 
 #[macro_export]
@@ -489,17 +700,70 @@ pub struct VampIRValidityPredicateCircuit {
     pub instances: Vec<pallas::Base>,
 }
 
+#[derive(Debug)]
+pub enum VampIRCircuitError {
+    MissingAssignment(String),
+    SourceParsingError(String),
+}
+
+impl VampIRCircuitError {
+    fn from_variable_assignment_error(error: VariableAssignmentError) -> Self {
+        match error {
+            VariableAssignmentError::MissingAssignment(s) => {
+                VampIRCircuitError::MissingAssignment(s)
+            }
+        }
+    }
+}
+
 impl VampIRValidityPredicateCircuit {
-    pub fn from_vamp_ir_circuit(vamp_ir_circuit_file: &PathBuf, inputs_file: &PathBuf) -> Self {
-        let mut circuit_file =
-            File::open(vamp_ir_circuit_file).expect("unable to load circuit file");
-        // let mut circuit: Halo2Module<pallas::Base> =
-        //     bincode::decode_from_std_read(&mut circuit_file, bincode::config::standard())
-        //         .expect("unable to load circuit file");
-        let HaloCircuitData {
+    pub fn from_vamp_ir_source(
+        vamp_ir_source: &str,
+        named_field_assignments: HashMap<String, Fp>,
+    ) -> Result<Self, VampIRCircuitError> {
+        let config = Config { quiet: true };
+        let parsed_vamp_ir_module =
+            parse(vamp_ir_source).map_err(VampIRCircuitError::SourceParsingError)?;
+        let vamp_ir_module = compile(
+            parsed_vamp_ir_module,
+            &PrimeFieldOps::<Fp>::default(),
+            &config,
+        );
+        let mut circuit = Halo2Module::<Fp>::new(Rc::new(vamp_ir_module));
+        let params = Params::new(circuit.k);
+        let field_assignments = get_circuit_assignments(&circuit.module, &named_field_assignments)
+            .map_err(VampIRCircuitError::from_variable_assignment_error)?;
+
+        // Populate variable definitions
+        circuit.populate_variables(field_assignments.clone());
+
+        // Get public inputs Fp
+        let instances = circuit
+            .module
+            .pubs
+            .iter()
+            .map(|inst| field_assignments[&inst.id])
+            .collect::<Vec<pallas::Base>>();
+
+        Ok(Self {
             params,
-            mut circuit,
-        } = HaloCircuitData::read(&mut circuit_file).unwrap();
+            circuit,
+            instances,
+        })
+    }
+
+    pub fn from_vamp_ir_file(vamp_ir_file: &PathBuf, inputs_file: &PathBuf) -> Self {
+        let config = Config { quiet: true };
+        let vamp_ir_source = fs::read_to_string(vamp_ir_file).expect("cannot read vamp-ir file");
+        let parsed_vamp_ir_module = Module::parse(&vamp_ir_source).unwrap();
+        let vamp_ir_module = compile(
+            parsed_vamp_ir_module,
+            &PrimeFieldOps::<Fp>::default(),
+            &config,
+        );
+        let mut circuit = Halo2Module::<Fp>::new(Rc::new(vamp_ir_module));
+        let params: Params<EqAffine> = Params::new(circuit.k);
+
         let var_assignments_ints = read_inputs_from_file(&circuit.module, inputs_file);
         let mut var_assignments = HashMap::new();
         for (k, v) in var_assignments_ints {
@@ -528,7 +792,6 @@ impl VampIRValidityPredicateCircuit {
 impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
     fn get_verifying_info(&self) -> VPVerifyingInfo {
         let mut rng = OsRng;
-        // let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
         let vk = keygen_vk(&self.params, &self.circuit).expect("keygen_vk should not fail");
         let pk =
             keygen_pk(&self.params, vk.clone(), &self.circuit).expect("keygen_pk should not fail");
@@ -548,45 +811,93 @@ impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
     }
 
     fn get_vp_vk(&self) -> ValidityPredicateVerifyingKey {
-        // let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
         let vk = keygen_vk(&self.params, &self.circuit).expect("keygen_vk should not fail");
         ValidityPredicateVerifyingKey::from_vk(vk)
     }
 }
 
-// TODO: We won't need the HaloCircuitData when we can import the circuit from vamp_ir.
-struct HaloCircuitData {
-    params: Params<vesta::Affine>,
-    circuit: Halo2Module<pallas::Base>,
-}
+#[cfg(test)]
+mod tests {
+    use crate::circuit::vp_circuit::{
+        ValidityPredicateVerifyingInfo, VampIRValidityPredicateCircuit,
+    };
+    use num_bigint::BigInt;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use vamp_ir::halo2::synth::make_constant;
 
-impl HaloCircuitData {
-    fn read<R>(mut reader: R) -> Result<Self, DecodeError>
-    where
-        R: std::io::Read,
-    {
-        let params = Params::<vesta::Affine>::read(&mut reader)
-            .map_err(|x| DecodeError::OtherString(x.to_string()))?;
-        let circuit: Halo2Module<pallas::Base> =
-            bincode::decode_from_std_read(&mut reader, bincode::config::standard())?;
-        Ok(Self { params, circuit })
+    #[test]
+    fn test_create_vp_from_vamp_ir_file() {
+        let vamp_ir_circuit_file = PathBuf::from("./src/circuit/vamp_ir_circuits/pyth.pir");
+        let inputs_file = PathBuf::from("./src/circuit/vamp_ir_circuits/pyth.inputs");
+        let vp_circuit =
+            VampIRValidityPredicateCircuit::from_vamp_ir_file(&vamp_ir_circuit_file, &inputs_file);
+
+        // generate proof and instance
+        let vp_info = vp_circuit.get_verifying_info();
+
+        // verify the proof
+        // TODO: use the vp_info.verify() instead. vp_info.verify() doesn't work now because it uses the fixed VP_CIRCUIT_PARAMS_SIZE params.
+        vp_info
+            .proof
+            .verify(&vp_info.vk, &vp_circuit.params, &[&vp_info.instance])
+            .unwrap();
     }
-}
 
-#[test]
-fn test_create_vp_from_vamp_ir_circuit() {
-    let vamp_ir_circuit_file = PathBuf::from("./src/circuit/vamp_ir_circuits/pyth.halo2");
-    let inputs_file = PathBuf::from("./src/circuit/vamp_ir_circuits/pyth.inputs");
-    let vp_circuit =
-        VampIRValidityPredicateCircuit::from_vamp_ir_circuit(&vamp_ir_circuit_file, &inputs_file);
+    #[test]
+    fn test_create_vp_from_invalid_vamp_ir_file() {
+        let invalid_vamp_ir_source =
+            VampIRValidityPredicateCircuit::from_vamp_ir_source("{aaxxx", HashMap::new());
+        assert!(invalid_vamp_ir_source.is_err());
+    }
 
-    // generate proof and instance
-    let vp_info = vp_circuit.get_verifying_info();
+    #[test]
+    fn test_create_vp_with_missing_assignment() {
+        let missing_x_assignment =
+            VampIRValidityPredicateCircuit::from_vamp_ir_source("x = 1;", HashMap::new());
+        assert!(missing_x_assignment.is_err());
+    }
 
-    // verify the proof
-    // TODO: use the vp_info.verify() instead. vp_info.verify() doesn't work now because it uses the fixed VP_CIRCUIT_PARAMS_SIZE params.
-    vp_info
-        .proof
-        .verify(&vp_info.vk, &vp_circuit.params, &[&vp_info.instance])
-        .unwrap();
+    #[test]
+    fn test_create_vp_with_no_assignment() {
+        let zero_constraint =
+            VampIRValidityPredicateCircuit::from_vamp_ir_source("0;", HashMap::new());
+        assert!(zero_constraint.is_ok());
+    }
+
+    #[test]
+    fn test_create_vp_with_valid_assignment() {
+        let x_assignment_circuit = VampIRValidityPredicateCircuit::from_vamp_ir_source(
+            "x = 1;",
+            HashMap::from([(String::from("x"), make_constant(BigInt::from(1)))]),
+        );
+
+        assert!(x_assignment_circuit.is_ok());
+
+        let vp_circuit = x_assignment_circuit.unwrap();
+        let vp_info = vp_circuit.get_verifying_info();
+
+        assert!(vp_info
+            .proof
+            .verify(&vp_info.vk, &vp_circuit.params, &[&vp_info.instance])
+            .is_ok());
+    }
+
+    #[test]
+    fn test_create_vp_with_invalid_assignment() {
+        let x_assignment_circuit = VampIRValidityPredicateCircuit::from_vamp_ir_source(
+            "x = 1;",
+            HashMap::from([(String::from("x"), make_constant(BigInt::from(0)))]),
+        );
+
+        assert!(x_assignment_circuit.is_ok());
+
+        let vp_circuit = x_assignment_circuit.unwrap();
+        let vp_info = vp_circuit.get_verifying_info();
+
+        assert!(vp_info
+            .proof
+            .verify(&vp_info.vk, &vp_circuit.params, &[&vp_info.instance])
+            .is_err());
+    }
 }

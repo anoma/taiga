@@ -4,6 +4,7 @@ use halo2_proofs::arithmetic::CurveAffine;
 use pasta_curves::group::cofactor::CofactorCurveAffine;
 use pasta_curves::group::{Curve, Group, GroupEncoding};
 use pasta_curves::pallas;
+use subtle::CtOption;
 
 #[derive(Copy, Clone, Debug)]
 pub struct ValueCommitment(pallas::Point);
@@ -41,5 +42,9 @@ impl ValueCommitment {
 
     pub fn to_bytes(&self) -> [u8; 32] {
         self.0.to_bytes()
+    }
+
+    pub fn from_bytes(bytes: [u8; 32]) -> CtOption<ValueCommitment> {
+        pallas::Point::from_bytes(&bytes).map(ValueCommitment)
     }
 }
