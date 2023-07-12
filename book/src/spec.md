@@ -10,33 +10,33 @@ We use Halo2/IPA with [Pasta curves](https://github.com/zcash/pasta) developed b
 Let `C(x; w) ⟶ 0/1` be a circuit with up to `m` gates. The circuit is represented as polynomials over the chosen curve's **scalar field**, following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html). Commitments are generated over the curve's **base field**.
 
 ### 1.2 Elliptic curves
-||Name|Scalar field| Base field|Purpose|Instantiation|
-|-|-|-|-|-|-|
-|$E_I$|Inner curve|$\mathbb{F}_q$|$\mathbb{F}_p$|ECC gadget| [Pallas](https://github.com/zcash/pasta#pallasvesta-supporting-evidence)
-|$E_M$|Main curve|$\mathbb{F}_p$|$\mathbb{F}_q$|Action and VP circuits| Vesta|
-|$E_O$|Outer curve|$\mathbb{F}_q$|$\mathbb{F}_p$|Accumulation circuit| Pallas|
+|Name|Base field| Scalar field|Purpose|Instantiation|
+|-|-|-|-|-|
+|$E_p$|$\mathbb{F}_p$|$\mathbb{F}_q$|ECC gadget, Accumulation circuit| [Pallas](https://github.com/zcash/pasta#pallasvesta-supporting-evidence)
+|$E_q$|$\mathbb{F}_q$|$\mathbb{F}_p$|Action and VP circuits| Vesta|
 
 ### 1.3 Proving system interfaces
 ||Interface|Description|
 |-|-|-|
-|__Preprocess__|`preproc(C) ⟶ desc_C`|`C` is turned into a *circuit description*, which is all data the verifier needs to verify a proof. It includes the verifier key `C_vk`, but not only that.|
-|__Prove__|`P(C, x, w) ⟶ π`||
-|__Verify__|`V(desc_C, x, π) ⟶ 0/1`||
+|__Generate Verifier key__|`keygen_vk(C) ⟶ vk`|`C` is turned into a *circuit description* or *verifying key* `vk`, a succint representation of the circuit that the verifier uses to verify a proof|
+|__Generate Proving key__|`keygen_pk(C, vk) ⟶ pk`|Generate a proving key from a verifying key and an instance of circuit|
+|__Prove__|`P(C, pk, x, w) ⟶ π`|Prove that a circuit is satisfied given instance `x` and witness `w`|
+|__Verify__|`V(vk, x, π) ⟶ 0/1`|Verify the proof|
 
 ## 2. Notes
-Note is an immutable particle of the application state.
+Note is an immutable particle of the application state in the UTXO model.
 
 ### 2.1 Note structure
-|Variable|Type/size|Description|
+|Variable|Type|Description|
 |-|-|-|
-|`value_base`||Value base represents the note type|
-|`app_data_dynamic`||Commitment to the note's extra data|
-|`v`|${0..2^{64} - 1}$|The quantity of fungible value|
-|`cm_nk`||Commitment to the nullifier key that will be used to derive the note's nullifier|
-|`ρ`|$\mathbb{F}_p$|An old nullifier from the same Action description (see Orchard)|
+|`note_type`|$E_p$|Identifier of the note's application|
+|`app_data_dynamic`|$\mathbb{F}_p$|Encoding of the application's extra data|
+|`v`|u64|The quantity of fungible value specific to a note type|
+|`cm_nk`|$\mathbb{F}_p$|Commitment to the nullifier key that will be used to derive the note's nullifier|
+|`ρ`|$\mathbb{F}_p$|The nullifier `nf` of the consumed note is equal to the `ρ` of the created note from the same Action description (see Orchard). This guarantees the uniqueness of a note|
 |`ψ`|$\mathbb{F}_p$|The prf output of `ρ` and `rcm_note` (see Orchard)|
-|`is_merkle_checked`|bool|Dummy note flag. It indicates whether the note's commitment Merkle path should be checked when spending the note.|
-|`rcm_note`|${0..2^{255} - 1}$|A random commitment trapdoor|
+|`is_merkle_checked`|bool|Ephemeral note flag. It indicates whether the note's commitment Merkle path should be checked when consuming the note.|
+|`rcm_note`|$F_q$|A random commitment trapdoor|
 
 Note: the value size cannot be bigger or close to the curve's scalar field size (to avoid overflowing) but besides that there are no strict reasons for choosing 64. We can use more notes to express a value that doesn't fit in one note (splitting the value into limbs). Having bigger value size requires fewer notes to express such a value and is more efficient. For example, a value size of 128 bits would require two times less notes to express a maximum value
 
@@ -47,12 +47,12 @@ Each note has three fields with application data.
 |Variable|Type/size|Description|
 |-|-|-|
 |`cm_app_vk`|| Contains the application's main VP verifier key. Used to identify the application the note belongs to. As the verifier key itself is large, the notes only store a commitment to it.|
-|`app_data_static`||Contains the application data that affects fungibility of the note. Along with `cm_app_vk`, it is used to derive note's value base||
+|`app_data_static`||Contains the application data that affects fungibility of the note. Along with `cm_app_vk`, it is used to derive note's type||
 |`app_data_dynamic`||Contains the application data that doesn't affect the fungibility of the note|
 
-#### Value base
+#### Note type
 
-Value base is used to distinguish note types. Notes with different value bases have different note types. The value base of a note is derived from two application-related fields: `cm_app_vk` and `app_data_static`.
+Note type is used to distinguish note types. Notes with different types have different note types. The type of a note is derived from two application-related fields: `cm_app_vk` and `app_data_static`.
 
 $VB = PRF^{vb}(cm_{app\_vk}, app\_data\_static)$
 
@@ -72,8 +72,8 @@ $cv = [v^{in}]VB^{in} - [v^{out}]VB^{out} + [rcv]R$
 |-|-|-|
 |$v^{in}$|${0..2^{64} - 1}$||
 |$v^{out}$|${0..2^{64} - 1}$||
-|$VB^{in}$|outer curve point|Input note's value base|
-|$VB^{out}$|outer curve point|Output note's value base|
+|$VB^{in}$|outer curve point|Input note's type|
+|$VB^{out}$|outer curve point|Output note's type|
 |`R`|outer curve point|Randomness base, fixed|
 |`rcv`|${0..2^{255} - 1}$|Value commitment trapdoor|
 |`cv`|outer curve point||
@@ -145,9 +145,9 @@ Public inputs (`x`):
 5. `cm_vp_out` - output note's application VP commitment
 
 Private inputs (`w`):
-1. `in_note = (value_base, v, cm_nk, ρ, ψ, is_merkle_checked, rcm_note)` - input note opening
+1. `in_note = (note_type, v, cm_nk, ρ, ψ, is_merkle_checked, rcm_note)` - input note opening
 2. `(cm_app_vk, rcm_vp)` - opening of `cm_vp_in`
-3. `out_note = (value_base, v, cm_nk, ρ, ψ, is_merkle_checked, rcm_note)` - output note opening
+3. `out_note = (note_type, v, cm_nk, ρ, ψ, is_merkle_checked, rcm_note)` - output note opening
 4. `(cm_app_vk, rcm_vp)` - opening of `cm_vp_out`
 
 Note: opening of a parameter is every field used to derive the parameter
@@ -155,16 +155,16 @@ Note: opening of a parameter is every field used to derive the parameter
 #### Checks
 - For input note:
     - If `is_merkle_checked = true`, check that the note is a valid note in `rt`: there is a path in Merkle tree with root `rt` to a note commitment `cm` that opens to `note`
-    - Nullifier integrity: $nf = DeriveNullier_{nk}(note)$.
+    - Nullifier integrity: $nf = DeriveNullifier_{nk}(note)$.
     - Application VP integrity: $cm_{vp} = VPCommit(cm_{app\_vk}, rcm_{vp})$
-    - Value base integrity: $vb = PRF^{vb}(cm_{app\_vk}, app\_data\_static)$
+    - Note type integrity: $vb = PRF^{vb}(cm_{app\_vk}, app\_data\_static)$
 - For output note:
     - Commitment integrity(output note only): $cm = NoteCom(note, rcm_{note})$
     - Application VP integrity: $cm_{vp} = VPCommit(cm_{app\_vk}, rcm_{vp})$
-    - Value base integrity: $vb = PRF^{vb}(cm_{app\_vk}, app\_data\_static)$
+    - Note type integrity: $vb = PRF^{vb}(cm_{app\_vk}, app\_data\_static)$
 - Value commitment integrity: $cv = ValueCommit(v_{in}, v_{out}, VB_{in}, VB_{out}, rcv)$
 
-Note: unlike MASP, the value base in Taiga is not used to compute note's commitment and the Action circuit doesn't take `vb` as private input but computes it from the note fields, and it is checked for both input and output notes.
+Note: unlike MASP, the type in Taiga is not used to compute note's commitment and the Action circuit doesn't take `vb` as private input but computes it from the note fields, and it is checked for both input and output notes.
 
 ### 3.2 Validity Predicate (VP) circuits
 Validity predicate is a circuit containing the application logic. Validity predicates take `n` input and `n` output notes, are represented as Halo2 circuits `VP(x; w) ⟶ 0/1` and arithmetized over $\mathbb{F}_p$.
@@ -226,7 +226,7 @@ Certain applications might allow to create more value from less input value, whi
 |$PRF^{vb}$|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$PRF^{vb} = hash\_to\_curve(Poseidon(app\_vk, app\_data\_static))$
 |`NKCommit`|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|$NKCommit(nk) = Poseidon(nk, user_derived_key)$; used to protect `nk` stored in a note. `user_derived_key` is currently not used
 |`NoteCommit`|[Sincemilla](https://zcash.github.io/halo2/design/gadgets/sinsemilla.html)|$\mathrm{F}_p \rightarrow \mathrm{F}_p \times \mathrm{F}_p$|
-|`ValueCommit`|Pedersen with variable value base|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$cv = [v_i] * VB_i - [v_o] * VB_o + [r]R$
+|`ValueCommit`|Pedersen with variable type|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$cv = [v_i] * VB_i - [v_o] * VB_o + [r]R$
 |`VPCommit`|Blake2s||Efficient over both $\mathrm{F}_p$ and $\mathrm{F}_q$
 |`VKCommit`|-||Efficient over the outer curve's scalar field|
 |address|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$| `address = Poseidon(app_data_dynamic, cm_nk)`; compresses the data fields that contain some ownership information

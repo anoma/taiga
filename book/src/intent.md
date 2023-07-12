@@ -14,12 +14,12 @@ until the interests of all users are satisfied.
 ### Intent notes
 
 Users express their preferences in their intent userVPs. For each intent userVP there is a corresponding note type derived from that userVP.
-Notes of that type are responsible to make sure that the intent userVP used to derive their value base is satisfied.
+Notes of that type are responsible to make sure that the intent userVP used to derive their type is satisfied.
 
 Strictly speaking, the notes don't make the intent userVP to be satisfied, 
 but rather make sure that the transaction doesn't get published until the intent userVP is satisfied.
 
-When a user specifies their intent userVP, they create an dummy intent note with the value base derived from the userVP and value 1.
+When a user specifies their intent userVP, they create an dummy intent note with the type derived from the userVP and value 1.
 This note gets spent (balancing the transaction) only when the corresponding intent is satisfied. 
 Only a fully balanced transaction can be published on the blockchain, 
 and balancing the intent notes requires satisfying the intent userVPs.
