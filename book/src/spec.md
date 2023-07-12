@@ -136,9 +136,10 @@ $ce = Encrypt(note, sk)$
 
 Not all of the note fields require to be encrypted (e.g. note commitment), and the encrypted fields may vary depending on the application. To make sure it is flexible enough, the encryption check is performed in VP circuits.
 
-### 2.6 Dummy notes
-In Taiga, note's value doesn't define if the note is dummy or not, unlike some other systems. Dummy notes can have non-zero value and are marked explicitly as dummy by setting `is_merkle_checked = false` meaning that for dummy notes the commitment's Merkle path is not checked when spending the note. Non-zero value dummy notes are handy for carrying additional constraints (e.g. intents) and balancing transactions.
+### 2.6 Ephemeral notes and dummy notes
+A note is _ephemeral_ if it never gets inserted into the append-only note commitment tree. In Taiga, this means that its existence is limited to the gossip network. An example of an ephemeral note is an intent note. A note is marked ephemeral by setting the `is_merkle_checked` flag to `false`. For ephemeral notes the Merkle authentication path is not checked when consuming the note.
 
+As in ZCash, a note is _dummy_ if its `value` field is zero and therefore it doesn’t affect the balance of a transaction.
 
 ## 3. Circuits
 ### 3.1 The Action Circuit
