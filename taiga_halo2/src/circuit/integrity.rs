@@ -348,7 +348,7 @@ pub fn check_output_note(
     })
 }
 
-pub fn derive_value_base(
+pub fn derive_note_type(
     mut layouter: impl Layouter<pallas::Base>,
     hash_to_curve_config: HashToCurveConfig,
     ecc_chip: EccChip<TaigaFixedBases>,
@@ -363,7 +363,7 @@ pub fn derive_value_base(
     )?;
 
     // Assign a new `NonIdentityPoint` and constran equal to hash_to_curve point since `Point` doesn't have mul operation
-    // IndentityPoint is an invalid value base and it returns an error.
+    // IndentityPoint is an invalid note type and it returns an error.
     let non_identity_point = app_vk
         .value()
         .zip(app_data_static.value())
@@ -372,11 +372,11 @@ pub fn derive_value_base(
         });
     let non_identity_point_var = NonIdentityPoint::new(
         ecc_chip,
-        layouter.namespace(|| "non-identity value base"),
+        layouter.namespace(|| "non-identity note type"),
         non_identity_point,
     )?;
     point.constrain_equal(
-        layouter.namespace(|| "non-identity value base"),
+        layouter.namespace(|| "non-identity note type"),
         &non_identity_point_var,
     )?;
     Ok(non_identity_point_var)
@@ -396,8 +396,8 @@ pub fn compute_value_commitment(
     rcv: pallas::Scalar,
 ) -> Result<Point<pallas::Affine, EccChip<TaigaFixedBases>>, Error> {
     // input value point
-    let value_base_input = derive_value_base(
-        layouter.namespace(|| "derive input value base"),
+    let note_type_input = derive_note_type(
+        layouter.namespace(|| "derive input note type"),
         hash_to_curve_config.clone(),
         ecc_chip.clone(),
         app_address_input,
@@ -409,11 +409,11 @@ pub fn compute_value_commitment(
         &v_input,
     )?;
     let (value_point_input, _) =
-        value_base_input.mul(layouter.namespace(|| "input value point"), v_input_scalar)?;
+        note_type_input.mul(layouter.namespace(|| "input value point"), v_input_scalar)?;
 
     // output value point
-    let value_base_output = derive_value_base(
-        layouter.namespace(|| "derive output value base"),
+    let note_type_output = derive_note_type(
+        layouter.namespace(|| "derive output note type"),
         hash_to_curve_config,
         ecc_chip.clone(),
         app_address_output,
@@ -425,7 +425,7 @@ pub fn compute_value_commitment(
         &v_output,
     )?;
     let (value_point_output, _) =
-        value_base_output.mul(layouter.namespace(|| "output value point"), v_output_scalar)?;
+        note_type_output.mul(layouter.namespace(|| "output value point"), v_output_scalar)?;
 
     // Get and constrain the negative output value point
     let neg_v_point_output = Point::new(

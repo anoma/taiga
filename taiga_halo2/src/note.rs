@@ -49,8 +49,8 @@ impl Default for NoteCommitment {
 /// A note
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Note {
-    pub note_type: ValueBase,
-    /// app_data_dynamic is the data defined in application vp and will NOT be used to derive value base
+    pub note_type: NoteType,
+    /// app_data_dynamic is the data defined in application vp and will NOT be used to derive type
     /// sub-vps and any other data can be encoded to the app_data_dynamic
     pub app_data_dynamic: pallas::Base,
     /// value denotes the amount of the note.
@@ -67,9 +67,9 @@ pub struct Note {
     pub is_merkle_checked: bool,
 }
 
-/// The parameters in the ValueBase are used to derive note value base.
+/// The parameters in the NoteType are used to derive note type.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct ValueBase {
+pub struct NoteType {
     /// app_vk is the compressed verifying key of VP
     pub app_vk: pallas::Base,
     /// app_data_static is the encoded data that is defined in application vp
@@ -107,7 +107,7 @@ impl Note {
         is_merkle_checked: bool,
         rseed: RandomSeed,
     ) -> Self {
-        let note_type = ValueBase::new(app_vk, app_data_static);
+        let note_type = NoteType::new(app_vk, app_data_static);
         Self {
             note_type,
             app_data_dynamic,
@@ -128,7 +128,7 @@ impl Note {
     pub fn dummy_from_rho<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
         let app_vk = pallas::Base::random(&mut rng);
         let app_data_static = pallas::Base::random(&mut rng);
-        let note_type = ValueBase::new(app_vk, app_data_static);
+        let note_type = NoteType::new(app_vk, app_data_static);
         let app_data_dynamic = pallas::Base::zero();
         let value: u64 = rng.gen();
         let nk_com = NullifierKeyCom::rand(&mut rng);
@@ -148,7 +148,7 @@ impl Note {
     pub fn dummy_zero_note<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
         let app_vk = *COMPRESSED_TRIVIAL_VP_VK;
         let app_data_static = pallas::Base::random(&mut rng);
-        let note_type = ValueBase::new(app_vk, app_data_static);
+        let note_type = NoteType::new(app_vk, app_data_static);
         let app_data_dynamic = pallas::Base::zero();
         let nk_com = NullifierKeyCom::rand(&mut rng);
         let rcm = pallas::Scalar::random(&mut rng);
@@ -236,8 +236,8 @@ impl Note {
         self.nk_com.get_nk()
     }
 
-    pub fn get_value_base(&self) -> pallas::Point {
-        self.note_type.derive_value_base()
+    pub fn get_note_type(&self) -> pallas::Point {
+        self.note_type.derive_note_type()
     }
 
     pub fn get_app_vk(&self) -> pallas::Base {
@@ -257,7 +257,7 @@ impl Note {
     }
 }
 
-impl ValueBase {
+impl NoteType {
     pub fn new(vk: pallas::Base, data: pallas::Base) -> Self {
         Self {
             app_vk: vk,
@@ -265,7 +265,7 @@ impl ValueBase {
         }
     }
 
-    pub fn derive_value_base(&self) -> pallas::Point {
+    pub fn derive_note_type(&self) -> pallas::Point {
         let inputs = [self.app_vk, self.app_data_static];
         poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&inputs)
     }

@@ -44,7 +44,7 @@ pub const ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX: usize = 4;
 
 pub const POSEIDON_TO_CURVE_INPUT_LEN: usize = 3;
 pub const CURVE_ID: &str = "pallas";
-pub const VALUE_BASE_DOMAIN_POSTFIX: &str = "Taiga-ValueBase";
+pub const VALUE_BASE_DOMAIN_POSTFIX: &str = "Taiga-NoteType";
 
 pub const VP_CIRCUIT_NULLIFIER_ONE_INSTANCE_IDX: usize = 0;
 pub const VP_CIRCUIT_OUTPUT_CM_ONE_INSTANCE_IDX: usize = 1;
