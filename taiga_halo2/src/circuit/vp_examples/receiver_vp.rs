@@ -15,7 +15,7 @@ use crate::{
     constant::{GENERATOR, NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX},
     note::Note,
     note_encryption::{NoteCipher, SecretKey},
-    nullifier::{Nullifier, NullifierKey},
+    nullifier::{Nullifier, NullifierKeyContainer},
     proof::Proof,
     utils::{mod_r_p, poseidon_hash_n},
     vp_vk::ValidityPredicateVerifyingKey,
@@ -130,7 +130,7 @@ impl ValidityPredicateInfo for ReceiverValidityPredicateCircuit {
             target_note.app_data_dynamic,
             pallas::Base::from(target_note.value),
             target_note.rho.inner(),
-            target_note.get_nk().get_closed_nk(),
+            target_note.get_nk_commitment(),
             target_note.psi,
             target_note.rcm,
         ];
@@ -358,7 +358,7 @@ pub fn decrypt_note(instances: Vec<pallas::Base>, sk: pallas::Base) -> Option<No
                     .expect("slice with incorrect length"),
             );
             let rho = Nullifier::new(plaintext[4]);
-            let nk = NullifierKey::from_closed(plaintext[5]);
+            let nk = NullifierKeyContainer::from_commitment(plaintext[5]);
             let note = Note::from_full(
                 plaintext[0],
                 plaintext[1],

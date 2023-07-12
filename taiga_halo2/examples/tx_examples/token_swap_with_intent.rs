@@ -22,7 +22,7 @@ use taiga_halo2::{
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::MerklePath,
     note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
-    nullifier::{Nullifier, NullifierKey},
+    nullifier::{Nullifier, NullifierKeyContainer},
     shielded_ptx::ShieldedPartialTransaction,
     transaction::{ShieldedPartialTxBundle, Transaction},
 };
@@ -34,11 +34,11 @@ pub fn create_token_intent_ptx<R: RngCore>(
     input_token: &str,
     input_value: u64,
     input_auth_sk: pallas::Scalar,
-    input_nk: NullifierKey, // NullifierKey::Open
+    input_nk: NullifierKeyContainer, // NullifierKeyContainer::Key
 ) -> (
     ShieldedPartialTransaction,
     pallas::Scalar,
-    NullifierKey,
+    NullifierKeyContainer,
     pallas::Base,
     Nullifier,
 ) {
@@ -135,7 +135,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     condition1: Condition,
     condition2: Condition,
     input_rho: Nullifier,
-    input_nk: NullifierKey,
+    input_nk: NullifierKeyContainer, // NullifierKeyContainer::Key
     input_address: pallas::Base,
     output_token: &str,
     output_value: u64,
@@ -159,7 +159,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
         output_token,
         output_value,
         input_note_nf,
-        input_nk,
+        input_nk.to_commitment(),
         &output_auth,
     );
     let address = output_note.get_address();
@@ -234,7 +234,7 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
     // Alice creates the partial transaction with 5 BTC input and intent output
     let alice_auth_sk = pallas::Scalar::random(&mut rng);
     let alice_auth_pk = generator * alice_auth_sk;
-    let alice_nk = NullifierKey::random(&mut rng);
+    let alice_nk = NullifierKeyContainer::random_key(&mut rng);
     let condition1 = Condition {
         token_name: "dolphin".to_string(),
         token_value: 1u64,
@@ -256,7 +256,7 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
     // Bob creates the partial transaction with 1 DOLPHIN input and 5 BTC output
     let bob_auth_sk = pallas::Scalar::random(&mut rng);
     let bob_auth_pk = generator * bob_auth_sk;
-    let bob_nk = NullifierKey::random(&mut rng);
+    let bob_nk = NullifierKeyContainer::random_key(&mut rng);
 
     let (bob_ptx, bob_r) = create_token_swap_ptx(
         &mut rng,
@@ -267,7 +267,7 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
         "btc",
         5,
         bob_auth_pk,
-        bob_nk,
+        bob_nk.to_commitment(),
     );
 
     // Solver/Bob creates the partial transaction to consume the intent note

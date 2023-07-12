@@ -22,7 +22,7 @@ use crate::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::{Note, RandomSeed},
-    nullifier::{Nullifier, NullifierKey},
+    nullifier::{Nullifier, NullifierKeyContainer},
     proof::Proof,
     utils::poseidon_hash_n,
     vp_vk::ValidityPredicateVerifyingKey,
@@ -96,7 +96,7 @@ impl PartialFulfillmentIntentValidityPredicateCircuit {
         let receiver_address = output_notes[0].get_address();
 
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        let nk = NullifierKey::random(&mut rng);
+        let nk = NullifierKeyContainer::random_key(&mut rng);
         let intent_note = create_intent_note(&mut rng, &sell, &buy, receiver_address, rho, nk);
         let padding_input_note = Note::dummy(&mut rng);
         let input_notes = [intent_note, padding_input_note];
@@ -447,7 +447,7 @@ pub fn create_intent_note<R: RngCore>(
     buy: &Token,
     receiver_address: pallas::Base,
     rho: Nullifier,
-    nk: NullifierKey,
+    nk: NullifierKeyContainer,
 ) -> Note {
     let app_data_static = PartialFulfillmentIntentValidityPredicateCircuit::encode_app_data_static(
         sell,
@@ -490,7 +490,7 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
     sold_note.value = sell.value;
     let receiver_address = sold_note.get_address();
     let rho = Nullifier::new(pallas::Base::random(&mut rng));
-    let nk = NullifierKey::random(&mut rng);
+    let nk = NullifierKeyContainer::random_key(&mut rng);
     let intent_note = create_intent_note(&mut rng, &sell, &buy, receiver_address, rho, nk);
     // Creating intent test
     {
@@ -519,7 +519,7 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
             bought_note.note_type.app_data_static =
                 transfrom_token_name_to_token_property(&buy.name);
             bought_note.app_data_dynamic = sold_note.app_data_dynamic;
-            bought_note.nk = sold_note.nk;
+            bought_note.nk_container = sold_note.nk_container;
 
             // full fulfillment
             {

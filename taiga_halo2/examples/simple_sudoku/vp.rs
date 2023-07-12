@@ -103,7 +103,7 @@ mod tests {
     use taiga_halo2::{
         constant::NUM_NOTE,
         note::{Note, RandomSeed},
-        nullifier::{Nullifier, NullifierKeyCom},
+        nullifier::{Nullifier, NullifierKeyContainer},
         vp_vk::ValidityPredicateVerifyingKey,
     };
 
@@ -147,7 +147,7 @@ mod tests {
         let app_data_dynamic = pallas::Base::zero();
 
         let value: u64 = 0;
-        let nk = NullifierKey::random(&mut rng);
+        let nk = NullifierKeyContainer::random_key(&mut rng);
         let rseed = RandomSeed::random(&mut rng);
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
         Note::new(

@@ -14,12 +14,12 @@ use subtle::CtOption;
 #[derive(Copy, Debug, Clone, PartialEq, Eq)]
 pub struct Nullifier(pallas::Base);
 
-/// The NullifierKey is to derive the Nullifier
+/// The NullifierKeyContainer contains the nullifier_key or the nullifier_key commitment
 #[derive(Copy, Debug, Clone, PartialEq, Eq)]
-pub enum NullifierKey {
-    // The closed NullifierKey is the commitment of open NullifierKey: `closed_nk = Com(open_nk, 0)`
-    Closed(pallas::Base),
-    Open(pallas::Base),
+pub enum NullifierKeyContainer {
+    // The NullifierKeyContainer::Commitment is the commitment of NullifierKeyContainer::Key `nk_com = Commitment(nk, 0)`
+    Commitment(pallas::Base),
+    Key(pallas::Base),
 }
 
 impl Nullifier {
@@ -31,18 +31,18 @@ impl Nullifier {
     // cm is a point
     // $nf =Extract_P([PRF_{nk}(\rho) + \psi \ mod \ q] * K + cm)$
     pub fn derive(
-        nk: &NullifierKey,
+        nk: &NullifierKeyContainer,
         rho: &pallas::Base,
         psi: &pallas::Base,
         cm: &NoteCommitment,
     ) -> Option<Self> {
         match nk {
-            NullifierKey::Closed(_) => None,
-            NullifierKey::Open(nk) => {
+            NullifierKeyContainer::Commitment(_) => None,
+            NullifierKeyContainer::Key(key) => {
                 let k = GENERATOR.to_curve();
 
                 let nf = Nullifier(extract_p(
-                    &(k * mod_r_p(prf_nf(*nk, *rho) + psi) + cm.inner()),
+                    &(k * mod_r_p(prf_nf(*key, *rho) + psi) + cm.inner()),
                 ));
                 Some(nf)
             }
@@ -68,42 +68,55 @@ impl Default for Nullifier {
     }
 }
 
-impl NullifierKey {
-    pub fn random<R: RngCore>(mut rng: R) -> Self {
-        NullifierKey::Open(pallas::Base::random(&mut rng))
+impl NullifierKeyContainer {
+    pub fn random_key<R: RngCore>(mut rng: R) -> Self {
+        NullifierKeyContainer::Key(pallas::Base::random(&mut rng))
     }
 
-    /// Creates an open NullifierKey.
-    pub fn from_open(nk: pallas::Base) -> Self {
-        NullifierKey::Open(nk)
+    pub fn random_commitment<R: RngCore>(mut rng: R) -> Self {
+        NullifierKeyContainer::Commitment(pallas::Base::random(&mut rng))
     }
 
-    /// Creates a closed NullifierKey.
-    pub fn from_closed(x: pallas::Base) -> Self {
-        NullifierKey::Closed(x)
+    /// Creates an NullifierKeyContainer::Key.
+    pub fn from_key(key: pallas::Base) -> Self {
+        NullifierKeyContainer::Key(key)
     }
 
-    pub fn get_open_nk(&self) -> Option<pallas::Base> {
+    /// Creates a NullifierKeyContainer::Commitment.
+    pub fn from_commitment(cm: pallas::Base) -> Self {
+        NullifierKeyContainer::Commitment(cm)
+    }
+
+    pub fn get_nk(&self) -> Option<pallas::Base> {
         match self {
-            NullifierKey::Open(nk) => Some(*nk),
+            NullifierKeyContainer::Key(key) => Some(*key),
             _ => None,
         }
     }
 
-    pub fn get_closed_nk(&self) -> pallas::Base {
+    pub fn get_commitment(&self) -> pallas::Base {
         match self {
-            NullifierKey::Closed(v) => *v,
-            NullifierKey::Open(nk) => {
-                // Com(nk, zero), use poseidon hash as Com.
-                prf_nf(*nk, pallas::Base::zero())
+            NullifierKeyContainer::Commitment(v) => *v,
+            NullifierKeyContainer::Key(key) => {
+                // Commitment(nk, zero), use poseidon hash as Commitment.
+                prf_nf(*key, pallas::Base::zero())
+            }
+        }
+    }
+
+    pub fn to_commitment(&self) -> Self {
+        match self {
+            NullifierKeyContainer::Commitment(_) => *self,
+            NullifierKeyContainer::Key(_) => {
+                NullifierKeyContainer::Commitment(self.get_commitment())
             }
         }
     }
 }
 
-impl Default for NullifierKey {
-    fn default() -> NullifierKey {
-        let nk = pallas::Base::default();
-        NullifierKey::from_open(nk)
+impl Default for NullifierKeyContainer {
+    fn default() -> NullifierKeyContainer {
+        let key = pallas::Base::default();
+        NullifierKeyContainer::from_key(key)
     }
 }

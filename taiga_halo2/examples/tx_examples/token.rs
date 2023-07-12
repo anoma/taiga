@@ -14,7 +14,7 @@ use taiga_halo2::{
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::MerklePath,
     note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
-    nullifier::{Nullifier, NullifierKey},
+    nullifier::{Nullifier, NullifierKeyContainer},
     shielded_ptx::ShieldedPartialTransaction,
 };
 
@@ -23,7 +23,7 @@ pub fn create_random_token_note<R: RngCore>(
     name: &str,
     value: u64,
     rho: Nullifier,
-    nk: NullifierKey,
+    nk_container: NullifierKeyContainer,
     auth: &TokenAuthorization,
 ) -> Note {
     let app_data_static = transfrom_token_name_to_token_property(name);
@@ -34,7 +34,7 @@ pub fn create_random_token_note<R: RngCore>(
         app_data_static,
         app_data_dynamic,
         value,
-        nk,
+        nk_container,
         rho,
         true,
         rseed,
@@ -47,11 +47,11 @@ pub fn create_token_swap_ptx<R: RngCore>(
     input_token: &str,
     input_value: u64,
     input_auth_sk: pallas::Scalar,
-    input_nk: NullifierKey, // NullifierKey::Open
+    input_nk: NullifierKeyContainer, // NullifierKeyContainer::Key
     output_token: &str,
     output_value: u64,
     output_auth_pk: pallas::Point,
-    output_nk: NullifierKey, // NullifierKey::Closed
+    output_nk_com: NullifierKeyContainer, // NullifierKeyContainer::Commitment
 ) -> (ShieldedPartialTransaction, pallas::Scalar) {
     let input_auth = TokenAuthorization::from_sk_vk(&input_auth_sk, &COMPRESSED_TOKEN_AUTH_VK);
 
@@ -74,7 +74,7 @@ pub fn create_token_swap_ptx<R: RngCore>(
         output_token,
         output_value,
         input_note_nf,
-        output_nk,
+        output_nk_com,
         &output_auth,
     );
 

@@ -8,7 +8,7 @@ use crate::{
         PRF_EXPAND_PERSONALIZATION, PRF_EXPAND_PSI, PRF_EXPAND_RCM, TAIGA_COMMITMENT_TREE_DEPTH,
     },
     merkle_tree::{MerklePath, Node, LR},
-    nullifier::{Nullifier, NullifierKey},
+    nullifier::{Nullifier, NullifierKeyContainer},
     utils::{extract_p, mod_r_p, poseidon_hash, poseidon_to_curve},
 };
 use bitvec::{array::BitArray, order::Lsb0};
@@ -58,8 +58,8 @@ pub struct Note {
     pub app_data_dynamic: pallas::Base,
     /// value denotes the amount of the note.
     pub value: u64,
-    /// the wrapped nullifier key.
-    pub nk: NullifierKey,
+    /// NullifierKeyContainer contains the nullifier_key or the nullifier_key commitment.
+    pub nk_container: NullifierKeyContainer,
     /// old nullifier. Nonce which is a deterministically computed, unique nonce
     pub rho: Nullifier,
     /// psi is to derive the nullifier
@@ -105,7 +105,7 @@ impl Note {
         app_data_static: pallas::Base,
         app_data_dynamic: pallas::Base,
         value: u64,
-        nk: NullifierKey,
+        nk_container: NullifierKeyContainer,
         rho: Nullifier,
         is_merkle_checked: bool,
         rseed: RandomSeed,
@@ -115,7 +115,7 @@ impl Note {
             note_type,
             app_data_dynamic,
             value,
-            nk,
+            nk_container,
             is_merkle_checked,
             psi: rseed.get_psi(&rho),
             rcm: rseed.get_rcm(&rho),
@@ -129,7 +129,7 @@ impl Note {
         app_data_static: pallas::Base,
         app_data_dynamic: pallas::Base,
         value: u64,
-        nk: NullifierKey,
+        nk_container: NullifierKeyContainer,
         rho: Nullifier,
         is_merkle_checked: bool,
         psi: pallas::Base,
@@ -140,7 +140,7 @@ impl Note {
             note_type,
             app_data_dynamic,
             value,
-            nk,
+            nk_container,
             is_merkle_checked,
             psi,
             rcm,
@@ -155,16 +155,20 @@ impl Note {
 
     pub fn dummy_input<R: RngCore>(mut rng: R) -> Self {
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        let nk = NullifierKey::from_open(pallas::Base::random(&mut rng));
+        let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
         Self::dummy_from_parts(rng, rho, nk)
     }
 
     pub fn dummy_output<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
-        let nk = NullifierKey::from_closed(pallas::Base::random(&mut rng));
-        Self::dummy_from_parts(rng, rho, nk)
+        let nk_com = NullifierKeyContainer::from_commitment(pallas::Base::random(&mut rng));
+        Self::dummy_from_parts(rng, rho, nk_com)
     }
 
-    pub fn dummy_from_parts<R: RngCore>(mut rng: R, rho: Nullifier, nk: NullifierKey) -> Self {
+    pub fn dummy_from_parts<R: RngCore>(
+        mut rng: R,
+        rho: Nullifier,
+        nk_container: NullifierKeyContainer,
+    ) -> Self {
         let app_vk = pallas::Base::random(&mut rng);
         let app_data_static = pallas::Base::random(&mut rng);
         let note_type = ValueBase::new(app_vk, app_data_static);
@@ -175,7 +179,7 @@ impl Note {
             note_type,
             app_data_dynamic,
             value,
-            nk,
+            nk_container,
             is_merkle_checked: true,
             psi: rseed.get_psi(&rho),
             rcm: rseed.get_rcm(&rho),
@@ -188,13 +192,13 @@ impl Note {
         let app_data_static = pallas::Base::random(&mut rng);
         let note_type = ValueBase::new(app_vk, app_data_static);
         let app_data_dynamic = pallas::Base::zero();
-        let nk = NullifierKey::random(&mut rng);
+        let nk = NullifierKeyContainer::random_key(&mut rng);
         let rseed = RandomSeed::random(&mut rng);
         Self {
             note_type,
             app_data_dynamic,
             value: 0,
-            nk,
+            nk_container: nk,
             rho,
             psi: rseed.get_psi(&rho),
             rcm: rseed.get_rcm(&rho),
@@ -252,7 +256,7 @@ impl Note {
 
     pub fn get_nf(&self) -> Option<Nullifier> {
         Nullifier::derive(
-            &self.get_nk(),
+            &self.nk_container,
             &self.rho.inner(),
             &self.psi,
             &self.commitment(),
@@ -260,11 +264,15 @@ impl Note {
     }
 
     pub fn get_address(&self) -> pallas::Base {
-        poseidon_hash(self.app_data_dynamic, self.nk.get_closed_nk())
+        poseidon_hash(self.app_data_dynamic, self.get_nk_commitment())
     }
 
-    pub fn get_nk(&self) -> NullifierKey {
-        self.nk
+    pub fn get_nk(&self) -> Option<pallas::Base> {
+        self.nk_container.get_nk()
+    }
+
+    pub fn get_nk_commitment(&self) -> pallas::Base {
+        self.nk_container.get_commitment()
     }
 
     pub fn get_value_base(&self) -> pallas::Point {
@@ -298,13 +306,13 @@ impl BorshSerialize for Note {
         writer.write_all(&self.app_data_dynamic.to_repr())?;
         // Write note value
         writer.write_u64::<LittleEndian>(self.value)?;
-        // Write nk
-        match self.nk {
-            NullifierKey::Closed(nk) => {
+        // Write nk_container
+        match self.nk_container {
+            NullifierKeyContainer::Commitment(nk) => {
                 writer.write_u8(1)?;
                 writer.write_all(&nk.to_repr())
             }
-            NullifierKey::Open(nk) => {
+            NullifierKeyContainer::Key(nk) => {
                 writer.write_u8(2)?;
                 writer.write_all(&nk.to_repr())
             }
@@ -342,15 +350,15 @@ impl BorshDeserialize for Note {
             })?;
         // Read note value
         let value = buf.read_u64::<LittleEndian>()?;
-        // Read nk
-        let nk_type = buf.read_u8()?;
-        let nk_bytes = <[u8; 32]>::deserialize(buf)?;
-        let nk = Option::from(pallas::Base::from_repr(nk_bytes))
+        // Read nk_container
+        let nk_container_type = buf.read_u8()?;
+        let nk_container_bytes = <[u8; 32]>::deserialize(buf)?;
+        let nk = Option::from(pallas::Base::from_repr(nk_container_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "nk not in field"))?;
-        let nk = if nk_type == 0x01 {
-            NullifierKey::from_closed(nk)
+        let nk_container = if nk_container_type == 0x01 {
+            NullifierKeyContainer::from_commitment(nk)
         } else {
-            NullifierKey::from_open(nk)
+            NullifierKeyContainer::from_key(nk)
         };
         // Read rho
         let rho_bytes = <[u8; 32]>::deserialize(buf)?;
@@ -373,7 +381,7 @@ impl BorshDeserialize for Note {
             app_data_static,
             app_data_dynamic,
             value,
-            nk,
+            nk_container,
             rho,
             is_merkle_checked,
             psi,

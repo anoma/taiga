@@ -94,7 +94,7 @@ pub fn check_input_note(
 ) -> Result<InputNoteVariables, Error> {
     // Check input note user integrity: address = Com_r(Com_r(nk, zero), app_data_dynamic)
     // Witness nk
-    let nk = input_note.get_nk().get_open_nk().unwrap();
+    let nk = input_note.get_nk().unwrap();
     let nk_var = assign_free_advice(
         layouter.namespace(|| "witness nk"),
         advices[0],
@@ -254,7 +254,7 @@ pub fn check_output_note(
     let nk_com = assign_free_advice(
         layouter.namespace(|| "witness nk_com"),
         advices[0],
-        Value::known(output_note.get_nk().get_closed_nk()),
+        Value::known(output_note.get_nk_commitment()),
     )?;
 
     // Witness app_data_dynamic
@@ -479,7 +479,7 @@ fn test_halo2_nullifier_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use crate::constant::{NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases};
     use crate::note::NoteCommitment;
-    use crate::nullifier::{Nullifier, NullifierKey};
+    use crate::nullifier::{Nullifier, NullifierKeyContainer};
     use halo2_gadgets::{
         ecc::chip::EccConfig,
         poseidon::{
@@ -498,7 +498,7 @@ fn test_halo2_nullifier_circuit() {
 
     #[derive(Default)]
     struct MyCircuit {
-        nk: NullifierKey,
+        nk: NullifierKeyContainer,
         rho: pallas::Base,
         psi: pallas::Base,
         cm: NoteCommitment,
@@ -612,7 +612,7 @@ fn test_halo2_nullifier_circuit() {
             let nk = assign_free_advice(
                 layouter.namespace(|| "witness nk"),
                 advices[0],
-                Value::known(self.nk.get_open_nk().unwrap()),
+                Value::known(self.nk.get_nk().unwrap()),
             )?;
 
             // Witness rho
@@ -667,7 +667,7 @@ fn test_halo2_nullifier_circuit() {
 
     let mut rng = OsRng;
     let circuit = MyCircuit {
-        nk: NullifierKey::random(&mut rng),
+        nk: NullifierKeyContainer::random_key(&mut rng),
         rho: pallas::Base::random(&mut rng),
         psi: pallas::Base::random(&mut rng),
         cm: NoteCommitment::default(),

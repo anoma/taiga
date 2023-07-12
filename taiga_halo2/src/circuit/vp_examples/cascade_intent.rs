@@ -18,7 +18,7 @@ use crate::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::{Note, RandomSeed},
-    nullifier::{Nullifier, NullifierKey},
+    nullifier::{Nullifier, NullifierKeyContainer},
     proof::Proof,
     vp_vk::ValidityPredicateVerifyingKey,
 };
@@ -60,7 +60,7 @@ impl CascadeIntentValidityPredicateCircuit {
         let cascade_input_note = Note::dummy(&mut rng);
         let cascade_note_cm = cascade_input_note.commitment().get_x();
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        let nk = NullifierKey::random(&mut rng);
+        let nk = NullifierKeyContainer::random_key(&mut rng);
         let intent_note = create_intent_note(&mut rng, cascade_note_cm, rho, nk);
         let input_notes = [intent_note, cascade_input_note];
         Self {
@@ -153,7 +153,7 @@ pub fn create_intent_note<R: RngCore>(
     mut rng: R,
     cascade_note_cm: pallas::Base,
     rho: Nullifier,
-    nk: NullifierKey,
+    nk: NullifierKeyContainer,
 ) -> Note {
     let app_data_static =
         CascadeIntentValidityPredicateCircuit::encode_app_data_static(cascade_note_cm);

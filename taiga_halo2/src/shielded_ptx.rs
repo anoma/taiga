@@ -332,7 +332,7 @@ pub mod testing {
         constant::TAIGA_COMMITMENT_TREE_DEPTH,
         merkle_tree::MerklePath,
         note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
-        nullifier::{Nullifier, NullifierKey},
+        nullifier::{Nullifier, NullifierKeyContainer},
         shielded_ptx::ShieldedPartialTransaction,
         utils::poseidon_hash,
     };
@@ -359,7 +359,7 @@ pub mod testing {
             let app_data_dynamic = poseidon_hash(app_dynamic_vp_vk[0], app_dynamic_vp_vk[1]);
             let rho = Nullifier::new(pallas::Base::random(&mut rng));
             let value = 5000u64;
-            let nk = NullifierKey::random(&mut rng);
+            let nk = NullifierKeyContainer::random_key(&mut rng);
             let rseed = RandomSeed::random(&mut rng);
             let is_merkle_checked = true;
             Note::new(
@@ -380,7 +380,7 @@ pub mod testing {
             let app_data_dynamic = pallas::Base::zero();
             let rho = input_note_1.get_nf().unwrap();
             let value = 5000u64;
-            let nk = NullifierKey::random(&mut rng);
+            let nk_com = NullifierKeyContainer::random_commitment(&mut rng);
             let rseed = RandomSeed::random(&mut rng);
             let is_merkle_checked = true;
             Note::new(
@@ -388,7 +388,7 @@ pub mod testing {
                 app_data_static,
                 app_data_dynamic,
                 value,
-                nk,
+                nk_com,
                 rho,
                 is_merkle_checked,
                 rseed,
@@ -400,7 +400,7 @@ pub mod testing {
             let app_data_dynamic = pallas::Base::zero();
             let rho = Nullifier::new(pallas::Base::random(&mut rng));
             let value = 10u64;
-            let nk = NullifierKey::random(&mut rng);
+            let nk = NullifierKeyContainer::random_key(&mut rng);
             let rseed = RandomSeed::random(&mut rng);
             let is_merkle_checked = true;
             Note::new(
@@ -419,7 +419,7 @@ pub mod testing {
             let app_data_dynamic = pallas::Base::zero();
             let rho = input_note_2.get_nf().unwrap();
             let value = 10u64;
-            let nk = NullifierKey::random(&mut rng);
+            let nk_com = NullifierKeyContainer::random_commitment(&mut rng);
             let rseed = RandomSeed::random(&mut rng);
             let is_merkle_checked = true;
             Note::new(
@@ -427,7 +427,7 @@ pub mod testing {
                 app_data_static,
                 app_data_dynamic,
                 value,
-                nk,
+                nk_com,
                 rho,
                 is_merkle_checked,
                 rseed,

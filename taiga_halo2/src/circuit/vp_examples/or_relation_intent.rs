@@ -20,7 +20,7 @@ use crate::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::{Note, RandomSeed},
-    nullifier::{Nullifier, NullifierKey},
+    nullifier::{Nullifier, NullifierKeyContainer},
     proof::Proof,
     utils::poseidon_hash_n,
     vp_vk::ValidityPredicateVerifyingKey,
@@ -100,7 +100,7 @@ impl OrRelationIntentValidityPredicateCircuit {
         let receiver_address = output_notes[0].get_address();
 
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        let nk = NullifierKey::random(&mut rng);
+        let nk = NullifierKeyContainer::random_key(&mut rng);
         let intent_note = create_intent_note(
             &mut rng,
             &condition1,
@@ -301,7 +301,7 @@ pub fn create_intent_note<R: RngCore>(
     condition2: &Condition,
     receiver_address: pallas::Base,
     rho: Nullifier,
-    nk: NullifierKey,
+    nk: NullifierKeyContainer,
 ) -> Note {
     let app_data_static = OrRelationIntentValidityPredicateCircuit::encode_app_data_static(
         condition1,
