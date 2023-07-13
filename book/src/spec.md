@@ -31,7 +31,7 @@ Note is an immutable particle of the application state in the UTXO model.
 |-|-|-|
 |`note_type`|$E_p$|Identifier of the note's application|
 |`app_data_dynamic`|$\mathbb{F}_p$|Encoding of the application's extra data|
-|`v`|u64|The quantity of fungible value specific to a note type|
+|`v`|u64|Fungible quantity specific to a note type|
 |`cm_nk`|$\mathbb{F}_p$|Commitment to the nullifier key that will be used to derive the note's nullifier|
 |`ρ`|$\mathbb{F}_p$|The nullifier `nf` of the consumed note is equal to the `ρ` of the created note from the same Action description (see Orchard). This guarantees the uniqueness of a note|
 |`ψ`|$\mathbb{F}_p$|$ψ = PRF(0, rseed, ρ)$|
