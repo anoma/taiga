@@ -7,9 +7,10 @@
 We use Halo2/IPA with [Pasta curves](https://github.com/zcash/pasta) developed by Zcash to instantiate our proving system.
 
 ### 1.1 Circuits
-Let `C(x; w) ⟶ 0/1` be a circuit. An elliptic curve has arithmetic defined within the _scalar field_ (i.e. the prime number of points of the curve). When we formulate circuits, we use this scalar field. The circuit is represented as polynomials over the chosen curve's scalar field, following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html). When we want to _commit_ to these values in the scalar field, we end up with values in the _base field_. When using these committed values, we encounter what is known as _non-native arithmetic_. This is the motivating factor for proposing a _cycle of curves_.
+Let `C(x; w) ⟶ 0/1` be a circuit. As a group, an elliptic curve has arithmetic defined within the _scalar field_ (i.e. the prime number of points of the curve). When we formulate circuits, we use this scalar field. The circuit is represented as polynomials over the chosen curve's scalar field, following [plonk-ish arithmetization](https://zcash.github.io/halo2/concepts/arithmetization.html). When we want to _commit_ to these values in the scalar field, we end up with values in the _base field_. When using these committed values, we encounter what is known as _non-native arithmetic_. This is the motivating factor for proposing a _cycle of curves_. 
 
 ### 1.2 Cycle of curves
+Cycles of curves serve as a solution to the problem of non-native arithmetic by employing a pair of elliptic curves, each operating in a manner that the base field of one becomes the scalar field of the other.
 |Name|Base field| Scalar field|Purpose|Instantiation|
 |-|-|-|-|-|
 |$E_p$|$\mathbb{F}_p$|$\mathbb{F}_q$|ECC gadget, Accumulation circuit| [Pallas](https://github.com/zcash/pasta#pallasvesta-supporting-evidence)
