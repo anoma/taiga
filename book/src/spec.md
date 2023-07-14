@@ -36,7 +36,7 @@ Note is an immutable particle of the application state in the UTXO model.
 |`cm_nk`|$\mathbb{F}_p$|Commitment to the nullifier key that will be used to derive the note's nullifier|
 |`ρ`|$\mathbb{F}_p$|The nullifier `nf` of the consumed note is equal to the `ρ` of the created note from the same Action description (see Orchard). This guarantees the uniqueness of a note|
 |`ψ`|$\mathbb{F}_p$|$ψ = PRF^{\psi}(0, rseed, ρ)$|
-|`is_merkle_checked`|bool|Ephemeral note flag. It indicates whether the note's commitment Merkle path should be checked when consuming the note.|
+|`is_merkle_checked`|bool|Checked note flag. It indicates whether the note's commitment Merkle path should be checked when consuming the note.|
 |`rcm_note`|$F_q$|A random commitment trapdoor $rcm\_{note} = PRF^{\texttt{rcm_note}}(1, rseed, ρ)$|
 
 Note: the value size cannot be bigger or close to the curve's scalar field size (to avoid overflowing) but besides that there are no strict reasons for choosing `u64`. We can use more notes to express a value that doesn't fit in one note (splitting the value into limbs). Having bigger value size requires fewer notes to express such a value and is more efficient. For example, a value size of 128 bits would require two times less notes to express a maximum value
@@ -135,8 +135,8 @@ $ce = Encrypt(note, sk)$
 
 Not all of the note fields require to be encrypted (e.g. note commitment), and the encrypted fields may vary depending on the application. To make sure it is flexible enough, the encryption check is performed in VP circuits.
 
-### 2.6 Ephemeral notes and dummy notes
-A note is _ephemeral_ if it doesn’t need to be inserted in the note commitment tree (i.e. created) before it can be consumed. An ephemeral note is marked ephemeral by setting the `is_merkle_checked` flag to `false`. For ephemeral notes the Merkle authentication path is not checked when consuming the note. An example of an ephemeral note is an _intent note_, since both the creation and the consumption of an intent happen within the same transaction.
+### 2.6 Unchecked notes and dummy notes
+A note is _unchecked_ if it doesn’t need to be inserted in the note commitment tree (i.e. created) before it can be consumed. An unchecked note is marked unchecked by setting the `is_merkle_checked` flag to `false`. For unchecked notes the Merkle authentication path is not checked when consuming the note. An example of an unchecked note is an _intent note_, since both the creation and the consumption of an intent happen within the same transaction.
 
 As in ZCash, a note is _dummy_ if its `value` field is zero and therefore it doesn’t affect the balance of a transaction.
 
@@ -207,7 +207,7 @@ All other constraints enforced by VP circuits are custom.
 A VP takes all notes from the current `ptx` as input which requires a mechanism to determine which note is the application's note being currently checked. Currently, to determine whether a note belongs to the application or not, Taiga passes the note commitment (for output notes) or the nullifier (for input notes) of the owned note as a tag. The VP identifies the owned note by its tag.
 
 #### VP commitment
-In the presense of a VP proof for a certain note, VP commitment is used to make sure the right VP is checked for the note. It makes sure that `vp_vk` the note refers to and `vp_vk` used to validate the VP proof are the same.
+In the presence of a VP proof for a certain note, VP commitment is used to make sure the right VP is checked for the note. It makes sure that `vp_vk` the note refers to and `vp_vk` used to validate the VP proof are the same.
 
 VP commitment has a nested structure: `VPCommit(vp, rcm_vp) = Com(cm_vp_vk, rcm_vp), cm_vp_vk = VKCom(vp_vk)`.
 
