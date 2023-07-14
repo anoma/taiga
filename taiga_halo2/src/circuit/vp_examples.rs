@@ -1,7 +1,8 @@
 use crate::{
     circuit::vp_circuit::{
         GeneralVerificationValidityPredicateConfig, VPVerifyingInfo, ValidityPredicateCircuit,
-        ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
+        ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicatePublicInputs,
+        ValidityPredicateVerifyingInfo,
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
@@ -62,8 +63,10 @@ impl ValidityPredicateInfo for TrivialValidityPredicateCircuit {
         &self.output_notes
     }
 
-    fn get_instances(&self) -> Vec<pallas::Base> {
-        self.get_note_instances()
+    fn get_public_inputs(&self) -> ValidityPredicatePublicInputs {
+        let mut public_inputs = self.get_mandatory_public_inputs();
+        public_inputs.extend(ValidityPredicatePublicInputs::padding(public_inputs.len()));
+        public_inputs.into()
     }
 
     fn get_owned_note_pub_id(&self) -> pallas::Base {
@@ -84,8 +87,9 @@ fn test_halo2_dummy_vp_circuit() {
 
     let mut rng = OsRng;
     let circuit = TrivialValidityPredicateCircuit::dummy(&mut rng);
-    let instances = circuit.get_instances();
+    let public_inputs = circuit.get_public_inputs();
 
-    let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances]).unwrap();
+    let prover =
+        MockProver::<pallas::Base>::run(12, &circuit, vec![public_inputs.to_vec()]).unwrap();
     assert_eq!(prover.verify(), Ok(()));
 }

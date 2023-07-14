@@ -74,12 +74,18 @@ pub struct Note {
 }
 
 /// The parameters in the NoteType are used to derive note type.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Eq)]
 pub struct NoteType {
     /// app_vk is the compressed verifying key of VP
     pub app_vk: pallas::Base,
     /// app_data_static is the encoded data that is defined in application vp
     pub app_data_static: pallas::Base,
+}
+
+impl PartialEq for NoteType {
+    fn eq(&self, other: &Self) -> bool {
+        self.app_vk == other.app_vk && self.app_data_static == other.app_data_static
+    }
 }
 
 #[derive(Copy, Clone, Debug, Default)]

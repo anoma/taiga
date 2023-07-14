@@ -10,7 +10,8 @@ use taiga_halo2::{
         note_circuit::NoteConfig,
         vp_circuit::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
+            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicatePublicInputs,
+            ValidityPredicateVerifyingInfo,
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
@@ -73,8 +74,10 @@ impl ValidityPredicateInfo for SudokuVP {
         &self.output_notes
     }
 
-    fn get_instances(&self) -> Vec<pallas::Base> {
-        self.get_note_instances()
+    fn get_public_inputs(&self) -> ValidityPredicatePublicInputs {
+        let mut public_inputs = self.get_mandatory_public_inputs();
+        public_inputs.extend(ValidityPredicatePublicInputs::padding(public_inputs.len()));
+        public_inputs.into()
     }
 
     fn get_owned_note_pub_id(&self) -> pallas::Base {

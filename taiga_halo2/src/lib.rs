@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 #![allow(clippy::large_enum_variant)]
+#![deny(clippy::derive_hash_xor_eq)]
 
 pub mod action;
 pub mod binding_signature;

@@ -7,10 +7,10 @@ use crate::{
         vp_circuit::{
             BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
             VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
+            ValidityPredicateInfo, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
         },
     },
-    constant::{NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX},
+    constant::{NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_CUSTOM_PUBLIC_INPUT_BEGIN_IDX},
     note::Note,
     proof::Proof,
     vp_vk::ValidityPredicateVerifyingKey,
@@ -60,12 +60,11 @@ impl ValidityPredicateInfo for FieldAdditionValidityPredicateCircuit {
         &self.output_notes
     }
 
-    fn get_instances(&self) -> Vec<pallas::Base> {
-        let mut instances = self.get_note_instances();
-
-        instances.push(self.a + self.b);
-
-        instances
+    fn get_public_inputs(&self) -> ValidityPredicatePublicInputs {
+        let mut public_inputs = self.get_mandatory_public_inputs();
+        public_inputs.push(self.a + self.b);
+        public_inputs.extend(ValidityPredicatePublicInputs::padding(public_inputs.len()));
+        public_inputs.into()
     }
 
     fn get_owned_note_pub_id(&self) -> pallas::Base {
@@ -103,7 +102,7 @@ impl ValidityPredicateCircuit for FieldAdditionValidityPredicateCircuit {
         layouter.constrain_instance(
             c.cell(),
             config.instances,
-            VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX,
+            VP_CIRCUIT_CUSTOM_PUBLIC_INPUT_BEGIN_IDX,
         )?;
 
         Ok(())
@@ -119,8 +118,9 @@ fn test_halo2_addition_vp_circuit() {
 
     let mut rng = OsRng;
     let circuit = FieldAdditionValidityPredicateCircuit::dummy(&mut rng);
-    let instances = circuit.get_instances();
+    let public_inputs = circuit.get_public_inputs();
 
-    let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances]).unwrap();
+    let prover =
+        MockProver::<pallas::Base>::run(12, &circuit, vec![public_inputs.to_vec()]).unwrap();
     assert_eq!(prover.verify(), Ok(()));
 }

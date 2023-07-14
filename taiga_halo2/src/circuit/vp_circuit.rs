@@ -15,17 +15,17 @@ use crate::{
     },
     constant::{
         NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases, NUM_NOTE,
-        SETUP_PARAMS_MAP, VP_CIRCUIT_NULLIFIER_ONE_INSTANCE_IDX,
-        VP_CIRCUIT_NULLIFIER_TWO_INSTANCE_IDX, VP_CIRCUIT_OUTPUT_CM_ONE_INSTANCE_IDX,
-        VP_CIRCUIT_OUTPUT_CM_TWO_INSTANCE_IDX, VP_CIRCUIT_OWNED_NOTE_PUB_ID_INSTANCE_IDX,
-        VP_CIRCUIT_PARAMS_SIZE,
+        SETUP_PARAMS_MAP, VP_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX,
+        VP_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX, VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX,
+        VP_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX, VP_CIRCUIT_OWNED_NOTE_PUB_ID_PUBLIC_INPUT_IDX,
+        VP_CIRCUIT_PARAMS_SIZE, VP_CIRCUIT_PUBLIC_INPUT_NUM,
     },
     note::Note,
     proof::Proof,
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
-use byteorder::{ReadBytesExt, WriteBytesExt};
+// use byteorder::{ReadBytesExt, WriteBytesExt};
 use dyn_clone::{clone_trait_object, DynClone};
 use ff::PrimeField;
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
@@ -53,31 +53,40 @@ use vamp_ir::util::{read_inputs_from_file, Config};
 pub struct VPVerifyingInfo {
     pub vk: VerifyingKey<vesta::Affine>,
     pub proof: Proof,
-    pub instance: Vec<pallas::Base>,
+    pub public_inputs: ValidityPredicatePublicInputs,
 }
+
+#[derive(Clone, Debug)]
+pub struct ValidityPredicatePublicInputs([pallas::Base; VP_CIRCUIT_PUBLIC_INPUT_NUM]);
 
 impl VPVerifyingInfo {
     pub fn verify(&self) -> Result<(), Error> {
         let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
-        self.proof.verify(&self.vk, params, &[&self.instance])
+        self.proof
+            .verify(&self.vk, params, &[self.public_inputs.inner()])
     }
 
     pub fn get_nullifiers(&self) -> [pallas::Base; NUM_NOTE] {
         [
-            self.instance[VP_CIRCUIT_NULLIFIER_ONE_INSTANCE_IDX],
-            self.instance[VP_CIRCUIT_NULLIFIER_TWO_INSTANCE_IDX],
+            self.public_inputs
+                .get_from_index(VP_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX),
+            self.public_inputs
+                .get_from_index(VP_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX),
         ]
     }
 
     pub fn get_note_commitments(&self) -> [pallas::Base; NUM_NOTE] {
         [
-            self.instance[VP_CIRCUIT_OUTPUT_CM_ONE_INSTANCE_IDX],
-            self.instance[VP_CIRCUIT_OUTPUT_CM_TWO_INSTANCE_IDX],
+            self.public_inputs
+                .get_from_index(VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX),
+            self.public_inputs
+                .get_from_index(VP_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX),
         ]
     }
 
     pub fn get_owned_note_pub_id(&self) -> pallas::Base {
-        self.instance[VP_CIRCUIT_OWNED_NOTE_PUB_ID_INSTANCE_IDX]
+        self.public_inputs
+            .get_from_index(VP_CIRCUIT_OWNED_NOTE_PUB_ID_PUBLIC_INPUT_IDX)
     }
 }
 
@@ -87,10 +96,8 @@ impl BorshSerialize for VPVerifyingInfo {
         self.vk.write(writer)?;
         // Write proof
         self.proof.serialize(writer)?;
-        // Write instance
-        assert!(self.instance.len() < 256);
-        writer.write_u8(self.instance.len() as u8)?;
-        for ele in self.instance.iter() {
+        // Write public inputs
+        for ele in self.public_inputs.inner().iter() {
             writer.write_all(&ele.to_repr())?;
         }
         Ok(())
@@ -99,27 +106,55 @@ impl BorshSerialize for VPVerifyingInfo {
 
 impl BorshDeserialize for VPVerifyingInfo {
     fn deserialize(buf: &mut &[u8]) -> borsh::maybestd::io::Result<Self> {
-        // TODO: Read vk
+        // Read vk
         use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
         let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
         let vk = VerifyingKey::read::<_, TrivialValidityPredicateCircuit>(buf, params)?;
         // Read proof
         let proof = Proof::deserialize(buf)?;
-        // Read instance
-        let instance_len = buf.read_u8()?;
-        let instance: Vec<_> = (0..instance_len)
+        // Read public inputs
+        let public_inputs: Vec<_> = (0..VP_CIRCUIT_PUBLIC_INPUT_NUM)
             .map(|_| {
                 let bytes = <[u8; 32]>::deserialize(buf)?;
                 Option::from(pallas::Base::from_repr(bytes)).ok_or_else(|| {
-                    io::Error::new(io::ErrorKind::InvalidData, "instance not in field")
+                    io::Error::new(io::ErrorKind::InvalidData, "public input not in field")
                 })
             })
             .collect::<Result<_, _>>()?;
         Ok(VPVerifyingInfo {
             vk,
             proof,
-            instance,
+            public_inputs: public_inputs.into(),
         })
+    }
+}
+
+impl ValidityPredicatePublicInputs {
+    pub fn inner(&self) -> &[pallas::Base; VP_CIRCUIT_PUBLIC_INPUT_NUM] {
+        &self.0
+    }
+
+    pub fn get_from_index(&self, idx: usize) -> pallas::Base {
+        assert!(idx < VP_CIRCUIT_PUBLIC_INPUT_NUM);
+        self.0[idx]
+    }
+
+    pub fn padding(input_len: usize) -> std::iter::Take<std::iter::Repeat<pallas::Base>> {
+        std::iter::repeat(pallas::Base::zero()).take(VP_CIRCUIT_PUBLIC_INPUT_NUM - input_len)
+    }
+
+    pub fn to_vec(&self) -> Vec<pallas::Base> {
+        self.0.to_vec()
+    }
+}
+
+impl From<Vec<pallas::Base>> for ValidityPredicatePublicInputs {
+    fn from(public_input_vec: Vec<pallas::Base>) -> Self {
+        ValidityPredicatePublicInputs(
+            public_input_vec
+                .try_into()
+                .expect("public input with incorrect length"),
+        )
     }
 }
 
@@ -213,21 +248,21 @@ impl ValidityPredicateConfig for GeneralVerificationValidityPredicateConfig {
 pub trait ValidityPredicateInfo {
     fn get_input_notes(&self) -> &[Note; NUM_NOTE];
     fn get_output_notes(&self) -> &[Note; NUM_NOTE];
-    fn get_note_instances(&self) -> Vec<pallas::Base> {
-        let mut instances = vec![];
+    fn get_mandatory_public_inputs(&self) -> Vec<pallas::Base> {
+        let mut public_inputs = vec![];
         self.get_input_notes()
             .iter()
             .zip(self.get_output_notes().iter())
             .for_each(|(input_note, output_note)| {
                 let nf = input_note.get_nf().unwrap().inner();
-                instances.push(nf);
+                public_inputs.push(nf);
                 let cm = output_note.commitment();
-                instances.push(cm.get_x());
+                public_inputs.push(cm.get_x());
             });
-        instances.push(self.get_owned_note_pub_id());
-        instances
+        public_inputs.push(self.get_owned_note_pub_id());
+        public_inputs
     }
-    fn get_instances(&self) -> Vec<pallas::Base>;
+    fn get_public_inputs(&self) -> ValidityPredicatePublicInputs;
     // The owned_note_pub_id is the input_note_nf or the output_note_cm_x
     // The owned_note_pub_id is the key to look up the target variables and
     // help determine whether the owned note is the input note or not in VP circuit.
@@ -319,7 +354,7 @@ pub trait ValidityPredicateCircuit:
         layouter.constrain_instance(
             owned_note_pub_id.cell(),
             note_config.instances,
-            VP_CIRCUIT_OWNED_NOTE_PUB_ID_INSTANCE_IDX,
+            VP_CIRCUIT_OWNED_NOTE_PUB_ID_PUBLIC_INPUT_IDX,
         )?;
 
         Ok(BasicValidityPredicateVariables {
@@ -672,13 +707,19 @@ macro_rules! vp_circuit_impl {
                 let params = SETUP_PARAMS_MAP.get(&12).unwrap();
                 let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
                 let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
-                let instance = self.get_instances();
-                let proof =
-                    Proof::create(&pk, params, self.clone(), &[&instance], &mut rng).unwrap();
+                let public_inputs = self.get_public_inputs();
+                let proof = Proof::create(
+                    &pk,
+                    params,
+                    self.clone(),
+                    &[public_inputs.inner()],
+                    &mut rng,
+                )
+                .unwrap();
                 VPVerifyingInfo {
                     vk,
                     proof,
-                    instance,
+                    public_inputs,
                 }
             }
 
@@ -697,7 +738,7 @@ pub struct VampIRValidityPredicateCircuit {
     // remove the params once we can set it as VP_CIRCUIT_PARAMS_SIZE in vamp_ir.
     pub params: Params<vesta::Affine>,
     pub circuit: Halo2Module<pallas::Base>,
-    pub instances: Vec<pallas::Base>,
+    pub public_inputs: Vec<pallas::Base>,
 }
 
 #[derive(Debug)]
@@ -738,17 +779,20 @@ impl VampIRValidityPredicateCircuit {
         circuit.populate_variables(field_assignments.clone());
 
         // Get public inputs Fp
-        let instances = circuit
+        let public_inputs = circuit
             .module
             .pubs
             .iter()
             .map(|inst| field_assignments[&inst.id])
             .collect::<Vec<pallas::Base>>();
+        // println!("begin: {:?}", public_inputs.len());
+        // public_inputs.extend(ValidityPredicatePublicInputs::padding(public_inputs.len()));
+        // println!("end: {:?}", public_inputs.len());
 
         Ok(Self {
             params,
             circuit,
-            instances,
+            public_inputs,
         })
     }
 
@@ -774,7 +818,7 @@ impl VampIRValidityPredicateCircuit {
         circuit.populate_variables(var_assignments.clone());
 
         // Get public inputs Fp
-        let instances = circuit
+        let public_inputs = circuit
             .module
             .pubs
             .iter()
@@ -784,7 +828,7 @@ impl VampIRValidityPredicateCircuit {
         Self {
             params,
             circuit,
-            instances,
+            public_inputs,
         }
     }
 }
@@ -795,18 +839,24 @@ impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
         let vk = keygen_vk(&self.params, &self.circuit).expect("keygen_vk should not fail");
         let pk =
             keygen_pk(&self.params, vk.clone(), &self.circuit).expect("keygen_pk should not fail");
+
+        let mut public_inputs = self.public_inputs.clone();
+        public_inputs.extend(ValidityPredicatePublicInputs::padding(
+            self.public_inputs.len(),
+        ));
+
         let proof = Proof::create(
             &pk,
             &self.params,
             self.circuit.clone(),
-            &[&self.instances],
+            &[&public_inputs.to_vec()],
             &mut rng,
         )
         .unwrap();
         VPVerifyingInfo {
             vk,
             proof,
-            instance: self.instances.clone(),
+            public_inputs: public_inputs.into(),
         }
     }
 
@@ -840,7 +890,11 @@ mod tests {
         // TODO: use the vp_info.verify() instead. vp_info.verify() doesn't work now because it uses the fixed VP_CIRCUIT_PARAMS_SIZE params.
         vp_info
             .proof
-            .verify(&vp_info.vk, &vp_circuit.params, &[&vp_info.instance])
+            .verify(
+                &vp_info.vk,
+                &vp_circuit.params,
+                &[vp_info.public_inputs.inner()],
+            )
             .unwrap();
     }
 
@@ -879,7 +933,11 @@ mod tests {
 
         assert!(vp_info
             .proof
-            .verify(&vp_info.vk, &vp_circuit.params, &[&vp_info.instance])
+            .verify(
+                &vp_info.vk,
+                &vp_circuit.params,
+                &[vp_info.public_inputs.inner()]
+            )
             .is_ok());
     }
 
@@ -897,7 +955,11 @@ mod tests {
 
         assert!(vp_info
             .proof
-            .verify(&vp_info.vk, &vp_circuit.params, &[&vp_info.instance])
+            .verify(
+                &vp_info.vk,
+                &vp_circuit.params,
+                &[vp_info.public_inputs.inner()]
+            )
             .is_err());
     }
 }
