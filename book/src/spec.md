@@ -35,11 +35,11 @@ Note is an immutable particle of the application state in the UTXO model.
 |`v`|u64|Fungible quantity specific to a note type|
 |`cm_nk`|$\mathbb{F}_p$|Commitment to the nullifier key that will be used to derive the note's nullifier|
 |`ρ`|$\mathbb{F}_p$|The nullifier `nf` of the consumed note is equal to the `ρ` of the created note from the same Action description (see Orchard). This guarantees the uniqueness of a note|
-|`ψ`|$\mathbb{F}_p$|$ψ = PRF(0, rseed, ρ)$|
+|`ψ`|$\mathbb{F}_p$|$ψ = PRF^{\psi}(0, rseed, ρ)$|
 |`is_merkle_checked`|bool|Ephemeral note flag. It indicates whether the note's commitment Merkle path should be checked when consuming the note.|
-|`rcm_note`|$F_q$|A random commitment trapdoor $rcm\_note = PRF^{\texttt{rcm\_note}}(1, rseed, ρ)$|
+|`rcm_note`|$F_q$|A random commitment trapdoor $rcm\_{note} = PRF^{\texttt{rcm_note}}(1, rseed, ρ)$|
 
-Note: the value size cannot be bigger or close to the curve's scalar field size (to avoid overflowing) but besides that there are no strict reasons for choosing 64. We can use more notes to express a value that doesn't fit in one note (splitting the value into limbs). Having bigger value size requires fewer notes to express such a value and is more efficient. For example, a value size of 128 bits would require two times less notes to express a maximum value
+Note: the value size cannot be bigger or close to the curve's scalar field size (to avoid overflowing) but besides that there are no strict reasons for choosing `u64`. We can use more notes to express a value that doesn't fit in one note (splitting the value into limbs). Having bigger value size requires fewer notes to express such a value and is more efficient. For example, a value size of 128 bits would require two times less notes to express a maximum value
 
 #### Derivation of random parameters
 
@@ -62,31 +62,29 @@ Each note has three fields with application data.
 
 #### Note type
 
-Note type is used to distinguish note types. Notes with different types have different note types. The type of a note is derived from two application-related fields: `cm_app_vk` and `app_data_static`.
+The type of a note is derived from two application-related fields: `cm_app_vk` and `app_data_static`.
 
-$VB = PRF^{vb}(cm_{\texttt{app\_vk}}, \texttt{app\_data\_static})$
+$NT = PRF^{nt}(cm_{\texttt{app\_vk}}, \texttt{app\_data\_static})$
 
 #### Value commitment
 
 Used to ensure balance across the notes in an Action.
 
-Compare one-type value commitment computation used in Orchard (Orchard spec p. 93, homomorphic pedersen commitment):
-
-$[v^{in} - v^{out}]VB + [rcv]R$
-
-And multiple types value commitment computation used in Taiga:
-
-$cv = [v^{in}]VB^{in} - [v^{out}]VB^{out} + [rcv]R$
+Comparison between Orchard and Taiga's value commitment: 
+- Orchard: one-type value commitment computation (Orchard spec p. 93, homomorphic pedersen commitment):
+$cv = [v^{in} - v^{out}]NT + [rcv]R$
+- Taiga: multiple types value commitment computation used in Taiga:
+$cv = [v^{in}]NT^{in} - [v^{out}]NT^{out} + [rcv]R$
 
 |Variable|Type/size|Description|
 |-|-|-|
 |$v^{in}$|${0..2^{64} - 1}$||
 |$v^{out}$|${0..2^{64} - 1}$||
-|$VB^{in}$|outer curve point|Input note's type|
-|$VB^{out}$|outer curve point|Output note's type|
-|`R`|outer curve point|Randomness base, fixed|
-|`rcv`|${0..2^{255} - 1}$|Value commitment trapdoor|
-|`cv`|outer curve point||
+|$NT^{in}$|$E_p$|Input note's type|
+|$NT^{out}$|$E_p$|Output note's type|
+|`R`|$E_p$|Randomness base, fixed|
+|`rcv`|$\mathbb{F}_q$|Value commitment trapdoor|
+|`cv`|$E_p$||
 
 ### 2.3 Note commitment
 
@@ -94,7 +92,7 @@ Note commitments are stored in a global commitment tree. The global commitment t
 
 |Name|Type/size|Description|
 |-|-|-|
-|`cm` |outer curve point|$cm = \mathrm{NoteCom}(note, rcm\_note)$|
+|`cm` |$E_p$|$cm = \mathrm{NoteCom}(note, rcm\_{note})$|
 
 ### 2.4 Nullifier
 Note nullifiers are stored in a global nullifier set. Adding a note's nullifier to the set invalidates the note. We use the same nullifier derivation algorithm as in Orchard: $\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF^{nf}_{nk}(ρ) + ψ \mod{q}]K + cm)$.
@@ -103,11 +101,11 @@ Note nullifiers are stored in a global nullifier set. Adding a note's nullifier 
 |-|-|-|
 |`nf`|$\mathbb F_p$|$nf = \mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm)$
 |`nk` | $\mathbb F_p$ | the nullifier deriving key|
-|`ρ`| $\mathbb{F}_p$ | an old nullifier|
+|`ρ`| $\mathbb{F}_p$ | the nullifier of an old (consumed) note|
 |`ψ`| $\mathbb{F}_p$ | additional nullifier randomness|
-|`cm` | outer curve point| note commitment |
-|`K`|outer curve point| a fixed base generator of the inner curve|
-|`Extract` | $(\mathbb F_p$, $\mathbb F_p) \rightarrow \mathbb F_p$ | the $x$ coordinate of an (inner curve) point|
+|`cm` | $E_p$| note commitment |
+|`K`|$E_p$| a fixed base generator of the Pallas curve|
+|`Extract` | $(\mathbb F_p$, $\mathbb F_p) \rightarrow \mathbb F_p$ | the $x$ coordinate of a point in $E_p$|
 |$PRF^{nf}_{nk}(\rho)$|$\mathrm{F}_p \times \mathrm{F}_p \rightarrow \mathrm{F}_p$||
 
 
@@ -173,9 +171,9 @@ Note: opening of a parameter is every field used to derive the parameter
     - Commitment integrity(output note only): $cm = NoteCom(note, rcm_{note})$
     - Application VP integrity: $cm_{vp} = VPCommit(cm_{\texttt{app\_vk}}, rcm_{vp})$
     - Value base integrity: $nt = PRF(cm_{app\_vk}, \texttt{app\_data\_static})$
-- Value commitment integrity: $cv = ValueCommit(v_{in}, v_{out}, VB_{in}, VB_{out}, rcv)$
+- Value commitment integrity: $cv = ValueCommit(v_{in}, v_{out}, NT_{in}, NT_{out}, rcv)$
 
-Note: unlike MASP, the type in Taiga is not used to compute note's commitment and the Action circuit doesn't take `vb` as private input but computes it from the note fields, and it is checked for both input and output notes.
+Note: unlike MASP, the type in Taiga is not used to compute note's commitment and the Action circuit doesn't take `nt` as private input but computes it from the note fields, and it is checked for both input and output notes.
 
 ### 3.2 Validity Predicate (VP) circuits
 Validity predicate is a circuit containing the application logic. Validity predicates take `n` input and `n` output notes, are represented as Halo2 circuits `VP(x; w) ⟶ 0/1` and arithmetized over $\mathbb{F}_p$.
@@ -237,12 +235,12 @@ Certain applications might allow to create more value from less input value, whi
 |-|-|-|-|
 |$PRF^{nf}$|Poseidon|$\mathrm{F}_p \times \mathrm{F}_p \rightarrow \mathrm{F}_p$|$PRF^{nf}_{nk}(ρ) = Poseidon(nk, \rho)$|
 |$PRF^{nk}$|Blake2s|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|$PRF^{nk}_{r}(\texttt{PERSONALIZATION\_{NK}}) = Blake2s(\texttt{PERSONALIZATION\_{NK}}, r)$| Used to derive `nk`; currently not implemented
-|$PRF^{vb}$|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$PRF^{vb} = hash\_to\_curve(Poseidon(app\_vk, \texttt{app\_data\_static}))$
+|$PRF^{nt}$|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$PRF^{nt} = hash\_to\_curve(Poseidon(app\_vk, \texttt{app\_data\_static}))$
 |$PRF^{\texttt{rcm\_note}}$|Blake2b|$ \mathrm{F}_p \times \mathrm{F}_p \times \mathrm{F}_p \rightarrow \mathrm{F}_p$|Used to derive note commitment randomness|
 |$PRF^{ψ}$|Blake2b|$\mathrm{F}_p \times \mathrm{F}_p \times \mathrm{F}_p \rightarrow \mathrm{F}_p$|Used to derive ψ|
 |`NKCommit`|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|$NKCommit(nk) = Poseidon(nk,\texttt{user\_derived\_key})$; used to protect `nk` stored in a note. `user_derived_key` is currently not used
 |`NoteCommit`|[Sincemilla](https://zcash.github.io/halo2/design/gadgets/sinsemilla.html)|$\mathrm{F}_p \rightarrow \mathrm{F}_p \times \mathrm{F}_p$|
-|`ValueCommit`|Pedersen with variable type|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$cv = [v_i] * VB_i - [v_o] * VB_o + [r]R$
+|`ValueCommit`|Pedersen with variable type|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$cv = [v_i] * NT_i - [v_o] * NT_o + [r]R$
 |`VPCommit`|Blake2s||Efficient over both $\mathrm{F}_p$ and $\mathrm{F}_q$
 |`VKCommit`|-||Efficient over the outer curve's scalar field|
 |address|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$| `address = Poseidon(app_data_dynamic, cm_nk)`; compresses the data fields that contain some ownership information
