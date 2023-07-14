@@ -209,17 +209,17 @@ A VP takes all notes from the current `ptx` as input which requires a mechanism 
 #### VP commitment
 In the presence of a VP proof for a certain note, VP commitment is used to make sure the right VP is checked for the note. It makes sure that `vp_vk` the note refers to and `vp_vk` used to validate the VP proof are the same.
 
-VP commitment has a nested structure: `VPCommit(vp, rcm_vp) = Com(cm_vp_vk, rcm_vp), cm_vp_vk = VKCom(vp_vk)`.
+VP commitment has a nested structure: `VPCommit(vp, rcm_vp) = Com(cm_vp_vk, rcm_vp)`, where `cm_vp_vk = VKCommit(vp_vk)`.
 
 The check is done in two parts:
 1. The Action circuit checks that the VP commitment `cm_vp` is derived with `cm_vp_vk` the note refers to:
-`cm_vp = VPCommit(cm_vp_vk, rcm_vp)`
+`cm_vp = Com(cm_vp_vk, rcm_vp)`
 2. The verifier circuit checks that the VP commitment is computed using the `vp_vk` that is used to validate the VP proof:
-`cm_vp = VPCommit(VKCommit(vp_vk), rcm_vp)`
+`cm_vp = Com(VKCommit(vp_vk), rcm_vp)`
 
 As the outer commitment `VPCommit` is verified in both Action and verifier circuit which are arithmetized over different fields, the outer commitment instantiation should be efficient over both fields.
 
-As the inner commitment `VKCommit` is only opened in the verifier circuit, it only needs to be efficient over the outer curve's scalar field.
+As the inner commitment `VKCommit` is only opened in the verifier circuit, it only needs to be efficient over the pallas curve's scalar field $\mathbb{F}_q$.
 
 ## 4. Circuit Accumulation
 TBD: Halo2 accumulation
