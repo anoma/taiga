@@ -17,10 +17,10 @@ use rand::{CryptoRng, RngCore};
 #[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct Transaction {
     // TODO: Other parameters to be added.
-    shielded_ptx_bundle: Option<ShieldedPartialTxBundle>,
-    transparent_ptx_bundle: Option<TransparentPartialTxBundle>,
+    pub shielded_ptx_bundle: Option<ShieldedPartialTxBundle>,
+    pub transparent_ptx_bundle: Option<TransparentPartialTxBundle>,
     // binding signature to check balance
-    signature: InProgressBindingSignature,
+    pub signature: InProgressBindingSignature,
 }
 
 #[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
@@ -31,19 +31,19 @@ pub enum InProgressBindingSignature {
 
 #[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct ShieldedPartialTxBundle {
-    partial_txs: Vec<ShieldedPartialTransaction>,
+    pub partial_txs: Vec<ShieldedPartialTransaction>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShieldedResult {
-    anchors: Vec<pallas::Base>,
-    nullifiers: Vec<Nullifier>,
-    output_cms: Vec<pallas::Base>,
+    pub anchors: Vec<pallas::Base>,
+    pub nullifiers: Vec<Nullifier>,
+    pub output_cms: Vec<pallas::Base>,
 }
 
 #[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct TransparentPartialTxBundle {
-    partial_txs: Vec<TransparentPartialTransaction>,
+    pub partial_txs: Vec<TransparentPartialTransaction>,
 }
 
 // TODO: add other outputs if needed.

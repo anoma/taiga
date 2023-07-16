@@ -17,21 +17,21 @@ use rand::RngCore;
 
 #[derive(Debug, Clone)]
 pub struct ShieldedPartialTransaction {
-    actions: [ActionVerifyingInfo; NUM_NOTE],
-    inputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
-    outputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
+    pub actions: [ActionVerifyingInfo; NUM_NOTE],
+    pub inputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
+    pub outputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
 }
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct ActionVerifyingInfo {
-    action_proof: Proof,
-    action_instance: ActionInstance,
+    pub action_proof: Proof,
+    pub action_instance: ActionInstance,
 }
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub struct NoteVPVerifyingInfoSet {
-    app_vp_verifying_info: VPVerifyingInfo,
-    app_dynamic_vp_verifying_info: Vec<VPVerifyingInfo>,
+    pub app_vp_verifying_info: VPVerifyingInfo,
+    pub app_dynamic_vp_verifying_info: Vec<VPVerifyingInfo>,
     // TODO: add verifier proof and according public inputs.
     // When the verifier proof is added, we may need to reconsider the structure of `VPVerifyingInfo`
 }
