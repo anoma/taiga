@@ -15,14 +15,14 @@ use taiga_halo2::{
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
-    note::Note,
+    note::{Note, RandomSeed},
     proof::Proof,
     vp_circuit_impl,
     vp_vk::ValidityPredicateVerifyingKey,
 };
 
 use crate::circuit::{SudokuCircuit, SudokuConfig};
-use rand::rngs::OsRng;
+use rand::{rngs::OsRng, RngCore};
 
 #[derive(Clone, Debug)]
 pub struct SudokuVPConfig {
@@ -74,9 +74,13 @@ impl ValidityPredicateInfo for SudokuVP {
         &self.output_notes
     }
 
-    fn get_public_inputs(&self) -> ValidityPredicatePublicInputs {
+    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
-        public_inputs.extend(ValidityPredicatePublicInputs::padding(public_inputs.len()));
+        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
+            public_inputs.len(),
+            &RandomSeed::random(&mut rng),
+        );
+        public_inputs.extend(padding);
         public_inputs.into()
     }
 

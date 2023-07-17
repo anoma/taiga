@@ -15,12 +15,13 @@ use crate::{
     },
     constant::{
         NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases, NUM_NOTE,
-        SETUP_PARAMS_MAP, VP_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX,
-        VP_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX, VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX,
-        VP_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX, VP_CIRCUIT_OWNED_NOTE_PUB_ID_PUBLIC_INPUT_IDX,
-        VP_CIRCUIT_PARAMS_SIZE, VP_CIRCUIT_PUBLIC_INPUT_NUM,
+        SETUP_PARAMS_MAP, VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
+        VP_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX, VP_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX,
+        VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX, VP_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX,
+        VP_CIRCUIT_OWNED_NOTE_PUB_ID_PUBLIC_INPUT_IDX, VP_CIRCUIT_PARAMS_SIZE,
+        VP_CIRCUIT_PUBLIC_INPUT_NUM,
     },
-    note::Note,
+    note::{Note, RandomSeed},
     proof::Proof,
     vp_vk::ValidityPredicateVerifyingKey,
 };
@@ -38,7 +39,7 @@ use halo2_proofs::{
     poly::commitment::Params,
 };
 use pasta_curves::{pallas, vesta, EqAffine, Fp};
-use rand::rngs::OsRng;
+use rand::{rngs::OsRng, RngCore};
 use std::collections::HashMap;
 use std::fs;
 use std::io;
@@ -139,8 +140,18 @@ impl ValidityPredicatePublicInputs {
         self.0[idx]
     }
 
-    pub fn padding(input_len: usize) -> std::iter::Take<std::iter::Repeat<pallas::Base>> {
-        std::iter::repeat(pallas::Base::zero()).take(VP_CIRCUIT_PUBLIC_INPUT_NUM - input_len)
+    pub fn get_public_input_padding(input_len: usize, rseed: &RandomSeed) -> Vec<pallas::Base> {
+        assert!(input_len < VP_CIRCUIT_PUBLIC_INPUT_NUM);
+        rseed.get_random_padding(VP_CIRCUIT_PUBLIC_INPUT_NUM - input_len)
+    }
+
+    // Only pad the custom public inputs, then we can add the actual note encryption public inputs.
+    pub fn get_custom_public_input_padding(
+        input_len: usize,
+        rseed: &RandomSeed,
+    ) -> Vec<pallas::Base> {
+        assert!(input_len < VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX);
+        rseed.get_random_padding(VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX - input_len)
     }
 
     pub fn to_vec(&self) -> Vec<pallas::Base> {
@@ -262,7 +273,7 @@ pub trait ValidityPredicateInfo {
         public_inputs.push(self.get_owned_note_pub_id());
         public_inputs
     }
-    fn get_public_inputs(&self) -> ValidityPredicatePublicInputs;
+    fn get_public_inputs(&self, rng: impl RngCore) -> ValidityPredicatePublicInputs;
     // The owned_note_pub_id is the input_note_nf or the output_note_cm_x
     // The owned_note_pub_id is the key to look up the target variables and
     // help determine whether the owned note is the input note or not in VP circuit.
@@ -707,7 +718,7 @@ macro_rules! vp_circuit_impl {
                 let params = SETUP_PARAMS_MAP.get(&12).unwrap();
                 let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
                 let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
-                let public_inputs = self.get_public_inputs();
+                let public_inputs = self.get_public_inputs(&mut rng);
                 let proof = Proof::create(
                     &pk,
                     params,
@@ -785,9 +796,6 @@ impl VampIRValidityPredicateCircuit {
             .iter()
             .map(|inst| field_assignments[&inst.id])
             .collect::<Vec<pallas::Base>>();
-        // println!("begin: {:?}", public_inputs.len());
-        // public_inputs.extend(ValidityPredicatePublicInputs::padding(public_inputs.len()));
-        // println!("end: {:?}", public_inputs.len());
 
         Ok(Self {
             params,
@@ -841,8 +849,10 @@ impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
             keygen_pk(&self.params, vk.clone(), &self.circuit).expect("keygen_pk should not fail");
 
         let mut public_inputs = self.public_inputs.clone();
-        public_inputs.extend(ValidityPredicatePublicInputs::padding(
+        let rseed = RandomSeed::random(&mut rng);
+        public_inputs.extend(ValidityPredicatePublicInputs::get_public_input_padding(
             self.public_inputs.len(),
+            &rseed,
         ));
 
         let proof = Proof::create(

@@ -5,7 +5,8 @@ use crate::{
     },
     constant::{
         BASE_BITS_NUM, NOTE_COMMIT_DOMAIN, NUM_NOTE, POSEIDON_TO_CURVE_INPUT_LEN,
-        PRF_EXPAND_PERSONALIZATION, PRF_EXPAND_PSI, PRF_EXPAND_RCM, TAIGA_COMMITMENT_TREE_DEPTH,
+        PRF_EXPAND_PERSONALIZATION, PRF_EXPAND_PSI, PRF_EXPAND_PUBLIC_INPUT_PADDING,
+        PRF_EXPAND_RCM, TAIGA_COMMITMENT_TREE_DEPTH,
     },
     merkle_tree::{MerklePath, Node, LR},
     nullifier::{Nullifier, NullifierKeyContainer},
@@ -453,6 +454,21 @@ impl RandomSeed {
         h.update(&rho.to_bytes());
         let rcm_bytes = *h.finalize().as_array();
         pallas::Base::from_uniform_bytes(&rcm_bytes)
+    }
+
+    pub fn get_random_padding(&self, padding_len: usize) -> Vec<pallas::Base> {
+        (0..padding_len)
+            .map(|i| {
+                let mut h = Blake2bParams::new()
+                    .hash_length(64)
+                    .personal(PRF_EXPAND_PERSONALIZATION)
+                    .to_state();
+                h.update(&[PRF_EXPAND_PUBLIC_INPUT_PADDING, i as u8]);
+                h.update(&self.0);
+                let rcm_bytes = *h.finalize().as_array();
+                pallas::Base::from_uniform_bytes(&rcm_bytes)
+            })
+            .collect()
     }
 }
 

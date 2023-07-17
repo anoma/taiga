@@ -16,7 +16,7 @@ use crate::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     merkle_tree::MerklePath,
-    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
+    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
     proof::Proof,
     utils::poseidon_hash_n,
     vp_vk::ValidityPredicateVerifyingKey,
@@ -123,9 +123,13 @@ impl ValidityPredicateInfo for TokenValidityPredicateCircuit {
         &self.output_notes
     }
 
-    fn get_public_inputs(&self) -> ValidityPredicatePublicInputs {
+    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
-        public_inputs.extend(ValidityPredicatePublicInputs::padding(public_inputs.len()));
+        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
+            public_inputs.len(),
+            &RandomSeed::random(&mut rng),
+        );
+        public_inputs.extend(padding);
         public_inputs.into()
     }
 
@@ -348,7 +352,7 @@ fn test_halo2_token_vp_circuit() {
 
     let mut rng = OsRng;
     let circuit = TokenValidityPredicateCircuit::random(&mut rng);
-    let public_inputs = circuit.get_public_inputs();
+    let public_inputs = circuit.get_public_inputs(&mut rng);
 
     let prover =
         MockProver::<pallas::Base>::run(12, &circuit, vec![public_inputs.to_vec()]).unwrap();

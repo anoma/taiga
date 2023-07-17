@@ -14,9 +14,9 @@ use crate::{
     },
     constant::{
         GENERATOR, NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_CUSTOM_PUBLIC_INPUT_BEGIN_IDX,
-        VP_CIRCUIT_CUSTOM_PUBLIC_INPUT_NUM, VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
+        VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
     },
-    note::Note,
+    note::{Note, RandomSeed},
     note_encryption::{NoteCipher, SecretKey},
     nullifier::{Nullifier, NullifierKeyContainer},
     proof::Proof,
@@ -117,9 +117,14 @@ impl ValidityPredicateInfo for ReceiverValidityPredicateCircuit {
         &self.output_notes
     }
 
-    fn get_public_inputs(&self) -> ValidityPredicatePublicInputs {
-        let mut instances = self.get_mandatory_public_inputs();
-        instances.extend([pallas::Base::zero(); VP_CIRCUIT_CUSTOM_PUBLIC_INPUT_NUM].iter());
+    fn get_public_inputs(&self, rng: impl RngCore) -> ValidityPredicatePublicInputs {
+        let mut public_inputs = self.get_mandatory_public_inputs();
+        let custom_public_input_padding =
+            ValidityPredicatePublicInputs::get_custom_public_input_padding(
+                public_inputs.len(),
+                &RandomSeed::random(rng),
+            );
+        public_inputs.extend(custom_public_input_padding.iter());
         assert_eq!(NUM_NOTE, 2);
         let target_note =
             if self.get_owned_note_pub_id() == self.get_output_notes()[0].commitment().get_x() {
@@ -141,15 +146,15 @@ impl ValidityPredicateInfo for ReceiverValidityPredicateCircuit {
         ];
         let key = SecretKey::from_dh_exchange(&self.rcv_pk, &mod_r_p(self.sk));
         let cipher = NoteCipher::encrypt(&message, &key, &self.nonce);
-        cipher.cipher.iter().for_each(|&c| instances.push(c));
+        cipher.cipher.iter().for_each(|&c| public_inputs.push(c));
 
-        instances.push(self.nonce);
+        public_inputs.push(self.nonce);
         let generator = GENERATOR.to_curve();
         let pk = generator * mod_r_p(self.sk);
         let pk_coord = pk.to_affine().coordinates().unwrap();
-        instances.push(*pk_coord.x());
-        instances.push(*pk_coord.y());
-        instances.into()
+        public_inputs.push(*pk_coord.x());
+        public_inputs.push(*pk_coord.y());
+        public_inputs.into()
     }
 
     fn get_owned_note_pub_id(&self) -> pallas::Base {
@@ -395,7 +400,7 @@ fn test_halo2_receiver_vp_circuit() {
 
     let mut rng = OsRng;
     let (circuit, _rcv_sk) = ReceiverValidityPredicateCircuit::rand(&mut rng);
-    let public_inputs = circuit.get_public_inputs();
+    let public_inputs = circuit.get_public_inputs(&mut rng);
 
     let prover =
         MockProver::<pallas::Base>::run(12, &circuit, vec![public_inputs.to_vec()]).unwrap();

@@ -24,7 +24,7 @@ use taiga_halo2::{
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
-    note::Note,
+    note::{Note, RandomSeed},
     proof::Proof,
     utils::poseidon_hash,
     vp_circuit_impl,
@@ -464,9 +464,13 @@ impl ValidityPredicateInfo for SudokuAppValidityPredicateCircuit {
         &self.output_notes
     }
 
-    fn get_public_inputs(&self) -> ValidityPredicatePublicInputs {
+    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
-        public_inputs.extend(ValidityPredicatePublicInputs::padding(public_inputs.len()));
+        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
+            public_inputs.len(),
+            &RandomSeed::random(&mut rng),
+        );
+        public_inputs.extend(padding);
         public_inputs.into()
     }
 
@@ -615,7 +619,7 @@ fn test_halo2_sudoku_app_vp_circuit_init() {
 
     let mut rng = OsRng;
     let circuit = SudokuAppValidityPredicateCircuit::dummy(&mut rng);
-    let public_inputs = circuit.get_public_inputs();
+    let public_inputs = circuit.get_public_inputs(&mut rng);
 
     let prover =
         MockProver::<pallas::Base>::run(13, &circuit, vec![public_inputs.to_vec()]).unwrap();
@@ -688,7 +692,7 @@ fn test_halo2_sudoku_app_vp_circuit_update() {
             current_state,
         }
     };
-    let public_inputs = circuit.get_public_inputs();
+    let public_inputs = circuit.get_public_inputs(&mut rng);
 
     let prover =
         MockProver::<pallas::Base>::run(13, &circuit, vec![public_inputs.to_vec()]).unwrap();
@@ -759,7 +763,7 @@ pub fn halo2_sudoku_app_vp_circuit_final() {
             current_state,
         }
     };
-    let public_inputs = circuit.get_public_inputs();
+    let public_inputs = circuit.get_public_inputs(&mut rng);
 
     let prover =
         MockProver::<pallas::Base>::run(13, &circuit, vec![public_inputs.to_vec()]).unwrap();
