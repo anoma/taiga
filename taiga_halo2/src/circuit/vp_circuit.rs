@@ -14,23 +14,29 @@ use crate::{
         note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig},
     },
     constant::{
-        NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases, NUM_NOTE,
-        SETUP_PARAMS_MAP, VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
+        NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases,
+        NOTE_ENCRYPTION_CIPHERTEXT_NUM, NUM_NOTE, SETUP_PARAMS_MAP,
+        VP_CIRCUIT_NOTE_ENCRYPTION_PK_X_IDX, VP_CIRCUIT_NOTE_ENCRYPTION_PK_Y_IDX,
+        VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
         VP_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX, VP_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX,
         VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX, VP_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX,
         VP_CIRCUIT_OWNED_NOTE_PUB_ID_PUBLIC_INPUT_IDX, VP_CIRCUIT_PARAMS_SIZE,
         VP_CIRCUIT_PUBLIC_INPUT_NUM,
     },
     note::{Note, RandomSeed},
+    note_encryption::{NoteCiphertext, SecretKey},
     proof::Proof,
+    utils::mod_r_p,
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 // use byteorder::{ReadBytesExt, WriteBytesExt};
 use dyn_clone::{clone_trait_object, DynClone};
 use ff::PrimeField;
+use group::cofactor::CofactorCurveAffine;
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
+    arithmetic::CurveAffine,
     circuit::{AssignedCell, Layouter, Value},
     plonk::{
         keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance,
@@ -156,6 +162,21 @@ impl ValidityPredicatePublicInputs {
 
     pub fn to_vec(&self) -> Vec<pallas::Base> {
         self.0.to_vec()
+    }
+
+    pub fn decrypt(&self, sk: pallas::Base) -> Option<Vec<pallas::Base>> {
+        let cipher: NoteCiphertext = self.0[VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX
+            ..VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX + NOTE_ENCRYPTION_CIPHERTEXT_NUM]
+            .to_vec()
+            .into();
+        let sender_pk = pallas::Affine::from_xy(
+            self.get_from_index(VP_CIRCUIT_NOTE_ENCRYPTION_PK_X_IDX),
+            self.get_from_index(VP_CIRCUIT_NOTE_ENCRYPTION_PK_Y_IDX),
+        )
+        .unwrap()
+        .to_curve();
+        let key = SecretKey::from_dh_exchange(&sender_pk, &mod_r_p(sk));
+        cipher.decrypt(&key)
     }
 }
 
