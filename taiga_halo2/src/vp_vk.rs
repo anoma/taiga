@@ -75,7 +75,7 @@ impl Eq for ValidityPredicateVerifyingKey {}
 
 #[test]
 fn test_vpd_hashing() {
-    use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
+    use crate::circuit::vp_examples::tests::random_trivial_vp_circuit;
     use halo2_proofs::plonk;
     use rand::rngs::OsRng;
     use std::{collections::hash_map::DefaultHasher, hash::Hasher};
@@ -86,9 +86,9 @@ fn test_vpd_hashing() {
         s.finish()
     }
 
-    let circuit1 = TrivialValidityPredicateCircuit::dummy(&mut OsRng);
-    let circuit2 = TrivialValidityPredicateCircuit::dummy(&mut OsRng);
-    let circuit3 = TrivialValidityPredicateCircuit::dummy(&mut OsRng);
+    let circuit1 = random_trivial_vp_circuit(&mut OsRng);
+    let circuit2 = random_trivial_vp_circuit(&mut OsRng);
+    let circuit3 = random_trivial_vp_circuit(&mut OsRng);
 
     let params1 = halo2_proofs::poly::commitment::Params::new(12);
     let vk1 = plonk::keygen_vk(&params1, &circuit1).unwrap();

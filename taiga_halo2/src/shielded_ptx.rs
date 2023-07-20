@@ -325,12 +325,12 @@ impl NoteVPVerifyingInfoSet {
     }
 }
 
+#[cfg(test)]
 pub mod testing {
     use crate::{
         circuit::vp_circuit::ValidityPredicateVerifyingInfo,
         circuit::vp_examples::TrivialValidityPredicateCircuit,
-        constant::TAIGA_COMMITMENT_TREE_DEPTH,
-        merkle_tree::MerklePath,
+        merkle_tree::tests::random_merkle_path,
         note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
         nullifier::{Nullifier, NullifierKeyContainer},
         shielded_ptx::ShieldedPartialTransaction,
@@ -435,7 +435,7 @@ pub mod testing {
         };
 
         // Generate note info
-        let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+        let merkle_path = random_merkle_path(&mut rng);
         // Create vp circuit and fill the note info
         let mut trivial_vp_circuit = TrivialValidityPredicateCircuit {
             owned_note_pub_id: input_note_1.get_nf().unwrap().inner(),

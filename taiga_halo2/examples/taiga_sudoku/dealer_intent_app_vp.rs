@@ -1,4 +1,3 @@
-use ff::Field;
 use halo2_gadgets::utilities::bool_check;
 use halo2_proofs::{
     circuit::{floor_planner, AssignedCell, Layouter, Region, Value},
@@ -10,7 +9,6 @@ use halo2_proofs::{
 };
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
-use rand::RngCore;
 use taiga_halo2::{
     circuit::{
         gadgets::{
@@ -87,26 +85,6 @@ impl ValidityPredicateConfig for IntentAppValidityPredicateConfig {
 }
 
 impl DealerIntentValidityPredicateCircuit {
-    #![allow(dead_code)]
-    pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let encoded_puzzle = pallas::Base::random(&mut rng);
-        let sudoku_app_vk = ValidityPredicateVerifyingKey::dummy(&mut rng).get_compressed();
-        output_notes[0].note_type.app_data_static =
-            Self::compute_app_data_static(encoded_puzzle, sudoku_app_vk);
-        let encoded_solution = pallas::Base::random(&mut rng);
-        let owned_note_pub_id = output_notes[0].commitment().get_x();
-        Self {
-            owned_note_pub_id,
-            input_notes,
-            output_notes,
-            encoded_puzzle,
-            sudoku_app_vk,
-            encoded_solution,
-        }
-    }
-
     pub fn compute_app_data_static(
         encoded_puzzle: pallas::Base,
         sudoku_app_vk: pallas::Base,
@@ -367,11 +345,35 @@ impl DealerIntentCheckConfig {
 
 #[test]
 fn test_halo2_dealer_intent_vp_circuit() {
+    use crate::note::tests::{random_input_note, random_output_note};
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
-    let circuit = DealerIntentValidityPredicateCircuit::dummy(&mut rng);
+    let circuit = {
+        let input_notes = [(); NUM_NOTE].map(|_| random_input_note(&mut rng));
+        let mut output_notes = input_notes
+            .iter()
+            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
+            .collect::<Vec<_>>();
+        let encoded_puzzle = pallas::Base::random(&mut rng);
+        let sudoku_app_vk = ValidityPredicateVerifyingKey::dummy(&mut rng).get_compressed();
+        output_notes[0].note_type.app_data_static =
+            DealerIntentValidityPredicateCircuit::compute_app_data_static(
+                encoded_puzzle,
+                sudoku_app_vk,
+            );
+        let encoded_solution = pallas::Base::random(&mut rng);
+        let owned_note_pub_id = output_notes[0].commitment().get_x();
+        DealerIntentValidityPredicateCircuit {
+            owned_note_pub_id,
+            input_notes,
+            output_notes,
+            encoded_puzzle,
+            sudoku_app_vk,
+            encoded_solution,
+        }
+    };
     let instances = circuit.get_instances();
 
     let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances.clone()]).unwrap();

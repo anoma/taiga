@@ -92,13 +92,11 @@ pub struct MerklePath {
 }
 
 impl MerklePath {
-    /// Constructs a random dummy merkle path with depth.
-    // TODO: move it to test mod
+    /// Constructs a random dummy merkle path with depth. Only used in tests.
     pub fn dummy(rng: &mut impl RngCore, depth: usize) -> Self {
         let auth_path = (0..depth).map(|_| (Node::rand(rng), rng.gen())).collect();
         Self::from_path(auth_path)
     }
-
     /// Constructs a Merkle path directly from a path.
     pub fn from_path(auth_path: Vec<(Node, LR)>) -> Self {
         MerklePath { auth_path }
@@ -200,11 +198,16 @@ impl Default for MerklePath {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
+    use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
     use crate::merkle_tree::Node;
     use halo2_gadgets::poseidon::primitives as poseidon;
     use pasta_curves::Fp;
+
+    pub fn random_merkle_path<R: RngCore>(mut rng: R) -> MerklePath {
+        MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH)
+    }
 
     #[test]
     // Test a Merkle tree with 4 leaves

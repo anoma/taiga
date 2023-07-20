@@ -5,7 +5,6 @@ use halo2_proofs::{
 };
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
-use rand::RngCore;
 use taiga_halo2::{
     circuit::{
         gadgets::{
@@ -177,27 +176,6 @@ impl ValidityPredicateConfig for SudokuAppValidityPredicateConfig {
 }
 
 impl SudokuAppValidityPredicateCircuit {
-    #![allow(dead_code)]
-    pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let encoded_init_state = SudokuState::default().encode();
-        let previous_state = SudokuState::default();
-        let current_state = SudokuState::default();
-        output_notes[0].note_type.app_data_static =
-            poseidon_hash(encoded_init_state, current_state.encode());
-        output_notes[0].value = 1u64;
-        let owned_note_pub_id = output_notes[0].commitment().get_x();
-        Self {
-            owned_note_pub_id,
-            input_notes,
-            output_notes,
-            encoded_init_state,
-            previous_state,
-            current_state,
-        }
-    }
-
     // Copy from valid_puzzle/circuit.rs
     #[allow(clippy::too_many_arguments)]
     fn check_puzzle(
@@ -610,9 +588,31 @@ vp_circuit_impl!(SudokuAppValidityPredicateCircuit);
 fn test_halo2_sudoku_app_vp_circuit_init() {
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
+    use taiga_halo2::note::tests::{random_input_note, random_output_note};
 
     let mut rng = OsRng;
-    let circuit = SudokuAppValidityPredicateCircuit::dummy(&mut rng);
+    let circuit = {
+        let input_notes = [(); NUM_NOTE].map(|_| random_input_note(&mut rng));
+        let mut output_notes = input_notes
+            .iter()
+            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
+            .collect::<Vec<_>>();
+        let encoded_init_state = SudokuState::default().encode();
+        let previous_state = SudokuState::default();
+        let current_state = SudokuState::default();
+        output_notes[0].note_type.app_data_static =
+            poseidon_hash(encoded_init_state, current_state.encode());
+        output_notes[0].value = 1u64;
+        let owned_note_pub_id = output_notes[0].commitment().get_x();
+        SudokuAppValidityPredicateCircuit {
+            owned_note_pub_id,
+            input_notes,
+            output_notes,
+            encoded_init_state,
+            previous_state,
+            current_state,
+        }
+    };
     let instances = circuit.get_instances();
 
     let prover = MockProver::<pallas::Base>::run(13, &circuit, vec![instances]).unwrap();
@@ -691,14 +691,19 @@ fn test_halo2_sudoku_app_vp_circuit_update() {
     assert_eq!(prover.verify(), Ok(()));
 }
 
-pub fn halo2_sudoku_app_vp_circuit_final() {
+#[test]
+fn halo2_sudoku_app_vp_circuit_final() {
     use halo2_proofs::dev::MockProver;
 
     let mut rng = OsRng;
     // Construct circuit
     let circuit = {
-        let mut input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        use taiga_halo2::note::tests::{random_input_note, random_output_note};
+        let input_notes = [(); NUM_NOTE].map(|_| random_input_note(&mut rng));
+        let output_notes = input_notes
+            .iter()
+            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
+            .collect::<Vec<_>>();
         let init_state = SudokuState {
             state: [
                 [5, 0, 1, 6, 7, 2, 4, 3, 9],
@@ -759,9 +764,4 @@ pub fn halo2_sudoku_app_vp_circuit_final() {
 
     let prover = MockProver::<pallas::Base>::run(13, &circuit, vec![instances]).unwrap();
     assert_eq!(prover.verify(), Ok(()));
-}
-
-#[test]
-pub fn test_halo2_sudoku_app_vp_circuit_final() {
-    halo2_sudoku_app_vp_circuit_final();
 }

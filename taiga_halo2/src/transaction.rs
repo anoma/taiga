@@ -317,6 +317,7 @@ impl TransparentPartialTxBundle {
     }
 }
 
+#[cfg(test)]
 pub mod testing {
     use crate::shielded_ptx::testing::create_shielded_ptx;
     use crate::transaction::ShieldedPartialTxBundle;
@@ -334,29 +335,30 @@ pub mod testing {
         });
         (bundle, r_vec)
     }
-}
 
-#[test]
-fn test_halo2_transaction() {
-    use crate::transaction::testing::create_shielded_ptx_bundle;
-    use rand::rngs::OsRng;
+    #[test]
+    fn test_halo2_transaction() {
+        use super::Transaction;
+        use borsh::{BorshDeserialize, BorshSerialize};
+        use rand::rngs::OsRng;
 
-    let rng = OsRng;
+        let rng = OsRng;
 
-    // Create shielded partial tx bundle
-    let (shielded_ptx_bundle, r_vec) = create_shielded_ptx_bundle(2);
-    // TODO: add transparent_ptx_bundle test
-    let transparent_ptx_bundle = None;
-    let tx = Transaction::build(
-        rng,
-        Some(shielded_ptx_bundle),
-        transparent_ptx_bundle,
-        r_vec,
-    );
-    let (shielded_ret, _) = tx.execute().unwrap();
+        // Create shielded partial tx bundle
+        let (shielded_ptx_bundle, r_vec) = create_shielded_ptx_bundle(2);
+        // TODO: add transparent_ptx_bundle test
+        let transparent_ptx_bundle = None;
+        let tx = Transaction::build(
+            rng,
+            Some(shielded_ptx_bundle),
+            transparent_ptx_bundle,
+            r_vec,
+        );
+        let (shielded_ret, _) = tx.execute().unwrap();
 
-    let borsh = tx.try_to_vec().unwrap();
-    let de_tx: Transaction = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
-    let (de_shielded_ret, _) = de_tx.execute().unwrap();
-    assert_eq!(shielded_ret, de_shielded_ret);
+        let borsh = tx.try_to_vec().unwrap();
+        let de_tx: Transaction = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
+        let (de_shielded_ret, _) = de_tx.execute().unwrap();
+        assert_eq!(shielded_ret, de_shielded_ret);
+    }
 }

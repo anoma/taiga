@@ -120,3 +120,24 @@ impl Default for NullifierKeyContainer {
         NullifierKeyContainer::from_key(key)
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use halo2_proofs::arithmetic::Field;
+    use pasta_curves::pallas;
+    use rand::RngCore;
+
+    use super::{Nullifier, NullifierKeyContainer};
+
+    pub fn random_nullifier<R: RngCore>(mut rng: R) -> Nullifier {
+        Nullifier::new(pallas::Base::random(&mut rng))
+    }
+
+    pub fn random_nullifier_key<R: RngCore>(mut rng: R) -> NullifierKeyContainer {
+        NullifierKeyContainer::from_key(pallas::Base::random(&mut rng))
+    }
+
+    pub fn random_nullifier_key_commitment<R: RngCore>(mut rng: R) -> NullifierKeyContainer {
+        NullifierKeyContainer::from_commitment(pallas::Base::random(&mut rng))
+    }
+}

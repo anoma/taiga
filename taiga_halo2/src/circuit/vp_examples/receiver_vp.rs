@@ -17,10 +17,10 @@ use crate::{
     note_encryption::{NoteCipher, SecretKey},
     nullifier::{Nullifier, NullifierKeyContainer},
     proof::Proof,
-    utils::{mod_r_p, poseidon_hash_n},
+    utils::mod_r_p,
     vp_vk::ValidityPredicateVerifyingKey,
 };
-use ff::{Field, PrimeField};
+use ff::PrimeField;
 use group::Group;
 use group::{cofactor::CofactorCurveAffine, Curve};
 use halo2_gadgets::ecc::{chip::EccChip, NonIdentityPoint};
@@ -32,7 +32,6 @@ use halo2_proofs::{
 use lazy_static::lazy_static;
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
-use rand::RngCore;
 const CIPHER_LEN: usize = 9;
 
 lazy_static! {
@@ -66,42 +65,6 @@ impl Default for ReceiverValidityPredicateCircuit {
             rcv_pk: pallas::Point::generator(),
             auth_vp_vk: pallas::Base::zero(),
         }
-    }
-}
-
-impl ReceiverValidityPredicateCircuit {
-    pub fn rand<R: RngCore>(mut rng: R) -> (Self, pallas::Base) {
-        let input_notes = [(); NUM_NOTE].map(|_| Note::dummy_input(&mut rng));
-        let mut output_notes: Vec<Note> = input_notes
-            .iter()
-            .map(|input| Note::dummy_output(&mut rng, input.get_nf().unwrap()))
-            .collect();
-        let nonce = pallas::Base::from_u128(23333u128);
-        let sk = pallas::Base::random(&mut rng);
-        let rcv_sk = pallas::Base::random(&mut rng);
-        let generator = GENERATOR.to_curve();
-        let rcv_pk = generator * mod_r_p(rcv_sk);
-        let rcv_pk_coord = rcv_pk.to_affine().coordinates().unwrap();
-        output_notes[0].app_data_dynamic = poseidon_hash_n([
-            *rcv_pk_coord.x(),
-            *rcv_pk_coord.y(),
-            *COMPRESSED_TOKEN_AUTH_VK,
-            *COMPRESSED_RECEIVER_VK,
-        ]);
-        let owned_note_pub_id = output_notes[0].commitment().get_x();
-        (
-            Self {
-                owned_note_pub_id,
-                input_notes,
-                output_notes: output_notes.try_into().unwrap(),
-                vp_vk: *COMPRESSED_RECEIVER_VK,
-                nonce,
-                sk,
-                rcv_pk,
-                auth_vp_vk: *COMPRESSED_TOKEN_AUTH_VK,
-            },
-            rcv_sk,
-        )
     }
 }
 
@@ -378,11 +341,48 @@ pub fn decrypt_note(instances: Vec<pallas::Base>, sk: pallas::Base) -> Option<No
 
 #[test]
 fn test_halo2_receiver_vp_circuit() {
+    use crate::{
+        note::tests::{random_input_note, random_output_note},
+        utils::poseidon_hash_n,
+    };
+    use ff::Field;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
-    let (circuit, rcv_sk) = ReceiverValidityPredicateCircuit::rand(&mut rng);
+    let (circuit, rcv_sk) = {
+        let input_notes = [(); NUM_NOTE].map(|_| random_input_note(&mut rng));
+        let mut output_notes = input_notes
+            .iter()
+            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
+            .collect::<Vec<_>>();
+        let nonce = pallas::Base::from_u128(23333u128);
+        let sk = pallas::Base::random(&mut rng);
+        let rcv_sk = pallas::Base::random(&mut rng);
+        let generator = GENERATOR.to_curve();
+        let rcv_pk = generator * mod_r_p(rcv_sk);
+        let rcv_pk_coord = rcv_pk.to_affine().coordinates().unwrap();
+        output_notes[0].app_data_dynamic = poseidon_hash_n([
+            *rcv_pk_coord.x(),
+            *rcv_pk_coord.y(),
+            *COMPRESSED_TOKEN_AUTH_VK,
+            *COMPRESSED_RECEIVER_VK,
+        ]);
+        let owned_note_pub_id = output_notes[0].commitment().get_x();
+        (
+            ReceiverValidityPredicateCircuit {
+                owned_note_pub_id,
+                input_notes,
+                output_notes: output_notes.try_into().unwrap(),
+                vp_vk: *COMPRESSED_RECEIVER_VK,
+                nonce,
+                sk,
+                rcv_pk,
+                auth_vp_vk: *COMPRESSED_TOKEN_AUTH_VK,
+            },
+            rcv_sk,
+        )
+    };
     let instances = circuit.get_instances();
 
     let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances.clone()]).unwrap();

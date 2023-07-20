@@ -1,8 +1,6 @@
 use crate::{
     circuit::action_circuit::ActionCircuit,
-    constant::TAIGA_COMMITMENT_TREE_DEPTH,
-    merkle_tree::MerklePath,
-    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
+    note::{InputNoteProvingInfo, OutputNoteProvingInfo},
     nullifier::Nullifier,
     value_commitment::ValueCommitment,
 };
@@ -96,24 +94,6 @@ impl ActionInfo {
         self.rcv
     }
 
-    pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
-        let input_note = Note::dummy(&mut rng);
-        let output_proving_info =
-            OutputNoteProvingInfo::dummy(&mut rng, input_note.get_nf().unwrap());
-        let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let app_vp_proving_info = Box::new(TrivialValidityPredicateCircuit::dummy(&mut rng));
-        let app_vp_proving_info_dynamic = vec![];
-        let input_proving_info = InputNoteProvingInfo::new(
-            input_note,
-            merkle_path,
-            app_vp_proving_info,
-            app_vp_proving_info_dynamic,
-        );
-
-        ActionInfo::new(input_proving_info, output_proving_info, &mut rng)
-    }
-
     pub fn build(self) -> (ActionInstance, ActionCircuit) {
         let nf = self.input.note.get_nf().unwrap();
         assert_eq!(
@@ -139,5 +119,18 @@ impl ActionInfo {
         };
 
         (action, action_circuit)
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::ActionInfo;
+    use crate::note::tests::{random_input_proving_info, random_output_proving_info};
+    use rand::RngCore;
+    pub fn random_action_info<R: RngCore>(mut rng: R) -> ActionInfo {
+        let input_proving_info = random_input_proving_info(&mut rng);
+        let output_proving_info =
+            random_output_proving_info(&mut rng, input_proving_info.note.get_nf().unwrap());
+        ActionInfo::new(input_proving_info, output_proving_info, &mut rng)
     }
 }
