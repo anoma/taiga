@@ -74,12 +74,18 @@ pub struct Note {
 }
 
 /// The parameters in the NoteType are used to derive note type.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Eq)]
 pub struct NoteType {
     /// app_vk is the compressed verifying key of VP
     pub app_vk: pallas::Base,
     /// app_data_static is the encoded data that is defined in application vp
     pub app_data_static: pallas::Base,
+}
+
+impl PartialEq for NoteType {
+    fn eq(&self, other: &Self) -> bool {
+        self.app_vk == other.app_vk && self.app_data_static == other.app_data_static
+    }
 }
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -516,7 +522,7 @@ impl OutputNoteProvingInfo {
 pub mod tests {
     use super::{InputNoteProvingInfo, Note, NoteType, OutputNoteProvingInfo, RandomSeed};
     use crate::{
-        circuit::vp_examples::{tests::random_trivial_vp_circuit, COMPRESSED_TRIVIAL_VP_VK},
+        circuit::vp_examples::tests::random_trivial_vp_circuit,
         merkle_tree::tests::random_merkle_path,
         nullifier::{tests::*, Nullifier, NullifierKeyContainer},
     };
@@ -539,25 +545,6 @@ pub mod tests {
     pub fn random_output_note<R: RngCore>(mut rng: R, rho: Nullifier) -> Note {
         let nk_com = random_nullifier_key_commitment(&mut rng);
         random_note_from_parts(&mut rng, rho, nk_com)
-    }
-
-    pub fn random_zero_note<R: RngCore>(mut rng: R, rho: Nullifier) -> Note {
-        let app_vk = *COMPRESSED_TRIVIAL_VP_VK;
-        let app_data_static = pallas::Base::random(&mut rng);
-        let note_type = NoteType::new(app_vk, app_data_static);
-        let app_data_dynamic = pallas::Base::random(&mut rng);
-        let nk = random_nullifier_key(&mut rng);
-        let rseed = RandomSeed::random(&mut rng);
-        Note {
-            note_type,
-            app_data_dynamic,
-            value: 0,
-            nk_container: nk,
-            rho,
-            psi: rseed.get_psi(&rho),
-            rcm: rseed.get_rcm(&rho),
-            is_merkle_checked: false,
-        }
     }
 
     fn random_note_from_parts<R: RngCore>(

@@ -69,9 +69,9 @@ pub fn create_token_intent_ptx<R: RngCore>(
     );
 
     // padding the zero notes
-    let padding_input_note = Note::dummy_zero_note(&mut rng, rho);
+    let padding_input_note = Note::random_padding_input_note(&mut rng);
     let padding_input_note_nf = padding_input_note.get_nf().unwrap();
-    let padding_output_note = Note::dummy_zero_note(&mut rng, padding_input_note_nf);
+    let padding_output_note = Note::random_padding_output_note(&mut rng, padding_input_note_nf);
 
     let input_notes = [input_note, padding_input_note];
     let output_notes = [intent_note, padding_output_note];
@@ -166,10 +166,9 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     assert_eq!(address, input_address);
 
     // padding the zero notes
-    let rho = Nullifier::new(pallas::Base::random(&mut rng));
-    let padding_input_note = Note::dummy_zero_note(&mut rng, rho);
+    let padding_input_note = Note::random_padding_input_note(&mut rng);
     let padding_input_note_nf = padding_input_note.get_nf().unwrap();
-    let padding_output_note = Note::dummy_zero_note(&mut rng, padding_input_note_nf);
+    let padding_output_note = Note::random_padding_output_note(&mut rng, padding_input_note_nf);
 
     let input_notes = [intent_note, padding_input_note];
     let output_notes = [output_note, padding_output_note];

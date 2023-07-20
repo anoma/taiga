@@ -282,8 +282,7 @@ pub fn create_intent_note<R: RngCore>(
 #[test]
 fn test_halo2_or_relation_intent_vp_circuit() {
     use crate::{
-        circuit::vp_examples::token::COMPRESSED_TOKEN_VK,
-        note::tests::{random_output_note, random_zero_note},
+        circuit::vp_examples::token::COMPRESSED_TOKEN_VK, note::tests::random_output_note,
         nullifier::tests::random_nullifier,
     };
     use halo2_proofs::arithmetic::Field;
@@ -320,8 +319,7 @@ fn test_halo2_or_relation_intent_vp_circuit() {
             rho,
             nk,
         );
-        let padding_rho = random_nullifier(&mut rng);
-        let padding_input_note = random_zero_note(&mut rng, padding_rho);
+        let padding_input_note = Note::random_padding_input_note(&mut rng);
         let input_notes = [intent_note, padding_input_note];
         OrRelationIntentValidityPredicateCircuit {
             owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),

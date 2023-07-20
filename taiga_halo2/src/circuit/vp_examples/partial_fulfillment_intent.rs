@@ -346,7 +346,7 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
                 || "conditional equal: check returned token address",
                 |mut region| {
                     config.conditional_equal_config.assign_region(
-                        &is_input_note,
+                        &is_partial_fulfillment,
                         &receiver_address,
                         &basic_variables.output_note_variables[1]
                             .note_variables
@@ -434,11 +434,7 @@ pub fn create_intent_note<R: RngCore>(
 
 #[test]
 fn test_halo2_partial_fulfillment_intent_vp_circuit() {
-    use crate::{
-        circuit::vp_examples::token::COMPRESSED_TOKEN_VK,
-        note::tests::{random_input_note, random_zero_note},
-        nullifier::tests::random_nullifier,
-    };
+    use crate::{circuit::vp_examples::token::COMPRESSED_TOKEN_VK, note::tests::random_input_note};
     use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
@@ -464,10 +460,10 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
     let intent_note = create_intent_note(&mut rng, &sell, &buy, receiver_address, rho, nk);
     // Creating intent test
     {
-        let padding_rho = random_nullifier(&mut rng);
-        let input_padding_note = random_zero_note(&mut rng, padding_rho);
+        let input_padding_note = Note::random_padding_input_note(&mut rng);
         let input_notes = [sold_note, input_padding_note];
-        let output_padding_note = random_zero_note(&mut rng, input_padding_note.get_nf().unwrap());
+        let output_padding_note =
+            Note::random_padding_output_note(&mut rng, input_padding_note.get_nf().unwrap());
         let output_notes = [intent_note, output_padding_note];
 
         let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
@@ -487,8 +483,7 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
     // Consuming intent test
     {
         {
-            let padding_rho = random_nullifier(&mut rng);
-            let input_padding_note = random_zero_note(&mut rng, padding_rho);
+            let input_padding_note = Note::random_padding_input_note(&mut rng);
             let input_notes = [intent_note, input_padding_note];
             let mut bought_note = sold_note;
             bought_note.note_type.app_data_static =
@@ -499,8 +494,10 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
             // full fulfillment
             {
                 bought_note.value = buy.value;
-                let output_padding_note =
-                    random_zero_note(&mut rng, input_padding_note.get_nf().unwrap());
+                let output_padding_note = Note::random_padding_output_note(
+                    &mut rng,
+                    input_padding_note.get_nf().unwrap(),
+                );
                 let output_notes = [bought_note, output_padding_note];
 
                 let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
