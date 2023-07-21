@@ -83,7 +83,20 @@ impl BorshDeserialize for ActionInstance {
 }
 
 impl ActionInfo {
-    // pub fn new()
+    pub fn new(
+        input_note: Note,
+        input_merkle_path: MerklePath,
+        output_note: Note,
+        rcv: pallas::Scalar,
+    ) -> Self {
+        Self {
+            input_note,
+            input_merkle_path,
+            output_note,
+            rcv,
+        }
+    }
+
     pub fn from_proving_info<R: RngCore>(
         input: InputNoteProvingInfo,
         output: OutputNoteProvingInfo,
