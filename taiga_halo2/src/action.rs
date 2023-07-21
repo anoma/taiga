@@ -23,8 +23,6 @@ pub struct ActionInstance {
     pub cm_x: pallas::Base,
     /// net value commitment
     pub cv_net: ValueCommitment,
-    // TODO: The EncryptedNote.
-    // encrypted_note,
 }
 
 /// The information to build ActionInstance and ActionCircuit.
@@ -150,12 +148,18 @@ impl ActionInfo {
 #[cfg(test)]
 pub mod tests {
     use super::ActionInfo;
-    use crate::note::tests::{random_input_proving_info, random_output_proving_info};
+    use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
+    use crate::merkle_tree::MerklePath;
+    use crate::note::tests::{random_input_note, random_output_note};
+    use halo2_proofs::arithmetic::Field;
+    use pasta_curves::pallas;
     use rand::RngCore;
+
     pub fn random_action_info<R: RngCore>(mut rng: R) -> ActionInfo {
-        let input_proving_info = random_input_proving_info(&mut rng);
-        let output_proving_info =
-            random_output_proving_info(&mut rng, input_proving_info.note.get_nf().unwrap());
-        ActionInfo::from_proving_info(input_proving_info, output_proving_info, &mut rng)
+        let input_note = random_input_note(&mut rng);
+        let output_note = random_output_note(&mut rng, input_note.get_nf().unwrap());
+        let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+        let rcv = pallas::Scalar::random(&mut rng);
+        ActionInfo::new(input_note, input_merkle_path, output_note, rcv)
     }
 }
