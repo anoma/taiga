@@ -328,11 +328,11 @@ pub mod testing {
     ) -> (ShieldedPartialTxBundle, Vec<pallas::Scalar>) {
         let mut bundle = ShieldedPartialTxBundle::new();
         let mut r_vec = vec![];
-        [0..num].iter().for_each(|_| {
+        for _ in 0..num {
             let (ptx, r) = create_shielded_ptx();
             bundle.add_partial_tx(ptx);
             r_vec.push(r);
-        });
+        }
         (bundle, r_vec)
     }
 

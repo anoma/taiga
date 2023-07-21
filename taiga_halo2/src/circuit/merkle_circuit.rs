@@ -94,12 +94,11 @@ pub fn merkle_poseidon_gadget(
                 Value::known(is_left(e.1)),
             )?
         };
-        let poseidon_message = [pair.0, pair.1];
 
         cur = poseidon_hash_gadget(
             chip.config().poseidon_config.clone(),
             layouter.namespace(|| "merkle poseidon hash"),
-            poseidon_message,
+            [pair.0, pair.1],
         )?;
     }
 

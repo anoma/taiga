@@ -63,7 +63,7 @@ impl ShieldedPartialTransaction {
         let mut rcv_sum = pallas::Scalar::zero();
         let actions: Vec<ActionVerifyingInfo> = input_info
             .into_iter()
-            .zip(output_info.into_iter())
+            .zip(output_info)
             .map(|(input, output)| {
                 let action_info = ActionInfo::from_proving_info(input, output, &mut rng);
                 rcv_sum += action_info.get_rcv();
@@ -352,7 +352,7 @@ pub mod testing {
         let input_note_1 = {
             let app_data_static = pallas::Base::zero();
             // TODO: add real application dynamic VPs and encode them to app_data_dynamic later.
-            let app_dynamic_vp_vk = vec![compressed_trivial_vp_vk, compressed_trivial_vp_vk];
+            let app_dynamic_vp_vk = [compressed_trivial_vp_vk, compressed_trivial_vp_vk];
             // Encode the app_dynamic_vp_vk into app_data_dynamic
             // The encoding method is flexible and defined in the application vp.
             // Use poseidon hash to encode the two dynamic VPs here
