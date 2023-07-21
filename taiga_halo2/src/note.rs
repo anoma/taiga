@@ -5,9 +5,9 @@ use crate::{
     },
     constant::{
         BASE_BITS_NUM, NOTE_COMMIT_DOMAIN, NUM_NOTE, POSEIDON_TO_CURVE_INPUT_LEN,
-        PRF_EXPAND_PERSONALIZATION, PRF_EXPAND_PSI, PRF_EXPAND_RCM, TAIGA_COMMITMENT_TREE_DEPTH,
+        PRF_EXPAND_PERSONALIZATION, PRF_EXPAND_PSI, PRF_EXPAND_RCM,
     },
-    merkle_tree::{MerklePath, Node, LR},
+    merkle_tree::MerklePath,
     nullifier::{Nullifier, NullifierKeyContainer},
     utils::{extract_p, mod_r_p, poseidon_hash, poseidon_to_curve},
 };
@@ -94,8 +94,7 @@ pub struct RandomSeed([u8; 32]);
 #[derive(Clone)]
 pub struct InputNoteProvingInfo {
     pub note: Note,
-    pub auth_path: [(pallas::Base, LR); TAIGA_COMMITMENT_TREE_DEPTH],
-    pub root: pallas::Base,
+    pub merkle_path: MerklePath,
     app_vp_verifying_info: Box<dyn ValidityPredicateVerifyingInfo>,
     app_vp_verifying_info_dynamic: Vec<Box<dyn ValidityPredicateVerifyingInfo>>,
 }
@@ -443,14 +442,9 @@ impl InputNoteProvingInfo {
         app_vp_verifying_info: Box<dyn ValidityPredicateVerifyingInfo>,
         app_vp_verifying_info_dynamic: Vec<Box<dyn ValidityPredicateVerifyingInfo>>,
     ) -> Self {
-        let cm_node = Node::new(note.commitment().get_x());
-        let root = merkle_path.root(cm_node).inner();
-        let auth_path: [(pallas::Base, LR); TAIGA_COMMITMENT_TREE_DEPTH] =
-            merkle_path.get_path().try_into().unwrap();
         Self {
             note,
-            auth_path,
-            root,
+            merkle_path,
             app_vp_verifying_info,
             app_vp_verifying_info_dynamic,
         }
@@ -570,12 +564,12 @@ pub mod tests {
 
     pub fn random_input_proving_info<R: RngCore>(mut rng: R) -> InputNoteProvingInfo {
         let note = random_input_note(&mut rng);
-        let auth_path = random_merkle_path(&mut rng);
+        let merkle_path = random_merkle_path(&mut rng);
         let app_vp_verifying_info = Box::new(random_trivial_vp_circuit(&mut rng));
         let app_vp_verifying_info_dynamic = vec![];
         InputNoteProvingInfo::new(
             note,
-            auth_path,
+            merkle_path,
             app_vp_verifying_info,
             app_vp_verifying_info_dynamic,
         )

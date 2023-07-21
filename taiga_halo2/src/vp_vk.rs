@@ -19,7 +19,7 @@ impl ValidityPredicateVerifyingKey {
         Self::Uncompressed(vk)
     }
 
-    pub fn from_compressed(vk: pallas::Base)  -> Self {
+    pub fn from_compressed(vk: pallas::Base) -> Self {
         Self::Compressed(vk)
     }
 

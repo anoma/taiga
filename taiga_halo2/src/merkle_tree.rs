@@ -88,18 +88,18 @@ impl MerkleTreeLeafs {
 /// In Orchard merkle tree, they are using MerkleCRH(layer, left, right), where MerkleCRH is a sinsemilla. We are using poseidon_hash(left, right).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MerklePath {
-    auth_path: Vec<(Node, LR)>,
+    merkle_path: Vec<(Node, LR)>,
 }
 
 impl MerklePath {
     /// Constructs a random dummy merkle path with depth. Only used in tests.
     pub fn random(rng: &mut impl RngCore, depth: usize) -> Self {
-        let auth_path = (0..depth).map(|_| (Node::rand(rng), rng.gen())).collect();
-        Self::from_path(auth_path)
+        let merkle_path = (0..depth).map(|_| (Node::rand(rng), rng.gen())).collect();
+        Self::from_path(merkle_path)
     }
     /// Constructs a Merkle path directly from a path.
-    pub fn from_path(auth_path: Vec<(Node, LR)>) -> Self {
-        MerklePath { auth_path }
+    pub fn from_path(merkle_path: Vec<(Node, LR)>) -> Self {
+        MerklePath { merkle_path }
     }
 
     pub fn find_sibling(leaf_hashes: &[Node], position: usize) -> (usize, Node) {
@@ -111,7 +111,11 @@ impl MerklePath {
         (pos, leaf_hashes[pos])
     }
 
-    fn build_auth_path(leaf_hashes: Vec<Node>, position: usize, path: &mut Vec<(Node, LR)>) {
+    fn build_merkle_path_inner(
+        leaf_hashes: Vec<Node>,
+        position: usize,
+        path: &mut Vec<(Node, LR)>,
+    ) {
         let mut new_leaves = vec![];
         if leaf_hashes.len() > 1 {
             let (sibling_pos, sibling) = Self::find_sibling(&leaf_hashes, position);
@@ -123,21 +127,21 @@ impl MerklePath {
                 new_leaves.push(hash_pair);
             }
 
-            Self::build_auth_path(new_leaves, position / 2, path);
+            Self::build_merkle_path_inner(new_leaves, position / 2, path);
         }
     }
 
     pub fn build_merkle_path(leaf_hashes: &[Node], position: usize) -> Self {
-        let mut auth_path = vec![];
+        let mut merkle_path = vec![];
         let completed_leaf_hashes = add_remaining_addresses(leaf_hashes);
-        Self::build_auth_path(completed_leaf_hashes, position, &mut auth_path);
-        MerklePath { auth_path }
+        Self::build_merkle_path_inner(completed_leaf_hashes, position, &mut merkle_path);
+        MerklePath { merkle_path }
     }
 
     /// Returns the root of the tree corresponding to this path applied to `leaf`.
     pub fn root(&self, leaf: Node) -> Node {
         let mut root = leaf;
-        for val in self.auth_path.iter() {
+        for val in self.merkle_path.iter() {
             root = match val.1 {
                 R => Node::combine(&root, &val.0),
                 L => Node::combine(&val.0, &root),
@@ -148,7 +152,7 @@ impl MerklePath {
 
     /// Returns the input parameters for merkle tree gadget.
     pub fn get_path(&self) -> Vec<(pallas::Base, LR)> {
-        self.auth_path
+        self.merkle_path
             .iter()
             .map(|(node, b)| (node.inner(), *b))
             .collect()
@@ -190,10 +194,10 @@ impl Node {
 
 impl Default for MerklePath {
     fn default() -> MerklePath {
-        let auth_path = (0..TAIGA_COMMITMENT_TREE_DEPTH)
+        let merkle_path = (0..TAIGA_COMMITMENT_TREE_DEPTH)
             .map(|_| (Node::new(pallas::Base::one()), L))
             .collect();
-        Self::from_path(auth_path)
+        Self::from_path(merkle_path)
     }
 }
 
@@ -211,7 +215,7 @@ pub mod tests {
 
     #[test]
     // Test a Merkle tree with 4 leaves
-    fn test_auth_path_4() {
+    fn test_merkle_path_4() {
         let mut rng = rand::thread_rng();
 
         let hashes: Vec<Node> = (0..4)
@@ -233,9 +237,9 @@ pub mod tests {
 
         let hash_2_3 = poseidon_hash(hashes[2].inner(), hashes[3].inner());
 
-        let auth_path = &[(Node::new(hashes[0].inner()), L), (Node::new(hash_2_3), R)];
+        let merkle_path = &[(Node::new(hashes[0].inner()), L), (Node::new(hash_2_3), R)];
 
-        let merkle_path = MerklePath::from_path(auth_path.to_vec());
+        let merkle_path = MerklePath::from_path(merkle_path.to_vec());
 
         let merkle_path_2: MerklePath = MerklePath::build_merkle_path(&hashes, position);
 

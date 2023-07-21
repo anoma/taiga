@@ -1,6 +1,7 @@
 use crate::{
     circuit::action_circuit::ActionCircuit,
-    note::{InputNoteProvingInfo, OutputNoteProvingInfo},
+    merkle_tree::{MerklePath, Node},
+    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
     nullifier::Nullifier,
     value_commitment::ValueCommitment,
 };
@@ -29,8 +30,9 @@ pub struct ActionInstance {
 /// The information to build ActionInstance and ActionCircuit.
 #[derive(Clone)]
 pub struct ActionInfo {
-    input: InputNoteProvingInfo,
-    output: OutputNoteProvingInfo,
+    input_note: Note,
+    input_merkle_path: MerklePath,
+    output_note: Note,
     rcv: pallas::Scalar,
 }
 
@@ -81,40 +83,50 @@ impl BorshDeserialize for ActionInstance {
 }
 
 impl ActionInfo {
-    pub fn new<R: RngCore>(
+    // pub fn new()
+    pub fn from_proving_info<R: RngCore>(
         input: InputNoteProvingInfo,
         output: OutputNoteProvingInfo,
         mut rng: R,
     ) -> Self {
         let rcv = pallas::Scalar::random(&mut rng);
-        Self { input, output, rcv }
+        Self {
+            input_note: input.note,
+            input_merkle_path: input.merkle_path,
+            output_note: output.note,
+            rcv,
+        }
     }
 
     pub fn get_rcv(&self) -> pallas::Scalar {
         self.rcv
     }
 
-    pub fn build(self) -> (ActionInstance, ActionCircuit) {
-        let nf = self.input.note.get_nf().unwrap();
+    pub fn build(&self) -> (ActionInstance, ActionCircuit) {
+        let nf = self.input_note.get_nf().unwrap();
         assert_eq!(
-            nf, self.output.note.rho,
+            nf, self.output_note.rho,
             "The nf of input note should be equal to the rho of output note"
         );
 
-        let cm_x = self.output.note.commitment().get_x();
+        let cm_x = self.output_note.commitment().get_x();
+        let anchor = {
+            let cm_node = Node::new(self.input_note.commitment().get_x());
+            self.input_merkle_path.root(cm_node).inner()
+        };
 
-        let cv_net = ValueCommitment::new(&self.input.note, &self.output.note, &self.rcv);
+        let cv_net = ValueCommitment::new(&self.input_note, &self.output_note, &self.rcv);
         let action = ActionInstance {
             nf,
             cm_x,
-            anchor: self.input.root,
+            anchor,
             cv_net,
         };
 
         let action_circuit = ActionCircuit {
-            input_note: self.input.note,
-            auth_path: self.input.auth_path,
-            output_note: self.output.note,
+            input_note: self.input_note,
+            merkle_path: self.input_merkle_path.get_path().try_into().unwrap(),
+            output_note: self.output_note,
             rcv: self.rcv,
         };
 
@@ -131,6 +143,6 @@ pub mod tests {
         let input_proving_info = random_input_proving_info(&mut rng);
         let output_proving_info =
             random_output_proving_info(&mut rng, input_proving_info.note.get_nf().unwrap());
-        ActionInfo::new(input_proving_info, output_proving_info, &mut rng)
+        ActionInfo::from_proving_info(input_proving_info, output_proving_info, &mut rng)
     }
 }

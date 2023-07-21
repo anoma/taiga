@@ -38,7 +38,7 @@ pub struct ActionCircuit {
     /// Input note
     pub input_note: Note,
     /// The authorization path of input note
-    pub auth_path: [(pallas::Base, LR); TAIGA_COMMITMENT_TREE_DEPTH],
+    pub merkle_path: [(pallas::Base, LR); TAIGA_COMMITMENT_TREE_DEPTH],
     /// Output note
     pub output_note: Note,
     /// random scalar for net value commitment
@@ -159,7 +159,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             layouter.namespace(|| "poseidon merkle"),
             merkle_chip,
             input_note_variables.cm_x,
-            &self.auth_path,
+            &self.merkle_path,
         )?;
 
         // TODO: user send address VP commitment and application VP commitment

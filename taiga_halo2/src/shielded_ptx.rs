@@ -65,7 +65,7 @@ impl ShieldedPartialTransaction {
             .into_iter()
             .zip(output_info.into_iter())
             .map(|(input, output)| {
-                let action_info = ActionInfo::new(input, output, &mut rng);
+                let action_info = ActionInfo::from_proving_info(input, output, &mut rng);
                 rcv_sum += action_info.get_rcv();
                 ActionVerifyingInfo::create(action_info, &mut rng).unwrap()
             })
