@@ -85,6 +85,7 @@ impl ValidityPredicateConfig for IntentAppValidityPredicateConfig {
 }
 
 impl DealerIntentValidityPredicateCircuit {
+    #![allow(dead_code)]
     pub fn compute_app_data_static(
         encoded_puzzle: pallas::Base,
         sudoku_app_vk: pallas::Base,
@@ -345,7 +346,7 @@ impl DealerIntentCheckConfig {
 
 #[test]
 fn test_halo2_dealer_intent_vp_circuit() {
-    use crate::note::tests::{random_input_note, random_output_note};
+    use crate::app_vp::tests::{random_input_note, random_output_note};
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
@@ -357,7 +358,7 @@ fn test_halo2_dealer_intent_vp_circuit() {
             .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
             .collect::<Vec<_>>();
         let encoded_puzzle = pallas::Base::random(&mut rng);
-        let sudoku_app_vk = ValidityPredicateVerifyingKey::dummy(&mut rng).get_compressed();
+        let sudoku_app_vk = pallas::Base::random(&mut rng);
         output_notes[0].note_type.app_data_static =
             DealerIntentValidityPredicateCircuit::compute_app_data_static(
                 encoded_puzzle,
@@ -368,7 +369,7 @@ fn test_halo2_dealer_intent_vp_circuit() {
         DealerIntentValidityPredicateCircuit {
             owned_note_pub_id,
             input_notes,
-            output_notes,
+            output_notes: output_notes.try_into().unwrap(),
             encoded_puzzle,
             sudoku_app_vk,
             encoded_solution,
