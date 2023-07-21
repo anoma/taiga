@@ -68,7 +68,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
     let input_notes = [input_note, padding_input_note];
     let output_notes = [intent_note, padding_output_note];
 
-    let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+    let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
     // Create the input note proving info
     let input_note_proving_info = generate_input_token_note_proving_info(
@@ -166,7 +166,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     let input_notes = [intent_note, padding_input_note];
     let output_notes = [bought_note, returned_note];
 
-    let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+    let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
     // Create the intent note proving info
     let intent_note_proving_info = {

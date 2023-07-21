@@ -102,7 +102,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_halo2_dummy_vp_circuit() {
+    fn test_halo2_trivial_vp_circuit() {
         use crate::circuit::vp_circuit::ValidityPredicateInfo;
         use halo2_proofs::dev::MockProver;
         use rand::rngs::OsRng;

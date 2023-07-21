@@ -87,7 +87,7 @@ pub fn create_token_swap_ptx<R: RngCore>(
     let output_notes = [output_note, padding_output_note];
 
     // Generate proving info
-    let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+    let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
     // Create the input note proving info
     let input_note_proving_info = generate_input_token_note_proving_info(

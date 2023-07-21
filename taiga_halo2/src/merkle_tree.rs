@@ -93,7 +93,7 @@ pub struct MerklePath {
 
 impl MerklePath {
     /// Constructs a random dummy merkle path with depth. Only used in tests.
-    pub fn dummy(rng: &mut impl RngCore, depth: usize) -> Self {
+    pub fn random(rng: &mut impl RngCore, depth: usize) -> Self {
         let auth_path = (0..depth).map(|_| (Node::rand(rng), rng.gen())).collect();
         Self::from_path(auth_path)
     }
@@ -206,7 +206,7 @@ pub mod tests {
     use pasta_curves::Fp;
 
     pub fn random_merkle_path<R: RngCore>(mut rng: R) -> MerklePath {
-        MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH)
+        MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH)
     }
 
     #[test]

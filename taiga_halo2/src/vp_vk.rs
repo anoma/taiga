@@ -1,10 +1,9 @@
 use blake2b_simd::Params as Blake2bParams;
-use halo2_proofs::{arithmetic::Field, plonk::VerifyingKey};
+use halo2_proofs::plonk::VerifyingKey;
 use pasta_curves::{
     group::ff::{FromUniformBytes, PrimeField},
     pallas, vesta,
 };
-use rand::RngCore;
 use std::hash::Hash;
 
 #[derive(Debug, Clone)]
@@ -18,6 +17,10 @@ pub enum ValidityPredicateVerifyingKey {
 impl ValidityPredicateVerifyingKey {
     pub fn from_vk(vk: VerifyingKey<vesta::Affine>) -> Self {
         Self::Uncompressed(vk)
+    }
+
+    pub fn from_compressed(vk: pallas::Base)  -> Self {
+        Self::Compressed(vk)
     }
 
     pub fn get_vk(&self) -> Option<VerifyingKey<vesta::Affine>> {
@@ -45,10 +48,6 @@ impl ValidityPredicateVerifyingKey {
             }
             ValidityPredicateVerifyingKey::Compressed(v) => *v,
         }
-    }
-
-    pub fn dummy(rng: &mut impl RngCore) -> Self {
-        Self::Compressed(pallas::Base::random(rng))
     }
 }
 
