@@ -35,11 +35,11 @@ Note is an immutable particle of the application state in the UTXO model.
 |`v`|u64|Fungible quantity specific to a note type|
 |`cm_nk`|$\mathbb{F}_p$|Commitment to the nullifier key that will be used to derive the note's nullifier|
 |`ρ`|$\mathbb{F}_p$|The nullifier `nf` of the consumed note is equal to the `ρ` of the created note from the same Action description (see Orchard). This guarantees the uniqueness of a note|
-|`ψ`|$\mathbb{F}_p$|$ψ = PRF(0, rseed, ρ)$|
-|`is_merkle_checked`|bool|Ephemeral note flag. It indicates whether the note's commitment Merkle path should be checked when consuming the note.|
-|`rcm_note`|$F_q$|A random commitment trapdoor $rcm\_note = PRF^{\texttt{rcm\_note}}(1, rseed, ρ)$|
+|`ψ`|$\mathbb{F}_p$|$ψ = PRF^{\psi}(0, rseed, ρ)$|
+|`is_merkle_checked`|bool|Checked note flag. It indicates whether the note's commitment Merkle path should be checked when consuming the note.|
+|`rcm_note`|$F_q$|A random commitment trapdoor $rcm\_{note} = PRF^{\texttt{rcm_note}}(1, rseed, ρ)$|
 
-Note: the value size cannot be bigger or close to the curve's scalar field size (to avoid overflowing) but besides that there are no strict reasons for choosing 64. We can use more notes to express a value that doesn't fit in one note (splitting the value into limbs). Having bigger value size requires fewer notes to express such a value and is more efficient. For example, a value size of 128 bits would require two times less notes to express a maximum value
+Note: the value size cannot be bigger or close to the curve's scalar field size (to avoid overflowing) but besides that there are no strict reasons for choosing `u64`. We can use more notes to express a value that doesn't fit in one note (splitting the value into limbs). Having bigger value size requires fewer notes to express such a value and is more efficient. For example, a value size of 128 bits would require two times less notes to express a maximum value
 
 #### Derivation of random parameters
 
@@ -62,31 +62,29 @@ Each note has three fields with application data.
 
 #### Note type
 
-Note type is used to distinguish note types. Notes with different types have different note types. The type of a note is derived from two application-related fields: `cm_app_vk` and `app_data_static`.
+The type of a note is derived from two application-related fields: `cm_app_vk` and `app_data_static`.
 
-$VB = PRF^{vb}(cm_{\texttt{app\_vk}}, \texttt{app\_data\_static})$
+$NT = PRF^{nt}(cm_{\texttt{app\_vk}}, \texttt{app\_data\_static})$
 
 #### Value commitment
 
 Used to ensure balance across the notes in an Action.
 
-Compare one-type value commitment computation used in Orchard (Orchard spec p. 93, homomorphic pedersen commitment):
-
-$[v^{in} - v^{out}]VB + [rcv]R$
-
-And multiple types value commitment computation used in Taiga:
-
-$cv = [v^{in}]VB^{in} - [v^{out}]VB^{out} + [rcv]R$
+Comparison between Orchard and Taiga's value commitment: 
+- Orchard: one-type value commitment computation (Orchard spec p. 93, homomorphic pedersen commitment):
+$cv = [v^{in} - v^{out}]NT + [rcv]R$
+- Taiga: multiple types value commitment computation used in Taiga:
+$cv = [v^{in}]NT^{in} - [v^{out}]NT^{out} + [rcv]R$
 
 |Variable|Type/size|Description|
 |-|-|-|
 |$v^{in}$|${0..2^{64} - 1}$||
 |$v^{out}$|${0..2^{64} - 1}$||
-|$VB^{in}$|outer curve point|Input note's type|
-|$VB^{out}$|outer curve point|Output note's type|
-|`R`|outer curve point|Randomness base, fixed|
-|`rcv`|${0..2^{255} - 1}$|Value commitment trapdoor|
-|`cv`|outer curve point||
+|$NT^{in}$|$E_p$|Input note's type|
+|$NT^{out}$|$E_p$|Output note's type|
+|`R`|$E_p$|Randomness base, fixed|
+|`rcv`|$\mathbb{F}_q$|Value commitment trapdoor|
+|`cv`|$E_p$||
 
 ### 2.3 Note commitment
 
@@ -94,7 +92,7 @@ Note commitments are stored in a global commitment tree. The global commitment t
 
 |Name|Type/size|Description|
 |-|-|-|
-|`cm` |outer curve point|$cm = \mathrm{NoteCom}(note, rcm\_note)$|
+|`cm` |$E_p$|$cm = \mathrm{NoteCom}(note, rcm\_{note})$|
 
 ### 2.4 Nullifier
 Note nullifiers are stored in a global nullifier set. Adding a note's nullifier to the set invalidates the note. We use the same nullifier derivation algorithm as in Orchard: $\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF^{nf}_{nk}(ρ) + ψ \mod{q}]K + cm)$.
@@ -103,11 +101,11 @@ Note nullifiers are stored in a global nullifier set. Adding a note's nullifier 
 |-|-|-|
 |`nf`|$\mathbb F_p$|$nf = \mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm)$
 |`nk` | $\mathbb F_p$ | the nullifier deriving key|
-|`ρ`| $\mathbb{F}_p$ | an old nullifier|
+|`ρ`| $\mathbb{F}_p$ | the nullifier of an old (consumed) note|
 |`ψ`| $\mathbb{F}_p$ | additional nullifier randomness|
-|`cm` | outer curve point| note commitment |
-|`K`|outer curve point| a fixed base generator of the inner curve|
-|`Extract` | $(\mathbb F_p$, $\mathbb F_p) \rightarrow \mathbb F_p$ | the $x$ coordinate of an (inner curve) point|
+|`cm` | $E_p$| note commitment |
+|`K`|$E_p$| a fixed base generator of the Pallas curve|
+|`Extract` | $(\mathbb F_p$, $\mathbb F_p) \rightarrow \mathbb F_p$ | the $x$ coordinate of a point in $E_p$|
 |$PRF^{nf}_{nk}(\rho)$|$\mathrm{F}_p \times \mathrm{F}_p \rightarrow \mathrm{F}_p$||
 
 
@@ -137,8 +135,8 @@ $ce = Encrypt(note, sk)$
 
 Not all of the note fields require to be encrypted (e.g. note commitment), and the encrypted fields may vary depending on the application. To make sure it is flexible enough, the encryption check is performed in VP circuits.
 
-### 2.6 Ephemeral notes and dummy notes
-A note is _ephemeral_ if it doesn’t need to be inserted in the note commitment tree (i.e. created) before it can be consumed. An ephemeral note is marked ephemeral by setting the `is_merkle_checked` flag to `false`. For ephemeral notes the Merkle authentication path is not checked when consuming the note. An example of an ephemeral note is an _intent note_, since both the creation and the consumption of an intent happen within the same transaction.
+### 2.6 Unchecked notes and dummy notes
+A note is _unchecked_ if it doesn’t need to be inserted in the note commitment tree (i.e. created) before it can be consumed. An unchecked note is marked unchecked by setting the `is_merkle_checked` flag to `false`. For unchecked notes the Merkle authentication path is not checked when consuming the note. An example of an unchecked note is an _intent note_, since both the creation and the consumption of an intent happen within the same transaction.
 
 As in ZCash, a note is _dummy_ if its `value` field is zero and therefore it doesn’t affect the balance of a transaction.
 
@@ -173,9 +171,9 @@ Note: opening of a parameter is every field used to derive the parameter
     - Commitment integrity(output note only): $cm = NoteCom(note, rcm_{note})$
     - Application VP integrity: $cm_{vp} = VPCommit(cm_{\texttt{app\_vk}}, rcm_{vp})$
     - Value base integrity: $nt = PRF(cm_{app\_vk}, \texttt{app\_data\_static})$
-- Value commitment integrity: $cv = ValueCommit(v_{in}, v_{out}, VB_{in}, VB_{out}, rcv)$
+- Value commitment integrity: $cv = ValueCommit(v_{in}, v_{out}, NT_{in}, NT_{out}, rcv)$
 
-Note: unlike MASP, the type in Taiga is not used to compute note's commitment and the Action circuit doesn't take `vb` as private input but computes it from the note fields, and it is checked for both input and output notes.
+Note: unlike MASP, the type in Taiga is not used to compute note's commitment and the Action circuit doesn't take `nt` as private input but computes it from the note fields, and it is checked for both input and output notes.
 
 ### 3.2 Validity Predicate (VP) circuits
 Validity predicate is a circuit containing the application logic. Validity predicates take `n` input and `n` output notes, are represented as Halo2 circuits `VP(x; w) ⟶ 0/1` and arithmetized over $\mathbb{F}_p$.
@@ -209,19 +207,19 @@ All other constraints enforced by VP circuits are custom.
 A VP takes all notes from the current `ptx` as input which requires a mechanism to determine which note is the application's note being currently checked. Currently, to determine whether a note belongs to the application or not, Taiga passes the note commitment (for output notes) or the nullifier (for input notes) of the owned note as a tag. The VP identifies the owned note by its tag.
 
 #### VP commitment
-In the presense of a VP proof for a certain note, VP commitment is used to make sure the right VP is checked for the note. It makes sure that `vp_vk` the note refers to and `vp_vk` used to validate the VP proof are the same.
+In the presence of a VP proof for a certain note, VP commitment is used to make sure the right VP is checked for the note. It makes sure that `vp_vk` the note refers to and `vp_vk` used to validate the VP proof are the same.
 
-VP commitment has a nested structure: `VPCommit(vp, rcm_vp) = Com(cm_vp_vk, rcm_vp), cm_vp_vk = VKCom(vp_vk)`.
+VP commitment has a nested structure: `VPCommit(vp, rcm_vp) = Com(cm_vp_vk, rcm_vp)`, where `cm_vp_vk = VKCommit(vp_vk)`.
 
 The check is done in two parts:
 1. The Action circuit checks that the VP commitment `cm_vp` is derived with `cm_vp_vk` the note refers to:
-`cm_vp = VPCommit(cm_vp_vk, rcm_vp)`
+`cm_vp = Com(cm_vp_vk, rcm_vp)`
 2. The verifier circuit checks that the VP commitment is computed using the `vp_vk` that is used to validate the VP proof:
-`cm_vp = VPCommit(VKCommit(vp_vk), rcm_vp)`
+`cm_vp = Com(VKCommit(vp_vk), rcm_vp)`
 
 As the outer commitment `VPCommit` is verified in both Action and verifier circuit which are arithmetized over different fields, the outer commitment instantiation should be efficient over both fields.
 
-As the inner commitment `VKCommit` is only opened in the verifier circuit, it only needs to be efficient over the outer curve's scalar field.
+As the inner commitment `VKCommit` is only opened in the verifier circuit, it only needs to be efficient over the pallas curve's scalar field $\mathbb{F}_q$.
 
 ## 4. Circuit Accumulation
 TBD: Halo2 accumulation
@@ -237,12 +235,12 @@ Certain applications might allow to create more value from less input value, whi
 |-|-|-|-|
 |$PRF^{nf}$|Poseidon|$\mathrm{F}_p \times \mathrm{F}_p \rightarrow \mathrm{F}_p$|$PRF^{nf}_{nk}(ρ) = Poseidon(nk, \rho)$|
 |$PRF^{nk}$|Blake2s|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|$PRF^{nk}_{r}(\texttt{PERSONALIZATION\_{NK}}) = Blake2s(\texttt{PERSONALIZATION\_{NK}}, r)$| Used to derive `nk`; currently not implemented
-|$PRF^{vb}$|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$PRF^{vb} = hash\_to\_curve(Poseidon(app\_vk, \texttt{app\_data\_static}))$
+|$PRF^{nt}$|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$PRF^{nt} = hash\_to\_curve(Poseidon(app\_vk, \texttt{app\_data\_static}))$
 |$PRF^{\texttt{rcm\_note}}$|Blake2b|$ \mathrm{F}_p \times \mathrm{F}_p \times \mathrm{F}_p \rightarrow \mathrm{F}_p$|Used to derive note commitment randomness|
 |$PRF^{ψ}$|Blake2b|$\mathrm{F}_p \times \mathrm{F}_p \times \mathrm{F}_p \rightarrow \mathrm{F}_p$|Used to derive ψ|
 |`NKCommit`|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|$NKCommit(nk) = Poseidon(nk,\texttt{user\_derived\_key})$; used to protect `nk` stored in a note. `user_derived_key` is currently not used
 |`NoteCommit`|[Sincemilla](https://zcash.github.io/halo2/design/gadgets/sinsemilla.html)|$\mathrm{F}_p \rightarrow \mathrm{F}_p \times \mathrm{F}_p$|
-|`ValueCommit`|Pedersen with variable type|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$cv = [v_i] * VB_i - [v_o] * VB_o + [r]R$
+|`ValueCommit`|Pedersen with variable type|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$cv = [v_i] * NT_i - [v_o] * NT_o + [r]R$
 |`VPCommit`|Blake2s||Efficient over both $\mathrm{F}_p$ and $\mathrm{F}_q$
 |`VKCommit`|-||Efficient over the outer curve's scalar field|
 |address|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$| `address = Poseidon(app_data_dynamic, cm_nk)`; compresses the data fields that contain some ownership information
