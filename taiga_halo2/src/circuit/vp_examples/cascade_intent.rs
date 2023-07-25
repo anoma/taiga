@@ -23,7 +23,6 @@ use crate::{
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use halo2_proofs::{
-    arithmetic::Field,
     circuit::{floor_planner, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
@@ -52,23 +51,6 @@ impl CascadeIntentValidityPredicateCircuit {
     // We can encode at most three notes to app_data_static if needed.
     pub fn encode_app_data_static(cascade_note_cm: pallas::Base) -> pallas::Base {
         cascade_note_cm
-    }
-
-    // TODO: Move the random function to the test mod
-    pub fn random<R: RngCore>(mut rng: R) -> Self {
-        let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let cascade_input_note = Note::dummy(&mut rng);
-        let cascade_note_cm = cascade_input_note.commitment().get_x();
-        let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        let nk = NullifierKeyContainer::random_key(&mut rng);
-        let intent_note = create_intent_note(&mut rng, cascade_note_cm, rho, nk);
-        let input_notes = [intent_note, cascade_input_note];
-        Self {
-            owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
-            input_notes,
-            output_notes,
-            cascade_note_cm,
-        }
     }
 }
 
@@ -178,11 +160,31 @@ pub fn create_intent_note<R: RngCore>(
 
 #[test]
 fn test_halo2_cascade_intent_vp_circuit() {
+    use crate::note::tests::{random_input_note, random_output_note};
+    use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
-    let circuit = CascadeIntentValidityPredicateCircuit::random(&mut rng);
+    let circuit = {
+        let cascade_input_note = random_input_note(&mut rng);
+        let cascade_note_cm = cascade_input_note.commitment().get_x();
+        let rho = Nullifier::new(pallas::Base::random(&mut rng));
+        let nk = NullifierKeyContainer::random_key(&mut rng);
+        let intent_note = create_intent_note(&mut rng, cascade_note_cm, rho, nk);
+        let input_notes = [intent_note, cascade_input_note];
+        let output_notes = input_notes
+            .iter()
+            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
+            .collect::<Vec<_>>();
+
+        CascadeIntentValidityPredicateCircuit {
+            owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
+            input_notes,
+            output_notes: output_notes.try_into().unwrap(),
+            cascade_note_cm,
+        }
+    };
     let public_inputs = circuit.get_public_inputs(&mut rng);
 
     let prover =

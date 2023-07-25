@@ -177,27 +177,6 @@ impl ValidityPredicateConfig for SudokuAppValidityPredicateConfig {
 }
 
 impl SudokuAppValidityPredicateCircuit {
-    #![allow(dead_code)]
-    pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let encoded_init_state = SudokuState::default().encode();
-        let previous_state = SudokuState::default();
-        let current_state = SudokuState::default();
-        output_notes[0].note_type.app_data_static =
-            poseidon_hash(encoded_init_state, current_state.encode());
-        output_notes[0].value = 1u64;
-        let owned_note_pub_id = output_notes[0].commitment().get_x();
-        Self {
-            owned_note_pub_id,
-            input_notes,
-            output_notes,
-            encoded_init_state,
-            previous_state,
-            current_state,
-        }
-    }
-
     // Copy from valid_puzzle/circuit.rs
     #[allow(clippy::too_many_arguments)]
     fn check_puzzle(
@@ -612,13 +591,91 @@ impl ValidityPredicateCircuit for SudokuAppValidityPredicateCircuit {
 
 vp_circuit_impl!(SudokuAppValidityPredicateCircuit);
 
+#[cfg(test)]
+pub mod tests {
+    use halo2_proofs::arithmetic::Field;
+    use pasta_curves::pallas;
+    use rand::{Rng, RngCore};
+    use taiga_halo2::{
+        note::{Note, NoteType, RandomSeed},
+        nullifier::{Nullifier, NullifierKeyContainer},
+    };
+
+    pub fn random_input_note<R: RngCore>(mut rng: R) -> Note {
+        let rho = Nullifier::new(pallas::Base::random(&mut rng));
+        let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
+        let note_type = {
+            let app_vk = pallas::Base::random(&mut rng);
+            let app_data_static = pallas::Base::random(&mut rng);
+            NoteType::new(app_vk, app_data_static)
+        };
+        let app_data_dynamic = pallas::Base::random(&mut rng);
+        let value: u64 = rng.gen();
+        let rseed = RandomSeed::random(&mut rng);
+        Note {
+            note_type,
+            app_data_dynamic,
+            value,
+            nk_container: nk,
+            is_merkle_checked: true,
+            psi: rseed.get_psi(&rho),
+            rcm: rseed.get_rcm(&rho),
+            rho,
+        }
+    }
+
+    pub fn random_output_note<R: RngCore>(mut rng: R, rho: Nullifier) -> Note {
+        let nk_com = NullifierKeyContainer::from_commitment(pallas::Base::random(&mut rng));
+        let note_type = {
+            let app_vk = pallas::Base::random(&mut rng);
+            let app_data_static = pallas::Base::random(&mut rng);
+            NoteType::new(app_vk, app_data_static)
+        };
+        let app_data_dynamic = pallas::Base::random(&mut rng);
+        let value: u64 = rng.gen();
+        let rseed = RandomSeed::random(&mut rng);
+        Note {
+            note_type,
+            app_data_dynamic,
+            value,
+            nk_container: nk_com,
+            is_merkle_checked: true,
+            psi: rseed.get_psi(&rho),
+            rcm: rseed.get_rcm(&rho),
+            rho,
+        }
+    }
+}
+
 #[test]
 fn test_halo2_sudoku_app_vp_circuit_init() {
+    use crate::app_vp::tests::{random_input_note, random_output_note};
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
-    let circuit = SudokuAppValidityPredicateCircuit::dummy(&mut rng);
+    let circuit = {
+        let input_notes = [(); NUM_NOTE].map(|_| random_input_note(&mut rng));
+        let mut output_notes = input_notes
+            .iter()
+            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
+            .collect::<Vec<_>>();
+        let encoded_init_state = SudokuState::default().encode();
+        let previous_state = SudokuState::default();
+        let current_state = SudokuState::default();
+        output_notes[0].note_type.app_data_static =
+            poseidon_hash(encoded_init_state, current_state.encode());
+        output_notes[0].value = 1u64;
+        let owned_note_pub_id = output_notes[0].commitment().get_x();
+        SudokuAppValidityPredicateCircuit {
+            owned_note_pub_id,
+            input_notes,
+            output_notes: output_notes.try_into().unwrap(),
+            encoded_init_state,
+            previous_state,
+            current_state,
+        }
+    };
     let public_inputs = circuit.get_public_inputs(&mut rng);
 
     let prover =
@@ -628,14 +685,18 @@ fn test_halo2_sudoku_app_vp_circuit_init() {
 
 #[test]
 fn test_halo2_sudoku_app_vp_circuit_update() {
+    use crate::app_vp::tests::{random_input_note, random_output_note};
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     // Construct circuit
     let circuit = {
-        let mut input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let mut input_notes = [(); NUM_NOTE].map(|_| random_input_note(&mut rng));
+        let mut output_notes = input_notes
+            .iter()
+            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
+            .collect::<Vec<_>>();
         let init_state = SudokuState {
             state: [
                 [5, 0, 1, 6, 7, 2, 4, 3, 9],
@@ -686,7 +747,7 @@ fn test_halo2_sudoku_app_vp_circuit_update() {
         SudokuAppValidityPredicateCircuit {
             owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
             input_notes,
-            output_notes,
+            output_notes: output_notes.try_into().unwrap(),
             encoded_init_state,
             previous_state,
             current_state,
@@ -699,14 +760,19 @@ fn test_halo2_sudoku_app_vp_circuit_update() {
     assert_eq!(prover.verify(), Ok(()));
 }
 
-pub fn halo2_sudoku_app_vp_circuit_final() {
+#[test]
+fn halo2_sudoku_app_vp_circuit_final() {
+    use crate::app_vp::tests::{random_input_note, random_output_note};
     use halo2_proofs::dev::MockProver;
 
     let mut rng = OsRng;
     // Construct circuit
     let circuit = {
-        let mut input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let mut input_notes = [(); NUM_NOTE].map(|_| random_input_note(&mut rng));
+        let mut output_notes = input_notes
+            .iter()
+            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
+            .collect::<Vec<_>>();
         let init_state = SudokuState {
             state: [
                 [5, 0, 1, 6, 7, 2, 4, 3, 9],
@@ -757,7 +823,7 @@ pub fn halo2_sudoku_app_vp_circuit_final() {
         SudokuAppValidityPredicateCircuit {
             owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
             input_notes,
-            output_notes,
+            output_notes: output_notes.try_into().unwrap(),
             encoded_init_state,
             previous_state,
             current_state,
@@ -768,9 +834,4 @@ pub fn halo2_sudoku_app_vp_circuit_final() {
     let prover =
         MockProver::<pallas::Base>::run(13, &circuit, vec![public_inputs.to_vec()]).unwrap();
     assert_eq!(prover.verify(), Ok(()));
-}
-
-#[test]
-pub fn test_halo2_sudoku_app_vp_circuit_final() {
-    halo2_sudoku_app_vp_circuit_final();
 }

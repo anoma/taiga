@@ -16,9 +16,7 @@ use crate::{
             VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
             ValidityPredicateInfo, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
         },
-        vp_examples::token::{
-            transfrom_token_name_to_token_property, Token, COMPRESSED_TOKEN_VK, TOKEN_VK,
-        },
+        vp_examples::token::{transfrom_token_name_to_token_property, Token, TOKEN_VK},
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::{Note, RandomSeed},
@@ -28,7 +26,6 @@ use crate::{
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use halo2_proofs::{
-    arithmetic::Field,
     circuit::{floor_planner, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
@@ -76,38 +73,6 @@ impl PartialFulfillmentIntentValidityPredicateCircuit {
             pallas::Base::zero(),
             pallas::Base::zero(),
         ])
-    }
-
-    // TODO: Move the random function to the test mod
-    pub fn random<R: RngCore>(mut rng: R) -> Self {
-        let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let sell = Token {
-            name: "token1".to_string(),
-            value: 2u64,
-        };
-        let buy = Token {
-            name: "token2".to_string(),
-            value: 4u64,
-        };
-        output_notes[0].note_type.app_vk = *COMPRESSED_TOKEN_VK;
-        output_notes[0].note_type.app_data_static =
-            transfrom_token_name_to_token_property(&sell.name);
-        output_notes[0].value = sell.value;
-        let receiver_address = output_notes[0].get_address();
-
-        let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        let nk = NullifierKeyContainer::random_key(&mut rng);
-        let intent_note = create_intent_note(&mut rng, &sell, &buy, receiver_address, rho, nk);
-        let padding_input_note = Note::dummy(&mut rng);
-        let input_notes = [intent_note, padding_input_note];
-        Self {
-            owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
-            input_notes,
-            output_notes,
-            sell,
-            buy,
-            receiver_address,
-        }
     }
 }
 
@@ -387,7 +352,7 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
                 || "conditional equal: check returned token address",
                 |mut region| {
                     config.conditional_equal_config.assign_region(
-                        &is_input_note,
+                        &is_partial_fulfillment,
                         &receiver_address,
                         &basic_variables.output_note_variables[1]
                             .note_variables
@@ -475,6 +440,8 @@ pub fn create_intent_note<R: RngCore>(
 
 #[test]
 fn test_halo2_partial_fulfillment_intent_vp_circuit() {
+    use crate::{circuit::vp_examples::token::COMPRESSED_TOKEN_VK, note::tests::random_input_note};
+    use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
@@ -489,8 +456,7 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
         value: 4u64,
     };
 
-    let dummy_note = Note::dummy(&mut rng);
-    let mut sold_note = dummy_note;
+    let mut sold_note = random_input_note(&mut rng);
     sold_note.note_type.app_vk = *COMPRESSED_TOKEN_VK;
     sold_note.note_type.app_data_static = transfrom_token_name_to_token_property(&sell.name);
     sold_note.value = sell.value;
@@ -500,8 +466,11 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
     let intent_note = create_intent_note(&mut rng, &sell, &buy, receiver_address, rho, nk);
     // Creating intent test
     {
-        let input_notes = [sold_note, dummy_note];
-        let output_notes = [intent_note, dummy_note];
+        let input_padding_note = Note::random_padding_input_note(&mut rng);
+        let input_notes = [sold_note, input_padding_note];
+        let output_padding_note =
+            Note::random_padding_output_note(&mut rng, input_padding_note.get_nf().unwrap());
+        let output_notes = [intent_note, output_padding_note];
 
         let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
             owned_note_pub_id: intent_note.commitment().get_x(),
@@ -521,7 +490,8 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
     // Consuming intent test
     {
         {
-            let input_notes = [intent_note, dummy_note];
+            let input_padding_note = Note::random_padding_input_note(&mut rng);
+            let input_notes = [intent_note, input_padding_note];
             let mut bought_note = sold_note;
             bought_note.note_type.app_data_static =
                 transfrom_token_name_to_token_property(&buy.name);
@@ -531,7 +501,11 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
             // full fulfillment
             {
                 bought_note.value = buy.value;
-                let output_notes = [bought_note, dummy_note];
+                let output_padding_note = Note::random_padding_output_note(
+                    &mut rng,
+                    input_padding_note.get_nf().unwrap(),
+                );
+                let output_notes = [bought_note, output_padding_note];
 
                 let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
                     owned_note_pub_id: intent_note.get_nf().unwrap().inner(),

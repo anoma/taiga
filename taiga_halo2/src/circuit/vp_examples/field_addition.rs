@@ -16,7 +16,6 @@ use crate::{
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use halo2_proofs::{
-    arithmetic::Field,
     circuit::{floor_planner, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
@@ -32,23 +31,6 @@ struct FieldAdditionValidityPredicateCircuit {
     output_notes: [Note; NUM_NOTE],
     a: pallas::Base,
     b: pallas::Base,
-}
-
-impl FieldAdditionValidityPredicateCircuit {
-    pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let a = pallas::Base::random(&mut rng);
-        let b = pallas::Base::random(&mut rng);
-        let owned_note_pub_id = pallas::Base::zero();
-        Self {
-            owned_note_pub_id,
-            input_notes,
-            output_notes,
-            a,
-            b,
-        }
-    }
 }
 
 impl ValidityPredicateInfo for FieldAdditionValidityPredicateCircuit {
@@ -117,11 +99,29 @@ vp_circuit_impl!(FieldAdditionValidityPredicateCircuit);
 
 #[test]
 fn test_halo2_addition_vp_circuit() {
+    use crate::note::tests::{random_input_note, random_output_note};
+    use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
-    let circuit = FieldAdditionValidityPredicateCircuit::dummy(&mut rng);
+    let circuit = {
+        let input_notes = [(); NUM_NOTE].map(|_| random_input_note(&mut rng));
+        let output_notes = input_notes
+            .iter()
+            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
+            .collect::<Vec<_>>();
+        let a = pallas::Base::random(&mut rng);
+        let b = pallas::Base::random(&mut rng);
+        let owned_note_pub_id = pallas::Base::random(&mut rng);
+        FieldAdditionValidityPredicateCircuit {
+            owned_note_pub_id,
+            input_notes,
+            output_notes: output_notes.try_into().unwrap(),
+            a,
+            b,
+        }
+    };
     let public_inputs = circuit.get_public_inputs(&mut rng);
 
     let prover =

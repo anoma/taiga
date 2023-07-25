@@ -94,12 +94,11 @@ pub fn merkle_poseidon_gadget(
                 Value::known(is_left(e.1)),
             )?
         };
-        let poseidon_message = [pair.0, pair.1];
 
         cur = poseidon_hash_gadget(
             chip.config().poseidon_config.clone(),
             layouter.namespace(|| "merkle poseidon hash"),
-            poseidon_message,
+            [pair.0, pair.1],
         )?;
     }
 
@@ -109,8 +108,7 @@ pub fn merkle_poseidon_gadget(
 #[test]
 fn test_halo2_merkle_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
-    use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
-    use crate::merkle_tree::{MerklePath, Node};
+    use crate::merkle_tree::{tests::random_merkle_path, MerklePath, Node};
     use halo2_gadgets::poseidon::{primitives as poseidon, Pow5Chip as PoseidonChip};
     use halo2_proofs::{
         arithmetic::Field,
@@ -206,7 +204,7 @@ fn test_halo2_merkle_circuit() {
     let mut rng = OsRng;
 
     let leaf = pallas::Base::random(rng);
-    let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+    let merkle_path = random_merkle_path(&mut rng);
 
     let circuit = MyCircuit { leaf, merkle_path };
 
