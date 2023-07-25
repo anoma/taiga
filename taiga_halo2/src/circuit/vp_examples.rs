@@ -16,7 +16,6 @@ use halo2_proofs::{
 use lazy_static::lazy_static;
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
-use rand::RngCore;
 
 pub mod cascade_intent;
 mod field_addition;
@@ -41,10 +40,11 @@ pub struct TrivialValidityPredicateCircuit {
 }
 
 impl TrivialValidityPredicateCircuit {
-    pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        let owned_note_pub_id = pallas::Base::zero();
-        let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+    pub fn new(
+        owned_note_pub_id: pallas::Base,
+        input_notes: [Note; NUM_NOTE],
+        output_notes: [Note; NUM_NOTE],
+    ) -> Self {
         Self {
             owned_note_pub_id,
             input_notes,
@@ -77,15 +77,41 @@ impl ValidityPredicateCircuit for TrivialValidityPredicateCircuit {
 
 vp_circuit_impl!(TrivialValidityPredicateCircuit);
 
-#[test]
-fn test_halo2_dummy_vp_circuit() {
-    use halo2_proofs::dev::MockProver;
-    use rand::rngs::OsRng;
+#[cfg(test)]
+pub mod tests {
+    use super::TrivialValidityPredicateCircuit;
+    use crate::{
+        constant::NUM_NOTE,
+        note::tests::{random_input_note, random_output_note},
+    };
+    use ff::Field;
+    use pasta_curves::pallas;
+    use rand::RngCore;
+    pub fn random_trivial_vp_circuit<R: RngCore>(mut rng: R) -> TrivialValidityPredicateCircuit {
+        let owned_note_pub_id = pallas::Base::random(&mut rng);
+        let input_notes = [(); NUM_NOTE].map(|_| random_input_note(&mut rng));
+        let output_notes = input_notes
+            .iter()
+            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
+            .collect::<Vec<_>>();
+        TrivialValidityPredicateCircuit::new(
+            owned_note_pub_id,
+            input_notes,
+            output_notes.try_into().unwrap(),
+        )
+    }
 
-    let mut rng = OsRng;
-    let circuit = TrivialValidityPredicateCircuit::dummy(&mut rng);
-    let instances = circuit.get_instances();
+    #[test]
+    fn test_halo2_trivial_vp_circuit() {
+        use crate::circuit::vp_circuit::ValidityPredicateInfo;
+        use halo2_proofs::dev::MockProver;
+        use rand::rngs::OsRng;
 
-    let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances]).unwrap();
-    assert_eq!(prover.verify(), Ok(()));
+        let mut rng = OsRng;
+        let circuit = random_trivial_vp_circuit(&mut rng);
+        let instances = circuit.get_instances();
+
+        let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances]).unwrap();
+        assert_eq!(prover.verify(), Ok(()));
+    }
 }

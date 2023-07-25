@@ -102,18 +102,14 @@ impl GetOwnedNoteVariableConfig {
                 nf_or_cm_minus_owned_note_pub_id_vec
                     .clone()
                     .into_iter()
-                    .zip(inv_vec.into_iter())
+                    .zip(inv_vec)
                     .map(|(nf_or_cm_minus_owned_note_pub_id, inv)| {
                         one.clone() - nf_or_cm_minus_owned_note_pub_id * inv
                     })
                     .collect();
             let poly_vec: Vec<Expression<pasta_curves::Fp>> = nf_or_cm_minus_owned_note_pub_id_vec
                 .into_iter()
-                .zip(
-                    nf_or_cm_minus_owned_note_pub_id_is_zero_vec
-                        .clone()
-                        .into_iter(),
-                )
+                .zip(nf_or_cm_minus_owned_note_pub_id_is_zero_vec.clone())
                 .map(|(nf_or_cm_minus_owned_note_pub_id, is_zero)| {
                     nf_or_cm_minus_owned_note_pub_id * is_zero
                 })
@@ -189,10 +185,7 @@ impl GetOwnedNoteVariableConfig {
         )?;
 
         let mut ret = Value::known(pallas::Base::zero());
-        for (pair, column) in note_variable_pairs
-            .iter()
-            .zip(self.note_variable_pairs.into_iter())
-        {
+        for (pair, column) in note_variable_pairs.iter().zip(self.note_variable_pairs) {
             pair.src_variable
                 .copy_advice(|| "nf or cm", region, column, offset + 1)?;
             pair.target_variable

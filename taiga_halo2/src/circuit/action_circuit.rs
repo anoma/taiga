@@ -38,7 +38,7 @@ pub struct ActionCircuit {
     /// Input note
     pub input_note: Note,
     /// The authorization path of input note
-    pub auth_path: [(pallas::Base, LR); TAIGA_COMMITMENT_TREE_DEPTH],
+    pub merkle_path: [(pallas::Base, LR); TAIGA_COMMITMENT_TREE_DEPTH],
     /// Output note
     pub output_note: Note,
     /// random scalar for net value commitment
@@ -159,7 +159,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             layouter.namespace(|| "poseidon merkle"),
             merkle_chip,
             input_note_variables.cm_x,
-            &self.auth_path,
+            &self.merkle_path,
         )?;
 
         // TODO: user send address VP commitment and application VP commitment
@@ -237,7 +237,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
 
 #[test]
 fn test_halo2_action_circuit() {
-    use crate::action::ActionInfo;
+    use crate::action::tests::random_action_info;
     use crate::constant::{
         ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, SETUP_PARAMS_MAP,
     };
@@ -247,7 +247,7 @@ fn test_halo2_action_circuit() {
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
-    let action_info = ActionInfo::dummy(&mut rng);
+    let action_info = random_action_info(&mut rng);
     let (action, action_circuit) = action_info.build();
     let instances = vec![action.to_instance()];
     let prover =

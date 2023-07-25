@@ -9,7 +9,6 @@ use crate::{
             VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
             ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
-        vp_examples::receiver_vp::COMPRESSED_RECEIVER_VK,
     },
     constant::{TaigaFixedBasesFull, NUM_NOTE, SETUP_PARAMS_MAP},
     note::Note,
@@ -148,28 +147,6 @@ impl SignatureVerificationValidityPredicateCircuit {
             receiver_vp_vk,
         }
     }
-
-    // TODO: Move the random function to the test mod
-    pub fn random<R: RngCore>(mut rng: R) -> Self {
-        use crate::circuit::vp_examples::token::TokenAuthorization;
-
-        let mut input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let sk = pallas::Scalar::random(&mut rng);
-        let auth_vk = pallas::Base::random(&mut rng);
-        let auth = TokenAuthorization::from_sk_vk(&sk, &auth_vk);
-        input_notes[0].app_data_dynamic = auth.to_app_data_dynamic();
-        let owned_note_pub_id = input_notes[0].get_nf().unwrap().inner();
-        Self::from_sk_and_sign(
-            &mut rng,
-            owned_note_pub_id,
-            input_notes,
-            output_notes,
-            auth_vk,
-            sk,
-            *COMPRESSED_RECEIVER_VK,
-        )
-    }
 }
 
 impl ValidityPredicateInfo for SignatureVerificationValidityPredicateCircuit {
@@ -298,11 +275,35 @@ vp_circuit_impl!(SignatureVerificationValidityPredicateCircuit);
 
 #[test]
 fn test_halo2_sig_verification_vp_circuit() {
+    use crate::circuit::vp_examples::{
+        receiver_vp::COMPRESSED_RECEIVER_VK, token::TokenAuthorization,
+    };
+    use crate::note::tests::{random_input_note, random_output_note};
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
-    let circuit = SignatureVerificationValidityPredicateCircuit::random(&mut rng);
+    let circuit = {
+        let mut input_notes = [(); NUM_NOTE].map(|_| random_input_note(&mut rng));
+        let output_notes = input_notes
+            .iter()
+            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
+            .collect::<Vec<_>>();
+        let sk = pallas::Scalar::random(&mut rng);
+        let auth_vk = pallas::Base::random(&mut rng);
+        let auth = TokenAuthorization::from_sk_vk(&sk, &auth_vk);
+        input_notes[0].app_data_dynamic = auth.to_app_data_dynamic();
+        let owned_note_pub_id = input_notes[0].get_nf().unwrap().inner();
+        SignatureVerificationValidityPredicateCircuit::from_sk_and_sign(
+            &mut rng,
+            owned_note_pub_id,
+            input_notes,
+            output_notes.try_into().unwrap(),
+            auth_vk,
+            sk,
+            *COMPRESSED_RECEIVER_VK,
+        )
+    };
     let instances = circuit.get_instances();
 
     let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances]).unwrap();

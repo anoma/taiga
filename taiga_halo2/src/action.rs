@@ -1,7 +1,6 @@
 use crate::{
     circuit::action_circuit::ActionCircuit,
-    constant::TAIGA_COMMITMENT_TREE_DEPTH,
-    merkle_tree::MerklePath,
+    merkle_tree::{MerklePath, Node},
     note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
     nullifier::Nullifier,
     value_commitment::ValueCommitment,
@@ -24,15 +23,14 @@ pub struct ActionInstance {
     pub cm_x: pallas::Base,
     /// net value commitment
     pub cv_net: ValueCommitment,
-    // TODO: The EncryptedNote.
-    // encrypted_note,
 }
 
 /// The information to build ActionInstance and ActionCircuit.
 #[derive(Clone)]
 pub struct ActionInfo {
-    input: InputNoteProvingInfo,
-    output: OutputNoteProvingInfo,
+    input_note: Note,
+    input_merkle_path: MerklePath,
+    output_note: Note,
     rcv: pallas::Scalar,
 }
 
@@ -83,61 +81,85 @@ impl BorshDeserialize for ActionInstance {
 }
 
 impl ActionInfo {
-    pub fn new<R: RngCore>(
+    pub fn new(
+        input_note: Note,
+        input_merkle_path: MerklePath,
+        output_note: Note,
+        rcv: pallas::Scalar,
+    ) -> Self {
+        Self {
+            input_note,
+            input_merkle_path,
+            output_note,
+            rcv,
+        }
+    }
+
+    pub fn from_proving_info<R: RngCore>(
         input: InputNoteProvingInfo,
         output: OutputNoteProvingInfo,
         mut rng: R,
     ) -> Self {
         let rcv = pallas::Scalar::random(&mut rng);
-        Self { input, output, rcv }
+        Self {
+            input_note: input.note,
+            input_merkle_path: input.merkle_path,
+            output_note: output.note,
+            rcv,
+        }
     }
 
     pub fn get_rcv(&self) -> pallas::Scalar {
         self.rcv
     }
 
-    pub fn dummy<R: RngCore>(mut rng: R) -> Self {
-        use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
-        let input_note = Note::dummy(&mut rng);
-        let output_proving_info =
-            OutputNoteProvingInfo::dummy(&mut rng, input_note.get_nf().unwrap());
-        let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let app_vp_proving_info = Box::new(TrivialValidityPredicateCircuit::dummy(&mut rng));
-        let app_vp_proving_info_dynamic = vec![];
-        let input_proving_info = InputNoteProvingInfo::new(
-            input_note,
-            merkle_path,
-            app_vp_proving_info,
-            app_vp_proving_info_dynamic,
-        );
-
-        ActionInfo::new(input_proving_info, output_proving_info, &mut rng)
-    }
-
-    pub fn build(self) -> (ActionInstance, ActionCircuit) {
-        let nf = self.input.note.get_nf().unwrap();
+    pub fn build(&self) -> (ActionInstance, ActionCircuit) {
+        let nf = self.input_note.get_nf().unwrap();
         assert_eq!(
-            nf, self.output.note.rho,
+            nf, self.output_note.rho,
             "The nf of input note should be equal to the rho of output note"
         );
 
-        let cm_x = self.output.note.commitment().get_x();
+        let cm_x = self.output_note.commitment().get_x();
+        let anchor = {
+            let cm_node = Node::new(self.input_note.commitment().get_x());
+            self.input_merkle_path.root(cm_node).inner()
+        };
 
-        let cv_net = ValueCommitment::new(&self.input.note, &self.output.note, &self.rcv);
+        let cv_net = ValueCommitment::new(&self.input_note, &self.output_note, &self.rcv);
         let action = ActionInstance {
             nf,
             cm_x,
-            anchor: self.input.root,
+            anchor,
             cv_net,
         };
 
         let action_circuit = ActionCircuit {
-            input_note: self.input.note,
-            auth_path: self.input.auth_path,
-            output_note: self.output.note,
+            input_note: self.input_note,
+            merkle_path: self.input_merkle_path.get_path().try_into().unwrap(),
+            output_note: self.output_note,
             rcv: self.rcv,
         };
 
         (action, action_circuit)
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::ActionInfo;
+    use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
+    use crate::merkle_tree::MerklePath;
+    use crate::note::tests::{random_input_note, random_output_note};
+    use halo2_proofs::arithmetic::Field;
+    use pasta_curves::pallas;
+    use rand::RngCore;
+
+    pub fn random_action_info<R: RngCore>(mut rng: R) -> ActionInfo {
+        let input_note = random_input_note(&mut rng);
+        let output_note = random_output_note(&mut rng, input_note.get_nf().unwrap());
+        let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+        let rcv = pallas::Scalar::random(&mut rng);
+        ActionInfo::new(input_note, input_merkle_path, output_note, rcv)
     }
 }

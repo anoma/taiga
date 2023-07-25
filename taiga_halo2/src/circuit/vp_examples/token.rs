@@ -93,27 +93,6 @@ impl Default for TokenValidityPredicateCircuit {
     }
 }
 
-impl TokenValidityPredicateCircuit {
-    // TODO: Move the random function to the test mod
-    pub fn random<R: RngCore>(mut rng: R) -> Self {
-        let mut input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let token_name = "Token_name".to_string();
-        let auth = TokenAuthorization::random(&mut rng);
-        input_notes[0].note_type.app_data_static =
-            transfrom_token_name_to_token_property(&token_name);
-        input_notes[0].app_data_dynamic = auth.to_app_data_dynamic();
-        Self {
-            owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
-            input_notes,
-            output_notes,
-            token_name,
-            auth,
-            receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
-        }
-    }
-}
-
 impl ValidityPredicateInfo for TokenValidityPredicateCircuit {
     fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
         &self.input_notes
@@ -341,11 +320,32 @@ pub fn generate_output_token_note_proving_info<R: RngCore>(
 
 #[test]
 fn test_halo2_token_vp_circuit() {
+    use crate::note::tests::{random_input_note, random_output_note};
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
-    let circuit = TokenValidityPredicateCircuit::random(&mut rng);
+    let circuit = {
+        let mut input_notes = [(); NUM_NOTE].map(|_| random_input_note(&mut rng));
+        let output_notes = input_notes
+            .iter()
+            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
+            .collect::<Vec<_>>();
+        let token_name = "Token_name".to_string();
+        let auth = TokenAuthorization::random(&mut rng);
+        input_notes[0].note_type.app_data_static =
+            transfrom_token_name_to_token_property(&token_name);
+        input_notes[0].app_data_dynamic = auth.to_app_data_dynamic();
+        TokenValidityPredicateCircuit {
+            owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
+            input_notes,
+            output_notes: output_notes.try_into().unwrap(),
+            token_name,
+            auth,
+            receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
+        }
+    };
+
     let instances = circuit.get_instances();
 
     let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances]).unwrap();

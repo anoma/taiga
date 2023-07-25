@@ -79,15 +79,15 @@ pub fn create_token_swap_ptx<R: RngCore>(
     );
 
     // padding the zero notes
-    let padding_input_note = Note::dummy_zero_note(&mut rng, rho);
+    let padding_input_note = Note::random_padding_input_note(&mut rng);
     let padding_input_note_nf = padding_input_note.get_nf().unwrap();
-    let padding_output_note = Note::dummy_zero_note(&mut rng, padding_input_note_nf);
+    let padding_output_note = Note::random_padding_output_note(&mut rng, padding_input_note_nf);
 
     let input_notes = [input_note, padding_input_note];
     let output_notes = [output_note, padding_output_note];
 
     // Generate proving info
-    let merkle_path = MerklePath::dummy(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+    let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
     // Create the input note proving info
     let input_note_proving_info = generate_input_token_note_proving_info(

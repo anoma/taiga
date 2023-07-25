@@ -14,9 +14,7 @@ use crate::{
             VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
             ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
         },
-        vp_examples::token::{
-            transfrom_token_name_to_token_property, COMPRESSED_TOKEN_VK, TOKEN_VK,
-        },
+        vp_examples::token::{transfrom_token_name_to_token_property, TOKEN_VK},
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::{Note, RandomSeed},
@@ -26,7 +24,6 @@ use crate::{
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use halo2_proofs::{
-    arithmetic::Field,
     circuit::{floor_planner, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
@@ -80,45 +77,6 @@ impl OrRelationIntentValidityPredicateCircuit {
             pallas::Base::zero(),
             pallas::Base::zero(),
         ])
-    }
-
-    // TODO: Move the random function to the test mod
-    pub fn random<R: RngCore>(mut rng: R) -> Self {
-        let mut output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let condition1 = Condition {
-            token_name: "token1".to_string(),
-            token_value: 1u64,
-        };
-        let condition2 = Condition {
-            token_name: "token2".to_string(),
-            token_value: 2u64,
-        };
-        output_notes[0].note_type.app_vk = *COMPRESSED_TOKEN_VK;
-        output_notes[0].note_type.app_data_static =
-            transfrom_token_name_to_token_property(&condition1.token_name);
-        output_notes[0].value = condition1.token_value;
-        let receiver_address = output_notes[0].get_address();
-
-        let rho = Nullifier::new(pallas::Base::random(&mut rng));
-        let nk = NullifierKeyContainer::random_key(&mut rng);
-        let intent_note = create_intent_note(
-            &mut rng,
-            &condition1,
-            &condition2,
-            receiver_address,
-            rho,
-            nk,
-        );
-        let padding_input_note = Note::dummy(&mut rng);
-        let input_notes = [intent_note, padding_input_note];
-        Self {
-            owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
-            input_notes,
-            output_notes,
-            condition1,
-            condition2,
-            receiver_address,
-        }
     }
 }
 
@@ -323,11 +281,55 @@ pub fn create_intent_note<R: RngCore>(
 
 #[test]
 fn test_halo2_or_relation_intent_vp_circuit() {
+    use crate::{
+        circuit::vp_examples::token::COMPRESSED_TOKEN_VK, note::tests::random_output_note,
+        nullifier::tests::random_nullifier,
+    };
+    use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
-    let circuit = OrRelationIntentValidityPredicateCircuit::random(&mut rng);
+    let circuit = {
+        let mut output_notes = [(); NUM_NOTE].map(|_| {
+            let padding_rho = random_nullifier(&mut rng);
+            random_output_note(&mut rng, padding_rho)
+        });
+        let condition1 = Condition {
+            token_name: "token1".to_string(),
+            token_value: 1u64,
+        };
+        let condition2 = Condition {
+            token_name: "token2".to_string(),
+            token_value: 2u64,
+        };
+        output_notes[0].note_type.app_vk = *COMPRESSED_TOKEN_VK;
+        output_notes[0].note_type.app_data_static =
+            transfrom_token_name_to_token_property(&condition1.token_name);
+        output_notes[0].value = condition1.token_value;
+        let receiver_address = output_notes[0].get_address();
+
+        let rho = Nullifier::new(pallas::Base::random(&mut rng));
+        let nk = NullifierKeyContainer::random_key(&mut rng);
+        let intent_note = create_intent_note(
+            &mut rng,
+            &condition1,
+            &condition2,
+            receiver_address,
+            rho,
+            nk,
+        );
+        let padding_input_note = Note::random_padding_input_note(&mut rng);
+        let input_notes = [intent_note, padding_input_note];
+        OrRelationIntentValidityPredicateCircuit {
+            owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
+            input_notes,
+            output_notes,
+            condition1,
+            condition2,
+            receiver_address,
+        }
+    };
     let instances = circuit.get_instances();
 
     let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances]).unwrap();

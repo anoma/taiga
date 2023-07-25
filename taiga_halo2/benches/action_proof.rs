@@ -1,20 +1,74 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use halo2_proofs::{
+    arithmetic::Field,
     plonk::{create_proof, verify_proof, SingleVerifier},
     transcript::{Blake2bRead, Blake2bWrite},
 };
-use pasta_curves::vesta;
+use pasta_curves::{pallas, vesta};
 use rand::rngs::OsRng;
+use rand::Rng;
 use taiga_halo2::{
     action::ActionInfo,
     constant::{
         ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, SETUP_PARAMS_MAP,
+        TAIGA_COMMITMENT_TREE_DEPTH,
     },
+    merkle_tree::MerklePath,
+    note::{Note, NoteType, RandomSeed},
+    nullifier::{Nullifier, NullifierKeyContainer},
 };
 
 fn bench_action_proof(name: &str, c: &mut Criterion) {
     let mut rng = OsRng;
-    let action_info = ActionInfo::dummy(&mut rng);
+    let action_info = {
+        let input_note = {
+            let rho = Nullifier::new(pallas::Base::random(&mut rng));
+            let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
+            let note_type = {
+                let app_vk = pallas::Base::random(&mut rng);
+                let app_data_static = pallas::Base::random(&mut rng);
+                NoteType::new(app_vk, app_data_static)
+            };
+            let app_data_dynamic = pallas::Base::random(&mut rng);
+            let value: u64 = rng.gen();
+            let rseed = RandomSeed::random(&mut rng);
+            Note {
+                note_type,
+                app_data_dynamic,
+                value,
+                nk_container: nk,
+                is_merkle_checked: true,
+                psi: rseed.get_psi(&rho),
+                rcm: rseed.get_rcm(&rho),
+                rho,
+            }
+        };
+        let output_note = {
+            let rho = input_note.get_nf().unwrap();
+            let nk_com = NullifierKeyContainer::from_commitment(pallas::Base::random(&mut rng));
+            let note_type = {
+                let app_vk = pallas::Base::random(&mut rng);
+                let app_data_static = pallas::Base::random(&mut rng);
+                NoteType::new(app_vk, app_data_static)
+            };
+            let app_data_dynamic = pallas::Base::random(&mut rng);
+            let value: u64 = rng.gen();
+            let rseed = RandomSeed::random(&mut rng);
+            Note {
+                note_type,
+                app_data_dynamic,
+                value,
+                nk_container: nk_com,
+                is_merkle_checked: true,
+                psi: rseed.get_psi(&rho),
+                rcm: rseed.get_rcm(&rho),
+                rho,
+            }
+        };
+        let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+        let rcv = pallas::Scalar::random(&mut rng);
+        ActionInfo::new(input_note, input_merkle_path, output_note, rcv)
+    };
     let (action, action_circuit) = action_info.build();
     let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
 
