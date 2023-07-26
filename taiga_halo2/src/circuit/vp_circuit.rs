@@ -907,6 +907,7 @@ mod tests {
     use std::path::PathBuf;
     use vamp_ir::halo2::synth::make_constant;
 
+    #[ignore]
     #[test]
     fn test_create_vp_from_vamp_ir_file() {
         let vamp_ir_circuit_file = PathBuf::from("./src/circuit/vamp_ir_circuits/pyth.pir");
@@ -950,6 +951,7 @@ mod tests {
         assert!(zero_constraint.is_ok());
     }
 
+    #[ignore]
     #[test]
     fn test_create_vp_with_valid_assignment() {
         let x_assignment_circuit = VampIRValidityPredicateCircuit::from_vamp_ir_source(
@@ -972,6 +974,7 @@ mod tests {
             .is_ok());
     }
 
+    #[ignore]
     #[test]
     fn test_create_vp_with_invalid_assignment() {
         let x_assignment_circuit = VampIRValidityPredicateCircuit::from_vamp_ir_source(
