@@ -7,7 +7,7 @@ use crate::{
         vp_circuit::{
             BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
             VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
+            ValidityPredicateInfo, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
         },
         vp_examples::receiver_vp::{ReceiverValidityPredicateCircuit, COMPRESSED_RECEIVER_VK},
         vp_examples::signature_verification::{
@@ -16,7 +16,7 @@ use crate::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     merkle_tree::MerklePath,
-    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
+    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
     proof::Proof,
     utils::poseidon_hash_n,
     vp_vk::ValidityPredicateVerifyingKey,
@@ -102,8 +102,14 @@ impl ValidityPredicateInfo for TokenValidityPredicateCircuit {
         &self.output_notes
     }
 
-    fn get_instances(&self) -> Vec<pallas::Base> {
-        self.get_note_instances()
+    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
+        let mut public_inputs = self.get_mandatory_public_inputs();
+        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
+            public_inputs.len(),
+            &RandomSeed::random(&mut rng),
+        );
+        public_inputs.extend(padding);
+        public_inputs.into()
     }
 
     fn get_owned_note_pub_id(&self) -> pallas::Base {
@@ -346,8 +352,9 @@ fn test_halo2_token_vp_circuit() {
         }
     };
 
-    let instances = circuit.get_instances();
+    let public_inputs = circuit.get_public_inputs(&mut rng);
 
-    let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances]).unwrap();
+    let prover =
+        MockProver::<pallas::Base>::run(12, &circuit, vec![public_inputs.to_vec()]).unwrap();
     assert_eq!(prover.verify(), Ok(()));
 }

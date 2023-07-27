@@ -7,9 +7,9 @@ use crate::circuit::merkle_circuit::{
 use crate::circuit::note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig};
 use crate::constant::{
     NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases,
-    ACTION_ANCHOR_INSTANCE_ROW_IDX, ACTION_NET_VALUE_CM_X_INSTANCE_ROW_IDX,
-    ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX, ACTION_NF_INSTANCE_ROW_IDX,
-    ACTION_OUTPUT_CM_INSTANCE_ROW_IDX, TAIGA_COMMITMENT_TREE_DEPTH,
+    ACTION_ANCHOR_PUBLIC_INPUT_ROW_IDX, ACTION_NET_VALUE_CM_X_PUBLIC_INPUT_ROW_IDX,
+    ACTION_NET_VALUE_CM_Y_PUBLIC_INPUT_ROW_IDX, ACTION_NF_PUBLIC_INPUT_ROW_IDX,
+    ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX, TAIGA_COMMITMENT_TREE_DEPTH,
 };
 use crate::merkle_tree::LR;
 use crate::note::Note;
@@ -151,7 +151,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             config.note_config.poseidon_config.clone(),
             add_chip,
             self.input_note,
-            ACTION_NF_INSTANCE_ROW_IDX,
+            ACTION_NF_PUBLIC_INPUT_ROW_IDX,
         )?;
 
         // Check the merkle tree path validity and public the root
@@ -175,7 +175,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             config.note_config.poseidon_config,
             self.output_note,
             input_note_variables.nf,
-            ACTION_OUTPUT_CM_INSTANCE_ROW_IDX,
+            ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX,
         )?;
 
         // TODO: application VP commitment
@@ -198,12 +198,12 @@ impl Circuit<pallas::Base> for ActionCircuit {
         layouter.constrain_instance(
             cv_net.inner().x().cell(),
             config.instances,
-            ACTION_NET_VALUE_CM_X_INSTANCE_ROW_IDX,
+            ACTION_NET_VALUE_CM_X_PUBLIC_INPUT_ROW_IDX,
         )?;
         layouter.constrain_instance(
             cv_net.inner().y().cell(),
             config.instances,
-            ACTION_NET_VALUE_CM_Y_INSTANCE_ROW_IDX,
+            ACTION_NET_VALUE_CM_Y_PUBLIC_INPUT_ROW_IDX,
         )?;
 
         // merkle path check
@@ -222,7 +222,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
                 region.assign_advice_from_instance(
                     || "anchor",
                     config.instances,
-                    ACTION_ANCHOR_INSTANCE_ROW_IDX,
+                    ACTION_ANCHOR_PUBLIC_INPUT_ROW_IDX,
                     config.advices[1],
                     0,
                 )?;

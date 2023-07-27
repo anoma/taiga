@@ -8,19 +8,17 @@ use crate::{
         vp_circuit::{
             BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
             VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
+            ValidityPredicateInfo, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
         },
         vp_examples::signature_verification::COMPRESSED_TOKEN_AUTH_VK,
     },
-    constant::{GENERATOR, NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX},
-    note::Note,
-    note_encryption::{NoteCipher, SecretKey},
-    nullifier::{Nullifier, NullifierKeyContainer},
+    constant::{GENERATOR, NUM_NOTE, SETUP_PARAMS_MAP},
+    note::{Note, RandomSeed},
+    note_encryption::{NoteCiphertext, NotePlaintext, SecretKey},
     proof::Proof,
     utils::mod_r_p,
     vp_vk::ValidityPredicateVerifyingKey,
 };
-use ff::PrimeField;
 use group::Group;
 use group::{cofactor::CofactorCurveAffine, Curve};
 use halo2_gadgets::ecc::{chip::EccChip, NonIdentityPoint};
@@ -32,6 +30,7 @@ use halo2_proofs::{
 use lazy_static::lazy_static;
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
+use rand::RngCore;
 const CIPHER_LEN: usize = 9;
 
 lazy_static! {
@@ -77,9 +76,14 @@ impl ValidityPredicateInfo for ReceiverValidityPredicateCircuit {
         &self.output_notes
     }
 
-    fn get_instances(&self) -> Vec<pallas::Base> {
-        let mut instances = self.get_note_instances();
-
+    fn get_public_inputs(&self, rng: impl RngCore) -> ValidityPredicatePublicInputs {
+        let mut public_inputs = self.get_mandatory_public_inputs();
+        let custom_public_input_padding =
+            ValidityPredicatePublicInputs::get_custom_public_input_padding(
+                public_inputs.len(),
+                &RandomSeed::random(rng),
+            );
+        public_inputs.extend(custom_public_input_padding.iter());
         assert_eq!(NUM_NOTE, 2);
         let target_note =
             if self.get_owned_note_pub_id() == self.get_output_notes()[0].commitment().get_x() {
@@ -97,18 +101,17 @@ impl ValidityPredicateInfo for ReceiverValidityPredicateCircuit {
             target_note.psi,
             target_note.rcm,
         ];
-        assert_eq!(message.len() + 1, CIPHER_LEN);
+        let plaintext = NotePlaintext::padding(&message);
         let key = SecretKey::from_dh_exchange(&self.rcv_pk, &mod_r_p(self.sk));
-        let cipher = NoteCipher::encrypt(&message, &key, &self.nonce);
-        cipher.cipher.iter().for_each(|&c| instances.push(c));
+        let cipher = NoteCiphertext::encrypt(&plaintext, &key, &self.nonce);
+        cipher.inner().iter().for_each(|&c| public_inputs.push(c));
 
-        instances.push(self.nonce);
         let generator = GENERATOR.to_curve();
         let pk = generator * mod_r_p(self.sk);
         let pk_coord = pk.to_affine().coordinates().unwrap();
-        instances.push(*pk_coord.x());
-        instances.push(*pk_coord.y());
-        instances
+        public_inputs.push(*pk_coord.x());
+        public_inputs.push(*pk_coord.y());
+        public_inputs.into()
     }
 
     fn get_owned_note_pub_id(&self) -> pallas::Base {
@@ -236,7 +239,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             &basic_variables.get_rcm_searchable_pairs(),
         )?;
 
-        let message = vec![
+        let mut message = vec![
             app_vk,
             app_data_static,
             app_data_dynamic,
@@ -250,46 +253,17 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
         let add_chip = AddChip::<pallas::Base>::construct(config.add_config.clone(), ());
 
         // Encryption
-        let ret = note_encryption_gadget(
+        note_encryption_gadget(
             layouter.namespace(|| "note encryption"),
             config.advices[0],
+            config.instances,
             config.get_note_config().poseidon_config,
             add_chip,
             ecc_chip,
             nonce,
             sk,
             rcv_pk,
-            &message,
-        )?;
-
-        // Publicize cihper and mac
-        ret.cipher.iter().enumerate().for_each(|(i, c)| {
-            layouter
-                .constrain_instance(
-                    c.cell(),
-                    config.instances,
-                    VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX + i,
-                )
-                .unwrap()
-        });
-
-        // Publicize nonce, the nonce is constant though
-        layouter.constrain_instance(
-            ret.nonce.cell(),
-            config.instances,
-            VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX + ret.cipher.len(),
-        )?;
-
-        // Publicize sender's pk
-        layouter.constrain_instance(
-            ret.sender_pk.inner().x().cell(),
-            config.instances,
-            VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX + ret.cipher.len() + 1,
-        )?;
-        layouter.constrain_instance(
-            ret.sender_pk.inner().y().cell(),
-            config.instances,
-            VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX + ret.cipher.len() + 2,
+            &mut message,
         )?;
 
         Ok(())
@@ -298,54 +272,13 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
 
 vp_circuit_impl!(ReceiverValidityPredicateCircuit);
 
-// TODO: we don't have a generic API to decrypt the instances since the indexes vary among applications.
-// If we want a unified API, we may need to fix the indexes and number of the ciphertext in the instances.
-pub fn decrypt_note(instances: Vec<pallas::Base>, sk: pallas::Base) -> Option<Note> {
-    let len = instances.len();
-    let cipher = NoteCipher {
-        cipher: instances[VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX
-            ..VP_CIRCUIT_CUSTOM_INSTANCE_BEGIN_IDX + CIPHER_LEN]
-            .to_vec(),
-    };
-    let sender_pk = pallas::Affine::from_xy(instances[len - 2], instances[len - 1])
-        .unwrap()
-        .to_curve();
-    let key = SecretKey::from_dh_exchange(&sender_pk, &mod_r_p(sk));
-    let nonce = instances[len - 3];
-    match cipher.decrypt(&key, &nonce) {
-        Some(plaintext) => {
-            assert_eq!(plaintext.len(), CIPHER_LEN - 1);
-            let value = u64::from_le_bytes(
-                plaintext[3].to_repr()[..8]
-                    .try_into()
-                    .expect("slice with incorrect length"),
-            );
-            let rho = Nullifier::new(plaintext[4]);
-            let nk = NullifierKeyContainer::from_commitment(plaintext[5]);
-            let note = Note::from_full(
-                plaintext[0],
-                plaintext[1],
-                plaintext[2],
-                value,
-                nk,
-                rho,
-                true,
-                plaintext[6],
-                plaintext[7],
-            );
-            Some(note)
-        }
-        None => None,
-    }
-}
-
 #[test]
 fn test_halo2_receiver_vp_circuit() {
     use crate::{
         note::tests::{random_input_note, random_output_note},
         utils::poseidon_hash_n,
     };
-    use ff::Field;
+    use ff::{Field, PrimeField};
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
@@ -383,11 +316,22 @@ fn test_halo2_receiver_vp_circuit() {
             rcv_sk,
         )
     };
-    let instances = circuit.get_instances();
+    let public_inputs = circuit.get_public_inputs(&mut rng);
 
-    let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances.clone()]).unwrap();
+    let prover =
+        MockProver::<pallas::Base>::run(12, &circuit, vec![public_inputs.to_vec()]).unwrap();
     assert_eq!(prover.verify(), Ok(()));
 
-    let decrypted_note = decrypt_note(instances, rcv_sk).unwrap();
-    assert_eq!(decrypted_note, circuit.output_notes[0]);
+    let de_cipher = public_inputs.decrypt(rcv_sk).unwrap();
+    assert_eq!(de_cipher[0], circuit.output_notes[0].get_app_vk());
+    assert_eq!(de_cipher[1], circuit.output_notes[0].get_app_data_static());
+    assert_eq!(de_cipher[2], circuit.output_notes[0].app_data_dynamic);
+    assert_eq!(
+        de_cipher[3],
+        pallas::Base::from(circuit.output_notes[0].value)
+    );
+    assert_eq!(de_cipher[4], circuit.output_notes[0].rho.inner());
+    assert_eq!(de_cipher[5], circuit.output_notes[0].get_nk_commitment());
+    assert_eq!(de_cipher[6], circuit.output_notes[0].get_psi());
+    assert_eq!(de_cipher[7], circuit.output_notes[0].get_rcm());
 }

@@ -10,18 +10,19 @@ use taiga_halo2::{
         note_circuit::NoteConfig,
         vp_circuit::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
+            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicatePublicInputs,
+            ValidityPredicateVerifyingInfo,
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
-    note::Note,
+    note::{Note, RandomSeed},
     proof::Proof,
     vp_circuit_impl,
     vp_vk::ValidityPredicateVerifyingKey,
 };
 
 use crate::circuit::{SudokuCircuit, SudokuConfig};
-use rand::rngs::OsRng;
+use rand::{rngs::OsRng, RngCore};
 
 #[derive(Clone, Debug)]
 pub struct SudokuVPConfig {
@@ -73,8 +74,14 @@ impl ValidityPredicateInfo for SudokuVP {
         &self.output_notes
     }
 
-    fn get_instances(&self) -> Vec<pallas::Base> {
-        self.get_note_instances()
+    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
+        let mut public_inputs = self.get_mandatory_public_inputs();
+        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
+            public_inputs.len(),
+            &RandomSeed::random(&mut rng),
+        );
+        public_inputs.extend(padding);
+        public_inputs.into()
     }
 
     fn get_owned_note_pub_id(&self) -> pallas::Base {

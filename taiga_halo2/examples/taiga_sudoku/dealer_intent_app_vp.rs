@@ -9,6 +9,7 @@ use halo2_proofs::{
 };
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
+use rand::RngCore;
 use taiga_halo2::{
     circuit::{
         gadgets::{
@@ -23,11 +24,11 @@ use taiga_halo2::{
         vp_circuit::{
             BasicValidityPredicateVariables, OutputNoteVariables, VPVerifyingInfo,
             ValidityPredicateCircuit, ValidityPredicateConfig, ValidityPredicateInfo,
-            ValidityPredicateVerifyingInfo,
+            ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
-    note::Note,
+    note::{Note, RandomSeed},
     proof::Proof,
     utils::poseidon_hash,
     vp_circuit_impl,
@@ -142,8 +143,14 @@ impl ValidityPredicateInfo for DealerIntentValidityPredicateCircuit {
         &self.output_notes
     }
 
-    fn get_instances(&self) -> Vec<pallas::Base> {
-        self.get_note_instances()
+    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
+        let mut public_inputs = self.get_mandatory_public_inputs();
+        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
+            public_inputs.len(),
+            &RandomSeed::random(&mut rng),
+        );
+        public_inputs.extend(padding);
+        public_inputs.into()
     }
 
     fn get_owned_note_pub_id(&self) -> pallas::Base {
@@ -375,15 +382,17 @@ fn test_halo2_dealer_intent_vp_circuit() {
             encoded_solution,
         }
     };
-    let instances = circuit.get_instances();
+    let public_inputs = circuit.get_public_inputs(&mut rng);
 
-    let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances.clone()]).unwrap();
+    let prover =
+        MockProver::<pallas::Base>::run(12, &circuit, vec![public_inputs.to_vec().clone()])
+            .unwrap();
     assert_eq!(prover.verify(), Ok(()));
 
     let params = SETUP_PARAMS_MAP.get(&12).unwrap();
     let vk = keygen_vk(params, &circuit).expect("keygen_vk should not fail");
     let pk = keygen_pk(params, vk.clone(), &circuit).expect("keygen_pk should not fail");
-    let proof = Proof::create(&pk, params, circuit, &[&instances], &mut rng).unwrap();
+    let proof = Proof::create(&pk, params, circuit, &[public_inputs.inner()], &mut rng).unwrap();
 
-    proof.verify(&vk, params, &[&instances]).unwrap();
+    proof.verify(&vk, params, &[public_inputs.inner()]).unwrap();
 }

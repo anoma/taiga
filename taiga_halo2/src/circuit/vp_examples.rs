@@ -1,10 +1,11 @@
 use crate::{
     circuit::vp_circuit::{
         GeneralVerificationValidityPredicateConfig, VPVerifyingInfo, ValidityPredicateCircuit,
-        ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicateVerifyingInfo,
+        ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicatePublicInputs,
+        ValidityPredicateVerifyingInfo,
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
-    note::Note,
+    note::{Note, RandomSeed},
     proof::Proof,
     vp_vk::ValidityPredicateVerifyingKey,
 };
@@ -15,7 +16,7 @@ use halo2_proofs::{
 };
 use lazy_static::lazy_static;
 use pasta_curves::pallas;
-use rand::rngs::OsRng;
+use rand::{rngs::OsRng, RngCore};
 
 pub mod cascade_intent;
 mod field_addition;
@@ -62,8 +63,14 @@ impl ValidityPredicateInfo for TrivialValidityPredicateCircuit {
         &self.output_notes
     }
 
-    fn get_instances(&self) -> Vec<pallas::Base> {
-        self.get_note_instances()
+    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
+        let mut public_inputs = self.get_mandatory_public_inputs();
+        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
+            public_inputs.len(),
+            &RandomSeed::random(&mut rng),
+        );
+        public_inputs.extend(padding);
+        public_inputs.into()
     }
 
     fn get_owned_note_pub_id(&self) -> pallas::Base {
@@ -109,9 +116,10 @@ pub mod tests {
 
         let mut rng = OsRng;
         let circuit = random_trivial_vp_circuit(&mut rng);
-        let instances = circuit.get_instances();
+        let public_inputs = circuit.get_public_inputs(&mut rng);
 
-        let prover = MockProver::<pallas::Base>::run(12, &circuit, vec![instances]).unwrap();
+        let prover =
+            MockProver::<pallas::Base>::run(12, &circuit, vec![public_inputs.to_vec()]).unwrap();
         assert_eq!(prover.verify(), Ok(()));
     }
 }
