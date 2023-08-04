@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+rustler = "0.29.1"
 rand = "0.8.4"
 lazy_static = "1"
 blake2b_simd = "1"
