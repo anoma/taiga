@@ -8,7 +8,7 @@ rustler = "0.29.1"
 rand = "0.8.4"
 lazy_static = "1"
 blake2b_simd = "1"
-pasta_curves = "0.5.1"
+pasta_curves = {version = "0.5.1", features = ["repr-erlang"]}
 ff = "0.13"
 group = "0.13"
 halo2_gadgets = {version = "0.3", features = ["test-dependencies"]}
