@@ -13,6 +13,7 @@ use pasta_curves::{
     pallas,
 };
 use rand::{CryptoRng, RngCore};
+use rustler::NifStruct;
 
 #[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct Transaction {
@@ -34,7 +35,8 @@ pub struct ShieldedPartialTxBundle {
     partial_txs: Vec<ShieldedPartialTransaction>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, NifStruct)]
+#[module = "Taiga.Transaction.Result"]
 pub struct ShieldedResult {
     anchors: Vec<pallas::Base>,
     nullifiers: Vec<Nullifier>,

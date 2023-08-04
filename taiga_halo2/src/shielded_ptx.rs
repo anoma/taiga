@@ -14,6 +14,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_proofs::plonk::Error;
 use pasta_curves::pallas;
 use rand::RngCore;
+use rustler::NifStruct;
 
 #[derive(Debug, Clone)]
 pub struct ShieldedPartialTransaction {
@@ -22,13 +23,15 @@ pub struct ShieldedPartialTransaction {
     outputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
 }
 
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, NifStruct)]
+#[module = "Taiga.Action.VerifyingInfo"]
 pub struct ActionVerifyingInfo {
     action_proof: Proof,
     action_instance: ActionInstance,
 }
 
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, NifStruct)]
+#[module = "Taiga.Note.VerifyingInfo"]
 pub struct NoteVPVerifyingInfoSet {
     app_vp_verifying_info: VPVerifyingInfo,
     app_dynamic_vp_verifying_info: Vec<VPVerifyingInfo>,

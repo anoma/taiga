@@ -24,13 +24,14 @@ use pasta_curves::{
     pallas,
 };
 use rand::RngCore;
+use rustler::{NifStruct, NifTuple};
 use std::{
     hash::{Hash, Hasher},
     io,
 };
 
 /// A commitment to a note.
-#[derive(Copy, Debug, Clone)]
+#[derive(Copy, Debug, Clone, NifTuple)]
 pub struct NoteCommitment(pallas::Point);
 
 impl NoteCommitment {
@@ -54,7 +55,8 @@ impl Default for NoteCommitment {
 }
 
 /// A note
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, NifStruct)]
+#[module = "Taiga.Note"]
 pub struct Note {
     pub note_type: NoteType,
     /// app_data_dynamic is the data defined in application vp and will NOT be used to derive type
@@ -75,7 +77,8 @@ pub struct Note {
 }
 
 /// The parameters in the NoteType are used to derive note type.
-#[derive(Debug, Clone, Copy, Default, Eq)]
+#[derive(Debug, Clone, Copy, Default, Eq, NifStruct)]
+#[module = "Taiga.NoteType"]
 pub struct NoteType {
     /// app_vk is the compressed verifying key of VP
     pub app_vk: pallas::Base,
