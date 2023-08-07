@@ -46,19 +46,19 @@ impl Distribution<LR> for Standard {
 }
 
 #[derive(Clone)]
-pub struct MerkleTreeLeafs {
-    leafs: Vec<Node>,
+pub struct MerkleTreeLeaves {
+    leaves: Vec<Node>,
 }
 
-impl MerkleTreeLeafs {
+impl MerkleTreeLeaves {
     pub fn new(values: Vec<pallas::Base>) -> Self {
         let nodes_vec = values.iter().map(|x| Node::new(*x)).collect::<Vec<_>>();
-        Self { leafs: nodes_vec }
+        Self { leaves: nodes_vec }
     }
 
     pub fn root(&mut self) -> Node {
-        // the list of leafs is extended with copies of elements so that its length is a power of 2.
-        let list = &mut self.leafs;
+        // the list of leaves is extended with copies of elements so that its length is a power of 2.
+        let list = &mut self.leaves;
         let n = list.len();
         let m = n.next_power_of_two();
         let mut ext = list.clone();
@@ -76,10 +76,10 @@ impl MerkleTreeLeafs {
     }
 
     pub fn insert(&mut self, value: pallas::Base) -> Self {
-        let leafs = &mut self.leafs;
-        leafs.push(Node::new(value));
+        let leaves = &mut self.leaves;
+        leaves.push(Node::new(value));
         Self {
-            leafs: leafs.to_vec(),
+            leaves: leaves.to_vec(),
         }
     }
 }
