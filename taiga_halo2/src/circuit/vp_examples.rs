@@ -17,6 +17,7 @@ use halo2_proofs::{
 use lazy_static::lazy_static;
 use pasta_curves::pallas;
 use rand::{rngs::OsRng, RngCore};
+use rustler::{Decoder, Encoder, Env, NifResult, NifStruct, Term};
 
 pub mod cascade_intent;
 mod field_addition;
@@ -40,6 +41,15 @@ pub struct TrivialValidityPredicateCircuit {
     pub output_notes: [Note; NUM_NOTE],
 }
 
+// I only exist to allow trivial derivation of the nifstruct
+#[derive(Clone, Debug, Default, NifStruct)]
+#[module = "Taiga.VP.Trivial"]
+struct TrivialValidtyPredicateCircuitProxy {
+    owned_note_pub_id: pallas::Base,
+    input_notes: Vec<Note>,
+    output_notes: Vec<Note>,
+}
+
 impl TrivialValidityPredicateCircuit {
     pub fn new(
         owned_note_pub_id: pallas::Base,
@@ -51,6 +61,39 @@ impl TrivialValidityPredicateCircuit {
             input_notes,
             output_notes,
         }
+    }
+
+    fn to_proxy(&self) -> TrivialValidtyPredicateCircuitProxy {
+        TrivialValidtyPredicateCircuitProxy {
+            owned_note_pub_id: self.owned_note_pub_id,
+            input_notes: self.input_notes.to_vec(),
+            output_notes: self.output_notes.to_vec(),
+        }
+    }
+}
+
+impl TrivialValidtyPredicateCircuitProxy {
+    fn to_concrete(&self) -> Option<TrivialValidityPredicateCircuit> {
+        let input_notes = self.input_notes.clone().try_into().ok()?;
+        let output_notes = self.output_notes.clone().try_into().ok()?;
+        let owned_note_pub_id = self.owned_note_pub_id;
+        Some(TrivialValidityPredicateCircuit {
+            owned_note_pub_id,
+            input_notes,
+            output_notes,
+        })
+    }
+}
+impl Encoder for TrivialValidityPredicateCircuit {
+    fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
+        self.to_proxy().encode(env)
+    }
+}
+impl<'a> Decoder<'a> for TrivialValidityPredicateCircuit {
+    fn decode(term: Term<'a>) -> NifResult<Self> {
+        let val: TrivialValidtyPredicateCircuitProxy = Decoder::decode(term)?;
+        val.to_concrete()
+            .ok_or(rustler::Error::RaiseAtom("Could not decode proxy"))
     }
 }
 
