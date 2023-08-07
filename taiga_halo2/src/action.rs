@@ -100,8 +100,6 @@ impl BorshDeserialize for ActionInstance {
             cv_net,
         })
     }
-
-
 }
 
 impl ActionInfo {
