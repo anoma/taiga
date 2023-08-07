@@ -320,28 +320,34 @@ impl BorshSerialize for Note {
 }
 
 impl BorshDeserialize for Note {
-    fn deserialize(buf: &mut &[u8]) -> borsh::maybestd::io::Result<Self> {
+    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
         // Read app_vk
-        let app_vk_bytes = <[u8; 32]>::deserialize(buf)?;
+        let mut app_vk_bytes = [0u8; 32];
+        reader.read_exact(&mut app_vk_bytes)?;
         let app_vk = Option::from(pallas::Base::from_repr(app_vk_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "app_vk not in field"))?;
         // Read app_data_static
-        let app_data_static_bytes = <[u8; 32]>::deserialize(buf)?;
+        let mut app_data_static_bytes = [0u8; 32];
+        reader.read_exact(&mut app_data_static_bytes)?;
         let app_data_static = Option::from(pallas::Base::from_repr(app_data_static_bytes))
             .ok_or_else(|| {
                 io::Error::new(io::ErrorKind::InvalidData, "app_data_static not in field")
             })?;
         // Read app_data_dynamic
-        let app_data_dynamic_bytes = <[u8; 32]>::deserialize(buf)?;
+        let mut app_data_dynamic_bytes = [0u8; 32];
+        reader.read_exact(&mut app_data_dynamic_bytes)?;
         let app_data_dynamic = Option::from(pallas::Base::from_repr(app_data_dynamic_bytes))
             .ok_or_else(|| {
                 io::Error::new(io::ErrorKind::InvalidData, "app_data_dynamic not in field")
             })?;
         // Read note value
-        let value = buf.read_u64::<LittleEndian>()?;
+        let value = reader.read_u64::<LittleEndian>()?;
         // Read nk_container
-        let nk_container_type = buf.read_u8()?;
-        let nk_container_bytes = <[u8; 32]>::deserialize(buf)?;
+        let mut nk_container_type = [0u8; 1];
+        reader.read_exact(&mut nk_container_type)?;
+        let nk_container_type = nk_container_type[0];
+        let mut nk_container_bytes = [0u8; 32];
+        reader.read_exact(&mut nk_container_bytes)?;
         let nk = Option::from(pallas::Base::from_repr(nk_container_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "nk not in field"))?;
         let nk_container = if nk_container_type == 0x01 {
@@ -350,19 +356,24 @@ impl BorshDeserialize for Note {
             NullifierKeyContainer::from_key(nk)
         };
         // Read rho
-        let rho_bytes = <[u8; 32]>::deserialize(buf)?;
+        let mut rho_bytes = [0u8; 32];
+        reader.read_exact(&mut rho_bytes)?;
         let rho = Option::from(Nullifier::from_bytes(rho_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "rho not in field"))?;
         // Read psi
-        let psi_bytes = <[u8; 32]>::deserialize(buf)?;
+        let mut psi_bytes = [0u8; 32];
+        reader.read_exact(&mut psi_bytes)?;
         let psi = Option::from(pallas::Base::from_repr(psi_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "psi not in field"))?;
         // Read rcm
-        let rcm_bytes = <[u8; 32]>::deserialize(buf)?;
+        let mut rcm_bytes = [0u8; 32];
+        reader.read_exact(&mut rcm_bytes)?;
         let rcm = Option::from(pallas::Base::from_repr(rcm_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "rcm not in field"))?;
         // Read is_merkle_checked
-        let is_merkle_checked_byte = buf.read_u8()?;
+        let mut is_merkle_checked_byte = [0u8; 1];
+        reader.read_exact(&mut is_merkle_checked_byte)?;
+        let is_merkle_checked_byte = is_merkle_checked_byte[0];
         let is_merkle_checked = is_merkle_checked_byte == 0x01;
         // Construct note
         Ok(Note::from_full(

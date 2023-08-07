@@ -112,17 +112,17 @@ impl BorshSerialize for VPVerifyingInfo {
 }
 
 impl BorshDeserialize for VPVerifyingInfo {
-    fn deserialize(buf: &mut &[u8]) -> borsh::maybestd::io::Result<Self> {
+    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
         // Read vk
         use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
         let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
-        let vk = VerifyingKey::read::<_, TrivialValidityPredicateCircuit>(buf, params)?;
+        let vk = VerifyingKey::read::<_, TrivialValidityPredicateCircuit>(reader, params)?;
         // Read proof
-        let proof = Proof::deserialize(buf)?;
+        let proof = Proof::deserialize_reader(reader)?;
         // Read public inputs
         let public_inputs: Vec<_> = (0..VP_CIRCUIT_PUBLIC_INPUT_NUM)
             .map(|_| {
-                let bytes = <[u8; 32]>::deserialize(buf)?;
+                let bytes = <[u8; 32]>::deserialize_reader(reader)?;
                 Option::from(pallas::Base::from_repr(bytes)).ok_or_else(|| {
                     io::Error::new(io::ErrorKind::InvalidData, "public input not in field")
                 })

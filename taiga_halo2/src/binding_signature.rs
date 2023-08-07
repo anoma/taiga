@@ -55,8 +55,9 @@ impl BorshSerialize for BindingSignature {
 }
 
 impl BorshDeserialize for BindingSignature {
-    fn deserialize(buf: &mut &[u8]) -> borsh::maybestd::io::Result<Self> {
-        let sig_bytes = <[u8; 64]>::deserialize(buf)?;
+    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+        let mut sig_bytes = [0u8; 64];
+        reader.read_exact(&mut sig_bytes)?;
         Ok(Self::from_bytes(sig_bytes))
     }
 }
@@ -87,8 +88,9 @@ impl BorshSerialize for BindingSigningKey {
 }
 
 impl BorshDeserialize for BindingSigningKey {
-    fn deserialize(buf: &mut &[u8]) -> borsh::maybestd::io::Result<Self> {
-        let key_bytes = <[u8; 32]>::deserialize(buf)?;
+    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+        let mut key_bytes = [0u8; 32];
+        reader.read_exact(&mut key_bytes)?;
         Self::from_bytes(key_bytes).map_err(|_| {
             io::Error::new(io::ErrorKind::InvalidData, "BindingSigningKey not in field")
         })
