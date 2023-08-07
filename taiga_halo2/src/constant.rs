@@ -24,6 +24,8 @@ pub const NOTE_COMMITMENT_PERSONALIZATION: &str = "Taiga-NoteCommit";
 
 pub const TRANSACTION_BINDING_HASH_PERSONALIZATION: &[u8; 16] = b"TxBindingSigHash";
 
+pub const VP_COMMITMENT_PERSONALIZATION: &[u8; 8] = b"VPCommit";
+
 pub const PRF_EXPAND_PERSONALIZATION: &[u8; 16] = b"Taiga_ExpandSeed";
 pub const PRF_EXPAND_PSI: u8 = 0;
 pub const PRF_EXPAND_RCM: u8 = 1;
