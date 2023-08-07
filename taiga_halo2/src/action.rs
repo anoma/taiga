@@ -78,6 +78,30 @@ impl BorshDeserialize for ActionInstance {
             cv_net,
         })
     }
+
+    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+        let anchor_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let anchor = Option::from(pallas::Base::from_repr(anchor_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "anchor not in field"))?;
+        let nf_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let nf = Option::from(Nullifier::from_bytes(nf_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "nf not in field"))?;
+        let cm_x_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let cm_x = Option::from(pallas::Base::from_repr(cm_x_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "cm_x not in field"))?;
+        let cv_net_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let cv_net = Option::from(ValueCommitment::from_bytes(cv_net_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "cv_net not in field"))?;
+
+        Ok(ActionInstance {
+            anchor,
+            nf,
+            cm_x,
+            cv_net,
+        })
+    }
+
+
 }
 
 impl ActionInfo {

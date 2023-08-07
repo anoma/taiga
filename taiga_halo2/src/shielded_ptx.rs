@@ -237,6 +237,23 @@ impl BorshDeserialize for ShieldedPartialTransaction {
             outputs: outputs.try_into().unwrap(),
         })
     }
+
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let actions: Vec<_> = (0..NUM_NOTE)
+            .map(|_| ActionVerifyingInfo::deserialize_reader(reader))
+            .collect::<Result<_, _>>()?;
+        let inputs: Vec<_> = (0..NUM_NOTE)
+            .map(|_| NoteVPVerifyingInfoSet::deserialize_reader(reader))
+            .collect::<Result<_, _>>()?;
+        let outputs: Vec<_> = (0..NUM_NOTE)
+            .map(|_| NoteVPVerifyingInfoSet::deserialize_reader(reader))
+            .collect::<Result<_, _>>()?;
+        Ok(ShieldedPartialTransaction {
+            actions: actions.try_into().unwrap(),
+            inputs: inputs.try_into().unwrap(),
+            outputs: outputs.try_into().unwrap(),
+        })
+    }
 }
 impl ActionVerifyingInfo {
     pub fn create<R: RngCore>(action_info: ActionInfo, mut rng: R) -> Result<Self, Error> {
