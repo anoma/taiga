@@ -13,7 +13,8 @@ use pasta_curves::{
     pallas,
 };
 use rand::{CryptoRng, RngCore};
-use rustler::NifStruct;
+use rustler::types::atom;
+use rustler::{atoms, Decoder, Env, NifRecord, NifResult, NifStruct, Term};
 
 #[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct Transaction {
@@ -30,7 +31,8 @@ pub enum InProgressBindingSignature {
     Unauthorized(BindingSigningKey),
 }
 
-#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize, NifRecord)]
+#[tag = "bundle"]
 pub struct ShieldedPartialTxBundle {
     partial_txs: Vec<ShieldedPartialTransaction>,
 }
@@ -197,6 +199,48 @@ impl Transaction {
         }
 
         h.finalize().as_bytes().try_into().unwrap()
+    }
+}
+
+atoms! { transaction }
+
+impl rustler::Encoder for Transaction {
+    fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
+        (
+            transaction().encode(env),
+            self.shielded_ptx_bundle.encode(env),
+            self.transparent_ptx_bundle
+                .try_to_vec()
+                .unwrap_or(vec![])
+                .encode(env),
+            self.signature.try_to_vec().unwrap_or(vec![]).encode(env),
+        )
+            .encode(env)
+    }
+}
+
+impl<'a> Decoder<'a> for Transaction {
+    fn decode(term: Term<'a>) -> NifResult<Self> {
+        let (term, shielded_ptx_bundle, transparent_bytes, sig_bytes): (
+            atom::Atom,
+            Option<ShieldedPartialTxBundle>,
+            Vec<u8>,
+            Vec<u8>,
+        ) = term.decode()?;
+        if term == transaction() {
+            let transparent_ptx_bundle =
+                BorshDeserialize::deserialize(&mut transparent_bytes.as_slice())
+                    .map_err(|_e| rustler::Error::Atom("Failure to decode"))?;
+            let signature = BorshDeserialize::deserialize(&mut sig_bytes.as_slice())
+                .map_err(|_e| rustler::Error::Atom("Failure to decode"))?;
+            Ok(Transaction {
+                shielded_ptx_bundle,
+                signature,
+                transparent_ptx_bundle,
+            })
+        } else {
+            Err(rustler::Error::BadArg)
+        }
     }
 }
 
