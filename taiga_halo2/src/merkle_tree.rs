@@ -2,6 +2,8 @@
 //!
 use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
 use crate::utils::poseidon_hash;
+use borsh::{BorshDeserialize, BorshSerialize};
+use ff::PrimeField;
 use halo2_proofs::arithmetic::Field;
 use pasta_curves::pallas;
 use rand::{Rng, RngCore};
@@ -9,7 +11,7 @@ use rand::{Rng, RngCore};
 use crate::merkle_tree::LR::{L, R};
 use rand::distributions::{Distribution, Standard};
 
-#[derive(Clone, Debug, PartialEq, Eq, Copy, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Copy, Default, BorshSerialize, BorshDeserialize)]
 pub enum LR {
     R,
     #[default]
@@ -45,7 +47,7 @@ impl Distribution<LR> for Standard {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, BorshSerialize, BorshDeserialize)]
 pub struct MerkleTreeLeaves {
     leaves: Vec<Node>,
 }
@@ -86,7 +88,7 @@ impl MerkleTreeLeaves {
 
 /// A path from a position in a particular commitment tree to the root of that tree.
 /// In Orchard merkle tree, they are using MerkleCRH(layer, left, right), where MerkleCRH is a sinsemilla. We are using poseidon_hash(left, right).
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct MerklePath {
     merkle_path: Vec<(Node, LR)>,
 }
@@ -189,6 +191,24 @@ impl Node {
 
     pub fn combine(left: &Node, right: &Node) -> Node {
         Self(poseidon_hash(left.inner(), right.inner()))
+    }
+}
+
+impl BorshSerialize for Node {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        writer.write_all(&self.0.to_repr())?;
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for Node {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let mut repr = [0u8; 32];
+        reader.read_exact(&mut repr)?;
+        let value = Option::from(pallas::Base::from_repr(repr)).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "Node value not in field")
+        })?;
+        Ok(Self(value))
     }
 }
 
