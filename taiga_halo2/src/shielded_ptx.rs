@@ -330,11 +330,12 @@ pub mod testing {
     use crate::{
         circuit::vp_circuit::ValidityPredicateVerifyingInfo,
         circuit::vp_examples::TrivialValidityPredicateCircuit,
+        constant::TAIGA_COMMITMENT_TREE_DEPTH,
+        merkle_tree::MerklePath,
         note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
         nullifier::{Nullifier, NullifierKeyContainer},
         shielded_ptx::ShieldedPartialTransaction,
-        utils::poseidon_hash, merkle_tree::MerklePath,
-        constant::TAIGA_COMMITMENT_TREE_DEPTH,
+        utils::poseidon_hash,
     };
     use halo2_proofs::arithmetic::Field;
     use pasta_curves::pallas;

@@ -1,5 +1,4 @@
 use crate::circuit::gadgets::poseidon_hash::poseidon_hash_gadget;
-use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
 use crate::merkle_tree::{is_left, LR};
 use halo2_gadgets::{
     poseidon::Pow5Config as PoseidonConfig,
@@ -109,6 +108,7 @@ pub fn merkle_poseidon_gadget(
 #[test]
 fn test_halo2_merkle_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
+    use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
     use crate::merkle_tree::{MerklePath, Node};
     use halo2_gadgets::poseidon::{primitives as poseidon, Pow5Chip as PoseidonChip};
     use halo2_proofs::{

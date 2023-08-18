@@ -544,8 +544,9 @@ pub mod tests {
     use super::{InputNoteProvingInfo, Note, NoteType, OutputNoteProvingInfo, RandomSeed};
     use crate::{
         circuit::vp_examples::tests::random_trivial_vp_circuit,
+        constant::TAIGA_COMMITMENT_TREE_DEPTH,
+        merkle_tree::MerklePath,
         nullifier::{tests::*, Nullifier, NullifierKeyContainer},
-        merkle_tree::MerklePath, constant::TAIGA_COMMITMENT_TREE_DEPTH,
     };
     use halo2_proofs::arithmetic::Field;
     use pasta_curves::pallas;

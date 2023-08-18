@@ -1,7 +1,7 @@
 //! Implementation of a Merkle tree of commitments used to prove the existence of notes.
 //!
-use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
 use crate::utils::poseidon_hash;
+use crate::{constant::TAIGA_COMMITMENT_TREE_DEPTH, note::Note};
 use borsh::{BorshDeserialize, BorshSerialize};
 use ff::PrimeField;
 use halo2_proofs::arithmetic::Field;
@@ -32,18 +32,13 @@ pub fn is_left(p: LR) -> bool {
     }
 }
 
-pub fn lr(i: usize) -> LR {
-    if i % 2 == 0 {
-        L
-    } else {
-        R
-    }
-}
-
 impl Distribution<LR> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> LR {
-        let u: usize = rng.gen();
-        lr(u)
+        if rng.gen_bool(0.5) {
+            L
+        } else {
+            R
+        }
     }
 }
 
@@ -102,6 +97,10 @@ pub struct Node(pallas::Base);
 impl Node {
     pub fn new(v: pallas::Base) -> Self {
         Self(v)
+    }
+
+    pub fn from_note(n: &Note) -> Self {
+        Self(n.commitment().get_x())
     }
 
     pub fn rand(rng: &mut impl RngCore) -> Self {
