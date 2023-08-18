@@ -1,6 +1,6 @@
 use crate::{
     circuit::{
-        vp_circuit::ValidityPredicateVerifyingInfo,
+        vp_circuit::ValidityPredicate,
         vp_examples::{TrivialValidityPredicateCircuit, COMPRESSED_TRIVIAL_VP_VK},
     },
     constant::{
@@ -96,15 +96,15 @@ pub struct RandomSeed([u8; 32]);
 pub struct InputNoteProvingInfo {
     pub note: Note,
     pub merkle_path: MerklePath,
-    app_vp_verifying_info: Box<dyn ValidityPredicateVerifyingInfo>,
-    app_vp_verifying_info_dynamic: Vec<Box<dyn ValidityPredicateVerifyingInfo>>,
+    app_vp_verifying_info: Box<ValidityPredicate>,
+    app_vp_verifying_info_dynamic: Vec<Box<ValidityPredicate>>,
 }
 
 #[derive(Clone)]
 pub struct OutputNoteProvingInfo {
     pub note: Note,
-    app_vp_verifying_info: Box<dyn ValidityPredicateVerifyingInfo>,
-    app_vp_verifying_info_dynamic: Vec<Box<dyn ValidityPredicateVerifyingInfo>>,
+    app_vp_verifying_info: Box<ValidityPredicate>,
+    app_vp_verifying_info_dynamic: Vec<Box<ValidityPredicate>>,
 }
 
 impl Note {
@@ -466,8 +466,8 @@ impl InputNoteProvingInfo {
     pub fn new(
         note: Note,
         merkle_path: MerklePath,
-        app_vp_verifying_info: Box<dyn ValidityPredicateVerifyingInfo>,
-        app_vp_verifying_info_dynamic: Vec<Box<dyn ValidityPredicateVerifyingInfo>>,
+        app_vp_verifying_info: Box<ValidityPredicate>,
+        app_vp_verifying_info_dynamic: Vec<Box<ValidityPredicate>>,
     ) -> Self {
         Self {
             note,
@@ -477,13 +477,11 @@ impl InputNoteProvingInfo {
         }
     }
 
-    pub fn get_app_vp_verifying_info(&self) -> Box<dyn ValidityPredicateVerifyingInfo> {
+    pub fn get_app_vp_verifying_info(&self) -> Box<ValidityPredicate> {
         self.app_vp_verifying_info.clone()
     }
 
-    pub fn get_app_vp_verifying_info_dynamic(
-        &self,
-    ) -> Vec<Box<dyn ValidityPredicateVerifyingInfo>> {
+    pub fn get_app_vp_verifying_info_dynamic(&self) -> Vec<Box<ValidityPredicate>> {
         self.app_vp_verifying_info_dynamic.clone()
     }
 
@@ -505,8 +503,8 @@ impl InputNoteProvingInfo {
 impl OutputNoteProvingInfo {
     pub fn new(
         note: Note,
-        app_vp_verifying_info: Box<dyn ValidityPredicateVerifyingInfo>,
-        app_vp_verifying_info_dynamic: Vec<Box<dyn ValidityPredicateVerifyingInfo>>,
+        app_vp_verifying_info: Box<ValidityPredicate>,
+        app_vp_verifying_info_dynamic: Vec<Box<ValidityPredicate>>,
     ) -> Self {
         Self {
             note,
@@ -515,13 +513,11 @@ impl OutputNoteProvingInfo {
         }
     }
 
-    pub fn get_app_vp_verifying_info(&self) -> Box<dyn ValidityPredicateVerifyingInfo> {
+    pub fn get_app_vp_verifying_info(&self) -> Box<ValidityPredicate> {
         self.app_vp_verifying_info.clone()
     }
 
-    pub fn get_app_vp_verifying_info_dynamic(
-        &self,
-    ) -> Vec<Box<dyn ValidityPredicateVerifyingInfo>> {
+    pub fn get_app_vp_verifying_info_dynamic(&self) -> Vec<Box<ValidityPredicate>> {
         self.app_vp_verifying_info_dynamic.clone()
     }
 

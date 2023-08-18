@@ -1,5 +1,5 @@
 use crate::action::{ActionInfo, ActionInstance};
-use crate::circuit::vp_circuit::{VPVerifyingInfo, ValidityPredicateVerifyingInfo};
+use crate::circuit::vp_circuit::{VPVerifyingInfo, ValidityPredicate};
 use crate::constant::{
     ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, NUM_NOTE,
     SETUP_PARAMS_MAP,
@@ -278,8 +278,8 @@ impl NoteVPVerifyingInfoSet {
     }
 
     pub fn build(
-        app_vp_verifying_info: Box<dyn ValidityPredicateVerifyingInfo>,
-        app_vp_verifying_info_dynamic: Vec<Box<dyn ValidityPredicateVerifyingInfo>>,
+        app_vp_verifying_info: Box<ValidityPredicate>,
+        app_vp_verifying_info_dynamic: Vec<Box<ValidityPredicate>>,
     ) -> Self {
         let app_vp_verifying_info = app_vp_verifying_info.get_verifying_info();
 
@@ -328,7 +328,7 @@ impl NoteVPVerifyingInfoSet {
 #[cfg(test)]
 pub mod testing {
     use crate::{
-        circuit::vp_circuit::ValidityPredicateVerifyingInfo,
+        circuit::vp_circuit::{ValidityPredicate, ValidityPredicateVerifyingInfo},
         circuit::vp_examples::TrivialValidityPredicateCircuit,
         merkle_tree::tests::random_merkle_path,
         note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
@@ -443,8 +443,7 @@ pub mod testing {
             output_notes: [output_note_1, output_note_2],
         };
         let input_app_vp_verifying_info_1 = Box::new(trivial_vp_circuit.clone());
-        let trivial_app_logic_1: Box<dyn ValidityPredicateVerifyingInfo> =
-            Box::new(trivial_vp_circuit.clone());
+        let trivial_app_logic_1: Box<ValidityPredicate> = Box::new(trivial_vp_circuit.clone());
         let trivial_app_logic_2 = Box::new(trivial_vp_circuit.clone());
         let trivial_app_vp_verifying_info_dynamic = vec![trivial_app_logic_1, trivial_app_logic_2];
         let input_note_proving_info_1 = InputNoteProvingInfo::new(

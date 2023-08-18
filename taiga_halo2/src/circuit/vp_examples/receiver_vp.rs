@@ -7,8 +7,7 @@ use crate::{
         note_encryption_circuit::note_encryption_gadget,
         vp_circuit::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicatePublicInputs,
-            ValidityPredicateVerifyingInfo,
+            ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
         },
         vp_examples::signature_verification::COMPRESSED_TOKEN_AUTH_VK,
     },
@@ -64,58 +63,6 @@ impl Default for ReceiverValidityPredicateCircuit {
             rcv_pk: pallas::Point::generator(),
             auth_vp_vk: pallas::Base::zero(),
         }
-    }
-}
-
-impl ValidityPredicateInfo for ReceiverValidityPredicateCircuit {
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.input_notes
-    }
-
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.output_notes
-    }
-
-    fn get_public_inputs(&self, rng: impl RngCore) -> ValidityPredicatePublicInputs {
-        let mut public_inputs = self.get_mandatory_public_inputs();
-        let custom_public_input_padding =
-            ValidityPredicatePublicInputs::get_custom_public_input_padding(
-                public_inputs.len(),
-                &RandomSeed::random(rng),
-            );
-        public_inputs.extend(custom_public_input_padding.iter());
-        assert_eq!(NUM_NOTE, 2);
-        let target_note =
-            if self.get_owned_note_pub_id() == self.get_output_notes()[0].commitment().get_x() {
-                self.get_output_notes()[0]
-            } else {
-                self.get_output_notes()[1]
-            };
-        let message = vec![
-            target_note.note_type.app_vk,
-            target_note.note_type.app_data_static,
-            target_note.app_data_dynamic,
-            pallas::Base::from(target_note.value),
-            target_note.rho.inner(),
-            target_note.get_nk_commitment(),
-            target_note.psi,
-            target_note.rcm,
-        ];
-        let plaintext = NotePlaintext::padding(&message);
-        let key = SecretKey::from_dh_exchange(&self.rcv_pk, &mod_r_p(self.sk));
-        let cipher = NoteCiphertext::encrypt(&plaintext, &key, &self.nonce);
-        cipher.inner().iter().for_each(|&c| public_inputs.push(c));
-
-        let generator = GENERATOR.to_curve();
-        let pk = generator * mod_r_p(self.sk);
-        let pk_coord = pk.to_affine().coordinates().unwrap();
-        public_inputs.push(*pk_coord.x());
-        public_inputs.push(*pk_coord.y());
-        public_inputs.into()
-    }
-
-    fn get_owned_note_pub_id(&self) -> pallas::Base {
-        self.owned_note_pub_id
     }
 }
 
@@ -266,6 +213,56 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
         )?;
 
         Ok(())
+    }
+
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.input_notes
+    }
+
+    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.output_notes
+    }
+
+    fn get_public_inputs(&self, rng: impl RngCore) -> ValidityPredicatePublicInputs {
+        let mut public_inputs = self.get_mandatory_public_inputs();
+        let custom_public_input_padding =
+            ValidityPredicatePublicInputs::get_custom_public_input_padding(
+                public_inputs.len(),
+                &RandomSeed::random(rng),
+            );
+        public_inputs.extend(custom_public_input_padding.iter());
+        assert_eq!(NUM_NOTE, 2);
+        let target_note =
+            if self.get_owned_note_pub_id() == self.get_output_notes()[0].commitment().get_x() {
+                self.get_output_notes()[0]
+            } else {
+                self.get_output_notes()[1]
+            };
+        let message = vec![
+            target_note.note_type.app_vk,
+            target_note.note_type.app_data_static,
+            target_note.app_data_dynamic,
+            pallas::Base::from(target_note.value),
+            target_note.rho.inner(),
+            target_note.get_nk_commitment(),
+            target_note.psi,
+            target_note.rcm,
+        ];
+        let plaintext = NotePlaintext::padding(&message);
+        let key = SecretKey::from_dh_exchange(&self.rcv_pk, &mod_r_p(self.sk));
+        let cipher = NoteCiphertext::encrypt(&plaintext, &key, &self.nonce);
+        cipher.inner().iter().for_each(|&c| public_inputs.push(c));
+
+        let generator = GENERATOR.to_curve();
+        let pk = generator * mod_r_p(self.sk);
+        let pk_coord = pk.to_affine().coordinates().unwrap();
+        public_inputs.push(*pk_coord.x());
+        public_inputs.push(*pk_coord.y());
+        public_inputs.into()
+    }
+
+    fn get_owned_note_pub_id(&self) -> pallas::Base {
+        self.owned_note_pub_id
     }
 }
 

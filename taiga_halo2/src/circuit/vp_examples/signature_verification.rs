@@ -6,8 +6,7 @@ use crate::{
         },
         vp_circuit::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicatePublicInputs,
-            ValidityPredicateVerifyingInfo,
+            ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
         },
     },
     constant::{TaigaFixedBasesFull, NUM_NOTE, SETUP_PARAMS_MAP},
@@ -149,30 +148,6 @@ impl SignatureVerificationValidityPredicateCircuit {
     }
 }
 
-impl ValidityPredicateInfo for SignatureVerificationValidityPredicateCircuit {
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.input_notes
-    }
-
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.output_notes
-    }
-
-    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
-        let mut public_inputs = self.get_mandatory_public_inputs();
-        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
-            public_inputs.len(),
-            &RandomSeed::random(&mut rng),
-        );
-        public_inputs.extend(padding);
-        public_inputs.into()
-    }
-
-    fn get_owned_note_pub_id(&self) -> pallas::Base {
-        self.owned_note_pub_id
-    }
-}
-
 impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit {
     // Add custom constraints
     fn custom_constraints(
@@ -273,6 +248,28 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
         s_g.constrain_equal(layouter.namespace(|| "s*G = R + Hash(r||P||m)*P"), &rhs)?;
 
         Ok(())
+    }
+
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.input_notes
+    }
+
+    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.output_notes
+    }
+
+    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
+        let mut public_inputs = self.get_mandatory_public_inputs();
+        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
+            public_inputs.len(),
+            &RandomSeed::random(&mut rng),
+        );
+        public_inputs.extend(padding);
+        public_inputs.into()
+    }
+
+    fn get_owned_note_pub_id(&self) -> pallas::Base {
+        self.owned_note_pub_id
     }
 }
 

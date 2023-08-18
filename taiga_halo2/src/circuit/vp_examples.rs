@@ -1,6 +1,6 @@
 use crate::{
     circuit::vp_circuit::{
-        VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig, ValidityPredicateInfo,
+        VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
         ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
@@ -53,7 +53,7 @@ impl TrivialValidityPredicateCircuit {
     }
 }
 
-impl ValidityPredicateInfo for TrivialValidityPredicateCircuit {
+impl ValidityPredicateCircuit for TrivialValidityPredicateCircuit {
     fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
         &self.input_notes
     }
@@ -76,8 +76,6 @@ impl ValidityPredicateInfo for TrivialValidityPredicateCircuit {
         self.owned_note_pub_id
     }
 }
-
-impl ValidityPredicateCircuit for TrivialValidityPredicateCircuit {}
 
 vp_circuit_impl!(TrivialValidityPredicateCircuit);
 
@@ -107,7 +105,7 @@ pub mod tests {
 
     #[test]
     fn test_halo2_trivial_vp_circuit() {
-        use crate::circuit::vp_circuit::ValidityPredicateInfo;
+        use crate::circuit::vp_circuit::ValidityPredicateCircuit;
         use halo2_proofs::dev::MockProver;
         use rand::rngs::OsRng;
 

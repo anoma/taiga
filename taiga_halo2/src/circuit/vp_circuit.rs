@@ -30,7 +30,6 @@ use crate::{
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
-// use byteorder::{ReadBytesExt, WriteBytesExt};
 use dyn_clone::{clone_trait_object, DynClone};
 use ff::PrimeField;
 use group::cofactor::CofactorCurveAffine;
@@ -55,6 +54,8 @@ use vamp_ir::ast::Module;
 use vamp_ir::halo2::synth::{make_constant, Halo2Module, PrimeFieldOps};
 use vamp_ir::transform::compile;
 use vamp_ir::util::{read_inputs_from_file, Config};
+
+pub type ValidityPredicate = dyn ValidityPredicateVerifyingInfo;
 
 #[derive(Debug, Clone)]
 pub struct VPVerifyingInfo {
@@ -262,30 +263,6 @@ impl ValidityPredicateConfig {
     }
 }
 
-pub trait ValidityPredicateInfo {
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE];
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE];
-    fn get_mandatory_public_inputs(&self) -> Vec<pallas::Base> {
-        let mut public_inputs = vec![];
-        self.get_input_notes()
-            .iter()
-            .zip(self.get_output_notes().iter())
-            .for_each(|(input_note, output_note)| {
-                let nf = input_note.get_nf().unwrap().inner();
-                public_inputs.push(nf);
-                let cm = output_note.commitment();
-                public_inputs.push(cm.get_x());
-            });
-        public_inputs.push(self.get_owned_note_pub_id());
-        public_inputs
-    }
-    fn get_public_inputs(&self, rng: impl RngCore) -> ValidityPredicatePublicInputs;
-    // The owned_note_pub_id is the input_note_nf or the output_note_cm_x
-    // The owned_note_pub_id is the key to look up the target variables and
-    // help determine whether the owned note is the input note or not in VP circuit.
-    fn get_owned_note_pub_id(&self) -> pallas::Base;
-}
-
 pub trait ValidityPredicateVerifyingInfo: DynClone {
     fn get_verifying_info(&self) -> VPVerifyingInfo;
     fn get_vp_vk(&self) -> ValidityPredicateVerifyingKey;
@@ -293,9 +270,7 @@ pub trait ValidityPredicateVerifyingInfo: DynClone {
 
 clone_trait_object!(ValidityPredicateVerifyingInfo);
 
-pub trait ValidityPredicateCircuit:
-    Circuit<pallas::Base> + ValidityPredicateInfo + ValidityPredicateVerifyingInfo
-{
+pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVerifyingInfo {
     // Default implementation, constrains the notes integrity.
     // TODO: how to enforce the constraints in vp circuit?
     fn basic_constraints(
@@ -392,6 +367,28 @@ pub trait ValidityPredicateCircuit:
     ) -> Result<(), Error> {
         Ok(())
     }
+
+    fn get_mandatory_public_inputs(&self) -> Vec<pallas::Base> {
+        let mut public_inputs = vec![];
+        self.get_input_notes()
+            .iter()
+            .zip(self.get_output_notes().iter())
+            .for_each(|(input_note, output_note)| {
+                let nf = input_note.get_nf().unwrap().inner();
+                public_inputs.push(nf);
+                let cm = output_note.commitment();
+                public_inputs.push(cm.get_x());
+            });
+        public_inputs.push(self.get_owned_note_pub_id());
+        public_inputs
+    }
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE];
+    fn get_output_notes(&self) -> &[Note; NUM_NOTE];
+    fn get_public_inputs(&self, rng: impl RngCore) -> ValidityPredicatePublicInputs;
+    // The owned_note_pub_id is the input_note_nf or the output_note_cm_x
+    // The owned_note_pub_id is the key to look up the target variables and
+    // help determine whether the owned note is the input note or not in VP circuit.
+    fn get_owned_note_pub_id(&self) -> pallas::Base;
 }
 
 /// BasicValidityPredicateVariables are generally constrained in ValidityPredicateCircuit::basic_constraints
