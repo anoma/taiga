@@ -6,7 +6,7 @@ use pasta_curves::pallas;
 use rand::rngs::OsRng;
 use rand::Rng;
 use taiga_halo2::{
-    circuit::{vp_circuit::ValidityPredicateInfo, vp_examples::TrivialValidityPredicateCircuit},
+    circuit::{vp_circuit::ValidityPredicateCircuit, vp_examples::TrivialValidityPredicateCircuit},
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::{Note, NoteType, RandomSeed},
     nullifier::{Nullifier, NullifierKeyContainer},
@@ -87,7 +87,8 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
                 vp_circuit.clone(),
                 &[public_inputs.inner()],
                 &mut rng,
-            );
+            )
+            .unwrap();
         })
     });
 
@@ -105,9 +106,9 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
     let verifier_name = name.to_string() + "-verifier";
     c.bench_function(&verifier_name, |b| {
         b.iter(|| {
-            proof
+            assert!(proof
                 .verify(pk.get_vk(), &params, &[public_inputs.inner()])
-                .is_ok();
+                .is_ok());
         })
     });
 }
