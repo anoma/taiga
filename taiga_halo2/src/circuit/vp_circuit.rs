@@ -190,8 +190,22 @@ impl From<Vec<pallas::Base>> for ValidityPredicatePublicInputs {
     }
 }
 
-pub trait ValidityPredicateConfig {
-    fn configure_note(meta: &mut ConstraintSystem<pallas::Base>) -> NoteConfig {
+#[derive(Clone, Debug)]
+pub struct ValidityPredicateConfig {
+    pub note_conifg: NoteConfig,
+    pub advices: [Column<Advice>; 10],
+    pub instances: Column<Instance>,
+    pub get_is_input_note_flag_config: GetIsInputNoteFlagConfig,
+    pub get_owned_note_variable_config: GetOwnedNoteVariableConfig,
+    pub conditional_equal_config: ConditionalEqualConfig,
+    pub extended_or_relation_config: ExtendedOrRelationConfig,
+    pub add_config: AddConfig,
+    pub sub_config: SubConfig,
+    pub mul_config: MulConfig,
+}
+
+impl ValidityPredicateConfig {
+    pub fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
         let instances = meta.instance_column();
         meta.enable_equality(instances);
 
@@ -212,36 +226,7 @@ pub trait ValidityPredicateConfig {
             meta.enable_equality(*advice);
         }
 
-        NoteChip::configure(meta, instances, advices)
-    }
-    fn get_note_config(&self) -> NoteConfig;
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self;
-}
-
-#[derive(Clone, Debug)]
-pub struct GeneralVerificationValidityPredicateConfig {
-    pub note_conifg: NoteConfig,
-    pub advices: [Column<Advice>; 10],
-    pub instances: Column<Instance>,
-    pub get_is_input_note_flag_config: GetIsInputNoteFlagConfig,
-    pub get_owned_note_variable_config: GetOwnedNoteVariableConfig,
-    pub conditional_equal_config: ConditionalEqualConfig,
-    pub extended_or_relation_config: ExtendedOrRelationConfig,
-    pub add_config: AddConfig,
-    pub sub_config: SubConfig,
-    pub mul_config: MulConfig,
-}
-
-impl ValidityPredicateConfig for GeneralVerificationValidityPredicateConfig {
-    fn get_note_config(&self) -> NoteConfig {
-        self.note_conifg.clone()
-    }
-
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
-        let note_conifg = Self::configure_note(meta);
-
-        let advices = note_conifg.advices;
-        let instances = note_conifg.instances;
+        let note_conifg = NoteChip::configure(meta, instances, advices);
 
         let get_owned_note_variable_config = GetOwnedNoteVariableConfig::configure(
             meta,
@@ -311,15 +296,14 @@ clone_trait_object!(ValidityPredicateVerifyingInfo);
 pub trait ValidityPredicateCircuit:
     Circuit<pallas::Base> + ValidityPredicateInfo + ValidityPredicateVerifyingInfo
 {
-    type VPConfig: ValidityPredicateConfig + Clone;
     // Default implementation, constrains the notes integrity.
     // TODO: how to enforce the constraints in vp circuit?
     fn basic_constraints(
         &self,
-        config: Self::VPConfig,
+        config: ValidityPredicateConfig,
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<BasicValidityPredicateVariables, Error> {
-        let note_config = config.get_note_config();
+        let note_config = config.note_conifg;
         // Load the Sinsemilla generator lookup table used by the whole circuit.
         SinsemillaChip::<NoteCommitmentHashDomain, NoteCommitmentDomain, TaigaFixedBases>::load(
             note_config.sinsemilla_config.clone(),
@@ -402,7 +386,7 @@ pub trait ValidityPredicateCircuit:
     // Add custom constraints on basic note variables and user-defined variables.
     fn custom_constraints(
         &self,
-        _config: Self::VPConfig,
+        _config: ValidityPredicateConfig,
         mut _layouter: impl Layouter<pallas::Base>,
         _basic_variables: BasicValidityPredicateVariables,
     ) -> Result<(), Error> {
@@ -704,7 +688,7 @@ impl BasicValidityPredicateVariables {
 macro_rules! vp_circuit_impl {
     ($name:ident) => {
         impl Circuit<pallas::Base> for $name {
-            type Config = <Self as ValidityPredicateCircuit>::VPConfig;
+            type Config = ValidityPredicateConfig;
             type FloorPlanner = floor_planner::V1;
 
             fn without_witnesses(&self) -> Self {

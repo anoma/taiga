@@ -11,9 +11,9 @@ use crate::{
             target_note_variable::{get_is_input_note_flag, get_owned_note_variable},
         },
         vp_circuit::{
-            BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
-            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
+            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
+            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicatePublicInputs,
+            ValidityPredicateVerifyingInfo,
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
@@ -79,7 +79,6 @@ impl ValidityPredicateInfo for CascadeIntentValidityPredicateCircuit {
 }
 
 impl ValidityPredicateCircuit for CascadeIntentValidityPredicateCircuit {
-    type VPConfig = GeneralVerificationValidityPredicateConfig;
     // Add custom constraints
     fn custom_constraints(
         &self,

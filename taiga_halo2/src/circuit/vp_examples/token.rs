@@ -5,9 +5,9 @@ use crate::{
             target_note_variable::get_owned_note_variable,
         },
         vp_circuit::{
-            BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
-            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
+            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
+            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicatePublicInputs,
+            ValidityPredicateVerifyingInfo,
         },
         vp_examples::receiver_vp::{ReceiverValidityPredicateCircuit, COMPRESSED_RECEIVER_VK},
         vp_examples::signature_verification::{
@@ -118,7 +118,6 @@ impl ValidityPredicateInfo for TokenValidityPredicateCircuit {
 }
 
 impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
-    type VPConfig = GeneralVerificationValidityPredicateConfig;
     // Add custom constraints
     fn custom_constraints(
         &self,
@@ -151,7 +150,7 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
         )?;
 
         // Construct an ECC chip
-        let ecc_chip = EccChip::construct(config.get_note_config().ecc_config);
+        let ecc_chip = EccChip::construct(config.note_conifg.ecc_config);
 
         let pk = NonIdentityPoint::new(
             ecc_chip,
@@ -181,7 +180,7 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
 
         // Decode the app_data_dynamic, and check the app_data_dynamic encoding
         let encoded_app_data_dynamic = poseidon_hash_gadget(
-            config.get_note_config().poseidon_config,
+            config.note_conifg.poseidon_config,
             layouter.namespace(|| "app_data_dynamic encoding"),
             [pk.inner().x(), pk.inner().y(), auth_vp_vk, receiver_vp_vk],
         )?;

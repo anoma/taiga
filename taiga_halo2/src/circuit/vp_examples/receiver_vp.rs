@@ -6,9 +6,9 @@ use crate::{
         },
         note_encryption_circuit::note_encryption_gadget,
         vp_circuit::{
-            BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
-            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
+            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
+            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicatePublicInputs,
+            ValidityPredicateVerifyingInfo,
         },
         vp_examples::signature_verification::COMPRESSED_TOKEN_AUTH_VK,
     },
@@ -120,7 +120,6 @@ impl ValidityPredicateInfo for ReceiverValidityPredicateCircuit {
 }
 
 impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
-    type VPConfig = GeneralVerificationValidityPredicateConfig;
     // Add custom constraints
     fn custom_constraints(
         &self,
@@ -141,7 +140,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
         )?;
 
         // Construct an ECC chip
-        let ecc_chip = EccChip::construct(config.get_note_config().ecc_config);
+        let ecc_chip = EccChip::construct(config.note_conifg.ecc_config);
 
         let rcv_pk = NonIdentityPoint::new(
             ecc_chip.clone(),
@@ -170,7 +169,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
 
         // Decode the app_data_dynamic, and check the app_data_dynamic encoding
         let encoded_app_data_dynamic = poseidon_hash_gadget(
-            config.get_note_config().poseidon_config,
+            config.note_conifg.poseidon_config.clone(),
             layouter.namespace(|| "app_data_dynamic encoding"),
             [
                 rcv_pk.inner().x(),
@@ -257,7 +256,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             layouter.namespace(|| "note encryption"),
             config.advices[0],
             config.instances,
-            config.get_note_config().poseidon_config,
+            config.note_conifg.poseidon_config,
             add_chip,
             ecc_chip,
             nonce,

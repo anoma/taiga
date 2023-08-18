@@ -5,9 +5,9 @@ use crate::{
             target_note_variable::get_owned_note_variable,
         },
         vp_circuit::{
-            BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
-            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
+            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
+            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicatePublicInputs,
+            ValidityPredicateVerifyingInfo,
         },
     },
     constant::{TaigaFixedBasesFull, NUM_NOTE, SETUP_PARAMS_MAP},
@@ -174,7 +174,6 @@ impl ValidityPredicateInfo for SignatureVerificationValidityPredicateCircuit {
 }
 
 impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit {
-    type VPConfig = GeneralVerificationValidityPredicateConfig;
     // Add custom constraints
     fn custom_constraints(
         &self,
@@ -183,7 +182,7 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
         basic_variables: BasicValidityPredicateVariables,
     ) -> Result<(), Error> {
         // Construct an ECC chip
-        let ecc_chip = EccChip::construct(config.get_note_config().ecc_config);
+        let ecc_chip = EccChip::construct(config.note_conifg.ecc_config);
 
         let pk = NonIdentityPoint::new(
             ecc_chip.clone(),
@@ -213,7 +212,7 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
 
         // Decode the app_data_dynamic, and check the app_data_dynamic encoding
         let encoded_app_data_dynamic = poseidon_hash_gadget(
-            config.get_note_config().poseidon_config,
+            config.note_conifg.poseidon_config.clone(),
             layouter.namespace(|| "app_data_dynamic encoding"),
             [pk.inner().x(), pk.inner().y(), auth_vp_vk, receiver_vp_vk],
         )?;
@@ -248,7 +247,7 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
             let cms = basic_variables.get_output_note_cms();
             assert_eq!(NUM_NOTE, 2);
             let h = poseidon_hash_gadget(
-                config.get_note_config().poseidon_config,
+                config.note_conifg.poseidon_config,
                 layouter.namespace(|| "Poseidon_hash(r, P, m)"),
                 [
                     r.inner().x(),

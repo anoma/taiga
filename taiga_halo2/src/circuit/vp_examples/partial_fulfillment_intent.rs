@@ -12,9 +12,9 @@ use crate::{
             target_note_variable::{get_is_input_note_flag, get_owned_note_variable},
         },
         vp_circuit::{
-            BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
-            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
+            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
+            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicatePublicInputs,
+            ValidityPredicateVerifyingInfo,
         },
         vp_examples::token::{transfrom_token_name_to_token_property, Token, TOKEN_VK},
     },
@@ -101,7 +101,6 @@ impl ValidityPredicateInfo for PartialFulfillmentIntentValidityPredicateCircuit 
 }
 
 impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircuit {
-    type VPConfig = GeneralVerificationValidityPredicateConfig;
     // Add custom constraints
     fn custom_constraints(
         &self,
@@ -162,7 +161,7 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
 
         // Encode the app_data_static of intent note
         let encoded_app_data_static = poseidon_hash_gadget(
-            config.get_note_config().poseidon_config,
+            config.note_conifg.poseidon_config,
             layouter.namespace(|| "app_data_static encoding"),
             [
                 sold_token.clone(),

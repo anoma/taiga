@@ -1,8 +1,7 @@
 use crate::{
     circuit::vp_circuit::{
-        GeneralVerificationValidityPredicateConfig, VPVerifyingInfo, ValidityPredicateCircuit,
-        ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicatePublicInputs,
-        ValidityPredicateVerifyingInfo,
+        VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig, ValidityPredicateInfo,
+        ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::{Note, RandomSeed},
@@ -78,9 +77,7 @@ impl ValidityPredicateInfo for TrivialValidityPredicateCircuit {
     }
 }
 
-impl ValidityPredicateCircuit for TrivialValidityPredicateCircuit {
-    type VPConfig = GeneralVerificationValidityPredicateConfig;
-}
+impl ValidityPredicateCircuit for TrivialValidityPredicateCircuit {}
 
 vp_circuit_impl!(TrivialValidityPredicateCircuit);
 
