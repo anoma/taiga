@@ -47,7 +47,7 @@ impl ShieldedPartialTransaction {
             .map(|input_note| {
                 NoteVPVerifyingInfoSet::build(
                     input_note.get_app_vp_verifying_info(),
-                    input_note.get_app_vp_verifying_info_dynamic(),
+                    input_note.get_dynamic_vps(),
                 )
             })
             .collect();
@@ -56,7 +56,7 @@ impl ShieldedPartialTransaction {
             .map(|output_note| {
                 NoteVPVerifyingInfoSet::build(
                     output_note.get_app_vp_verifying_info(),
-                    output_note.get_app_vp_verifying_info_dynamic(),
+                    output_note.get_dynamic_vps(),
                 )
             })
             .collect();
@@ -279,11 +279,11 @@ impl NoteVPVerifyingInfoSet {
 
     pub fn build(
         app_vp_verifying_info: Box<ValidityPredicate>,
-        app_vp_verifying_info_dynamic: Vec<Box<ValidityPredicate>>,
+        dynamic_vps: Vec<Box<ValidityPredicate>>,
     ) -> Self {
         let app_vp_verifying_info = app_vp_verifying_info.get_verifying_info();
 
-        let app_dynamic_vp_verifying_info = app_vp_verifying_info_dynamic
+        let app_dynamic_vp_verifying_info = dynamic_vps
             .into_iter()
             .map(|verifying_info| verifying_info.get_verifying_info())
             .collect();
@@ -445,22 +445,22 @@ pub mod testing {
         let input_app_vp_verifying_info_1 = Box::new(trivial_vp_circuit.clone());
         let trivial_app_logic_1: Box<ValidityPredicate> = Box::new(trivial_vp_circuit.clone());
         let trivial_app_logic_2 = Box::new(trivial_vp_circuit.clone());
-        let trivial_app_vp_verifying_info_dynamic = vec![trivial_app_logic_1, trivial_app_logic_2];
+        let trivial_dynamic_vps = vec![trivial_app_logic_1, trivial_app_logic_2];
         let input_note_proving_info_1 = InputNoteProvingInfo::new(
             input_note_1,
             merkle_path.clone(),
             input_app_vp_verifying_info_1,
-            trivial_app_vp_verifying_info_dynamic.clone(),
+            trivial_dynamic_vps.clone(),
         );
         // The following notes use empty logic vps and use app_data_dynamic with pallas::Base::zero() by default.
         trivial_vp_circuit.owned_note_pub_id = input_note_2.get_nf().unwrap().inner();
         let input_app_vp_verifying_info_2 = Box::new(trivial_vp_circuit.clone());
-        let app_vp_verifying_info_dynamic = vec![];
+        let dynamic_vps = vec![];
         let input_note_proving_info_2 = InputNoteProvingInfo::new(
             input_note_2,
             merkle_path,
             input_app_vp_verifying_info_2,
-            app_vp_verifying_info_dynamic.clone(),
+            dynamic_vps.clone(),
         );
 
         trivial_vp_circuit.owned_note_pub_id = output_note_1.commitment().get_x();
@@ -468,16 +468,13 @@ pub mod testing {
         let output_note_proving_info_1 = OutputNoteProvingInfo::new(
             output_note_1,
             output_app_vp_verifying_info_1,
-            app_vp_verifying_info_dynamic.clone(),
+            dynamic_vps.clone(),
         );
 
         trivial_vp_circuit.owned_note_pub_id = output_note_2.commitment().get_x();
         let output_app_vp_verifying_info_2 = Box::new(trivial_vp_circuit);
-        let output_note_proving_info_2 = OutputNoteProvingInfo::new(
-            output_note_2,
-            output_app_vp_verifying_info_2,
-            app_vp_verifying_info_dynamic,
-        );
+        let output_note_proving_info_2 =
+            OutputNoteProvingInfo::new(output_note_2, output_app_vp_verifying_info_2, dynamic_vps);
 
         // Create shielded partial tx
         ShieldedPartialTransaction::build(

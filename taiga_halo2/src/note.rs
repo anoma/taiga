@@ -97,14 +97,14 @@ pub struct InputNoteProvingInfo {
     pub note: Note,
     pub merkle_path: MerklePath,
     app_vp_verifying_info: Box<ValidityPredicate>,
-    app_vp_verifying_info_dynamic: Vec<Box<ValidityPredicate>>,
+    dynamic_vps: Vec<Box<ValidityPredicate>>,
 }
 
 #[derive(Clone)]
 pub struct OutputNoteProvingInfo {
     pub note: Note,
     app_vp_verifying_info: Box<ValidityPredicate>,
-    app_vp_verifying_info_dynamic: Vec<Box<ValidityPredicate>>,
+    dynamic_vps: Vec<Box<ValidityPredicate>>,
 }
 
 impl Note {
@@ -467,13 +467,13 @@ impl InputNoteProvingInfo {
         note: Note,
         merkle_path: MerklePath,
         app_vp_verifying_info: Box<ValidityPredicate>,
-        app_vp_verifying_info_dynamic: Vec<Box<ValidityPredicate>>,
+        dynamic_vps: Vec<Box<ValidityPredicate>>,
     ) -> Self {
         Self {
             note,
             merkle_path,
             app_vp_verifying_info,
-            app_vp_verifying_info_dynamic,
+            dynamic_vps,
         }
     }
 
@@ -481,8 +481,8 @@ impl InputNoteProvingInfo {
         self.app_vp_verifying_info.clone()
     }
 
-    pub fn get_app_vp_verifying_info_dynamic(&self) -> Vec<Box<ValidityPredicate>> {
-        self.app_vp_verifying_info_dynamic.clone()
+    pub fn get_dynamic_vps(&self) -> Vec<Box<ValidityPredicate>> {
+        self.dynamic_vps.clone()
     }
 
     pub fn create_padding_note_proving_info(
@@ -504,12 +504,12 @@ impl OutputNoteProvingInfo {
     pub fn new(
         note: Note,
         app_vp_verifying_info: Box<ValidityPredicate>,
-        app_vp_verifying_info_dynamic: Vec<Box<ValidityPredicate>>,
+        dynamic_vps: Vec<Box<ValidityPredicate>>,
     ) -> Self {
         Self {
             note,
             app_vp_verifying_info,
-            app_vp_verifying_info_dynamic,
+            dynamic_vps,
         }
     }
 
@@ -517,8 +517,8 @@ impl OutputNoteProvingInfo {
         self.app_vp_verifying_info.clone()
     }
 
-    pub fn get_app_vp_verifying_info_dynamic(&self) -> Vec<Box<ValidityPredicate>> {
-        self.app_vp_verifying_info_dynamic.clone()
+    pub fn get_dynamic_vps(&self) -> Vec<Box<ValidityPredicate>> {
+        self.dynamic_vps.clone()
     }
 
     pub fn create_padding_note_proving_info(
@@ -589,13 +589,8 @@ pub mod tests {
         let note = random_input_note(&mut rng);
         let merkle_path = random_merkle_path(&mut rng);
         let app_vp_verifying_info = Box::new(random_trivial_vp_circuit(&mut rng));
-        let app_vp_verifying_info_dynamic = vec![];
-        InputNoteProvingInfo::new(
-            note,
-            merkle_path,
-            app_vp_verifying_info,
-            app_vp_verifying_info_dynamic,
-        )
+        let dynamic_vps = vec![];
+        InputNoteProvingInfo::new(note, merkle_path, app_vp_verifying_info, dynamic_vps)
     }
 
     pub fn random_output_proving_info<R: RngCore>(
@@ -604,11 +599,11 @@ pub mod tests {
     ) -> OutputNoteProvingInfo {
         let note = random_output_note(&mut rng, rho);
         let app_vp_verifying_info = Box::new(random_trivial_vp_circuit(&mut rng));
-        let app_vp_verifying_info_dynamic = vec![];
+        let dynamic_vps = vec![];
         OutputNoteProvingInfo {
             note,
             app_vp_verifying_info,
-            app_vp_verifying_info_dynamic,
+            dynamic_vps,
         }
     }
 
