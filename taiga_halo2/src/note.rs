@@ -96,14 +96,14 @@ pub struct RandomSeed([u8; 32]);
 pub struct InputNoteProvingInfo {
     pub note: Note,
     pub merkle_path: MerklePath,
-    app_vp_verifying_info: Box<ValidityPredicate>,
+    application_vp: Box<ValidityPredicate>,
     dynamic_vps: Vec<Box<ValidityPredicate>>,
 }
 
 #[derive(Clone)]
 pub struct OutputNoteProvingInfo {
     pub note: Note,
-    app_vp_verifying_info: Box<ValidityPredicate>,
+    application_vp: Box<ValidityPredicate>,
     dynamic_vps: Vec<Box<ValidityPredicate>>,
 }
 
@@ -466,19 +466,19 @@ impl InputNoteProvingInfo {
     pub fn new(
         note: Note,
         merkle_path: MerklePath,
-        app_vp_verifying_info: Box<ValidityPredicate>,
+        application_vp: Box<ValidityPredicate>,
         dynamic_vps: Vec<Box<ValidityPredicate>>,
     ) -> Self {
         Self {
             note,
             merkle_path,
-            app_vp_verifying_info,
+            application_vp,
             dynamic_vps,
         }
     }
 
-    pub fn get_app_vp_verifying_info(&self) -> Box<ValidityPredicate> {
-        self.app_vp_verifying_info.clone()
+    pub fn get_application_vp(&self) -> Box<ValidityPredicate> {
+        self.application_vp.clone()
     }
 
     pub fn get_dynamic_vps(&self) -> Vec<Box<ValidityPredicate>> {
@@ -503,18 +503,18 @@ impl InputNoteProvingInfo {
 impl OutputNoteProvingInfo {
     pub fn new(
         note: Note,
-        app_vp_verifying_info: Box<ValidityPredicate>,
+        application_vp: Box<ValidityPredicate>,
         dynamic_vps: Vec<Box<ValidityPredicate>>,
     ) -> Self {
         Self {
             note,
-            app_vp_verifying_info,
+            application_vp,
             dynamic_vps,
         }
     }
 
-    pub fn get_app_vp_verifying_info(&self) -> Box<ValidityPredicate> {
-        self.app_vp_verifying_info.clone()
+    pub fn get_application_vp(&self) -> Box<ValidityPredicate> {
+        self.application_vp.clone()
     }
 
     pub fn get_dynamic_vps(&self) -> Vec<Box<ValidityPredicate>> {
@@ -588,9 +588,9 @@ pub mod tests {
     pub fn random_input_proving_info<R: RngCore>(mut rng: R) -> InputNoteProvingInfo {
         let note = random_input_note(&mut rng);
         let merkle_path = random_merkle_path(&mut rng);
-        let app_vp_verifying_info = Box::new(random_trivial_vp_circuit(&mut rng));
+        let application_vp = Box::new(random_trivial_vp_circuit(&mut rng));
         let dynamic_vps = vec![];
-        InputNoteProvingInfo::new(note, merkle_path, app_vp_verifying_info, dynamic_vps)
+        InputNoteProvingInfo::new(note, merkle_path, application_vp, dynamic_vps)
     }
 
     pub fn random_output_proving_info<R: RngCore>(
@@ -598,11 +598,11 @@ pub mod tests {
         rho: Nullifier,
     ) -> OutputNoteProvingInfo {
         let note = random_output_note(&mut rng, rho);
-        let app_vp_verifying_info = Box::new(random_trivial_vp_circuit(&mut rng));
+        let application_vp = Box::new(random_trivial_vp_circuit(&mut rng));
         let dynamic_vps = vec![];
         OutputNoteProvingInfo {
             note,
-            app_vp_verifying_info,
+            application_vp,
             dynamic_vps,
         }
     }
