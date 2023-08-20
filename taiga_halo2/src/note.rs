@@ -544,7 +544,8 @@ pub mod tests {
     use super::{InputNoteProvingInfo, Note, NoteType, OutputNoteProvingInfo, RandomSeed};
     use crate::{
         circuit::vp_examples::tests::random_trivial_vp_circuit,
-        merkle_tree::tests::random_merkle_path,
+        constant::TAIGA_COMMITMENT_TREE_DEPTH,
+        merkle_tree::MerklePath,
         nullifier::{tests::*, Nullifier, NullifierKeyContainer},
     };
     use halo2_proofs::arithmetic::Field;
@@ -591,7 +592,7 @@ pub mod tests {
 
     pub fn random_input_proving_info<R: RngCore>(mut rng: R) -> InputNoteProvingInfo {
         let note = random_input_note(&mut rng);
-        let merkle_path = random_merkle_path(&mut rng);
+        let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         let app_vp_verifying_info = Box::new(random_trivial_vp_circuit(&mut rng));
         let app_vp_verifying_info_dynamic = vec![];
         InputNoteProvingInfo::new(
