@@ -4,27 +4,27 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rand = "0.8.4"
-lazy_static = "1"
-blake2b_simd = "1"
+rand = "0.8"
+lazy_static = "1.4"
+blake2b_simd = "1.0"
 pasta_curves = "0.5.1"
 ff = "0.13"
 group = "0.13"
-halo2_gadgets = {version = "0.3", features = ["test-dependencies"]}
-halo2_proofs = {version="0.3", features = ["dev-graph"]}
-bitvec = "1"
+halo2_gadgets = { version = "0.3", features = ["test-dependencies"] }
+halo2_proofs = { version = "0.3", features = ["dev-graph"] }
+bitvec = "1.0"
 subtle = { version = "2.3", default-features = false }
 dyn-clone = "1.0"
 reddsa = "0.5"
 vamp-ir = { git = "https://github.com/anoma/vamp-ir.git", rev = "6d401f8a479951727586ef0c44c42edab3139090"}
 bincode = "2.0.0-rc.3"
-borsh = {version = "0.10.3", features = ["const-generics"]}
-byteorder = "1"
-num-bigint = "0.4.3"
+borsh = { version = "0.10", features = ["const-generics"] }
+byteorder = "1.4"
+num-bigint = "0.4"
 
 [dev-dependencies]
-criterion = "0.5.1"
-proptest = "1.0.0"
+criterion = "0.5"
+proptest = "1.2"
 
 [[bench]]
 name = "action_proof"

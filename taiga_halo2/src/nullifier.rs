@@ -3,6 +3,7 @@ use crate::{
     note::NoteCommitment,
     utils::{extract_p, mod_r_p, prf_nf},
 };
+use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_proofs::arithmetic::Field;
 use pasta_curves::group::cofactor::CofactorCurveAffine;
 use pasta_curves::group::ff::PrimeField;
@@ -65,6 +66,24 @@ impl Nullifier {
 impl Default for Nullifier {
     fn default() -> Nullifier {
         Nullifier(pallas::Base::one())
+    }
+}
+
+impl BorshSerialize for Nullifier {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        writer.write_all(&self.0.to_repr())?;
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for Nullifier {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let mut repr = [0u8; 32];
+        reader.read_exact(&mut repr)?;
+        let value = Option::from(pallas::Base::from_repr(repr)).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "Nullifier not in field")
+        })?;
+        Ok(Self(value))
     }
 }
 

@@ -330,7 +330,8 @@ pub mod testing {
     use crate::{
         circuit::vp_circuit::{ValidityPredicate, ValidityPredicateVerifyingInfo},
         circuit::vp_examples::TrivialValidityPredicateCircuit,
-        merkle_tree::tests::random_merkle_path,
+        constant::TAIGA_COMMITMENT_TREE_DEPTH,
+        merkle_tree::MerklePath,
         note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
         nullifier::{Nullifier, NullifierKeyContainer},
         shielded_ptx::ShieldedPartialTransaction,
@@ -435,7 +436,7 @@ pub mod testing {
         };
 
         // Generate note info
-        let merkle_path = random_merkle_path(&mut rng);
+        let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         // Create vp circuit and fill the note info
         let mut trivial_vp_circuit = TrivialValidityPredicateCircuit {
             owned_note_pub_id: input_note_1.get_nf().unwrap().inner(),

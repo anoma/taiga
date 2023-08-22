@@ -122,7 +122,7 @@ impl ActionInfo {
 
         let cm_x = self.output_note.commitment().get_x();
         let anchor = {
-            let cm_node = Node::new(self.input_note.commitment().get_x());
+            let cm_node = Node::from_note(&self.input_note);
             self.input_merkle_path.root(cm_node).inner()
         };
 
