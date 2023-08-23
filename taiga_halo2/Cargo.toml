@@ -15,7 +15,7 @@ halo2_proofs = {version="0.3", features = ["dev-graph"]}
 bitvec = "1"
 subtle = { version = "2.3", default-features = false }
 dyn-clone = "1.0"
-reddsa = "0.5"
+reddsa = {git = "https://github.com/heliaxdev/reddsa.git", branch = "taiga"}
 vamp-ir = { git = "https://github.com/anoma/vamp-ir.git", rev = "6d401f8a479951727586ef0c44c42edab3139090"}
 bincode = "2.0.0-rc.3"
 borsh = {version = "0.10.3", features = ["const-generics"]}
