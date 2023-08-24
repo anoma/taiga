@@ -1,5 +1,7 @@
 //! Implementation of a Merkle tree of commitments used to prove the existence of notes.
-//!
+
+use std::hash::{Hash, Hasher};
+
 use crate::utils::poseidon_hash;
 use crate::{constant::TAIGA_COMMITMENT_TREE_DEPTH, note::Note};
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -11,7 +13,7 @@ use rand::{Rng, RngCore};
 use crate::merkle_tree::LR::{L, R};
 use rand::distributions::{Distribution, Standard};
 
-#[derive(Clone, Debug, PartialEq, Eq, Copy, Default, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Copy, Hash, Default, BorshSerialize, BorshDeserialize)]
 pub enum LR {
     R,
     #[default]
@@ -44,7 +46,7 @@ impl Distribution<LR> for Standard {
 
 /// A path from a position in a particular commitment tree to the root of that tree.
 /// In Orchard merkle tree, they are using MerkleCRH(layer, left, right), where MerkleCRH is a sinsemilla. We are using poseidon_hash(left, right).
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, BorshSerialize, BorshDeserialize)]
 pub struct MerklePath {
     merkle_path: Vec<(Node, LR)>,
 }
@@ -131,5 +133,11 @@ impl BorshDeserialize for Node {
             std::io::Error::new(std::io::ErrorKind::InvalidData, "Node value not in field")
         })?;
         Ok(Self(value))
+    }
+}
+
+impl Hash for Node {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.to_repr().hash(state);
     }
 }
