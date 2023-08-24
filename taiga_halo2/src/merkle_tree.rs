@@ -1,5 +1,3 @@
-//! Implementation of a Merkle tree of commitments used to prove the existence of notes.
-
 use std::hash::{Hash, Hasher};
 
 use crate::utils::poseidon_hash;
