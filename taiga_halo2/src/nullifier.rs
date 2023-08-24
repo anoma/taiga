@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use crate::constant::GENERATOR;
 use crate::{
     note::NoteCommitment,
@@ -84,6 +86,12 @@ impl BorshDeserialize for Nullifier {
             std::io::Error::new(std::io::ErrorKind::InvalidData, "Nullifier not in field")
         })?;
         Ok(Self(value))
+    }
+}
+
+impl Hash for Nullifier {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.to_repr().hash(state);
     }
 }
 
