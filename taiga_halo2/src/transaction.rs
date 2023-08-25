@@ -13,7 +13,9 @@ use pasta_curves::{
     pallas,
 };
 use rand::{CryptoRng, RngCore};
+#[cfg(feature = "nif")]
 use rustler::types::atom;
+#[cfg(feature = "nif")]
 use rustler::{atoms, Decoder, Env, NifRecord, NifResult, NifStruct, Term};
 
 #[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
@@ -31,14 +33,16 @@ pub enum InProgressBindingSignature {
     Unauthorized(BindingSigningKey),
 }
 
-#[derive(Debug, Clone, BorshDeserialize, BorshSerialize, NifRecord)]
-#[tag = "bundle"]
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
+#[cfg_attr(feature = "nif", derive(NifRecord))]
+#[cfg_attr(feature = "nif", tag = "bundle")]
 pub struct ShieldedPartialTxBundle {
     partial_txs: Vec<ShieldedPartialTransaction>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, NifStruct)]
-#[module = "Taiga.Transaction.Result"]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "nif", derive(NifStruct))]
+#[cfg_attr(feature = "nif", module = "Taiga.Transaction.Result")]
 pub struct ShieldedResult {
     anchors: Vec<pallas::Base>,
     nullifiers: Vec<Nullifier>,
@@ -202,8 +206,10 @@ impl Transaction {
     }
 }
 
+#[cfg(feature = "nif")]
 atoms! { transaction }
 
+#[cfg(feature = "nif")]
 impl rustler::Encoder for Transaction {
     fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
         (
@@ -219,6 +225,7 @@ impl rustler::Encoder for Transaction {
     }
 }
 
+#[cfg(feature = "nif")]
 impl<'a> Decoder<'a> for Transaction {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         let (term, shielded_ptx_bundle, transparent_bytes, sig_bytes): (

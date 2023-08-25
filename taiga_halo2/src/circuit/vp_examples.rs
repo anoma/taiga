@@ -17,6 +17,7 @@ use halo2_proofs::{
 use lazy_static::lazy_static;
 use pasta_curves::pallas;
 use rand::{rngs::OsRng, RngCore};
+#[cfg(feature = "nif")]
 use rustler::{Decoder, Encoder, Env, NifResult, NifStruct, Term};
 
 pub mod cascade_intent;
@@ -42,8 +43,9 @@ pub struct TrivialValidityPredicateCircuit {
 }
 
 // I only exist to allow trivial derivation of the nifstruct
-#[derive(Clone, Debug, Default, NifStruct)]
-#[module = "Taiga.VP.Trivial"]
+#[derive(Clone, Debug, Default)]
+#[cfg_attr(feature = "nif", derive(NifStruct))]
+#[cfg_attr(feature = "nif", module = "Taiga.VP.Trivial")]
 struct TrivialValidtyPredicateCircuitProxy {
     owned_note_pub_id: pallas::Base,
     input_notes: Vec<Note>,
@@ -84,11 +86,13 @@ impl TrivialValidtyPredicateCircuitProxy {
         })
     }
 }
+#[cfg(feature = "nif")]
 impl Encoder for TrivialValidityPredicateCircuit {
     fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
         self.to_proxy().encode(env)
     }
 }
+#[cfg(feature = "nif")]
 impl<'a> Decoder<'a> for TrivialValidityPredicateCircuit {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         let val: TrivialValidtyPredicateCircuitProxy = Decoder::decode(term)?;

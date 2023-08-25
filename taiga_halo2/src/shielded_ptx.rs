@@ -14,6 +14,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_proofs::plonk::Error;
 use pasta_curves::pallas;
 use rand::RngCore;
+#[cfg(feature = "nif")]
 use rustler::{Decoder, Encoder, Env, NifResult, NifStruct, Term};
 
 #[derive(Debug, Clone)]
@@ -23,15 +24,17 @@ pub struct ShieldedPartialTransaction {
     outputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
 }
 
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, NifStruct)]
-#[module = "Taiga.Action.VerifyingInfo"]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "nif", derive(NifStruct))]
+#[cfg_attr(feature = "nif", module = "Taiga.Action.VerifyingInfo")]
 pub struct ActionVerifyingInfo {
     action_proof: Proof,
     action_instance: ActionInstance,
 }
 
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, NifStruct)]
-#[module = "Taiga.Note.VerifyingInfo"]
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "nif", derive(NifStruct))]
+#[cfg_attr(feature = "nif", module = "Taiga.Note.VerifyingInfo")]
 pub struct NoteVPVerifyingInfoSet {
     app_vp_verifying_info: VPVerifyingInfo,
     app_dynamic_vp_verifying_info: Vec<VPVerifyingInfo>,
@@ -40,8 +43,9 @@ pub struct NoteVPVerifyingInfoSet {
 }
 
 // Is easier to derive traits for
-#[derive(Debug, Clone, NifStruct)]
-#[module = "Taiga.Shielded.PTX"]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "nif", derive(NifStruct))]
+#[cfg_attr(feature = "nif", module = "Taiga.Shielded.PTX")]
 struct ShieldedPartialTransactionProxy {
     actions: Vec<ActionVerifyingInfo>,
     inputs: Vec<NoteVPVerifyingInfoSet>,
@@ -272,11 +276,15 @@ impl BorshDeserialize for ShieldedPartialTransaction {
         })
     }
 }
+
+#[cfg(feature = "nif")]
 impl Encoder for ShieldedPartialTransaction {
     fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
         self.to_proxy().encode(env)
     }
 }
+
+#[cfg(feature = "nif")]
 impl<'a> Decoder<'a> for ShieldedPartialTransaction {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         let val: ShieldedPartialTransactionProxy = Decoder::decode(term)?;

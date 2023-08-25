@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rustler = "0.29.1"
+rustler = {version = "0.29.1", optional = true}
 rand = "0.8.4"
 lazy_static = "1"
 blake2b_simd = "1"
@@ -26,6 +26,10 @@ num-bigint = "0.4.3"
 [dev-dependencies]
 criterion = "0.5.1"
 proptest = "1.0.0"
+
+[features]
+default = []
+nif = ["rustler", "pasta_curves/repr-erlang"]
 
 [[bench]]
 name = "action_proof"

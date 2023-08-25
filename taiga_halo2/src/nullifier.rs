@@ -8,15 +8,18 @@ use pasta_curves::group::cofactor::CofactorCurveAffine;
 use pasta_curves::group::ff::PrimeField;
 use pasta_curves::pallas;
 use rand::RngCore;
+#[cfg(feature = "nif")]
 use rustler::{NifTaggedEnum, NifTuple};
 use subtle::CtOption;
 
 /// The unique nullifier.
-#[derive(Copy, Debug, Clone, PartialEq, Eq, NifTuple)]
+#[derive(Copy, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "nif", derive(NifTuple))]
 pub struct Nullifier(pallas::Base);
 
 /// The NullifierKeyContainer contains the nullifier_key or the nullifier_key commitment
-#[derive(Copy, Debug, Clone, PartialEq, Eq, NifTaggedEnum)]
+#[derive(Copy, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "nif", derive(NifTaggedEnum))]
 pub enum NullifierKeyContainer {
     // The NullifierKeyContainer::Commitment is the commitment of NullifierKeyContainer::Key `nk_com = Commitment(nk, 0)`
     Commitment(pallas::Base),

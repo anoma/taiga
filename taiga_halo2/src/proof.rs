@@ -6,9 +6,11 @@ use halo2_proofs::{
 };
 use pasta_curves::{pallas, vesta};
 use rand::RngCore;
+#[cfg(feature = "nif")]
 use rustler::NifTuple;
 
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize, NifTuple)]
+#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "nif", derive(NifTuple))]
 pub struct Proof(Vec<u8>);
 
 impl Proof {

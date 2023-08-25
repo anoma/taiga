@@ -24,6 +24,7 @@ use pasta_curves::{
     pallas,
 };
 use rand::RngCore;
+#[cfg(feature = "nif")]
 use rustler::{NifStruct, NifTuple};
 use std::{
     hash::{Hash, Hasher},
@@ -31,7 +32,8 @@ use std::{
 };
 
 /// A commitment to a note.
-#[derive(Copy, Debug, Clone, NifTuple)]
+#[derive(Copy, Debug, Clone)]
+#[cfg_attr(feature = "nif", derive(NifTuple))]
 pub struct NoteCommitment(pallas::Point);
 
 impl NoteCommitment {
@@ -55,8 +57,9 @@ impl Default for NoteCommitment {
 }
 
 /// A note
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, NifStruct)]
-#[module = "Taiga.Note"]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "nif", derive(NifStruct))]
+#[cfg_attr(feature = "nif", module = "Taiga.Note")]
 pub struct Note {
     pub note_type: NoteType,
     /// app_data_dynamic is the data defined in application vp and will NOT be used to derive type
@@ -77,8 +80,9 @@ pub struct Note {
 }
 
 /// The parameters in the NoteType are used to derive note type.
-#[derive(Debug, Clone, Copy, Default, Eq, NifStruct)]
-#[module = "Taiga.NoteType"]
+#[derive(Debug, Clone, Copy, Default, Eq)]
+#[cfg_attr(feature = "nif", derive(NifStruct))]
+#[cfg_attr(feature = "nif", module = "Taiga.NoteType")]
 pub struct NoteType {
     /// app_vk is the compressed verifying key of VP
     pub app_vk: pallas::Base,

@@ -56,7 +56,9 @@ use vamp_ir::halo2::synth::{make_constant, Halo2Module, PrimeFieldOps};
 use vamp_ir::transform::compile;
 use vamp_ir::util::{read_inputs_from_file, Config};
 
+#[cfg(feature = "nif")]
 use rustler::types::atom;
+#[cfg(feature = "nif")]
 use rustler::{Decoder, Encoder, Env, NifResult, Term};
 
 #[derive(Debug, Clone)]
@@ -66,8 +68,10 @@ pub struct VPVerifyingInfo {
     pub public_inputs: ValidityPredicatePublicInputs,
 }
 
+#[cfg(feature = "nif")]
 rustler::atoms! {verifying_info}
 
+#[cfg(feature = "nif")]
 impl Encoder for VPVerifyingInfo {
     fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
         (
@@ -80,6 +84,7 @@ impl Encoder for VPVerifyingInfo {
     }
 }
 
+#[cfg(feature = "nif")]
 impl<'a> Decoder<'a> for VPVerifyingInfo {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         let (term, vk, proof, public_inputs): (
@@ -107,12 +112,14 @@ impl<'a> Decoder<'a> for VPVerifyingInfo {
 #[derive(Clone, Debug)]
 pub struct ValidityPredicatePublicInputs([pallas::Base; VP_CIRCUIT_PUBLIC_INPUT_NUM]);
 
+#[cfg(feature = "nif")]
 impl Encoder for ValidityPredicatePublicInputs {
     fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
         self.0.to_vec().encode(env)
     }
 }
 
+#[cfg(feature = "nif")]
 impl<'a> Decoder<'a> for ValidityPredicatePublicInputs {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         let val: Vec<pallas::Base> = Decoder::decode(term)?;
