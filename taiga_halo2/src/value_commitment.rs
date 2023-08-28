@@ -4,9 +4,12 @@ use halo2_proofs::arithmetic::CurveAffine;
 use pasta_curves::group::cofactor::CofactorCurveAffine;
 use pasta_curves::group::{Curve, Group, GroupEncoding};
 use pasta_curves::pallas;
+#[cfg(feature = "nif")]
+use rustler::NifTuple;
 use subtle::CtOption;
 
 #[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "nif", derive(NifTuple))]
 pub struct ValueCommitment(pallas::Point);
 
 impl ValueCommitment {

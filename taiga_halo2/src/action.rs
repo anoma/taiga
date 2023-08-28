@@ -10,10 +10,14 @@ use ff::PrimeField;
 use halo2_proofs::arithmetic::Field;
 use pasta_curves::pallas;
 use rand::RngCore;
+#[cfg(feature = "nif")]
+use rustler::NifStruct;
 use std::io;
 
 /// The action result used in transaction.
 #[derive(Copy, Debug, Clone)]
+#[cfg_attr(feature = "nif", derive(NifStruct))]
+#[cfg_attr(feature = "nif", module = "Taiga.Action.Instance")]
 pub struct ActionInstance {
     /// The root of the note commitment Merkle tree.
     pub anchor: pallas::Base,

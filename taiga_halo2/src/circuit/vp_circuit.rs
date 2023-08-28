@@ -55,6 +55,11 @@ use vamp_ir::halo2::synth::{make_constant, Halo2Module, PrimeFieldOps};
 use vamp_ir::transform::compile;
 use vamp_ir::util::{read_inputs_from_file, Config};
 
+#[cfg(feature = "nif")]
+use rustler::types::atom;
+#[cfg(feature = "nif")]
+use rustler::{Decoder, Encoder, Env, NifResult, Term};
+
 pub type ValidityPredicate = dyn ValidityPredicateVerifyingInfo;
 
 #[derive(Debug, Clone)]
@@ -64,8 +69,65 @@ pub struct VPVerifyingInfo {
     pub public_inputs: ValidityPredicatePublicInputs,
 }
 
+#[cfg(feature = "nif")]
+rustler::atoms! {verifying_info}
+
+#[cfg(feature = "nif")]
+impl Encoder for VPVerifyingInfo {
+    fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
+        (
+            verifying_info().encode(env),
+            self.vk.to_bytes().encode(env),
+            self.proof.encode(env),
+            self.public_inputs.encode(env),
+        )
+            .encode(env)
+    }
+}
+
+#[cfg(feature = "nif")]
+impl<'a> Decoder<'a> for VPVerifyingInfo {
+    fn decode(term: Term<'a>) -> NifResult<Self> {
+        let (term, vk, proof, public_inputs): (
+            atom::Atom,
+            Vec<u8>,
+            Proof,
+            ValidityPredicatePublicInputs,
+        ) = term.decode()?;
+        if term == verifying_info() {
+            use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
+            let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
+            let vk = VerifyingKey::from_bytes::<TrivialValidityPredicateCircuit>(&vk, params)
+                .map_err(|_e| rustler::Error::Atom("failure to decode"))?;
+            Ok(VPVerifyingInfo {
+                vk,
+                proof,
+                public_inputs,
+            })
+        } else {
+            Err(rustler::Error::BadArg)
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ValidityPredicatePublicInputs([pallas::Base; VP_CIRCUIT_PUBLIC_INPUT_NUM]);
+
+#[cfg(feature = "nif")]
+impl Encoder for ValidityPredicatePublicInputs {
+    fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
+        self.0.to_vec().encode(env)
+    }
+}
+
+#[cfg(feature = "nif")]
+impl<'a> Decoder<'a> for ValidityPredicatePublicInputs {
+    fn decode(term: Term<'a>) -> NifResult<Self> {
+        let val: Vec<pallas::Base> = Decoder::decode(term)?;
+        val.try_into()
+            .map_err(|_e| rustler::Error::Atom("failure to decode"))
+    }
+}
 
 impl VPVerifyingInfo {
     pub fn verify(&self) -> Result<(), Error> {

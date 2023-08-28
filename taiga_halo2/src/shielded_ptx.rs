@@ -14,6 +14,8 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_proofs::plonk::Error;
 use pasta_curves::pallas;
 use rand::RngCore;
+#[cfg(feature = "nif")]
+use rustler::{Decoder, Encoder, Env, NifResult, NifStruct, Term};
 
 #[derive(Debug, Clone)]
 pub struct ShieldedPartialTransaction {
@@ -23,17 +25,31 @@ pub struct ShieldedPartialTransaction {
 }
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "nif", derive(NifStruct))]
+#[cfg_attr(feature = "nif", module = "Taiga.Action.VerifyingInfo")]
 pub struct ActionVerifyingInfo {
     action_proof: Proof,
     action_instance: ActionInstance,
 }
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "nif", derive(NifStruct))]
+#[cfg_attr(feature = "nif", module = "Taiga.Note.VerifyingInfo")]
 pub struct NoteVPVerifyingInfoSet {
     app_vp_verifying_info: VPVerifyingInfo,
     app_dynamic_vp_verifying_info: Vec<VPVerifyingInfo>,
     // TODO: add verifier proof and according public inputs.
     // When the verifier proof is added, we may need to reconsider the structure of `VPVerifyingInfo`
+}
+
+// Is easier to derive traits for
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "nif", derive(NifStruct))]
+#[cfg_attr(feature = "nif", module = "Taiga.Shielded.PTX")]
+struct ShieldedPartialTransactionProxy {
+    actions: Vec<ActionVerifyingInfo>,
+    inputs: Vec<NoteVPVerifyingInfoSet>,
+    outputs: Vec<NoteVPVerifyingInfoSet>,
 }
 
 impl ShieldedPartialTransaction {
@@ -163,6 +179,28 @@ impl ShieldedPartialTransaction {
         }
         Ok(())
     }
+
+    // Conversion to the generic length proxy
+    fn to_proxy(&self) -> ShieldedPartialTransactionProxy {
+        ShieldedPartialTransactionProxy {
+            actions: self.actions.to_vec(),
+            inputs: self.inputs.to_vec(),
+            outputs: self.outputs.to_vec(),
+        }
+    }
+}
+
+impl ShieldedPartialTransactionProxy {
+    fn to_concrete(&self) -> Option<ShieldedPartialTransaction> {
+        let actions = self.actions.clone().try_into().ok()?;
+        let inputs = self.inputs.clone().try_into().ok()?;
+        let outputs = self.outputs.clone().try_into().ok()?;
+        Some(ShieldedPartialTransaction {
+            actions,
+            inputs,
+            outputs,
+        })
+    }
 }
 
 impl Executable for ShieldedPartialTransaction {
@@ -238,6 +276,23 @@ impl BorshDeserialize for ShieldedPartialTransaction {
         })
     }
 }
+
+#[cfg(feature = "nif")]
+impl Encoder for ShieldedPartialTransaction {
+    fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
+        self.to_proxy().encode(env)
+    }
+}
+
+#[cfg(feature = "nif")]
+impl<'a> Decoder<'a> for ShieldedPartialTransaction {
+    fn decode(term: Term<'a>) -> NifResult<Self> {
+        let val: ShieldedPartialTransactionProxy = Decoder::decode(term)?;
+        val.to_concrete()
+            .ok_or(rustler::Error::RaiseAtom("Could not decode proxy"))
+    }
+}
+
 impl ActionVerifyingInfo {
     pub fn create<R: RngCore>(action_info: ActionInfo, mut rng: R) -> Result<Self, Error> {
         let (action_instance, circuit) = action_info.build();
