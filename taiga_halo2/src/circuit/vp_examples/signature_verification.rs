@@ -5,9 +5,8 @@ use crate::{
             target_note_variable::get_owned_note_variable,
         },
         vp_circuit::{
-            BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
-            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
+            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
+            ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
         },
     },
     constant::{TaigaFixedBasesFull, NUM_NOTE, SETUP_PARAMS_MAP},
@@ -149,32 +148,7 @@ impl SignatureVerificationValidityPredicateCircuit {
     }
 }
 
-impl ValidityPredicateInfo for SignatureVerificationValidityPredicateCircuit {
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.input_notes
-    }
-
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.output_notes
-    }
-
-    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
-        let mut public_inputs = self.get_mandatory_public_inputs();
-        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
-            public_inputs.len(),
-            &RandomSeed::random(&mut rng),
-        );
-        public_inputs.extend(padding);
-        public_inputs.into()
-    }
-
-    fn get_owned_note_pub_id(&self) -> pallas::Base {
-        self.owned_note_pub_id
-    }
-}
-
 impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit {
-    type VPConfig = GeneralVerificationValidityPredicateConfig;
     // Add custom constraints
     fn custom_constraints(
         &self,
@@ -183,7 +157,7 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
         basic_variables: BasicValidityPredicateVariables,
     ) -> Result<(), Error> {
         // Construct an ECC chip
-        let ecc_chip = EccChip::construct(config.get_note_config().ecc_config);
+        let ecc_chip = EccChip::construct(config.note_conifg.ecc_config);
 
         let pk = NonIdentityPoint::new(
             ecc_chip.clone(),
@@ -213,7 +187,7 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
 
         // Decode the app_data_dynamic, and check the app_data_dynamic encoding
         let encoded_app_data_dynamic = poseidon_hash_gadget(
-            config.get_note_config().poseidon_config,
+            config.note_conifg.poseidon_config.clone(),
             layouter.namespace(|| "app_data_dynamic encoding"),
             [pk.inner().x(), pk.inner().y(), auth_vp_vk, receiver_vp_vk],
         )?;
@@ -248,7 +222,7 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
             let cms = basic_variables.get_output_note_cms();
             assert_eq!(NUM_NOTE, 2);
             let h = poseidon_hash_gadget(
-                config.get_note_config().poseidon_config,
+                config.note_conifg.poseidon_config,
                 layouter.namespace(|| "Poseidon_hash(r, P, m)"),
                 [
                     r.inner().x(),
@@ -274,6 +248,28 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
         s_g.constrain_equal(layouter.namespace(|| "s*G = R + Hash(r||P||m)*P"), &rhs)?;
 
         Ok(())
+    }
+
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.input_notes
+    }
+
+    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.output_notes
+    }
+
+    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
+        let mut public_inputs = self.get_mandatory_public_inputs();
+        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
+            public_inputs.len(),
+            &RandomSeed::random(&mut rng),
+        );
+        public_inputs.extend(padding);
+        public_inputs.into()
+    }
+
+    fn get_owned_note_pub_id(&self) -> pallas::Base {
+        self.owned_note_pub_id
     }
 }
 

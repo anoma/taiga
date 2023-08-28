@@ -30,21 +30,6 @@ pub struct SudokuVPConfig {
     sudoku_config: SudokuConfig,
 }
 
-impl ValidityPredicateConfig for SudokuVPConfig {
-    fn get_note_config(&self) -> NoteConfig {
-        self.note_config.clone()
-    }
-
-    fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
-        let note_config = Self::configure_note(meta);
-        let sudoku_config = SudokuCircuit::configure(meta);
-        Self {
-            note_config,
-            sudoku_config,
-        }
-    }
-}
-
 #[derive(Clone, Debug, Default)]
 pub struct SudokuVP {
     pub sudoku: SudokuCircuit,
@@ -53,11 +38,9 @@ pub struct SudokuVP {
 }
 
 impl ValidityPredicateCircuit for SudokuVP {
-    type VPConfig = SudokuVPConfig;
-
     fn custom_constraints(
         &self,
-        config: Self::VPConfig,
+        config: ValidityPredicateConfig,
         layouter: impl Layouter<pallas::Base>,
         _basic_variables: BasicValidityPredicateVariables,
     ) -> Result<(), plonk::Error> {
