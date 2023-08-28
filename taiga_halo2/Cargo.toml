@@ -7,7 +7,7 @@ edition = "2021"
 rand = "0.8"
 lazy_static = "1.4"
 blake2b_simd = "1.0"
-pasta_curves = { version = "0.5.1", features = ["serde"] }
+pasta_curves = "0.5.1"
 ff = "0.13"
 group = "0.13"
 halo2_gadgets = { version = "0.3", features = ["test-dependencies"] }
@@ -45,5 +45,5 @@ name = "tx_examples"
 
 [features]
 default = ["borsh", "serde"]
-serde = ["dep:serde"]
+serde = ["dep:serde", "pasta_curves/serde"]
 borsh = ["dep:borsh"]
