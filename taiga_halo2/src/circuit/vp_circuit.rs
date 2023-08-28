@@ -193,8 +193,8 @@ impl BorshSerialize for VPVerifyingInfo {
 #[cfg(feature = "borsh")]
 impl BorshDeserialize for VPVerifyingInfo {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        use std::io;
         use ff::PrimeField;
+        use std::io;
         // Read vk
         use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
         let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();

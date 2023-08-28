@@ -70,8 +70,8 @@ impl BorshSerialize for ActionInstance {
 #[cfg(feature = "borsh")]
 impl BorshDeserialize for ActionInstance {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        use std::io;
         use ff::PrimeField;
+        use std::io;
         let anchor_bytes = <[u8; 32]>::deserialize_reader(reader)?;
         let anchor = Option::from(pallas::Base::from_repr(anchor_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "anchor not in field"))?;
