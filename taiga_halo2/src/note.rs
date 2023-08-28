@@ -22,9 +22,10 @@ use pasta_curves::{
     pallas,
 };
 use rand::RngCore;
+use std::hash::{Hash, Hasher};
+
 #[cfg(feature = "nif")]
 use rustler::{NifStruct, NifTuple};
-use std::hash::{Hash, Hasher};
 
 #[cfg(feature = "serde")]
 use serde;
