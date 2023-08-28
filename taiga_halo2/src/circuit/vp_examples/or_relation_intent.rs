@@ -10,9 +10,8 @@ use crate::{
             target_note_variable::{get_is_input_note_flag, get_owned_note_variable},
         },
         vp_circuit::{
-            BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
-            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
+            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
+            ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
         },
         vp_examples::token::{transfrom_token_name_to_token_property, TOKEN_VK},
     },
@@ -80,32 +79,7 @@ impl OrRelationIntentValidityPredicateCircuit {
     }
 }
 
-impl ValidityPredicateInfo for OrRelationIntentValidityPredicateCircuit {
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.input_notes
-    }
-
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.output_notes
-    }
-
-    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
-        let mut public_inputs = self.get_mandatory_public_inputs();
-        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
-            public_inputs.len(),
-            &RandomSeed::random(&mut rng),
-        );
-        public_inputs.extend(padding);
-        public_inputs.into()
-    }
-
-    fn get_owned_note_pub_id(&self) -> pallas::Base {
-        self.owned_note_pub_id
-    }
-}
-
 impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
-    type VPConfig = GeneralVerificationValidityPredicateConfig;
     // Add custom constraints
     fn custom_constraints(
         &self,
@@ -170,7 +144,7 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
 
         // Encode the app_data_static of intent note
         let encoded_app_data_static = poseidon_hash_gadget(
-            config.get_note_config().poseidon_config,
+            config.note_conifg.poseidon_config,
             layouter.namespace(|| "encode app_data_static"),
             [
                 token_property_1.clone(),
@@ -254,6 +228,28 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
         )?;
 
         Ok(())
+    }
+
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.input_notes
+    }
+
+    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.output_notes
+    }
+
+    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
+        let mut public_inputs = self.get_mandatory_public_inputs();
+        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
+            public_inputs.len(),
+            &RandomSeed::random(&mut rng),
+        );
+        public_inputs.extend(padding);
+        public_inputs.into()
+    }
+
+    fn get_owned_note_pub_id(&self) -> pallas::Base {
+        self.owned_note_pub_id
     }
 }
 

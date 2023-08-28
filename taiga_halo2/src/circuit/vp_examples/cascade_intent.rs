@@ -11,9 +11,8 @@ use crate::{
             target_note_variable::{get_is_input_note_flag, get_owned_note_variable},
         },
         vp_circuit::{
-            BasicValidityPredicateVariables, GeneralVerificationValidityPredicateConfig,
-            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
+            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
+            ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
@@ -54,32 +53,7 @@ impl CascadeIntentValidityPredicateCircuit {
     }
 }
 
-impl ValidityPredicateInfo for CascadeIntentValidityPredicateCircuit {
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.input_notes
-    }
-
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.output_notes
-    }
-
-    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
-        let mut public_inputs = self.get_mandatory_public_inputs();
-        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
-            public_inputs.len(),
-            &RandomSeed::random(&mut rng),
-        );
-        public_inputs.extend(padding);
-        public_inputs.into()
-    }
-
-    fn get_owned_note_pub_id(&self) -> pallas::Base {
-        self.owned_note_pub_id
-    }
-}
-
 impl ValidityPredicateCircuit for CascadeIntentValidityPredicateCircuit {
-    type VPConfig = GeneralVerificationValidityPredicateConfig;
     // Add custom constraints
     fn custom_constraints(
         &self,
@@ -132,6 +106,28 @@ impl ValidityPredicateCircuit for CascadeIntentValidityPredicateCircuit {
         )?;
 
         Ok(())
+    }
+
+    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.input_notes
+    }
+
+    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
+        &self.output_notes
+    }
+
+    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
+        let mut public_inputs = self.get_mandatory_public_inputs();
+        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
+            public_inputs.len(),
+            &RandomSeed::random(&mut rng),
+        );
+        public_inputs.extend(padding);
+        public_inputs.into()
+    }
+
+    fn get_owned_note_pub_id(&self) -> pallas::Base {
+        self.owned_note_pub_id
     }
 }
 

@@ -34,8 +34,8 @@ harness = false
 name = "vp_proof"
 harness = false
 
-[[example]]
-name = "taiga_sudoku"
+# [[example]]
+# name = "taiga_sudoku"
 
 [[example]]
 name = "tx_examples"
