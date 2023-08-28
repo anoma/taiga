@@ -7,7 +7,7 @@ edition = "2021"
 rand = "0.8"
 lazy_static = "1.4"
 blake2b_simd = "1.0"
-pasta_curves = "0.5.1"
+pasta_curves = { version = "0.5.1", features = ["serde"] }
 ff = "0.13"
 group = "0.13"
 halo2_gadgets = { version = "0.3", features = ["test-dependencies"] }
@@ -18,13 +18,16 @@ dyn-clone = "1.0"
 reddsa = "0.5"
 vamp-ir = { git = "https://github.com/anoma/vamp-ir.git", rev = "6d401f8a479951727586ef0c44c42edab3139090"}
 bincode = "2.0.0-rc.3"
-borsh = { version = "0.10", features = ["const-generics"] }
 byteorder = "1.4"
 num-bigint = "0.4"
+
+serde = { version = "1.0", features = ["derive"], optional = true }
+borsh = { version = "0.10", features = ["const-generics"], optional = true }
 
 [dev-dependencies]
 criterion = "0.5"
 proptest = "1.2"
+serde_json = "1.0"
 
 [[bench]]
 name = "action_proof"
@@ -39,3 +42,8 @@ name = "taiga_sudoku"
 
 [[example]]
 name = "tx_examples"
+
+[features]
+default = ["borsh", "serde"]
+serde = ["dep:serde"]
+borsh = ["dep:borsh"]

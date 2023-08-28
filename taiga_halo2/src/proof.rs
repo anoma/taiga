@@ -1,4 +1,3 @@
-use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_proofs::{
     plonk::{self, Circuit, ProvingKey, SingleVerifier, VerifyingKey},
     poly::commitment::Params,
@@ -7,7 +6,15 @@ use halo2_proofs::{
 use pasta_curves::{pallas, vesta};
 use rand::RngCore;
 
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
+#[cfg(feature = "serde")]
+use serde;
+
+#[cfg(feature = "borsh")]
+use borsh::{BorshDeserialize, BorshSerialize};
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Proof(Vec<u8>);
 
 impl Proof {

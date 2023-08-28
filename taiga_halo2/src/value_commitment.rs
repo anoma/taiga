@@ -6,7 +6,11 @@ use pasta_curves::group::{Curve, Group, GroupEncoding};
 use pasta_curves::pallas;
 use subtle::CtOption;
 
+#[cfg(feature = "serde")]
+use serde;
+
 #[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ValueCommitment(pallas::Point);
 
 impl ValueCommitment {

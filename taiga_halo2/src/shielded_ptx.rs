@@ -10,25 +10,35 @@ use crate::note::{InputNoteProvingInfo, OutputNoteProvingInfo};
 use crate::nullifier::Nullifier;
 use crate::proof::Proof;
 use crate::value_commitment::ValueCommitment;
-use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_proofs::plonk::Error;
 use pasta_curves::pallas;
 use rand::RngCore;
 
+#[cfg(feature = "serde")]
+use serde;
+
+#[cfg(feature = "borsh")]
+use borsh::{BorshDeserialize, BorshSerialize};
+
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ShieldedPartialTransaction {
     actions: [ActionVerifyingInfo; NUM_NOTE],
     inputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
     outputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
 }
 
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionVerifyingInfo {
     action_proof: Proof,
     action_instance: ActionInstance,
 }
 
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NoteVPVerifyingInfoSet {
     app_vp_verifying_info: VPVerifyingInfo,
     app_dynamic_vp_verifying_info: Vec<VPVerifyingInfo>,
@@ -202,6 +212,7 @@ impl Executable for ShieldedPartialTransaction {
     }
 }
 
+#[cfg(feature = "borsh")]
 impl BorshSerialize for ShieldedPartialTransaction {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
         for action in self.actions.iter() {
@@ -220,6 +231,7 @@ impl BorshSerialize for ShieldedPartialTransaction {
     }
 }
 
+#[cfg(feature = "borsh")]
 impl BorshDeserialize for ShieldedPartialTransaction {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let actions: Vec<_> = (0..NUM_NOTE)

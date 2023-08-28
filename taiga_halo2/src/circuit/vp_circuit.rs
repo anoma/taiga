@@ -29,10 +29,8 @@ use crate::{
     utils::mod_r_p,
     vp_vk::ValidityPredicateVerifyingKey,
 };
-use borsh::{BorshDeserialize, BorshSerialize};
-// use byteorder::{ReadBytesExt, WriteBytesExt};
 use dyn_clone::{clone_trait_object, DynClone};
-use ff::PrimeField;
+//use ff::PrimeField;
 use group::cofactor::CofactorCurveAffine;
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
@@ -48,7 +46,7 @@ use pasta_curves::{pallas, vesta, EqAffine, Fp};
 use rand::{rngs::OsRng, RngCore};
 use std::collections::HashMap;
 use std::fs;
-use std::io;
+//use std::io;
 use std::path::PathBuf;
 use std::rc::Rc;
 use vamp_ir::ast::Module;
@@ -56,14 +54,29 @@ use vamp_ir::halo2::synth::{make_constant, Halo2Module, PrimeFieldOps};
 use vamp_ir::transform::compile;
 use vamp_ir::util::{read_inputs_from_file, Config};
 
+#[cfg(feature = "serde")]
+use serde;
+
+#[cfg(feature = "borsh")]
+use borsh::{BorshDeserialize, BorshSerialize};
+
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VPVerifyingInfo {
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            serialize_with = "serde_serialize_verifying_key",
+            deserialize_with = "serde_deserialize_verifying_key"
+        )
+    )]
     pub vk: VerifyingKey<vesta::Affine>,
     pub proof: Proof,
     pub public_inputs: ValidityPredicatePublicInputs,
 }
 
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ValidityPredicatePublicInputs([pallas::Base; VP_CIRCUIT_PUBLIC_INPUT_NUM]);
 
 impl VPVerifyingInfo {
@@ -97,8 +110,10 @@ impl VPVerifyingInfo {
     }
 }
 
+#[cfg(feature = "borsh")]
 impl BorshSerialize for VPVerifyingInfo {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
+        use ff::PrimeField;
         // Write vk
         self.vk.write(writer)?;
         // Write proof
@@ -111,8 +126,11 @@ impl BorshSerialize for VPVerifyingInfo {
     }
 }
 
+#[cfg(feature = "borsh")]
 impl BorshDeserialize for VPVerifyingInfo {
-    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        use ff::PrimeField;
+        use std::io;
         // Read vk
         use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
         let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
@@ -134,6 +152,34 @@ impl BorshDeserialize for VPVerifyingInfo {
             public_inputs: public_inputs.into(),
         })
     }
+}
+
+#[cfg(feature = "serde")]
+fn serde_serialize_verifying_key<S>(
+    x: &VerifyingKey<vesta::Affine>,
+    s: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let mut buf = Vec::new();
+    x.write(&mut buf).unwrap();
+    s.serialize_bytes(&buf)
+}
+
+#[cfg(feature = "serde")]
+fn serde_deserialize_verifying_key<'de, D>(d: D) -> Result<VerifyingKey<vesta::Affine>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+    let buf: Vec<u8> = serde::Deserialize::deserialize(d)?;
+
+    use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
+    let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
+    let vk = VerifyingKey::read::<_, TrivialValidityPredicateCircuit>(&mut buf.as_slice(), params)
+        .map_err(|e| Error::custom(format!("Error reading VerifyingKey: {}", e)))?;
+    Ok(vk)
 }
 
 impl ValidityPredicatePublicInputs {
@@ -995,5 +1041,40 @@ mod tests {
                 &[vp_info.public_inputs.inner()]
             )
             .is_err());
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_vk_serialize() {
+        use crate::circuit::{
+            vp_circuit::{serde_deserialize_verifying_key, serde_serialize_verifying_key},
+            vp_examples::TrivialValidityPredicateCircuit,
+        };
+        use halo2_proofs::plonk::VerifyingKey;
+        use pasta_curves::vesta;
+        use serde_json;
+
+        #[derive(serde::Serialize, serde::Deserialize)]
+        struct TestStruct {
+            #[serde(
+                serialize_with = "serde_serialize_verifying_key",
+                deserialize_with = "serde_deserialize_verifying_key"
+            )]
+            vk: VerifyingKey<vesta::Affine>,
+        }
+
+        let t = TrivialValidityPredicateCircuit::default().get_vp_vk();
+
+        let a = TestStruct {
+            vk: t.get_vk().unwrap(),
+        };
+
+        let ser = serde_json::to_string(&a).unwrap();
+        let deser: TestStruct = serde_json::from_str(&ser).unwrap();
+
+        let a_bytes = a.vk.to_bytes();
+        let deser_bytes = deser.vk.to_bytes();
+
+        assert_eq!(a_bytes, deser_bytes);
     }
 }

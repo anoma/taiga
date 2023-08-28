@@ -5,15 +5,19 @@ use crate::{
     nullifier::Nullifier,
     value_commitment::ValueCommitment,
 };
-use borsh::{BorshDeserialize, BorshSerialize};
-use ff::PrimeField;
 use halo2_proofs::arithmetic::Field;
 use pasta_curves::pallas;
 use rand::RngCore;
-use std::io;
+
+#[cfg(feature = "serde")]
+use serde;
+
+#[cfg(feature = "borsh")]
+use borsh::{BorshDeserialize, BorshSerialize};
 
 /// The action result used in transaction.
 #[derive(Copy, Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionInstance {
     /// The root of the note commitment Merkle tree.
     pub anchor: pallas::Base,
@@ -46,8 +50,10 @@ impl ActionInstance {
     }
 }
 
+#[cfg(feature = "borsh")]
 impl BorshSerialize for ActionInstance {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
+        use ff::PrimeField;
         writer.write_all(&self.anchor.to_repr())?;
         writer.write_all(&self.nf.to_bytes())?;
         writer.write_all(&self.cm_x.to_repr())?;
@@ -56,8 +62,11 @@ impl BorshSerialize for ActionInstance {
     }
 }
 
+#[cfg(feature = "borsh")]
 impl BorshDeserialize for ActionInstance {
-    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        use ff::PrimeField;
+        use std::io;
         let anchor_bytes = <[u8; 32]>::deserialize_reader(reader)?;
         let anchor = Option::from(pallas::Base::from_repr(anchor_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "anchor not in field"))?;

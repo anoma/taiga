@@ -2,8 +2,6 @@
 //!
 use crate::utils::poseidon_hash;
 use crate::{constant::TAIGA_COMMITMENT_TREE_DEPTH, note::Note};
-use borsh::{BorshDeserialize, BorshSerialize};
-use ff::PrimeField;
 use halo2_proofs::arithmetic::Field;
 use pasta_curves::pallas;
 use rand::{Rng, RngCore};
@@ -11,7 +9,18 @@ use rand::{Rng, RngCore};
 use crate::merkle_tree::LR::{L, R};
 use rand::distributions::{Distribution, Standard};
 
-#[derive(Clone, Debug, PartialEq, Eq, Copy, Default, BorshSerialize, BorshDeserialize)]
+#[cfg(feature = "borsh")]
+use ff::PrimeField;
+
+#[cfg(feature = "serde")]
+use serde;
+
+#[cfg(feature = "borsh")]
+use borsh::{BorshDeserialize, BorshSerialize};
+
+#[derive(Clone, Debug, PartialEq, Eq, Copy, Default)]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum LR {
     R,
     #[default]
@@ -44,7 +53,9 @@ impl Distribution<LR> for Standard {
 
 /// A path from a position in a particular commitment tree to the root of that tree.
 /// In Orchard merkle tree, they are using MerkleCRH(layer, left, right), where MerkleCRH is a sinsemilla. We are using poseidon_hash(left, right).
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MerklePath {
     merkle_path: Vec<(Node, LR)>,
 }
@@ -92,6 +103,7 @@ impl Default for MerklePath {
 
 /// A node within the Sapling commitment tree.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Node(pallas::Base);
 
 impl Node {
@@ -116,6 +128,7 @@ impl Node {
     }
 }
 
+#[cfg(feature = "borsh")]
 impl BorshSerialize for Node {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         writer.write_all(&self.0.to_repr())?;
@@ -123,6 +136,7 @@ impl BorshSerialize for Node {
     }
 }
 
+#[cfg(feature = "borsh")]
 impl BorshDeserialize for Node {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let mut repr = [0u8; 32];
