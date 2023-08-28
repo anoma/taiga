@@ -619,8 +619,9 @@ pub mod tests {
         }
     }
 
+    #[cfg(feature = "borsh")]
     #[test]
-    fn note_serialization_test() {
+    fn note_borsh_serialization_test() {
         use borsh::{BorshDeserialize, BorshSerialize};
         use rand::rngs::OsRng;
         let mut rng = OsRng;
