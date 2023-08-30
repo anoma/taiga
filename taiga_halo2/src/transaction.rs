@@ -349,6 +349,25 @@ pub mod testing {
         (bundle, r_vec)
     }
 
+    #[test]
+    fn test_halo2_transaction() {
+        use super::Transaction;
+        use rand::rngs::OsRng;
+
+        let rng = OsRng;
+
+        let (shielded_ptx_bundle, r_vec) = create_shielded_ptx_bundle(2);
+        // TODO: add transparent_ptx_bundle test
+        let transparent_ptx_bundle = None;
+        let tx = Transaction::build(
+            rng,
+            Some(shielded_ptx_bundle),
+            transparent_ptx_bundle,
+            r_vec,
+        );
+        let (_, _) = tx.execute().unwrap();
+    }
+
     #[cfg(feature = "borsh")]
     #[test]
     fn test_halo2_transaction_borsh_serialize() {
@@ -358,7 +377,6 @@ pub mod testing {
 
         let rng = OsRng;
 
-        // Create shielded partial tx bundle
         let (shielded_ptx_bundle, r_vec) = create_shielded_ptx_bundle(2);
         // TODO: add transparent_ptx_bundle test
         let transparent_ptx_bundle = None;
