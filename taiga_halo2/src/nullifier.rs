@@ -5,7 +5,6 @@ use crate::{
     note::NoteCommitment,
     utils::{extract_p, mod_r_p, prf_nf},
 };
-use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_proofs::arithmetic::Field;
 use pasta_curves::group::cofactor::CofactorCurveAffine;
 use pasta_curves::group::ff::PrimeField;
@@ -15,14 +14,22 @@ use rand::RngCore;
 use rustler::{NifTaggedEnum, NifTuple};
 use subtle::CtOption;
 
+#[cfg(feature = "serde")]
+use serde;
+
+#[cfg(feature = "borsh")]
+use borsh::{BorshDeserialize, BorshSerialize};
+
 /// The unique nullifier.
 #[derive(Copy, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "nif", derive(NifTuple))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Nullifier(pallas::Base);
 
 /// The NullifierKeyContainer contains the nullifier_key or the nullifier_key commitment
 #[derive(Copy, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "nif", derive(NifTaggedEnum))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum NullifierKeyContainer {
     // The NullifierKeyContainer::Commitment is the commitment of NullifierKeyContainer::Key `nk_com = Commitment(nk, 0)`
     Commitment(pallas::Base),
@@ -75,6 +82,7 @@ impl Default for Nullifier {
     }
 }
 
+#[cfg(feature = "borsh")]
 impl BorshSerialize for Nullifier {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         writer.write_all(&self.0.to_repr())?;
@@ -82,6 +90,7 @@ impl BorshSerialize for Nullifier {
     }
 }
 
+#[cfg(feature = "borsh")]
 impl BorshDeserialize for Nullifier {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let mut repr = [0u8; 32];

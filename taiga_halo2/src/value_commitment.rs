@@ -8,8 +8,12 @@ use pasta_curves::pallas;
 use rustler::NifTuple;
 use subtle::CtOption;
 
+#[cfg(feature = "serde")]
+use serde;
+
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "nif", derive(NifTuple))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ValueCommitment(pallas::Point);
 
 impl ValueCommitment {

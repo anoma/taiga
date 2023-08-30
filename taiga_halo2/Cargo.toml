@@ -19,17 +19,16 @@ dyn-clone = "1.0"
 reddsa = {git = "https://github.com/heliaxdev/reddsa.git", branch = "taiga"}
 vamp-ir = { git = "https://github.com/anoma/vamp-ir.git", rev = "6d401f8a479951727586ef0c44c42edab3139090"}
 bincode = "2.0.0-rc.3"
-borsh = { version = "0.10", features = ["const-generics"] }
 byteorder = "1.4"
 num-bigint = "0.4"
+
+serde = { version = "1.0", features = ["derive"], optional = true }
+borsh = { version = "0.10", features = ["const-generics"], optional = true }
 
 [dev-dependencies]
 criterion = "0.5"
 proptest = "1.2"
-
-[features]
-default = []
-nif = ["rustler", "pasta_curves/repr-erlang"]
+serde_json = "1.0"
 
 [[bench]]
 name = "action_proof"
@@ -44,3 +43,9 @@ harness = false
 
 [[example]]
 name = "tx_examples"
+
+[features]
+default = ["borsh", "serde"]
+nif = ["rustler", "pasta_curves/repr-erlang"]
+serde = ["dep:serde", "pasta_curves/serde"]
+borsh = ["dep:borsh"]

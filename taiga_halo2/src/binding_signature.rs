@@ -1,11 +1,15 @@
 use crate::constant::NOTE_COMMITMENT_R_GENERATOR;
-use borsh::{BorshDeserialize, BorshSerialize};
 use pasta_curves::group::cofactor::CofactorCurveAffine;
 use pasta_curves::group::{ff::PrimeField, GroupEncoding};
 use pasta_curves::pallas;
 use rand::{CryptoRng, RngCore};
 use reddsa::{private, Error, SigType, Signature, SigningKey, VerificationKey};
-use std::io;
+
+#[cfg(feature = "serde")]
+use serde;
+
+#[cfg(feature = "borsh")]
+use borsh::{BorshDeserialize, BorshSerialize};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum TaigaBinding {}
@@ -29,12 +33,15 @@ impl private::Sealed<TaigaBinding> for TaigaBinding {
 impl SigType for TaigaBinding {}
 
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BindingSignature(Signature<TaigaBinding>);
 
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BindingSigningKey(SigningKey<TaigaBinding>);
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BindingVerificationKey(VerificationKey<TaigaBinding>);
 
 impl BindingSignature {
@@ -48,14 +55,16 @@ impl BindingSignature {
     }
 }
 
+#[cfg(feature = "borsh")]
 impl BorshSerialize for BindingSignature {
-    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         writer.write_all(&self.to_bytes())
     }
 }
 
+#[cfg(feature = "borsh")]
 impl BorshDeserialize for BindingSignature {
-    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let mut sig_bytes = [0u8; 64];
         reader.read_exact(&mut sig_bytes)?;
         Ok(Self::from_bytes(sig_bytes))
@@ -81,14 +90,17 @@ impl BindingSigningKey {
     }
 }
 
+#[cfg(feature = "borsh")]
 impl BorshSerialize for BindingSigningKey {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
         writer.write_all(&self.to_bytes())
     }
 }
 
+#[cfg(feature = "borsh")]
 impl BorshDeserialize for BindingSigningKey {
-    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        use std::io;
         let mut key_bytes = [0u8; 32];
         reader.read_exact(&mut key_bytes)?;
         Self::from_bytes(key_bytes).map_err(|_| {

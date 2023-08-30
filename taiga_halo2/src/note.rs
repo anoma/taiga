@@ -14,8 +14,6 @@ use crate::{
 };
 use bitvec::{array::BitArray, order::Lsb0};
 use blake2b_simd::Params as Blake2bParams;
-use borsh::{BorshDeserialize, BorshSerialize};
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use core::iter;
 use ff::{FromUniformBytes, PrimeField};
 use halo2_proofs::arithmetic::Field;
@@ -26,14 +24,18 @@ use pasta_curves::{
 use rand::RngCore;
 #[cfg(feature = "nif")]
 use rustler::{NifStruct, NifTuple};
-use std::{
-    hash::{Hash, Hasher},
-    io,
-};
+use std::hash::{Hash, Hasher};
+
+#[cfg(feature = "serde")]
+use serde;
+
+#[cfg(feature = "borsh")]
+use borsh::{BorshDeserialize, BorshSerialize};
 
 /// A commitment to a note.
-#[derive(Copy, Debug, Clone)]
+#[derive(Copy, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "nif", derive(NifTuple))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NoteCommitment(pallas::Point);
 
 impl NoteCommitment {
@@ -56,10 +58,37 @@ impl Default for NoteCommitment {
     }
 }
 
+#[cfg(feature = "borsh")]
+impl BorshSerialize for NoteCommitment {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        writer.write_all(&self.0.to_bytes())?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "borsh")]
+impl BorshDeserialize for NoteCommitment {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let mut repr = [0u8; 32];
+        reader.read_exact(&mut repr)?;
+        let value = Option::from(pallas::Point::from_bytes(&repr)).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "Node value not in field")
+        })?;
+        Ok(Self(value))
+    }
+}
+
+impl Hash for NoteCommitment {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.to_bytes().as_ref().hash(state);
+    }
+}
+
 /// A note
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "nif", derive(NifStruct))]
 #[cfg_attr(feature = "nif", module = "Taiga.Note")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Note {
     pub note_type: NoteType,
     /// app_data_dynamic is the data defined in application vp and will NOT be used to derive type
@@ -80,20 +109,15 @@ pub struct Note {
 }
 
 /// The parameters in the NoteType are used to derive note type.
-#[derive(Debug, Clone, Copy, Default, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "nif", derive(NifStruct))]
 #[cfg_attr(feature = "nif", module = "Taiga.NoteType")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NoteType {
     /// app_vk is the compressed verifying key of VP
     pub app_vk: pallas::Base,
     /// app_data_static is the encoded data that is defined in application vp
     pub app_data_static: pallas::Base,
-}
-
-impl PartialEq for NoteType {
-    fn eq(&self, other: &Self) -> bool {
-        self.app_vk == other.app_vk && self.app_data_static == other.app_data_static
-    }
 }
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -292,8 +316,10 @@ impl Note {
     }
 }
 
+#[cfg(feature = "borsh")]
 impl BorshSerialize for Note {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
+        use byteorder::{LittleEndian, WriteBytesExt};
         // Write app_vk
         writer.write_all(&self.note_type.app_vk.to_repr())?;
         // Write app_data_static
@@ -326,8 +352,11 @@ impl BorshSerialize for Note {
     }
 }
 
+#[cfg(feature = "borsh")]
 impl BorshDeserialize for Note {
-    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        use byteorder::{LittleEndian, ReadBytesExt};
+        use std::io;
         // Read app_vk
         let mut app_vk_bytes = [0u8; 32];
         reader.read_exact(&mut app_vk_bytes)?;
@@ -615,10 +644,13 @@ pub mod tests {
         }
     }
 
+    #[cfg(feature = "borsh")]
     #[test]
-    fn note_serialization_test() {
+    fn note_borsh_serialization_test() {
         use borsh::{BorshDeserialize, BorshSerialize};
         use rand::rngs::OsRng;
+
+        use crate::note::NoteCommitment;
         let mut rng = OsRng;
 
         let input_note = random_input_note(&mut rng);
@@ -637,6 +669,26 @@ pub mod tests {
             // BorshDeserialize
             let de_note: Note = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
             assert_eq!(output_note, de_note);
+        }
+
+        let icm = input_note.commitment();
+        {
+            // BorshSerialize
+            let borsh = icm.try_to_vec().unwrap();
+            // BorshDeserialize
+            let de_icm: NoteCommitment =
+                BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
+            assert_eq!(icm, de_icm);
+        }
+
+        let ocm = output_note.commitment();
+        {
+            // BorshSerialize
+            let borsh = ocm.try_to_vec().unwrap();
+            // BorshDeserialize
+            let de_ocm: NoteCommitment =
+                BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
+            assert_eq!(ocm, de_ocm);
         }
     }
 }

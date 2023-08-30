@@ -1,4 +1,3 @@
-use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_proofs::{
     plonk::{self, Circuit, ProvingKey, SingleVerifier, VerifyingKey},
     poly::commitment::Params,
@@ -9,8 +8,16 @@ use rand::RngCore;
 #[cfg(feature = "nif")]
 use rustler::NifTuple;
 
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
+#[cfg(feature = "serde")]
+use serde;
+
+#[cfg(feature = "borsh")]
+use borsh::{BorshDeserialize, BorshSerialize};
+
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "nif", derive(NifTuple))]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Proof(Vec<u8>);
 
 impl Proof {

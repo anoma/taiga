@@ -7,7 +7,6 @@ use crate::shielded_ptx::ShieldedPartialTransaction;
 use crate::transparent_ptx::{OutputResource, TransparentPartialTransaction};
 use crate::value_commitment::ValueCommitment;
 use blake2b_simd::Params as Blake2bParams;
-use borsh::{BorshDeserialize, BorshSerialize};
 use pasta_curves::{
     group::{ff::PrimeField, Group},
     pallas,
@@ -18,7 +17,15 @@ use rustler::types::atom;
 #[cfg(feature = "nif")]
 use rustler::{atoms, Decoder, Env, NifRecord, NifResult, NifStruct, Term};
 
-#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
+#[cfg(feature = "serde")]
+use serde;
+
+#[cfg(feature = "borsh")]
+use borsh::{BorshDeserialize, BorshSerialize};
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Transaction {
     // TODO: Other parameters to be added.
     shielded_ptx_bundle: Option<ShieldedPartialTxBundle>,
@@ -27,15 +34,19 @@ pub struct Transaction {
     signature: InProgressBindingSignature,
 }
 
-#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InProgressBindingSignature {
     Authorized(BindingSignature),
     Unauthorized(BindingSigningKey),
 }
 
-#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "nif", derive(NifRecord))]
 #[cfg_attr(feature = "nif", tag = "bundle")]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ShieldedPartialTxBundle {
     partial_txs: Vec<ShieldedPartialTransaction>,
 }
@@ -49,7 +60,9 @@ pub struct ShieldedResult {
     output_cms: Vec<pallas::Base>,
 }
 
-#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TransparentPartialTxBundle {
     partial_txs: Vec<TransparentPartialTransaction>,
 }
@@ -397,7 +410,6 @@ pub mod testing {
 
         let rng = OsRng;
 
-        // Create shielded partial tx bundle
         let (shielded_ptx_bundle, r_vec) = create_shielded_ptx_bundle(2);
         // TODO: add transparent_ptx_bundle test
         let transparent_ptx_bundle = None;
@@ -409,9 +421,12 @@ pub mod testing {
         );
         let (shielded_ret, _) = tx.execute().unwrap();
 
-        let borsh = tx.try_to_vec().unwrap();
-        let de_tx: Transaction = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
-        let (de_shielded_ret, _) = de_tx.execute().unwrap();
-        assert_eq!(shielded_ret, de_shielded_ret);
+        #[cfg(feature = "borsh")]
+        {
+            let borsh = tx.try_to_vec().unwrap();
+            let de_tx: Transaction = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
+            let (de_shielded_ret, _) = de_tx.execute().unwrap();
+            assert_eq!(shielded_ret, de_shielded_ret);
+        }
     }
 }
