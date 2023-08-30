@@ -352,26 +352,6 @@ pub mod testing {
     #[test]
     fn test_halo2_transaction() {
         use super::Transaction;
-        use rand::rngs::OsRng;
-
-        let rng = OsRng;
-
-        let (shielded_ptx_bundle, r_vec) = create_shielded_ptx_bundle(2);
-        // TODO: add transparent_ptx_bundle test
-        let transparent_ptx_bundle = None;
-        let tx = Transaction::build(
-            rng,
-            Some(shielded_ptx_bundle),
-            transparent_ptx_bundle,
-            r_vec,
-        );
-        let (_, _) = tx.execute().unwrap();
-    }
-
-    #[cfg(feature = "borsh")]
-    #[test]
-    fn test_halo2_transaction_borsh_serialize() {
-        use super::Transaction;
         use borsh::{BorshDeserialize, BorshSerialize};
         use rand::rngs::OsRng;
 
@@ -388,9 +368,12 @@ pub mod testing {
         );
         let (shielded_ret, _) = tx.execute().unwrap();
 
-        let borsh = tx.try_to_vec().unwrap();
-        let de_tx: Transaction = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
-        let (de_shielded_ret, _) = de_tx.execute().unwrap();
-        assert_eq!(shielded_ret, de_shielded_ret);
+        #[cfg(feature = "borsh")]
+        {
+            let borsh = tx.try_to_vec().unwrap();
+            let de_tx: Transaction = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
+            let (de_shielded_ret, _) = de_tx.execute().unwrap();
+            assert_eq!(shielded_ret, de_shielded_ret);
+        }
     }
 }

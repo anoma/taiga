@@ -31,7 +31,8 @@ use serde;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// A commitment to a note.
-#[derive(Copy, Debug, Clone)]
+#[derive(Copy, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NoteCommitment(pallas::Point);
 
 impl NoteCommitment {
@@ -51,6 +52,32 @@ impl NoteCommitment {
 impl Default for NoteCommitment {
     fn default() -> NoteCommitment {
         NoteCommitment(pallas::Point::generator())
+    }
+}
+
+#[cfg(feature = "borsh")]
+impl BorshSerialize for NoteCommitment {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        writer.write_all(&self.0.to_bytes())?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "borsh")]
+impl BorshDeserialize for NoteCommitment {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let mut repr = [0u8; 32];
+        reader.read_exact(&mut repr)?;
+        let value = Option::from(pallas::Point::from_bytes(&repr)).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "Node value not in field")
+        })?;
+        Ok(Self(value))
+    }
+}
+
+impl Hash for NoteCommitment {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.to_bytes().as_ref().hash(state);
     }
 }
 
@@ -624,6 +651,8 @@ pub mod tests {
     fn note_borsh_serialization_test() {
         use borsh::{BorshDeserialize, BorshSerialize};
         use rand::rngs::OsRng;
+
+        use crate::note::NoteCommitment;
         let mut rng = OsRng;
 
         let input_note = random_input_note(&mut rng);
@@ -642,6 +671,26 @@ pub mod tests {
             // BorshDeserialize
             let de_note: Note = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
             assert_eq!(output_note, de_note);
+        }
+
+        let icm = input_note.commitment();
+        {
+            // BorshSerialize
+            let borsh = icm.try_to_vec().unwrap();
+            // BorshDeserialize
+            let de_icm: NoteCommitment =
+                BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
+            assert_eq!(icm, de_icm);
+        }
+
+        let ocm = output_note.commitment();
+        {
+            // BorshSerialize
+            let borsh = ocm.try_to_vec().unwrap();
+            // BorshDeserialize
+            let de_ocm: NoteCommitment =
+                BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
+            assert_eq!(ocm, de_ocm);
         }
     }
 }
