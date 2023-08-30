@@ -401,9 +401,8 @@ pub mod testing {
         (bundle, r_vec)
     }
 
-    #[cfg(feature = "borsh")]
     #[test]
-    fn test_halo2_transaction_borsh_serialize() {
+    fn test_halo2_transaction() {
         use super::Transaction;
         use borsh::{BorshDeserialize, BorshSerialize};
         use rand::rngs::OsRng;
