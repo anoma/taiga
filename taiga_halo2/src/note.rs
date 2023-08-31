@@ -319,7 +319,7 @@ impl Note {
 
 #[cfg(feature = "borsh")]
 impl BorshSerialize for Note {
-    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         use byteorder::{LittleEndian, WriteBytesExt};
         // Write app_vk
         writer.write_all(&self.note_type.app_vk.to_repr())?;

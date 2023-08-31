@@ -57,7 +57,7 @@ impl ActionInstance {
 
 #[cfg(feature = "borsh")]
 impl BorshSerialize for ActionInstance {
-    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         use ff::PrimeField;
         writer.write_all(&self.anchor.to_repr())?;
         writer.write_all(&self.nf.to_bytes())?;

@@ -258,7 +258,7 @@ impl Executable for ShieldedPartialTransaction {
 
 #[cfg(feature = "borsh")]
 impl BorshSerialize for ShieldedPartialTransaction {
-    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         for action in self.actions.iter() {
             action.serialize(writer)?;
         }
