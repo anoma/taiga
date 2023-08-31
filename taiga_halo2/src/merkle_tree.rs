@@ -1,5 +1,6 @@
 use std::hash::{Hash, Hasher};
 
+use crate::note::NoteCommitment;
 use crate::utils::poseidon_hash;
 use crate::{constant::TAIGA_COMMITMENT_TREE_DEPTH, note::Note};
 use halo2_proofs::arithmetic::Field;
@@ -113,6 +114,10 @@ impl Node {
 
     pub fn from_note(n: &Note) -> Self {
         Self(n.commitment().get_x())
+    }
+
+    pub fn from_note_commitment(n: &NoteCommitment) -> Self {
+        Self(n.get_x())
     }
 
     pub fn rand(rng: &mut impl RngCore) -> Self {
