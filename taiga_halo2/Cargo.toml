@@ -46,6 +46,6 @@ name = "tx_examples"
 
 [features]
 default = []
-nif = ["dep:rustler", "pasta_curves/repr-erlang"]
+nif = ["dep:rustler", "borsh", "pasta_curves/repr-erlang"]
 serde = ["dep:serde", "pasta_curves/serde"]
 borsh = ["dep:borsh"]

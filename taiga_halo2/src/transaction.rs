@@ -417,14 +417,14 @@ pub mod testing {
             transparent_ptx_bundle,
             r_vec,
         );
-        let (shielded_ret, _) = tx.execute().unwrap();
+        let (_shielded_ret, _) = tx.execute().unwrap();
 
         #[cfg(feature = "borsh")]
         {
             let borsh = tx.try_to_vec().unwrap();
             let de_tx: Transaction = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
             let (de_shielded_ret, _) = de_tx.execute().unwrap();
-            assert_eq!(shielded_ret, de_shielded_ret);
+            assert_eq!(_shielded_ret, de_shielded_ret);
         }
     }
 }
