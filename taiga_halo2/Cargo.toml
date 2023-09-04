@@ -23,7 +23,7 @@ num-bigint = "0.4"
 
 rustler = { version = "0.29.1", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
-borsh = { version = "1.0.0-alpha.3", features = ["derive"], optional = true }
+borsh = { version = "= 1.0.0-alpha.3", features = ["derive"], optional = true }
 
 [dev-dependencies]
 criterion = "0.5"
@@ -46,6 +46,6 @@ name = "tx_examples"
 
 [features]
 default = []
-nif = ["dep:rustler", "pasta_curves/repr-erlang"]
+nif = ["dep:rustler", "borsh", "pasta_curves/repr-erlang"]
 serde = ["dep:serde", "pasta_curves/serde"]
 borsh = ["dep:borsh"]
