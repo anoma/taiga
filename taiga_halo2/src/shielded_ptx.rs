@@ -13,6 +13,7 @@ use crate::value_commitment::ValueCommitment;
 use halo2_proofs::plonk::Error;
 use pasta_curves::pallas;
 use rand::RngCore;
+
 #[cfg(feature = "nif")]
 use rustler::{Decoder, Encoder, Env, NifResult, NifStruct, Term};
 
@@ -252,7 +253,7 @@ impl Executable for ShieldedPartialTransaction {
 
 #[cfg(feature = "borsh")]
 impl BorshSerialize for ShieldedPartialTransaction {
-    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         for action in self.actions.iter() {
             action.serialize(writer)?;
         }

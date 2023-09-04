@@ -92,7 +92,7 @@ impl BindingSigningKey {
 
 #[cfg(feature = "borsh")]
 impl BorshSerialize for BindingSigningKey {
-    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         writer.write_all(&self.to_bytes())
     }
 }

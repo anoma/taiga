@@ -22,9 +22,10 @@ use pasta_curves::{
     pallas,
 };
 use rand::RngCore;
+use std::hash::{Hash, Hasher};
+
 #[cfg(feature = "nif")]
 use rustler::{NifStruct, NifTuple};
-use std::hash::{Hash, Hasher};
 
 #[cfg(feature = "serde")]
 use serde;
@@ -318,7 +319,7 @@ impl Note {
 
 #[cfg(feature = "borsh")]
 impl BorshSerialize for Note {
-    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> borsh::maybestd::io::Result<()> {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         use byteorder::{LittleEndian, WriteBytesExt};
         // Write app_vk
         writer.write_all(&self.note_type.app_vk.to_repr())?;
