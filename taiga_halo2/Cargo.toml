@@ -4,11 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rustler = {version = "0.29.1", optional = true}
 rand = "0.8"
 lazy_static = "1.4"
 blake2b_simd = "1.0"
-pasta_curves = { git = "https://github.com/heliaxdev/pasta_curves", branch = "taiga", features = ["repr-erlang"] }
+pasta_curves = "0.5.1"
 ff = "0.13"
 group = "0.13"
 halo2_gadgets = { git = "https://github.com/heliaxdev/halo2", branch = "taiga", features = ["test-dependencies"] }
@@ -22,6 +21,7 @@ bincode = "2.0.0-rc.3"
 byteorder = "1.4"
 num-bigint = "0.4"
 
+rustler = { version = "0.29.1", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
 borsh = { version = "1.0.0-alpha.3", features = ["derive"], optional = true }
 
@@ -45,7 +45,7 @@ harness = false
 name = "tx_examples"
 
 [features]
-default = ["borsh", "serde"]
-nif = ["rustler", "pasta_curves/repr-erlang"]
+default = []
+nif = ["dep:rustler", "pasta_curves/repr-erlang"]
 serde = ["dep:serde", "pasta_curves/serde"]
 borsh = ["dep:borsh"]

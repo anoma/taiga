@@ -13,14 +13,9 @@ use crate::value_commitment::ValueCommitment;
 use halo2_proofs::plonk::Error;
 use pasta_curves::pallas;
 use rand::RngCore;
+
 #[cfg(feature = "nif")]
 use rustler::{Decoder, Encoder, Env, NifResult, NifStruct, Term};
-
-#[cfg(feature = "serde")]
-use serde;
-
-#[cfg(feature = "borsh")]
-use borsh::{BorshDeserialize, BorshSerialize};
 
 #[cfg(feature = "serde")]
 use serde;

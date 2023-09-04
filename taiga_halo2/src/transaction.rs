@@ -14,7 +14,7 @@ use pasta_curves::{
 use rand::{CryptoRng, RngCore};
 
 #[cfg(feature = "nif")]
-use rustler::{atoms, Decoder, Env, NifRecord, NifResult, NifStruct, Term, types::atom};
+use rustler::{atoms, types::atom, Decoder, Env, NifRecord, NifResult, NifStruct, Term};
 
 #[cfg(feature = "serde")]
 use serde;
