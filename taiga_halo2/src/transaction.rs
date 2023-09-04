@@ -403,8 +403,7 @@ pub mod testing {
 
     #[test]
     fn test_halo2_transaction() {
-        use super::Transaction;
-        use borsh::{BorshDeserialize, BorshSerialize};
+        use super::*;
         use rand::rngs::OsRng;
 
         let rng = OsRng;
