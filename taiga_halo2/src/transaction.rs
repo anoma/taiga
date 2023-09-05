@@ -227,11 +227,10 @@ impl rustler::Encoder for Transaction {
         (
             transaction().encode(env),
             self.shielded_ptx_bundle.encode(env),
-            self.transparent_ptx_bundle
-                .try_to_vec()
+            borsh::to_vec(&self.transparent_ptx_bundle)
                 .unwrap_or(vec![])
                 .encode(env),
-            self.signature.try_to_vec().unwrap_or(vec![]).encode(env),
+            borsh::to_vec(&self.signature).unwrap_or(vec![]).encode(env),
         )
             .encode(env)
     }
@@ -421,7 +420,7 @@ pub mod testing {
 
         #[cfg(feature = "borsh")]
         {
-            let borsh = tx.try_to_vec().unwrap();
+            let borsh = borsh::to_vec(&tx).unwrap();
             let de_tx: Transaction = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
             let (de_shielded_ret, _) = de_tx.execute().unwrap();
             assert_eq!(_shielded_ret, de_shielded_ret);

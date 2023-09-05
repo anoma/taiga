@@ -3,6 +3,7 @@ members = [
     "taiga_halo2",
     # "taiga_zk_garage",
 ]
+resolver = "2"
 
 [patch.crates-io]
 # ark-serialize = { git="https://github.com/simonmasson/algebra", rev="e2ea75c" }
