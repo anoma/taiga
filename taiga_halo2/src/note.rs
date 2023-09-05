@@ -648,7 +648,7 @@ pub mod tests {
     #[cfg(feature = "borsh")]
     #[test]
     fn note_borsh_serialization_test() {
-        use borsh::{BorshDeserialize, BorshSerialize};
+        use borsh::BorshDeserialize;
         use rand::rngs::OsRng;
 
         use crate::note::NoteCommitment;
@@ -657,7 +657,7 @@ pub mod tests {
         let input_note = random_input_note(&mut rng);
         {
             // BorshSerialize
-            let borsh = input_note.try_to_vec().unwrap();
+            let borsh = borsh::to_vec(&input_note).unwrap();
             // BorshDeserialize
             let de_note: Note = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
             assert_eq!(input_note, de_note);
@@ -666,7 +666,7 @@ pub mod tests {
         let output_note = random_output_note(&mut rng, input_note.rho);
         {
             // BorshSerialize
-            let borsh = output_note.try_to_vec().unwrap();
+            let borsh = borsh::to_vec(&output_note).unwrap();
             // BorshDeserialize
             let de_note: Note = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
             assert_eq!(output_note, de_note);
@@ -675,7 +675,7 @@ pub mod tests {
         let icm = input_note.commitment();
         {
             // BorshSerialize
-            let borsh = icm.try_to_vec().unwrap();
+            let borsh = borsh::to_vec(&icm).unwrap();
             // BorshDeserialize
             let de_icm: NoteCommitment =
                 BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
@@ -685,7 +685,7 @@ pub mod tests {
         let ocm = output_note.commitment();
         {
             // BorshSerialize
-            let borsh = ocm.try_to_vec().unwrap();
+            let borsh = borsh::to_vec(&ocm).unwrap();
             // BorshDeserialize
             let de_ocm: NoteCommitment =
                 BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
