@@ -30,6 +30,9 @@ pub const PRF_EXPAND_PERSONALIZATION: &[u8; 16] = b"Taiga_ExpandSeed";
 pub const PRF_EXPAND_PSI: u8 = 0;
 pub const PRF_EXPAND_RCM: u8 = 1;
 pub const PRF_EXPAND_PUBLIC_INPUT_PADDING: u8 = 2;
+pub const PRF_EXPAND_VCM_R: u8 = 3;
+pub const PRF_EXPAND_INPUT_VP_CM_R: u8 = 4;
+pub const PRF_EXPAND_OUTPUT_VP_CM_R: u8 = 5;
 
 /// Commitment merkle tree depth
 pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
@@ -44,6 +47,10 @@ pub const ACTION_ANCHOR_PUBLIC_INPUT_ROW_IDX: usize = 1;
 pub const ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX: usize = 2;
 pub const ACTION_NET_VALUE_CM_X_PUBLIC_INPUT_ROW_IDX: usize = 3;
 pub const ACTION_NET_VALUE_CM_Y_PUBLIC_INPUT_ROW_IDX: usize = 4;
+pub const ACTION_INPUT_VP_CM_1_ROW_IDX: usize = 5;
+pub const ACTION_INPUT_VP_CM_2_ROW_IDX: usize = 6;
+pub const ACTION_OUTPUT_VP_CM_1_ROW_IDX: usize = 7;
+pub const ACTION_OUTPUT_VP_CM_2_ROW_IDX: usize = 8;
 
 pub const POSEIDON_TO_CURVE_INPUT_LEN: usize = 3;
 pub const CURVE_ID: &str = "pallas";
@@ -98,8 +105,7 @@ lazy_static! {
     };
 }
 
-pub const CIRCUIT_PARAMS_SIZE_12: u32 = 12;
-pub const ACTION_CIRCUIT_PARAMS_SIZE: u32 = 12;
+pub const ACTION_CIRCUIT_PARAMS_SIZE: u32 = 15;
 pub const VP_CIRCUIT_PARAMS_SIZE: u32 = 12;
 
 // Setup params map
@@ -107,7 +113,7 @@ lazy_static! {
     pub static ref SETUP_PARAMS_MAP: HashMap<u32, Params<vesta::Affine>> = {
         let mut m = HashMap::new();
         #[allow(clippy::single_element_loop)]
-        for circuit_size in [CIRCUIT_PARAMS_SIZE_12] {
+        for circuit_size in [ACTION_CIRCUIT_PARAMS_SIZE, VP_CIRCUIT_PARAMS_SIZE] {
             let params = Params::new(circuit_size);
             m.insert(circuit_size, params);
         }

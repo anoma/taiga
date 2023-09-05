@@ -1,11 +1,11 @@
 use crate::{
     circuit::action_circuit::ActionCircuit,
     merkle_tree::{MerklePath, Node},
-    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
+    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
     nullifier::Nullifier,
     value_commitment::ValueCommitment,
+    vp_commitment::ValidityPredicateCommitment,
 };
-use halo2_proofs::arithmetic::Field;
 use pasta_curves::pallas;
 use rand::RngCore;
 
@@ -28,10 +28,14 @@ pub struct ActionInstance {
     pub anchor: pallas::Base,
     /// The nullifier of input note.
     pub nf: Nullifier,
-    /// The commitment of the output note.
+    /// The commitment to the output note.
     pub cm_x: pallas::Base,
-    /// net value commitment
+    /// The commitment to net value
     pub cv_net: ValueCommitment,
+    /// The commitment to input note application(static) vp
+    pub input_vp_commitment: ValidityPredicateCommitment,
+    /// The commitment to output note application(static) vp
+    pub output_vp_commitment: ValidityPredicateCommitment,
 }
 
 /// The information to build ActionInstance and ActionCircuit.
@@ -40,17 +44,24 @@ pub struct ActionInfo {
     input_note: Note,
     input_merkle_path: MerklePath,
     output_note: Note,
-    rcv: pallas::Scalar,
+    // rseed is to generate the randomness of the value commitment and vp commitments
+    rseed: RandomSeed,
 }
 
 impl ActionInstance {
     pub fn to_instance(&self) -> Vec<pallas::Base> {
+        let input_vp_commitment = self.input_vp_commitment.to_public_inputs();
+        let output_vp_commitment = self.output_vp_commitment.to_public_inputs();
         vec![
             self.nf.inner(),
             self.anchor,
             self.cm_x,
             self.cv_net.get_x(),
             self.cv_net.get_y(),
+            input_vp_commitment[0],
+            input_vp_commitment[1],
+            output_vp_commitment[0],
+            output_vp_commitment[1],
         ]
     }
 }
@@ -63,6 +74,8 @@ impl BorshSerialize for ActionInstance {
         writer.write_all(&self.nf.to_bytes())?;
         writer.write_all(&self.cm_x.to_repr())?;
         writer.write_all(&self.cv_net.to_bytes())?;
+        writer.write_all(&self.input_vp_commitment.to_bytes())?;
+        writer.write_all(&self.output_vp_commitment.to_bytes())?;
         Ok(())
     }
 }
@@ -84,12 +97,20 @@ impl BorshDeserialize for ActionInstance {
         let cv_net_bytes = <[u8; 32]>::deserialize_reader(reader)?;
         let cv_net = Option::from(ValueCommitment::from_bytes(cv_net_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "cv_net not in field"))?;
+        let input_vp_commitment_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let input_vp_commitment =
+            ValidityPredicateCommitment::from_bytes(input_vp_commitment_bytes);
+        let output_vp_commitment_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let output_vp_commitment =
+            ValidityPredicateCommitment::from_bytes(output_vp_commitment_bytes);
 
         Ok(ActionInstance {
             anchor,
             nf,
             cm_x,
             cv_net,
+            input_vp_commitment,
+            output_vp_commitment,
         })
     }
 }
@@ -99,13 +120,13 @@ impl ActionInfo {
         input_note: Note,
         input_merkle_path: MerklePath,
         output_note: Note,
-        rcv: pallas::Scalar,
+        rseed: RandomSeed,
     ) -> Self {
         Self {
             input_note,
             input_merkle_path,
             output_note,
-            rcv,
+            rseed,
         }
     }
 
@@ -114,17 +135,28 @@ impl ActionInfo {
         output: OutputNoteProvingInfo,
         mut rng: R,
     ) -> Self {
-        let rcv = pallas::Scalar::random(&mut rng);
+        let rseed = RandomSeed::random(&mut rng);
         Self {
             input_note: input.note,
             input_merkle_path: input.merkle_path,
             output_note: output.note,
-            rcv,
+            rseed,
         }
     }
 
+    // Get the randomness of value commitment
     pub fn get_rcv(&self) -> pallas::Scalar {
-        self.rcv
+        self.rseed.get_rcv()
+    }
+
+    // Get the randomness of input note application vp commitment
+    pub fn get_input_vp_com_r(&self) -> pallas::Base {
+        self.rseed.get_input_vp_cm_r()
+    }
+
+    // Get the randomness of output note application vp commitment
+    pub fn get_output_vp_com_r(&self) -> pallas::Base {
+        self.rseed.get_output_vp_cm_r()
     }
 
     pub fn build(&self) -> (ActionInstance, ActionCircuit) {
@@ -140,19 +172,33 @@ impl ActionInfo {
             self.input_merkle_path.root(cm_node).inner()
         };
 
-        let cv_net = ValueCommitment::new(&self.input_note, &self.output_note, &self.rcv);
+        let rcv = self.get_rcv();
+        let cv_net = ValueCommitment::new(&self.input_note, &self.output_note, &rcv);
+
+        let input_vp_cm_r = self.get_input_vp_com_r();
+        let input_vp_commitment =
+            ValidityPredicateCommitment::commit(&self.input_note.get_app_vk(), &input_vp_cm_r);
+
+        let output_vp_cm_r = self.get_output_vp_com_r();
+        let output_vp_commitment =
+            ValidityPredicateCommitment::commit(&self.output_note.get_app_vk(), &output_vp_cm_r);
+
         let action = ActionInstance {
             nf,
             cm_x,
             anchor,
             cv_net,
+            input_vp_commitment,
+            output_vp_commitment,
         };
 
         let action_circuit = ActionCircuit {
             input_note: self.input_note,
             merkle_path: self.input_merkle_path.get_path().try_into().unwrap(),
             output_note: self.output_note,
-            rcv: self.rcv,
+            rcv,
+            input_vp_cm_r,
+            output_vp_cm_r,
         };
 
         (action, action_circuit)
@@ -165,15 +211,14 @@ pub mod tests {
     use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
     use crate::merkle_tree::MerklePath;
     use crate::note::tests::{random_input_note, random_output_note};
-    use halo2_proofs::arithmetic::Field;
-    use pasta_curves::pallas;
+    use crate::note::RandomSeed;
     use rand::RngCore;
 
     pub fn random_action_info<R: RngCore>(mut rng: R) -> ActionInfo {
         let input_note = random_input_note(&mut rng);
         let output_note = random_output_note(&mut rng, input_note.get_nf().unwrap());
         let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let rcv = pallas::Scalar::random(&mut rng);
-        ActionInfo::new(input_note, input_merkle_path, output_note, rcv)
+        let rseed = RandomSeed::random(&mut rng);
+        ActionInfo::new(input_note, input_merkle_path, output_note, rseed)
     }
 }

@@ -108,7 +108,7 @@ impl<F: PrimeField> Blake2sByte<F> {
     }
 
     pub fn from_u8(
-        value: u8,
+        value: Value<u8>,
         mut layouter: impl Layouter<F>,
         config: &Blake2sConfig<F>,
     ) -> Result<Self, Error> {
@@ -119,21 +119,16 @@ impl<F: PrimeField> Blake2sByte<F> {
                 let mut byte = value;
                 let mut bits = Vec::with_capacity(8);
                 for i in 0..8 {
-                    let bit = byte & 1;
-                    let bit_var = region.assign_advice(
-                        || "bit",
-                        config.advices[i],
-                        0,
-                        || Value::known(F::from(bit as u64)),
-                    )?;
+                    let bit = byte.map(|b| F::from((b & 1) as u64));
+                    let bit_var = region.assign_advice(|| "bit", config.advices[i], 0, || bit)?;
                     bits.push(bit_var);
-                    byte >>= 1;
+                    byte = byte.map(|b| b >> 1);
                 }
                 let byte = region.assign_advice(
                     || "byte",
                     config.advices[0],
                     1,
-                    || Value::known(F::from(value as u64)),
+                    || value.map(|v| F::from(v as u64)),
                 )?;
                 Ok(Self {
                     byte,
@@ -342,8 +337,7 @@ impl<F: PrimeField> Blake2sChip<F> {
         personalization: &[u8],
     ) -> Result<Vec<Blake2sWord<F>>, Error> {
         assert_eq!(personalization.len(), 8);
-        // TODO: add padding
-        assert!(inputs.len() == 2);
+        assert!(inputs.len() % 2 == 0);
 
         // Init
         let mut h = vec![
@@ -735,14 +729,13 @@ impl<F: PrimeField> Blake2sChip<F> {
         // the decomposition from bytes to bits
         let mut bits = vec![];
         let mut bytes = vec![];
-        field.value().map(|f| {
-            f.to_repr().as_ref().iter().for_each(|&b| {
-                let byte = Blake2sByte::from_u8(b, layouter.namespace(|| "from_u8"), &self.config)
-                    .unwrap();
-                bits.append(&mut byte.get_bits().to_vec());
-                bytes.push(byte.get_byte());
-            })
-        });
+        for i in 0..32 {
+            let byte_value = field.value().map(|f| f.to_repr().as_ref()[i]);
+            let byte =
+                Blake2sByte::from_u8(byte_value, layouter.namespace(|| "from_u8"), &self.config)?;
+            bits.append(&mut byte.get_bits().to_vec());
+            bytes.push(byte.get_byte());
+        }
 
         // Check the decomposition from words to bytes
         let mut words = vec![];
@@ -1038,14 +1031,14 @@ impl<F: PrimeField> Blake2sWord<F> {
     ) -> Result<Self, Error> {
         let mut bytes = Vec::with_capacity(4);
         let mut bits = Vec::with_capacity(32);
-        word.value().map(|v| {
-            for b in v.to_repr().as_ref().iter().take(4) {
-                let byte = Blake2sByte::from_u8(*b, layouter.namespace(|| "from_u8"), &chip.config)
-                    .unwrap();
-                bits.append(&mut byte.get_bits().to_vec());
-                bytes.push(byte.get_byte());
-            }
-        });
+        for i in 0..4 {
+            let byte_value = word.value().map(|v| v.to_repr().as_ref()[i]);
+            let byte =
+                Blake2sByte::from_u8(byte_value, layouter.namespace(|| "from_u8"), &chip.config)?;
+            bits.append(&mut byte.get_bits().to_vec());
+            bytes.push(byte.get_byte());
+        }
+
         chip.word_decompose(layouter.namespace(|| "word decompose"), &bytes, &word)?;
         Ok(Self {
             word,
@@ -1061,7 +1054,7 @@ fn test_blake2s_circuit() {
         vp_commitment::ValidityPredicateCommitment,
     };
     use halo2_proofs::{
-        circuit::{Layouter, SimpleFloorPlanner, Value},
+        circuit::{floor_planner, Layouter, Value},
         dev::MockProver,
         plonk::{Circuit, ConstraintSystem, Error},
     };
@@ -1072,7 +1065,7 @@ fn test_blake2s_circuit() {
 
     impl Circuit<pallas::Base> for MyCircuit {
         type Config = Blake2sConfig<pallas::Base>;
-        type FloorPlanner = SimpleFloorPlanner;
+        type FloorPlanner = floor_planner::V1;
 
         fn without_witnesses(&self) -> Self {
             Self::default()

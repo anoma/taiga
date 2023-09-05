@@ -66,8 +66,8 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
             }
         };
         let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let rcv = pallas::Scalar::random(&mut rng);
-        ActionInfo::new(input_note, input_merkle_path, output_note, rcv)
+        let rseed = RandomSeed::random(&mut rng);
+        ActionInfo::new(input_note, input_merkle_path, output_note, rseed)
     };
     let (action, action_circuit) = action_info.build();
     let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();

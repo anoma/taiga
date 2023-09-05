@@ -2,8 +2,11 @@ use crate::constant::VP_COMMITMENT_PERSONALIZATION;
 use blake2s_simd::Params;
 use byteorder::{ByteOrder, LittleEndian};
 use ff::PrimeField;
+#[cfg(feature = "serde")]
+use serde;
 
 #[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ValidityPredicateCommitment([u8; 32]);
 
 impl ValidityPredicateCommitment {
