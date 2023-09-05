@@ -1,4 +1,6 @@
+use super::gadgets::assign_free_advice;
 use crate::circuit::gadgets::assign_free_constant;
+use crate::constant::VP_COMMITMENT_PERSONALIZATION;
 use byteorder::{ByteOrder, LittleEndian};
 use group::ff::PrimeField;
 use halo2_gadgets::utilities::bool_check;
@@ -9,7 +11,15 @@ use halo2_proofs::{
 };
 use std::{convert::TryInto, marker::PhantomData};
 
-use super::gadgets::assign_free_advice;
+pub fn vp_commitment_gadget<F: PrimeField>(
+    layouter: &mut impl Layouter<F>,
+    blake2s_chip: &Blake2sChip<F>,
+    vp: AssignedCell<F, F>,
+    rcm: AssignedCell<F, F>,
+) -> Result<[AssignedCell<F, F>; 2], Error> {
+    let hash = blake2s_chip.process(layouter, &[vp, rcm], VP_COMMITMENT_PERSONALIZATION)?;
+    blake2s_chip.encode_result(layouter, &hash)
+}
 
 //               | BLAKE2s          |
 // --------------+------------------+
@@ -70,6 +80,7 @@ pub struct Blake2sConfig<F: PrimeField> {
     pub s_byte_decompose: Selector,
     pub s_byte_xor: Selector,
     pub s_word_add: Selector,
+    pub s_result_encode: Selector,
     _marker: PhantomData<F>,
 }
 
@@ -179,6 +190,7 @@ impl<F: PrimeField> Blake2sConfig<F> {
         let s_byte_decompose = meta.selector();
         let s_byte_xor = meta.selector();
         let s_word_add = meta.selector();
+        let s_result_encode = meta.selector();
 
         meta.create_gate("decompose field to words", |meta| {
             let field_element = meta.query_advice(advices[0], Rotation::next());
@@ -284,6 +296,24 @@ impl<F: PrimeField> Blake2sConfig<F> {
             )
         });
 
+        meta.create_gate("encode four words to one field", |meta| {
+            let field_element = meta.query_advice(advices[0], Rotation::next());
+            let word_1 = meta.query_advice(advices[0], Rotation::cur());
+            let word_2 = meta.query_advice(advices[1], Rotation::cur());
+            let word_3 = meta.query_advice(advices[2], Rotation::cur());
+            let word_4 = meta.query_advice(advices[3], Rotation::cur());
+            let s_result_encode = meta.query_selector(s_result_encode);
+
+            vec![
+                s_result_encode
+                    * (word_1
+                        + word_2 * F::from(1 << 32)
+                        + word_3 * F::from_u128(1 << 64)
+                        + word_4 * F::from_u128(1 << 96)
+                        - field_element),
+            ]
+        });
+
         Blake2sConfig {
             advices,
             s_field_decompose,
@@ -291,6 +321,7 @@ impl<F: PrimeField> Blake2sConfig<F> {
             s_byte_decompose,
             s_byte_xor,
             s_word_add,
+            s_result_encode,
             _marker: PhantomData,
         }
     }
@@ -368,6 +399,49 @@ impl<F: PrimeField> Blake2sChip<F> {
         )?;
 
         Ok(h)
+    }
+
+    // Encode the eight words to two field elements
+    pub fn encode_result(
+        &self,
+        layouter: &mut impl Layouter<F>,
+        ret: &Vec<Blake2sWord<F>>,
+    ) -> Result<[AssignedCell<F, F>; 2], Error> {
+        let mut fields = vec![];
+        assert_eq!(ret.len(), 8);
+        for words in ret.chunks(4) {
+            let field = layouter.assign_region(
+                || "encode four words to one field",
+                |mut region| {
+                    self.config.s_result_encode.enable(&mut region, 0)?;
+                    for (i, word) in words.iter().enumerate() {
+                        word.get_word().copy_advice(
+                            || "word",
+                            &mut region,
+                            self.config.advices[i],
+                            0,
+                        )?;
+                    }
+                    let word_values: Value<Vec<_>> =
+                        words.iter().map(|word| word.get_word().value()).collect();
+                    let field_value = word_values.map(|words| {
+                        words
+                            .into_iter()
+                            .rev()
+                            .fold(F::ZERO, |acc, byte| acc * F::from(1 << 32) + byte)
+                    });
+                    region.assign_advice(
+                        || "result field",
+                        self.config.advices[0],
+                        1,
+                        || field_value,
+                    )
+                },
+            )?;
+            fields.push(field);
+        }
+        assert_eq!(fields.len(), 2);
+        Ok(fields.try_into().unwrap())
     }
 
     // Compression function F takes as an argument the state vector "h",
@@ -565,14 +639,11 @@ impl<F: PrimeField> Blake2sChip<F> {
         v[a] = {
             let sum_a_b = self.add_mod_u32(
                 layouter.namespace(|| "add_mod_u32"),
-                &v[a].get_word(),
-                &v[b].get_word(),
+                v[a].get_word(),
+                v[b].get_word(),
             )?;
-            let sum_a_b_x = self.add_mod_u32(
-                layouter.namespace(|| "add_mod_u32"),
-                &sum_a_b,
-                &x.get_word(),
-            )?;
+            let sum_a_b_x =
+                self.add_mod_u32(layouter.namespace(|| "add_mod_u32"), &sum_a_b, x.get_word())?;
             Blake2sWord::from_word(self, layouter.namespace(|| "from word"), sum_a_b_x)?
         };
 
@@ -591,8 +662,8 @@ impl<F: PrimeField> Blake2sChip<F> {
         v[c] = {
             let sum = self.add_mod_u32(
                 layouter.namespace(|| "add_mod_u32"),
-                &v[c].get_word(),
-                &v[d].get_word(),
+                v[c].get_word(),
+                v[d].get_word(),
             )?;
             Blake2sWord::from_word(self, layouter.namespace(|| "from word"), sum)?
         };
@@ -612,14 +683,11 @@ impl<F: PrimeField> Blake2sChip<F> {
         v[a] = {
             let sum_a_b = self.add_mod_u32(
                 layouter.namespace(|| "add_mod_u32"),
-                &v[a].get_word(),
-                &v[b].get_word(),
+                v[a].get_word(),
+                v[b].get_word(),
             )?;
-            let sum_a_b_y = self.add_mod_u32(
-                layouter.namespace(|| "add_mod_u32"),
-                &sum_a_b,
-                &y.get_word(),
-            )?;
+            let sum_a_b_y =
+                self.add_mod_u32(layouter.namespace(|| "add_mod_u32"), &sum_a_b, y.get_word())?;
             Blake2sWord::from_word(self, layouter.namespace(|| "from word"), sum_a_b_y)?
         };
 
@@ -638,8 +706,8 @@ impl<F: PrimeField> Blake2sChip<F> {
         v[c] = {
             let sum = self.add_mod_u32(
                 layouter.namespace(|| "add_mod_u32"),
-                &v[c].get_word(),
-                &v[d].get_word(),
+                v[c].get_word(),
+                v[d].get_word(),
             )?;
             Blake2sWord::from_word(self, layouter.namespace(|| "from word"), sum)?
         };
@@ -916,8 +984,8 @@ impl<F: PrimeField> Blake2sWord<F> {
         &self.bits
     }
 
-    pub fn get_word(&self) -> AssignedCell<F, F> {
-        self.word.clone()
+    pub fn get_word(&self) -> &AssignedCell<F, F> {
+        &self.word
     }
 
     pub fn from_bits(
@@ -988,8 +1056,10 @@ impl<F: PrimeField> Blake2sWord<F> {
 
 #[test]
 fn test_blake2s_circuit() {
-    use crate::{circuit::gadgets::assign_free_advice, constant::VP_COMMITMENT_PERSONALIZATION};
-    use blake2s_simd::Params;
+    use crate::{
+        circuit::gadgets::assign_free_advice, constant::VP_COMMITMENT_PERSONALIZATION,
+        vp_commitment::ValidityPredicateCommitment,
+    };
     use halo2_proofs::{
         circuit::{Layouter, SimpleFloorPlanner, Value},
         dev::MockProver,
@@ -1036,54 +1106,62 @@ fn test_blake2s_circuit() {
             config: Self::Config,
             mut layouter: impl Layouter<pallas::Base>,
         ) -> Result<(), Error> {
-            let message = vec![
-                assign_free_advice(
-                    layouter.namespace(|| "message one"),
-                    config.advices[0],
-                    Value::known(pallas::Base::one()),
-                )
-                .unwrap(),
-                assign_free_advice(
-                    layouter.namespace(|| "message two"),
-                    config.advices[0],
-                    Value::known(pallas::Base::one()),
-                )
-                .unwrap(),
-            ];
-            let blake2s_chip = Blake2sChip::construct(config);
-            let ret =
-                blake2s_chip.process(&mut layouter, &message, VP_COMMITMENT_PERSONALIZATION)?;
+            let vp = pallas::Base::one();
+            let rcm = pallas::Base::one();
+            let vp_var = assign_free_advice(
+                layouter.namespace(|| "message one"),
+                config.advices[0],
+                Value::known(vp),
+            )?;
+            let rcm_var = assign_free_advice(
+                layouter.namespace(|| "message two"),
+                config.advices[0],
+                Value::known(rcm),
+            )?;
 
-            let expect_ret: Vec<u32> = {
-                let one = pallas::Base::one().to_repr();
-                let hash = Params::new()
-                    .hash_length(32)
-                    .personal(VP_COMMITMENT_PERSONALIZATION)
-                    .to_state()
-                    .update(&one)
-                    .update(&one)
-                    .finalize();
-                hash.as_bytes()
-                    .chunks(4)
-                    .map(LittleEndian::read_u32)
-                    .collect()
-            };
-            for (word, expect_word) in ret.iter().zip(expect_ret.into_iter()) {
+            let blake2s_chip = Blake2sChip::construct(config);
+            let words_result = blake2s_chip.process(
+                &mut layouter,
+                &[vp_var, rcm_var],
+                VP_COMMITMENT_PERSONALIZATION,
+            )?;
+
+            let expect_ret = ValidityPredicateCommitment::commit(&vp, &rcm);
+            let expect_words_result: Vec<u32> = expect_ret
+                .to_bytes()
+                .chunks(4)
+                .map(LittleEndian::read_u32)
+                .collect();
+
+            for (word, expect_word) in words_result.iter().zip(expect_words_result.into_iter()) {
                 let expect_word_var = assign_free_advice(
-                    layouter.namespace(|| "message one"),
+                    layouter.namespace(|| "expected words"),
                     config.advices[0],
                     Value::known(pallas::Base::from(expect_word as u64)),
-                )
-                .unwrap();
-                layouter
-                    .assign_region(
-                        || "constrain result",
-                        |mut region| {
-                            region.constrain_equal(word.get_word().cell(), expect_word_var.cell())
-                        },
-                    )
-                    .unwrap();
+                )?;
+                layouter.assign_region(
+                    || "constrain result",
+                    |mut region| {
+                        region.constrain_equal(word.get_word().cell(), expect_word_var.cell())
+                    },
+                )?;
             }
+
+            let expect_field_ret: [pallas::Base; 2] = expect_ret.to_public_inputs();
+            let field_ret = blake2s_chip.encode_result(&mut layouter, &words_result)?;
+
+            for (field, expect_field) in field_ret.iter().zip(expect_field_ret.into_iter()) {
+                let expect_field_var = assign_free_advice(
+                    layouter.namespace(|| "expected field"),
+                    config.advices[0],
+                    Value::known(expect_field),
+                )?;
+                layouter.assign_region(
+                    || "constrain result",
+                    |mut region| region.constrain_equal(field.cell(), expect_field_var.cell()),
+                )?;
+            }
+
             Ok(())
         }
     }
