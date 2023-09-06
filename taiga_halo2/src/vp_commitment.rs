@@ -5,7 +5,7 @@ use ff::PrimeField;
 #[cfg(feature = "serde")]
 use serde;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ValidityPredicateCommitment([u8; 32]);
 

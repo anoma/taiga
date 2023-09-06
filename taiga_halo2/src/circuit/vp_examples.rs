@@ -6,6 +6,7 @@ use crate::{
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::{Note, RandomSeed},
     proof::Proof,
+    vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use halo2_proofs::plonk::{keygen_pk, keygen_vk};
@@ -111,6 +112,10 @@ impl ValidityPredicateCircuit for TrivialValidityPredicateCircuit {
 
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
+        let default_vp_cm: [pallas::Base; 2] =
+            ValidityPredicateCommitment::default().to_public_inputs();
+        public_inputs.extend(default_vp_cm);
+        public_inputs.extend(default_vp_cm);
         let padding = ValidityPredicatePublicInputs::get_public_input_padding(
             public_inputs.len(),
             &RandomSeed::random(&mut rng),
@@ -153,6 +158,7 @@ pub mod tests {
     #[test]
     fn test_halo2_trivial_vp_circuit() {
         use crate::circuit::vp_circuit::ValidityPredicateCircuit;
+        use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
         use halo2_proofs::dev::MockProver;
         use rand::rngs::OsRng;
 
@@ -160,8 +166,12 @@ pub mod tests {
         let circuit = random_trivial_vp_circuit(&mut rng);
         let public_inputs = circuit.get_public_inputs(&mut rng);
 
-        let prover =
-            MockProver::<pallas::Base>::run(12, &circuit, vec![public_inputs.to_vec()]).unwrap();
+        let prover = MockProver::<pallas::Base>::run(
+            VP_CIRCUIT_PARAMS_SIZE,
+            &circuit,
+            vec![public_inputs.to_vec()],
+        )
+        .unwrap();
         assert_eq!(prover.verify(), Ok(()));
     }
 }

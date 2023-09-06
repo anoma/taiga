@@ -1,8 +1,8 @@
 use crate::action::{ActionInfo, ActionInstance};
 use crate::circuit::vp_circuit::{VPVerifyingInfo, ValidityPredicate};
 use crate::constant::{
-    ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, NUM_NOTE,
-    SETUP_PARAMS_MAP,
+    ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, MAX_DYNAMIC_VP_NUM,
+    NUM_NOTE, SETUP_PARAMS_MAP,
 };
 use crate::error::TransactionError;
 use crate::executable::Executable;
@@ -339,6 +339,8 @@ impl NoteVPVerifyingInfoSet {
         app_vp_verifying_info: VPVerifyingInfo,
         app_dynamic_vp_verifying_info: Vec<VPVerifyingInfo>,
     ) -> Self {
+        assert!(app_dynamic_vp_verifying_info.len() <= MAX_DYNAMIC_VP_NUM);
+
         Self {
             app_vp_verifying_info,
             app_dynamic_vp_verifying_info,
@@ -349,6 +351,8 @@ impl NoteVPVerifyingInfoSet {
         application_vp: Box<ValidityPredicate>,
         dynamic_vps: Vec<Box<ValidityPredicate>>,
     ) -> Self {
+        assert!(dynamic_vps.len() <= MAX_DYNAMIC_VP_NUM);
+
         let app_vp_verifying_info = application_vp.get_verifying_info();
 
         let app_dynamic_vp_verifying_info = dynamic_vps

@@ -1,5 +1,6 @@
 use crate::{
     circuit::action_circuit::ActionCircuit,
+    constant::{PRF_EXPAND_INPUT_VP_CM_R, PRF_EXPAND_OUTPUT_VP_CM_R},
     merkle_tree::{MerklePath, Node},
     note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
     nullifier::Nullifier,
@@ -151,12 +152,12 @@ impl ActionInfo {
 
     // Get the randomness of input note application vp commitment
     pub fn get_input_vp_com_r(&self) -> pallas::Base {
-        self.rseed.get_input_vp_cm_r()
+        self.rseed.get_vp_cm_r(PRF_EXPAND_INPUT_VP_CM_R)
     }
 
     // Get the randomness of output note application vp commitment
     pub fn get_output_vp_com_r(&self) -> pallas::Base {
-        self.rseed.get_output_vp_cm_r()
+        self.rseed.get_vp_cm_r(PRF_EXPAND_OUTPUT_VP_CM_R)
     }
 
     pub fn build(&self) -> (ActionInstance, ActionCircuit) {

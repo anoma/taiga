@@ -1,10 +1,13 @@
 use crate::circuit::vamp_ir_utils::{get_circuit_assignments, parse, VariableAssignmentError};
 use crate::{
     circuit::{
+        blake2s::publicize_default_dynamic_vp_commitments,
+        blake2s::Blake2sConfig,
         gadgets::{
             add::{AddChip, AddConfig},
             assign_free_advice,
             conditional_equal::ConditionalEqualConfig,
+            conditional_select::ConditionalSelectConfig,
             extended_or_relation::ExtendedOrRelationConfig,
             mul::{MulChip, MulConfig},
             sub::{SubChip, SubConfig},
@@ -308,10 +311,12 @@ pub struct ValidityPredicateConfig {
     pub get_is_input_note_flag_config: GetIsInputNoteFlagConfig,
     pub get_owned_note_variable_config: GetOwnedNoteVariableConfig,
     pub conditional_equal_config: ConditionalEqualConfig,
+    pub conditional_select_config: ConditionalSelectConfig,
     pub extended_or_relation_config: ExtendedOrRelationConfig,
     pub add_config: AddConfig,
     pub sub_config: SubConfig,
     pub mul_config: MulConfig,
+    pub blake2s_config: Blake2sConfig<pallas::Base>,
 }
 
 impl ValidityPredicateConfig {
@@ -349,6 +354,8 @@ impl ValidityPredicateConfig {
 
         let conditional_equal_config =
             ConditionalEqualConfig::configure(meta, [advices[0], advices[1], advices[2]]);
+        let conditional_select_config =
+            ConditionalSelectConfig::configure(meta, [advices[0], advices[1]]);
 
         let add_config = note_conifg.add_config.clone();
         let sub_config = SubChip::configure(meta, [advices[0], advices[1]]);
@@ -356,7 +363,7 @@ impl ValidityPredicateConfig {
 
         let extended_or_relation_config =
             ExtendedOrRelationConfig::configure(meta, [advices[0], advices[1], advices[2]]);
-
+        let blake2s_config = Blake2sConfig::configure(meta, advices);
         Self {
             note_conifg,
             advices,
@@ -364,10 +371,12 @@ impl ValidityPredicateConfig {
             get_is_input_note_flag_config,
             get_owned_note_variable_config,
             conditional_equal_config,
+            conditional_select_config,
             extended_or_relation_config,
             add_config,
             sub_config,
             mul_config,
+            blake2s_config,
         }
     }
 }
@@ -468,12 +477,20 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVer
     // `get_input_notes` and `get_output_notes` will be used in `basic_constraints` to get the basic note info.
 
     // Add custom constraints on basic note variables and user-defined variables.
+    // It should at least contain the default vp commitment
     fn custom_constraints(
         &self,
-        _config: ValidityPredicateConfig,
-        mut _layouter: impl Layouter<pallas::Base>,
+        config: ValidityPredicateConfig,
+        mut layouter: impl Layouter<pallas::Base>,
         _basic_variables: BasicValidityPredicateVariables,
     ) -> Result<(), Error> {
+        // Publicize the dynamic vp commitments with default value
+        publicize_default_dynamic_vp_commitments(
+            &mut layouter,
+            config.advices[0],
+            config.instances,
+        )?;
+
         Ok(())
     }
 
@@ -826,7 +843,7 @@ macro_rules! vp_circuit_impl {
         impl ValidityPredicateVerifyingInfo for $name {
             fn get_verifying_info(&self) -> VPVerifyingInfo {
                 let mut rng = OsRng;
-                let params = SETUP_PARAMS_MAP.get(&12).unwrap();
+                let params = SETUP_PARAMS_MAP.get(&15).unwrap();
                 let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
                 let pk = keygen_pk(params, vk.clone(), self).expect("keygen_pk should not fail");
                 let public_inputs = self.get_public_inputs(&mut rng);
@@ -846,7 +863,7 @@ macro_rules! vp_circuit_impl {
             }
 
             fn get_vp_vk(&self) -> ValidityPredicateVerifyingKey {
-                let params = SETUP_PARAMS_MAP.get(&12).unwrap();
+                let params = SETUP_PARAMS_MAP.get(&15).unwrap();
                 let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
                 ValidityPredicateVerifyingKey::from_vk(vk)
             }

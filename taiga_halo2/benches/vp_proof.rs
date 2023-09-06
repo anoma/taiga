@@ -7,7 +7,7 @@ use rand::rngs::OsRng;
 use rand::Rng;
 use taiga_halo2::{
     circuit::{vp_circuit::ValidityPredicateCircuit, vp_examples::TrivialValidityPredicateCircuit},
-    constant::{NUM_NOTE, SETUP_PARAMS_MAP},
+    constant::{NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_PARAMS_SIZE},
     note::{Note, NoteType, RandomSeed},
     nullifier::{Nullifier, NullifierKeyContainer},
     proof::Proof,
@@ -71,7 +71,7 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
             output_notes.try_into().unwrap(),
         )
     };
-    let params = SETUP_PARAMS_MAP.get(&12).unwrap();
+    let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
     let empty_circuit: TrivialValidityPredicateCircuit = Default::default();
     let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
     let pk = keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail");

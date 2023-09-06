@@ -1,12 +1,19 @@
 use super::gadgets::assign_free_advice;
 use crate::circuit::gadgets::assign_free_constant;
-use crate::constant::VP_COMMITMENT_PERSONALIZATION;
+use crate::constant::{
+    VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_1, VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_2,
+    VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_1, VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_2,
+    VP_COMMITMENT_PERSONALIZATION,
+};
+use crate::vp_commitment::ValidityPredicateCommitment;
 use byteorder::{ByteOrder, LittleEndian};
 use group::ff::PrimeField;
 use halo2_gadgets::utilities::bool_check;
 use halo2_proofs::{
     circuit::{AssignedCell, Layouter, Value},
-    plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Selector, VirtualCells},
+    plonk::{
+        Advice, Column, ConstraintSystem, Constraints, Error, Instance, Selector, VirtualCells,
+    },
     poly::Rotation,
 };
 use std::{convert::TryInto, marker::PhantomData};
@@ -19,6 +26,31 @@ pub fn vp_commitment_gadget<F: PrimeField>(
 ) -> Result<[AssignedCell<F, F>; 2], Error> {
     let hash = blake2s_chip.process(layouter, &[vp, rcm], VP_COMMITMENT_PERSONALIZATION)?;
     blake2s_chip.encode_result(layouter, &hash)
+}
+
+pub fn publicize_default_dynamic_vp_commitments<F: PrimeField>(
+    layouter: &mut impl Layouter<F>,
+    advice: Column<Advice>,
+    instances: Column<Instance>,
+) -> Result<(), Error> {
+    let vp_cm_fields: [F; 2] = ValidityPredicateCommitment::default().to_public_inputs();
+    let vp_cm_1 = assign_free_advice(
+        layouter.namespace(|| "vp_cm 1"),
+        advice,
+        Value::known(vp_cm_fields[0]),
+    )?;
+    let vp_cm_2 = assign_free_advice(
+        layouter.namespace(|| "vp_cm 2"),
+        advice,
+        Value::known(vp_cm_fields[1]),
+    )?;
+
+    layouter.constrain_instance(vp_cm_1.cell(), instances, VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_1)?;
+    layouter.constrain_instance(vp_cm_2.cell(), instances, VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_2)?;
+    layouter.constrain_instance(vp_cm_1.cell(), instances, VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_1)?;
+    layouter.constrain_instance(vp_cm_2.cell(), instances, VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_2)?;
+
+    Ok(())
 }
 
 //               | BLAKE2s          |
