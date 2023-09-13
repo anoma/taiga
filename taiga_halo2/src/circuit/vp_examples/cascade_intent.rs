@@ -100,7 +100,7 @@ impl ValidityPredicateCircuit for CascadeIntentValidityPredicateCircuit {
                 config.conditional_equal_config.assign_region(
                     &is_input_note,
                     &app_data_static,
-                    &basic_variables.input_note_variables[1].cm_x,
+                    &basic_variables.input_note_variables[1].cm,
                     0,
                     &mut region,
                 )
@@ -178,7 +178,7 @@ fn test_halo2_cascade_intent_vp_circuit() {
     let mut rng = OsRng;
     let circuit = {
         let cascade_input_note = random_input_note(&mut rng);
-        let cascade_note_cm = cascade_input_note.commitment().get_x();
+        let cascade_note_cm = cascade_input_note.commitment().inner();
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
         let nk = NullifierKeyContainer::random_key(&mut rng);
         let intent_note = create_intent_note(&mut rng, cascade_note_cm, rho, nk);

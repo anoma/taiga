@@ -666,7 +666,7 @@ fn test_halo2_sudoku_app_vp_circuit_init() {
         output_notes[0].note_type.app_data_static =
             poseidon_hash(encoded_init_state, current_state.encode());
         output_notes[0].value = 1u64;
-        let owned_note_pub_id = output_notes[0].commitment().get_x();
+        let owned_note_pub_id = output_notes[0].commitment().inner();
         SudokuAppValidityPredicateCircuit {
             owned_note_pub_id,
             input_notes,

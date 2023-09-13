@@ -110,11 +110,11 @@ impl Node {
     }
 
     pub fn from_note(n: &Note) -> Self {
-        Self(n.commitment().get_x())
+        Self(n.commitment().inner())
     }
 
     pub fn from_note_commitment(n: &NoteCommitment) -> Self {
-        Self(n.get_x())
+        Self(n.inner())
     }
 
     pub fn rand(rng: &mut impl RngCore) -> Self {

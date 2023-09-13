@@ -30,8 +30,8 @@ pub struct ActionInstance {
     /// The nullifier of input note.
     pub nf: Nullifier,
     /// The commitment to the output note.
-    pub cm_x: pallas::Base,
-    /// The commitment to net value
+    pub cm: pallas::Base,
+    /// net value commitment
     pub cv_net: ValueCommitment,
     /// The commitment to input note application(static) vp
     pub input_vp_commitment: ValidityPredicateCommitment,
@@ -56,7 +56,7 @@ impl ActionInstance {
         vec![
             self.nf.inner(),
             self.anchor,
-            self.cm_x,
+            self.cm,
             self.cv_net.get_x(),
             self.cv_net.get_y(),
             input_vp_commitment[0],
@@ -73,7 +73,7 @@ impl BorshSerialize for ActionInstance {
         use ff::PrimeField;
         writer.write_all(&self.anchor.to_repr())?;
         writer.write_all(&self.nf.to_bytes())?;
-        writer.write_all(&self.cm_x.to_repr())?;
+        writer.write_all(&self.cm.to_repr())?;
         writer.write_all(&self.cv_net.to_bytes())?;
         writer.write_all(&self.input_vp_commitment.to_bytes())?;
         writer.write_all(&self.output_vp_commitment.to_bytes())?;
@@ -92,9 +92,9 @@ impl BorshDeserialize for ActionInstance {
         let nf_bytes = <[u8; 32]>::deserialize_reader(reader)?;
         let nf = Option::from(Nullifier::from_bytes(nf_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "nf not in field"))?;
-        let cm_x_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let cm_x = Option::from(pallas::Base::from_repr(cm_x_bytes))
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "cm_x not in field"))?;
+        let cm_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let cm = Option::from(pallas::Base::from_repr(cm_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "cm not in field"))?;
         let cv_net_bytes = <[u8; 32]>::deserialize_reader(reader)?;
         let cv_net = Option::from(ValueCommitment::from_bytes(cv_net_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "cv_net not in field"))?;
@@ -108,7 +108,7 @@ impl BorshDeserialize for ActionInstance {
         Ok(ActionInstance {
             anchor,
             nf,
-            cm_x,
+            cm,
             cv_net,
             input_vp_commitment,
             output_vp_commitment,
@@ -167,7 +167,7 @@ impl ActionInfo {
             "The nf of input note should be equal to the rho of output note"
         );
 
-        let cm_x = self.output_note.commitment().get_x();
+        let cm = self.output_note.commitment().inner();
         let anchor = {
             let cm_node = Node::from_note(&self.input_note);
             self.input_merkle_path.root(cm_node).inner()
@@ -186,7 +186,7 @@ impl ActionInfo {
 
         let action = ActionInstance {
             nf,
-            cm_x,
+            cm,
             anchor,
             cv_net,
             input_vp_commitment,

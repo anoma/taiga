@@ -372,7 +372,7 @@ fn test_halo2_dealer_intent_vp_circuit() {
                 sudoku_app_vk,
             );
         let encoded_solution = pallas::Base::random(&mut rng);
-        let owned_note_pub_id = output_notes[0].commitment().get_x();
+        let owned_note_pub_id = output_notes[0].commitment().inner();
         DealerIntentValidityPredicateCircuit {
             owned_note_pub_id,
             input_notes,

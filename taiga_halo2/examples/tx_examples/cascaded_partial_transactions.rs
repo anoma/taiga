@@ -45,7 +45,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
     let input_note_3 = create_random_token_note(&mut rng, "xan", 3u64, rho, alice_nk, &alice_auth);
     let cascade_intent_note = create_intent_note(
         &mut rng,
-        input_note_3.commitment().get_x(),
+        input_note_3.commitment().inner(),
         input_note_2.get_nf().unwrap(),
         alice_nk,
     );
@@ -108,7 +108,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
 
         let intent_note_proving_info = {
             let intent_vp = CascadeIntentValidityPredicateCircuit {
-                owned_note_pub_id: cascade_intent_note.commitment().get_x(),
+                owned_note_pub_id: cascade_intent_note.commitment().inner(),
                 input_notes,
                 output_notes,
                 cascade_note_cm: cascade_intent_note.get_app_data_static(),

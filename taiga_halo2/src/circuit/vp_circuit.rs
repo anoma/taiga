@@ -14,11 +14,9 @@ use crate::{
             target_note_variable::{GetIsInputNoteFlagConfig, GetOwnedNoteVariableConfig},
         },
         integrity::{check_input_note, check_output_note},
-        note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig},
     },
     constant::{
-        NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases,
-        NOTE_ENCRYPTION_CIPHERTEXT_NUM, NUM_NOTE, SETUP_PARAMS_MAP,
+        TaigaFixedBases, NOTE_ENCRYPTION_CIPHERTEXT_NUM, NUM_NOTE, SETUP_PARAMS_MAP,
         VP_CIRCUIT_NOTE_ENCRYPTION_PK_X_IDX, VP_CIRCUIT_NOTE_ENCRYPTION_PK_Y_IDX,
         VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
         VP_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX, VP_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX,
@@ -35,13 +33,18 @@ use crate::{
 use dyn_clone::{clone_trait_object, DynClone};
 //use ff::PrimeField;
 use group::cofactor::CofactorCurveAffine;
-use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
+use halo2_gadgets::{
+    ecc::chip::EccChip,
+    ecc::chip::EccConfig,
+    poseidon::{primitives as poseidon, Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig},
+    utilities::lookup_range_check::LookupRangeCheckConfig,
+};
 use halo2_proofs::{
     arithmetic::CurveAffine,
     circuit::{AssignedCell, Layouter, Value},
     plonk::{
         keygen_pk, keygen_vk, Advice, Circuit, Column, ConstraintSystem, Error, Instance,
-        VerifyingKey,
+        TableColumn, VerifyingKey,
     },
     poly::commitment::Params,
 };
@@ -305,9 +308,11 @@ impl From<Vec<pallas::Base>> for ValidityPredicatePublicInputs {
 
 #[derive(Clone, Debug)]
 pub struct ValidityPredicateConfig {
-    pub note_conifg: NoteConfig,
     pub advices: [Column<Advice>; 10],
     pub instances: Column<Instance>,
+    pub table_idx: TableColumn,
+    pub ecc_config: EccConfig<TaigaFixedBases>,
+    pub poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
     pub get_is_input_note_flag_config: GetIsInputNoteFlagConfig,
     pub get_owned_note_variable_config: GetOwnedNoteVariableConfig,
     pub conditional_equal_config: ConditionalEqualConfig,
@@ -341,7 +346,32 @@ impl ValidityPredicateConfig {
             meta.enable_equality(*advice);
         }
 
-        let note_conifg = NoteChip::configure(meta, instances, advices);
+        let table_idx = meta.lookup_table_column();
+
+        let range_check = LookupRangeCheckConfig::configure(meta, advices[9], table_idx);
+
+        let lagrange_coeffs = [
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+        ];
+        meta.enable_constant(lagrange_coeffs[0]);
+
+        let ecc_config =
+            EccChip::<TaigaFixedBases>::configure(meta, advices, lagrange_coeffs, range_check);
+
+        let poseidon_config = PoseidonChip::configure::<poseidon::P128Pow5T3>(
+            meta,
+            advices[6..9].try_into().unwrap(),
+            advices[5],
+            lagrange_coeffs[2..5].try_into().unwrap(),
+            lagrange_coeffs[5..8].try_into().unwrap(),
+        );
 
         let get_owned_note_variable_config = GetOwnedNoteVariableConfig::configure(
             meta,
@@ -357,7 +387,7 @@ impl ValidityPredicateConfig {
         let conditional_select_config =
             ConditionalSelectConfig::configure(meta, [advices[0], advices[1]]);
 
-        let add_config = note_conifg.add_config.clone();
+        let add_config = AddChip::configure(meta, [advices[0], advices[1]]);
         let sub_config = SubChip::configure(meta, [advices[0], advices[1]]);
         let mul_config = MulChip::configure(meta, [advices[0], advices[1]]);
 
@@ -365,9 +395,11 @@ impl ValidityPredicateConfig {
             ExtendedOrRelationConfig::configure(meta, [advices[0], advices[1], advices[2]]);
         let blake2s_config = Blake2sConfig::configure(meta, advices);
         Self {
-            note_conifg,
             advices,
             instances,
+            table_idx,
+            ecc_config,
+            poseidon_config,
             get_is_input_note_flag_config,
             get_owned_note_variable_config,
             conditional_equal_config,
@@ -396,25 +428,20 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVer
         config: ValidityPredicateConfig,
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<BasicValidityPredicateVariables, Error> {
-        let note_config = config.note_conifg;
-        // Load the Sinsemilla generator lookup table used by the whole circuit.
-        SinsemillaChip::<NoteCommitmentHashDomain, NoteCommitmentDomain, TaigaFixedBases>::load(
-            note_config.sinsemilla_config.clone(),
-            &mut layouter,
+        layouter.assign_table(
+            || "table_idx",
+            |mut table| {
+                for index in 0..(1 << 10) {
+                    table.assign_cell(
+                        || "table_idx",
+                        config.table_idx,
+                        index,
+                        || Value::known(pallas::Base::from(index as u64)),
+                    )?;
+                }
+                Ok(())
+            },
         )?;
-
-        // Construct a Sinsemilla chip
-        let sinsemilla_chip = SinsemillaChip::construct(note_config.sinsemilla_config.clone());
-
-        // Construct an ECC chip
-        let ecc_chip = EccChip::construct(note_config.ecc_config);
-
-        // Construct a NoteCommit chip
-        let note_commit_chip =
-            NoteCommitmentChip::construct(note_config.note_commit_config.clone());
-
-        // Construct an add chip
-        let add_chip = AddChip::<pallas::Base>::construct(note_config.add_config, ());
 
         let input_notes = self.get_input_notes();
         let output_notes = self.get_output_notes();
@@ -423,13 +450,9 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVer
         for i in 0..NUM_NOTE {
             input_note_variables.push(check_input_note(
                 layouter.namespace(|| "check input note"),
-                note_config.advices,
-                note_config.instances,
-                ecc_chip.clone(),
-                sinsemilla_chip.clone(),
-                note_commit_chip.clone(),
-                note_config.poseidon_config.clone(),
-                add_chip.clone(),
+                config.advices,
+                config.instances,
+                config.poseidon_config.clone(),
                 input_notes[i],
                 i * 2,
             )?);
@@ -437,17 +460,14 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVer
             // The old_nf may not be from above input note
             let old_nf = assign_free_advice(
                 layouter.namespace(|| "old nf"),
-                note_config.advices[0],
+                config.advices[0],
                 Value::known(output_notes[i].rho.inner()),
             )?;
             output_note_variables.push(check_output_note(
                 layouter.namespace(|| "check output note"),
-                note_config.advices,
-                note_config.instances,
-                ecc_chip.clone(),
-                sinsemilla_chip.clone(),
-                note_commit_chip.clone(),
-                note_config.poseidon_config.clone(),
+                config.advices,
+                config.instances,
+                config.poseidon_config.clone(),
                 output_notes[i],
                 old_nf,
                 i * 2 + 1,
@@ -457,12 +477,12 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVer
         // Publicize the owned_note_pub_id
         let owned_note_pub_id = assign_free_advice(
             layouter.namespace(|| "owned_note_pub_id"),
-            note_config.advices[0],
+            config.advices[0],
             Value::known(self.get_owned_note_pub_id()),
         )?;
         layouter.constrain_instance(
             owned_note_pub_id.cell(),
-            note_config.instances,
+            config.instances,
             VP_CIRCUIT_OWNED_NOTE_PUB_ID_PUBLIC_INPUT_IDX,
         )?;
 
@@ -503,7 +523,7 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVer
                 let nf = input_note.get_nf().unwrap().inner();
                 public_inputs.push(nf);
                 let cm = output_note.commitment();
-                public_inputs.push(cm.get_x());
+                public_inputs.push(cm.inner());
             });
         public_inputs.push(self.get_owned_note_pub_id());
         public_inputs
@@ -528,7 +548,6 @@ pub struct BasicValidityPredicateVariables {
 
 #[derive(Debug, Clone)]
 pub struct NoteVariables {
-    pub address: AssignedCell<pallas::Base, pallas::Base>,
     pub app_vk: AssignedCell<pallas::Base, pallas::Base>,
     pub app_data_static: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
@@ -544,14 +563,14 @@ pub struct NoteVariables {
 #[derive(Debug, Clone)]
 pub struct InputNoteVariables {
     pub nf: AssignedCell<pallas::Base, pallas::Base>,
-    pub cm_x: AssignedCell<pallas::Base, pallas::Base>,
+    pub cm: AssignedCell<pallas::Base, pallas::Base>,
     pub note_variables: NoteVariables,
 }
 
 // Variables in the out note
 #[derive(Debug, Clone)]
 pub struct OutputNoteVariables {
-    pub cm_x: AssignedCell<pallas::Base, pallas::Base>,
+    pub cm: AssignedCell<pallas::Base, pallas::Base>,
     pub note_variables: NoteVariables,
 }
 
@@ -581,30 +600,9 @@ impl BasicValidityPredicateVariables {
         let ret: Vec<_> = self
             .output_note_variables
             .iter()
-            .map(|variables| variables.cm_x.clone())
+            .map(|variables| variables.cm.clone())
             .collect();
         ret.try_into().unwrap()
-    }
-
-    pub fn get_address_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
-        let mut input_note_pairs: Vec<_> = self
-            .input_note_variables
-            .iter()
-            .map(|variables| NoteSearchableVariablePair {
-                src_variable: variables.nf.clone(),
-                target_variable: variables.note_variables.address.clone(),
-            })
-            .collect();
-        let output_note_pairs: Vec<_> = self
-            .output_note_variables
-            .iter()
-            .map(|variables| NoteSearchableVariablePair {
-                src_variable: variables.cm_x.clone(),
-                target_variable: variables.note_variables.address.clone(),
-            })
-            .collect();
-        input_note_pairs.extend(output_note_pairs);
-        input_note_pairs.try_into().unwrap()
     }
 
     pub fn get_app_vk_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
@@ -620,7 +618,7 @@ impl BasicValidityPredicateVariables {
             .output_note_variables
             .iter()
             .map(|variables| NoteSearchableVariablePair {
-                src_variable: variables.cm_x.clone(),
+                src_variable: variables.cm.clone(),
                 target_variable: variables.note_variables.app_vk.clone(),
             })
             .collect();
@@ -643,7 +641,7 @@ impl BasicValidityPredicateVariables {
             .output_note_variables
             .iter()
             .map(|variables| NoteSearchableVariablePair {
-                src_variable: variables.cm_x.clone(),
+                src_variable: variables.cm.clone(),
                 target_variable: variables.note_variables.app_data_static.clone(),
             })
             .collect();
@@ -664,7 +662,7 @@ impl BasicValidityPredicateVariables {
             .output_note_variables
             .iter()
             .map(|variables| NoteSearchableVariablePair {
-                src_variable: variables.cm_x.clone(),
+                src_variable: variables.cm.clone(),
                 target_variable: variables.note_variables.value.clone(),
             })
             .collect();
@@ -687,7 +685,7 @@ impl BasicValidityPredicateVariables {
             .output_note_variables
             .iter()
             .map(|variables| NoteSearchableVariablePair {
-                src_variable: variables.cm_x.clone(),
+                src_variable: variables.cm.clone(),
                 target_variable: variables.note_variables.is_merkle_checked.clone(),
             })
             .collect();
@@ -710,7 +708,7 @@ impl BasicValidityPredicateVariables {
             .output_note_variables
             .iter()
             .map(|variables| NoteSearchableVariablePair {
-                src_variable: variables.cm_x.clone(),
+                src_variable: variables.cm.clone(),
                 target_variable: variables.note_variables.app_data_dynamic.clone(),
             })
             .collect();
@@ -732,7 +730,7 @@ impl BasicValidityPredicateVariables {
             .output_note_variables
             .iter()
             .map(|variables| NoteSearchableVariablePair {
-                src_variable: variables.cm_x.clone(),
+                src_variable: variables.cm.clone(),
                 target_variable: variables.note_variables.rho.clone(),
             })
             .collect();
@@ -754,7 +752,7 @@ impl BasicValidityPredicateVariables {
             .output_note_variables
             .iter()
             .map(|variables| NoteSearchableVariablePair {
-                src_variable: variables.cm_x.clone(),
+                src_variable: variables.cm.clone(),
                 target_variable: variables.note_variables.nk_com.clone(),
             })
             .collect();
@@ -776,7 +774,7 @@ impl BasicValidityPredicateVariables {
             .output_note_variables
             .iter()
             .map(|variables| NoteSearchableVariablePair {
-                src_variable: variables.cm_x.clone(),
+                src_variable: variables.cm.clone(),
                 target_variable: variables.note_variables.psi.clone(),
             })
             .collect();
@@ -798,7 +796,7 @@ impl BasicValidityPredicateVariables {
             .output_note_variables
             .iter()
             .map(|variables| NoteSearchableVariablePair {
-                src_variable: variables.cm_x.clone(),
+                src_variable: variables.cm.clone(),
                 target_variable: variables.note_variables.rcm.clone(),
             })
             .collect();

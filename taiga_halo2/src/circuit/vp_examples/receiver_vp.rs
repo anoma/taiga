@@ -89,7 +89,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
         )?;
 
         // Construct an ECC chip
-        let ecc_chip = EccChip::construct(config.note_conifg.ecc_config);
+        let ecc_chip = EccChip::construct(config.ecc_config);
 
         let rcv_pk = NonIdentityPoint::new(
             ecc_chip.clone(),
@@ -118,7 +118,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
 
         // Decode the app_data_dynamic, and check the app_data_dynamic encoding
         let encoded_app_data_dynamic = poseidon_hash_gadget(
-            config.note_conifg.poseidon_config.clone(),
+            config.poseidon_config.clone(),
             layouter.namespace(|| "app_data_dynamic encoding"),
             [
                 rcv_pk.inner().x(),
@@ -205,7 +205,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             layouter.namespace(|| "note encryption"),
             config.advices[0],
             config.instances,
-            config.note_conifg.poseidon_config,
+            config.poseidon_config,
             add_chip,
             ecc_chip,
             nonce,
@@ -246,7 +246,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
         public_inputs.extend(custom_public_input_padding.iter());
         assert_eq!(NUM_NOTE, 2);
         let target_note =
-            if self.get_owned_note_pub_id() == self.get_output_notes()[0].commitment().get_x() {
+            if self.get_owned_note_pub_id() == self.get_output_notes()[0].commitment().inner() {
                 self.get_output_notes()[0]
             } else {
                 self.get_output_notes()[1]
@@ -311,7 +311,7 @@ fn test_halo2_receiver_vp_circuit() {
             *COMPRESSED_TOKEN_AUTH_VK,
             *COMPRESSED_RECEIVER_VK,
         ]);
-        let owned_note_pub_id = output_notes[0].commitment().get_x();
+        let owned_note_pub_id = output_notes[0].commitment().inner();
         (
             ReceiverValidityPredicateCircuit {
                 owned_note_pub_id,

@@ -4,25 +4,20 @@ use crate::{
         vp_examples::{TrivialValidityPredicateCircuit, COMPRESSED_TRIVIAL_VP_VK},
     },
     constant::{
-        BASE_BITS_NUM, NOTE_COMMIT_DOMAIN, NUM_NOTE, POSEIDON_TO_CURVE_INPUT_LEN,
-        PRF_EXPAND_PERSONALIZATION, PRF_EXPAND_PSI, PRF_EXPAND_PUBLIC_INPUT_PADDING,
-        PRF_EXPAND_RCM, PRF_EXPAND_VCM_R,
+        NUM_NOTE, POSEIDON_TO_CURVE_INPUT_LEN, PRF_EXPAND_PERSONALIZATION, PRF_EXPAND_PSI,
+        PRF_EXPAND_PUBLIC_INPUT_PADDING, PRF_EXPAND_RCM, PRF_EXPAND_VCM_R,
     },
     merkle_tree::MerklePath,
     nullifier::{Nullifier, NullifierKeyContainer},
-    utils::{extract_p, mod_r_p, poseidon_hash, poseidon_to_curve},
+    utils::{poseidon_hash_n, poseidon_to_curve},
 };
-use bitvec::{array::BitArray, order::Lsb0};
 use blake2b_simd::Params as Blake2bParams;
-use core::iter;
 use ff::{FromUniformBytes, PrimeField};
 use halo2_proofs::arithmetic::Field;
-use pasta_curves::{
-    group::{ff::PrimeFieldBits, Group, GroupEncoding},
-    pallas,
-};
+use pasta_curves::pallas;
 use rand::RngCore;
 use std::hash::{Hash, Hasher};
+use subtle::CtOption;
 
 #[cfg(feature = "nif")]
 use rustler::{NifStruct, NifTuple};
@@ -34,35 +29,29 @@ use serde;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// A commitment to a note.
-#[derive(Copy, Debug, Clone, PartialEq, Eq)]
+#[derive(Copy, Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "nif", derive(NifTuple))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct NoteCommitment(pallas::Point);
+pub struct NoteCommitment(pallas::Base);
 
 impl NoteCommitment {
-    pub fn inner(&self) -> pallas::Point {
+    pub fn inner(&self) -> pallas::Base {
         self.0
     }
 
-    pub fn get_x(&self) -> pallas::Base {
-        extract_p(&self.0)
-    }
-
     pub fn to_bytes(&self) -> [u8; 32] {
-        self.0.to_bytes()
+        self.0.to_repr()
     }
-}
 
-impl Default for NoteCommitment {
-    fn default() -> NoteCommitment {
-        NoteCommitment(pallas::Point::generator())
+    pub fn from_bytes(bytes: [u8; 32]) -> CtOption<Self> {
+        pallas::Base::from_repr(bytes).map(NoteCommitment)
     }
 }
 
 #[cfg(feature = "borsh")]
 impl BorshSerialize for NoteCommitment {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        writer.write_all(&self.0.to_bytes())?;
+        writer.write_all(&self.to_bytes())?;
         Ok(())
     }
 }
@@ -72,8 +61,11 @@ impl BorshDeserialize for NoteCommitment {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let mut repr = [0u8; 32];
         reader.read_exact(&mut repr)?;
-        let value = Option::from(pallas::Point::from_bytes(&repr)).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "Node value not in field")
+        let value = Option::from(pallas::Base::from_repr(repr)).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "NoteCommitment value not in field",
+            )
         })?;
         Ok(Self(value))
     }
@@ -81,7 +73,7 @@ impl BorshDeserialize for NoteCommitment {
 
 impl Hash for NoteCommitment {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.to_bytes().as_ref().hash(state);
+        self.to_bytes().as_ref().hash(state);
     }
 }
 
@@ -227,51 +219,20 @@ impl Note {
             is_merkle_checked: false,
         }
     }
-    // cm = SinsemillaCommit^rcm(address || app_vk || app_data_static || rho || psi || is_merkle_checked || value)
+
+    // note_commitment = poseidon_hash(app_vk || app_data_static || app_data_dynamic || nk_commitment || rho || psi || is_merkle_checked || value || rcm)
     pub fn commitment(&self) -> NoteCommitment {
-        let address = self.get_address();
-        let ret = NOTE_COMMIT_DOMAIN
-            .commit(
-                iter::empty()
-                    .chain(address.to_le_bits().iter().by_vals().take(BASE_BITS_NUM))
-                    .chain(
-                        self.get_app_vk()
-                            .to_le_bits()
-                            .iter()
-                            .by_vals()
-                            .take(BASE_BITS_NUM),
-                    )
-                    .chain(
-                        self.get_app_data_static()
-                            .to_le_bits()
-                            .iter()
-                            .by_vals()
-                            .take(BASE_BITS_NUM),
-                    )
-                    .chain(
-                        self.rho
-                            .inner()
-                            .to_le_bits()
-                            .iter()
-                            .by_vals()
-                            .take(BASE_BITS_NUM),
-                    )
-                    .chain(
-                        self.get_psi()
-                            .to_le_bits()
-                            .iter()
-                            .by_vals()
-                            .take(BASE_BITS_NUM),
-                    )
-                    .chain([self.is_merkle_checked])
-                    .chain(
-                        BitArray::<_, Lsb0>::new(self.value.to_le())
-                            .iter()
-                            .by_vals(),
-                    ),
-                &mod_r_p(self.get_rcm()),
-            )
-            .unwrap();
+        let ret = poseidon_hash_n([
+            self.get_app_vk(),
+            self.get_app_data_static(),
+            self.app_data_dynamic,
+            self.get_nk_commitment(),
+            self.rho.inner(),
+            self.psi,
+            pallas::Base::from(self.is_merkle_checked as u64),
+            pallas::Base::from(self.value),
+            self.rcm,
+        ]);
         NoteCommitment(ret)
     }
 
@@ -282,10 +243,6 @@ impl Note {
             &self.psi,
             &self.commitment(),
         )
-    }
-
-    pub fn get_address(&self) -> pallas::Base {
-        poseidon_hash(self.app_data_dynamic, self.get_nk_commitment())
     }
 
     pub fn get_nk(&self) -> Option<pallas::Base> {
@@ -586,7 +543,7 @@ impl OutputNoteProvingInfo {
         output_notes: [Note; NUM_NOTE],
     ) -> Self {
         let trivail_vp = Box::new(TrivialValidityPredicateCircuit {
-            owned_note_pub_id: padding_note.commitment().get_x(),
+            owned_note_pub_id: padding_note.commitment().inner(),
             input_notes,
             output_notes,
         });

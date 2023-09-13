@@ -1,29 +1,14 @@
 use crate::circuit::{
-    gadgets::{
-        add::{AddChip, AddInstructions},
-        assign_free_advice, assign_free_constant,
-        poseidon_hash::poseidon_hash_gadget,
-    },
+    gadgets::{assign_free_advice, assign_free_constant, poseidon_hash::poseidon_hash_gadget},
     hash_to_curve::{hash_to_curve_circuit, HashToCurveConfig},
-    note_circuit::{note_commitment_gadget, NoteCommitmentChip},
     vp_circuit::{InputNoteVariables, NoteVariables, OutputNoteVariables},
 };
-use crate::constant::{
-    BaseFieldGenerators, NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases,
-    TaigaFixedBasesFull, POSEIDON_TO_CURVE_INPUT_LEN,
-};
+use crate::constant::{TaigaFixedBases, TaigaFixedBasesFull, POSEIDON_TO_CURVE_INPUT_LEN};
 use crate::note::Note;
 use crate::utils::poseidon_to_curve;
 use halo2_gadgets::{
-    ecc::{
-        chip::EccChip, FixedPoint, FixedPointBaseField, NonIdentityPoint, Point, ScalarFixed,
-        ScalarVar,
-    },
-    poseidon::{
-        primitives as poseidon, primitives::ConstantLength, Hash as PoseidonHash,
-        Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
-    },
-    sinsemilla::chip::SinsemillaChip,
+    ecc::{chip::EccChip, FixedPoint, NonIdentityPoint, Point, ScalarFixed, ScalarVar},
+    poseidon::Pow5Config as PoseidonConfig,
 };
 use halo2_proofs::{
     circuit::{AssignedCell, Layouter, Value},
@@ -33,43 +18,55 @@ use pasta_curves::group::Curve;
 use pasta_curves::pallas;
 use std::ops::Neg;
 
-// cm is a point
+#[allow(clippy::too_many_arguments)]
+pub fn note_commitment_circuit(
+    mut layouter: impl Layouter<pallas::Base>,
+    poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
+    app_vp: AssignedCell<pallas::Base, pallas::Base>,
+    app_data_static: AssignedCell<pallas::Base, pallas::Base>,
+    app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
+    nk_com: AssignedCell<pallas::Base, pallas::Base>,
+    rho: AssignedCell<pallas::Base, pallas::Base>,
+    psi: AssignedCell<pallas::Base, pallas::Base>,
+    value: AssignedCell<pallas::Base, pallas::Base>,
+    is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
+    rcm: AssignedCell<pallas::Base, pallas::Base>,
+) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
+    // TODO: compose the value and is_merkle_checked to one field in order to save one poseidon absorb
+    let poseidon_message = [
+        app_vp,
+        app_data_static,
+        app_data_dynamic,
+        nk_com,
+        rho,
+        psi,
+        is_merkle_checked,
+        value,
+        rcm,
+    ];
+    poseidon_hash_gadget(
+        poseidon_config,
+        layouter.namespace(|| "note commitment"),
+        poseidon_message,
+    )
+}
+
+// cm is a field element
 #[allow(clippy::too_many_arguments)]
 pub fn nullifier_circuit(
     mut layouter: impl Layouter<pallas::Base>,
-    poseidon_chip: PoseidonChip<pallas::Base, 3, 2>,
-    add_chip: AddChip<pallas::Base>,
-    ecc_chip: EccChip<TaigaFixedBases>,
+    poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
     nk: AssignedCell<pallas::Base, pallas::Base>,
     rho: AssignedCell<pallas::Base, pallas::Base>,
     psi: AssignedCell<pallas::Base, pallas::Base>,
-    cm: &Point<pallas::Affine, EccChip<TaigaFixedBases>>,
+    cm: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
-    let poseidon_message = [nk, rho];
-    let poseidon_hasher =
-        PoseidonHash::<_, _, poseidon::P128Pow5T3, ConstantLength<2>, 3, 2>::init(
-            poseidon_chip,
-            layouter.namespace(|| "Poseidon init"),
-        )?;
-    let hash_nk_rho = poseidon_hasher.hash(
-        layouter.namespace(|| "Poseidon_hash(nk, rho)"),
+    let poseidon_message = [nk, rho, psi, cm];
+    poseidon_hash_gadget(
+        poseidon_config,
+        layouter.namespace(|| "derive nullifier"),
         poseidon_message,
-    )?;
-
-    let hash_nk_rho_add_psi = add_chip.add(
-        layouter.namespace(|| "scalar = poseidon_hash(nk, rho) + psi"),
-        &hash_nk_rho,
-        &psi,
-    )?;
-
-    let nullifier_k = FixedPointBaseField::from_inner(ecc_chip, BaseFieldGenerators::BaseGenerator);
-    let hash_nk_rho_add_psi_mul_k = nullifier_k.mul(
-        layouter.namespace(|| "hash_nk_rho_add_psi * nullifier_k"),
-        hash_nk_rho_add_psi,
-    )?;
-
-    cm.add(layouter.namespace(|| "nf"), &hash_nk_rho_add_psi_mul_k)
-        .map(|res| res.extract_p().inner().clone())
+    )
 }
 
 // Check input note integrity and return the input note variables and the nullifier
@@ -78,21 +75,11 @@ pub fn check_input_note(
     mut layouter: impl Layouter<pallas::Base>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
-    ecc_chip: EccChip<TaigaFixedBases>,
-    sinsemilla_chip: SinsemillaChip<
-        NoteCommitmentHashDomain,
-        NoteCommitmentDomain,
-        TaigaFixedBases,
-    >,
-    note_commit_chip: NoteCommitmentChip,
     // PoseidonChip can not be cloned, use PoseidonConfig temporarily
     poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
-    // poseidon_chip: PoseidonChip<pallas::Base, 3, 2>,
-    add_chip: AddChip<pallas::Base>,
     input_note: Note,
     nf_row_idx: usize,
 ) -> Result<InputNoteVariables, Error> {
-    // Check input note user integrity: address = Com_r(Com_r(nk, zero), app_data_dynamic)
     // Witness nk
     let nk = input_note.get_nk().unwrap();
     let nk_var = assign_free_advice(
@@ -119,13 +106,6 @@ pub fn check_input_note(
         layouter.namespace(|| "witness app_data_dynamic"),
         advices[0],
         Value::known(input_note.app_data_dynamic),
-    )?;
-
-    // address = Com_r(app_data_dynamic, nk_com)
-    let address = poseidon_hash_gadget(
-        poseidon_config.clone(),
-        layouter.namespace(|| "address encoding"),
-        [app_data_dynamic.clone(), nk_com.clone()],
     )?;
 
     // Witness app_vk
@@ -178,41 +158,34 @@ pub fn check_input_note(
     )?;
 
     // Check note commitment
-    let cm = note_commitment_gadget(
-        layouter.namespace(|| "Hash NoteCommit pieces"),
-        sinsemilla_chip,
-        ecc_chip.clone(),
-        note_commit_chip,
-        address.clone(),
+    let cm = note_commitment_circuit(
+        layouter.namespace(|| "note commitment"),
+        poseidon_config.clone(),
         app_vk.clone(),
         app_data_static.clone(),
+        app_data_dynamic.clone(),
+        nk_com.clone(),
         rho.clone(),
         psi.clone(),
         value.clone(),
-        rcm.clone(),
         is_merkle_checked.clone(),
+        rcm.clone(),
     )?;
 
     // Generate nullifier
-    let poseidon_chip = PoseidonChip::construct(poseidon_config);
     let nf = nullifier_circuit(
         layouter.namespace(|| "Generate nullifier"),
-        poseidon_chip,
-        add_chip,
-        ecc_chip,
+        poseidon_config,
         nk_var,
         rho.clone(),
         psi.clone(),
-        &cm,
+        cm.clone(),
     )?;
 
     // Public nullifier
     layouter.constrain_instance(nf.cell(), instances, nf_row_idx)?;
 
-    let cm_x = cm.extract_p().inner().clone();
-
     let note_variables = NoteVariables {
-        address,
         app_vk,
         value,
         app_data_static,
@@ -227,7 +200,7 @@ pub fn check_input_note(
     Ok(InputNoteVariables {
         note_variables,
         nf,
-        cm_x,
+        cm,
     })
 }
 
@@ -236,13 +209,6 @@ pub fn check_output_note(
     mut layouter: impl Layouter<pallas::Base>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
-    ecc_chip: EccChip<TaigaFixedBases>,
-    sinsemilla_chip: SinsemillaChip<
-        NoteCommitmentHashDomain,
-        NoteCommitmentDomain,
-        TaigaFixedBases,
-    >,
-    note_commit_chip: NoteCommitmentChip,
     // PoseidonChip can not be cloned, use PoseidonConfig temporarily
     poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
     // poseidon_chip: PoseidonChip<pallas::Base, 3, 2>,
@@ -262,13 +228,6 @@ pub fn check_output_note(
         layouter.namespace(|| "witness app_data_dynamic"),
         advices[0],
         Value::known(output_note.app_data_dynamic),
-    )?;
-
-    // Check output note user integrity: address = Com_r(app_data_dynamic, nk_com)
-    let address = poseidon_hash_gadget(
-        poseidon_config,
-        layouter.namespace(|| "address encoding"),
-        [app_data_dynamic.clone(), nk_com.clone()],
     )?;
 
     // Witness app_vk
@@ -314,27 +273,24 @@ pub fn check_output_note(
     )?;
 
     // Check note commitment
-    let cm = note_commitment_gadget(
-        layouter.namespace(|| "Hash NoteCommit pieces"),
-        sinsemilla_chip,
-        ecc_chip,
-        note_commit_chip,
-        address.clone(),
+    let cm = note_commitment_circuit(
+        layouter.namespace(|| "note commitment"),
+        poseidon_config.clone(),
         app_vk.clone(),
         app_data_static.clone(),
+        app_data_dynamic.clone(),
+        nk_com.clone(),
         old_nf.clone(),
         psi.clone(),
         value.clone(),
-        rcm.clone(),
         is_merkle_checked.clone(),
+        rcm.clone(),
     )?;
 
     // Public cm
-    let cm_x = cm.extract_p().inner().clone();
-    layouter.constrain_instance(cm_x.cell(), instances, cm_row_idx)?;
+    layouter.constrain_instance(cm.cell(), instances, cm_row_idx)?;
 
     let note_variables = NoteVariables {
-        address,
         app_vk,
         app_data_static,
         value,
@@ -346,10 +302,7 @@ pub fn check_output_note(
         rcm,
     };
 
-    Ok(OutputNoteVariables {
-        note_variables,
-        cm_x,
-    })
+    Ok(OutputNoteVariables { note_variables, cm })
 }
 
 pub fn derive_note_type(
@@ -475,18 +428,11 @@ pub fn compute_value_commitment(
 
 #[test]
 fn test_halo2_nullifier_circuit() {
-    use crate::circuit::gadgets::add::AddConfig;
     use crate::circuit::gadgets::assign_free_advice;
-    use crate::constant::{NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases};
     use crate::note::NoteCommitment;
     use crate::nullifier::{Nullifier, NullifierKeyContainer};
-    use halo2_gadgets::{
-        ecc::chip::EccConfig,
-        poseidon::{
-            primitives as poseidon, Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
-        },
-        sinsemilla::chip::{SinsemillaChip, SinsemillaConfig},
-        utilities::lookup_range_check::LookupRangeCheckConfig,
+    use halo2_gadgets::poseidon::{
+        primitives as poseidon, Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
     };
     use halo2_proofs::{
         arithmetic::Field,
@@ -506,14 +452,7 @@ fn test_halo2_nullifier_circuit() {
 
     impl Circuit<pallas::Base> for MyCircuit {
         #[allow(clippy::type_complexity)]
-        type Config = (
-            [Column<Advice>; 10],
-            PoseidonConfig<pallas::Base, 3, 2>,
-            AddConfig,
-            EccConfig<TaigaFixedBases>,
-            // add SinsemillaConfig to load look table, just for test
-            SinsemillaConfig<NoteCommitmentHashDomain, NoteCommitmentDomain, TaigaFixedBases>,
-        );
+        type Config = ([Column<Advice>; 10], PoseidonConfig<pallas::Base, 3, 2>);
         type FloorPlanner = SimpleFloorPlanner;
 
         fn without_witnesses(&self) -> Self {
@@ -549,17 +488,9 @@ fn test_halo2_nullifier_circuit() {
                 meta.fixed_column(),
             ];
 
-            let table_idx = meta.lookup_table_column();
-            let lookup = (
-                table_idx,
-                meta.lookup_table_column(),
-                meta.lookup_table_column(),
-            );
-
             let constants = meta.fixed_column();
             meta.enable_constant(constants);
 
-            let range_check = LookupRangeCheckConfig::configure(meta, advices[9], table_idx);
             let poseidon_config = PoseidonChip::configure::<poseidon::P128Pow5T3>(
                 meta,
                 advices[6..9].try_into().unwrap(),
@@ -567,30 +498,7 @@ fn test_halo2_nullifier_circuit() {
                 lagrange_coeffs[2..5].try_into().unwrap(),
                 lagrange_coeffs[5..8].try_into().unwrap(),
             );
-
-            let add_config = AddChip::configure(meta, advices[0..2].try_into().unwrap());
-
-            let ecc_config =
-                EccChip::<TaigaFixedBases>::configure(meta, advices, lagrange_coeffs, range_check);
-            let sinsemilla_config = SinsemillaChip::<
-                NoteCommitmentHashDomain,
-                NoteCommitmentDomain,
-                TaigaFixedBases,
-            >::configure(
-                meta,
-                advices[..5].try_into().unwrap(),
-                advices[2],
-                lagrange_coeffs[0],
-                lookup,
-                range_check,
-            );
-            (
-                advices,
-                poseidon_config,
-                add_config,
-                ecc_config,
-                sinsemilla_config,
-            )
+            (advices, poseidon_config)
         }
 
         fn synthesize(
@@ -598,16 +506,7 @@ fn test_halo2_nullifier_circuit() {
             config: Self::Config,
             mut layouter: impl Layouter<pallas::Base>,
         ) -> Result<(), Error> {
-            let (advices, poseidon_config, add_config, ecc_config, sinsemilla_config) = config;
-            let poseidon_chip = PoseidonChip::construct(poseidon_config);
-            let ecc_chip = EccChip::construct(ecc_config);
-            let add_chip = AddChip::<pallas::Base>::construct(add_config, ());
-            SinsemillaChip::<
-                NoteCommitmentHashDomain,
-                NoteCommitmentDomain,
-                TaigaFixedBases,
-            >::load(sinsemilla_config, &mut layouter)?;
-
+            let (advices, poseidon_config) = config;
             // Witness nk
             let nk = assign_free_advice(
                 layouter.namespace(|| "witness nk"),
@@ -630,21 +529,19 @@ fn test_halo2_nullifier_circuit() {
             )?;
 
             // Witness cm
-            let cm = Point::new(
-                ecc_chip.clone(),
+            let cm = assign_free_advice(
                 layouter.namespace(|| "witness cm"),
-                Value::known(self.cm.inner().to_affine()),
+                advices[0],
+                Value::known(self.cm.inner()),
             )?;
 
             let nf = nullifier_circuit(
                 layouter.namespace(|| "nullifier"),
-                poseidon_chip,
-                add_chip,
-                ecc_chip,
+                poseidon_config,
                 nk,
                 rho,
                 psi,
-                &cm,
+                cm,
             )?;
 
             let expect_nf = {

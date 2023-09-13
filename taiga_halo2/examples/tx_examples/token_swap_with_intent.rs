@@ -40,6 +40,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
     pallas::Scalar,
     NullifierKeyContainer,
     pallas::Base,
+    pallas::Base,
     Nullifier,
 ) {
     let input_auth = TokenAuthorization::from_sk_vk(&input_auth_sk, &COMPRESSED_TOKEN_AUTH_VK);
@@ -56,14 +57,14 @@ pub fn create_token_intent_ptx<R: RngCore>(
     );
 
     // output intent note
-    // Use the same address as that in the input note. They can be different.
-    let receiver_address = input_note.get_address();
     let input_note_nf = input_note.get_nf().unwrap();
+    let input_note_nk_com = input_note.get_nk_commitment();
     let intent_note = create_intent_note(
         &mut rng,
         &condition1,
         &condition2,
-        receiver_address,
+        input_note_nk_com,
+        input_note.app_data_dynamic,
         input_note_nf,
         input_nk,
     );
@@ -93,12 +94,13 @@ pub fn create_token_intent_ptx<R: RngCore>(
     // Create the intent note proving info
     let intent_note_proving_info = {
         let intent_vp = OrRelationIntentValidityPredicateCircuit {
-            owned_note_pub_id: intent_note.commitment().get_x(),
+            owned_note_pub_id: intent_note.commitment().inner(),
             input_notes,
             output_notes,
             condition1,
             condition2,
-            receiver_address,
+            receiver_nk_com: input_note_nk_com,
+            receiver_app_data_dynamic: input_note.app_data_dynamic,
         };
 
         OutputNoteProvingInfo::new(intent_note, Box::new(intent_vp), vec![])
@@ -126,7 +128,14 @@ pub fn create_token_intent_ptx<R: RngCore>(
         &mut rng,
     );
 
-    (ptx, r, input_nk, receiver_address, rho)
+    (
+        ptx,
+        r,
+        input_nk,
+        input_note_nk_com,
+        input_note.app_data_dynamic,
+        rho,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -136,7 +145,8 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     condition2: Condition,
     input_rho: Nullifier,
     input_nk: NullifierKeyContainer, // NullifierKeyContainer::Key
-    input_address: pallas::Base,
+    receiver_nk_com: pallas::Base,
+    receiver_app_data_dynamic: pallas::Base,
     output_token: &str,
     output_value: u64,
     output_auth_pk: pallas::Point,
@@ -146,7 +156,8 @@ pub fn consume_token_intent_ptx<R: RngCore>(
         &mut rng,
         &condition1,
         &condition2,
-        input_address,
+        receiver_nk_com,
+        receiver_app_data_dynamic,
         input_rho,
         input_nk,
     );
@@ -162,8 +173,6 @@ pub fn consume_token_intent_ptx<R: RngCore>(
         input_nk.to_commitment(),
         &output_auth,
     );
-    let address = output_note.get_address();
-    assert_eq!(address, input_address);
 
     // padding the zero notes
     let padding_input_note = Note::random_padding_input_note(&mut rng);
@@ -183,7 +192,8 @@ pub fn consume_token_intent_ptx<R: RngCore>(
             output_notes,
             condition1,
             condition2,
-            receiver_address: input_address,
+            receiver_nk_com,
+            receiver_app_data_dynamic,
         };
 
         InputNoteProvingInfo::new(
@@ -242,15 +252,16 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
         token_name: "monkey".to_string(),
         token_value: 2u64,
     };
-    let (alice_ptx, alice_r, intent_nk, receiver_address, intent_rho) = create_token_intent_ptx(
-        &mut rng,
-        condition1.clone(),
-        condition2.clone(),
-        "btc",
-        5u64,
-        alice_auth_sk,
-        alice_nk,
-    );
+    let (alice_ptx, alice_r, intent_nk, receiver_nk_com, receiver_app_data_dynamic, intent_rho) =
+        create_token_intent_ptx(
+            &mut rng,
+            condition1.clone(),
+            condition2.clone(),
+            "btc",
+            5u64,
+            alice_auth_sk,
+            alice_nk,
+        );
 
     // Bob creates the partial transaction with 1 DOLPHIN input and 5 BTC output
     let bob_auth_sk = pallas::Scalar::random(&mut rng);
@@ -277,7 +288,8 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
         condition2,
         intent_rho,
         intent_nk,
-        receiver_address,
+        receiver_nk_com,
+        receiver_app_data_dynamic,
         "dolphin",
         1u64,
         alice_auth_pk,

@@ -2,6 +2,8 @@ use crate::constant::VP_COMMITMENT_PERSONALIZATION;
 use blake2s_simd::Params;
 use byteorder::{ByteOrder, LittleEndian};
 use ff::PrimeField;
+#[cfg(feature = "nif")]
+use rustler::{Decoder, Encoder, Env, NifResult, Term};
 #[cfg(feature = "serde")]
 use serde;
 
@@ -40,5 +42,23 @@ impl ValidityPredicateCommitment {
         let low = F::from_u128(LittleEndian::read_u128(&self.0[0..16]));
         let high = F::from_u128(LittleEndian::read_u128(&self.0[16..]));
         [low, high]
+    }
+}
+
+#[cfg(feature = "nif")]
+impl Encoder for ValidityPredicateCommitment {
+    fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
+        self.0.to_vec().encode(env)
+    }
+}
+
+#[cfg(feature = "nif")]
+impl<'a> Decoder<'a> for ValidityPredicateCommitment {
+    fn decode(term: Term<'a>) -> NifResult<Self> {
+        let val: Vec<u8> = Decoder::decode(term)?;
+        let val_array = val
+            .try_into()
+            .map_err(|_e| rustler::Error::Atom("failure to decode"))?;
+        Ok(ValidityPredicateCommitment(val_array))
     }
 }
