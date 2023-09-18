@@ -1,5 +1,6 @@
 use crate::{
     circuit::{
+        blake2s::publicize_default_dynamic_vp_commitments,
         gadgets::{
             assign_free_advice, poseidon_hash::poseidon_hash_gadget,
             target_note_variable::get_owned_note_variable,
@@ -13,6 +14,7 @@ use crate::{
     note::{Note, RandomSeed},
     proof::Proof,
     utils::{mod_r_p, poseidon_hash_n},
+    vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use halo2_gadgets::ecc::{chip::EccChip, FixedPoint, NonIdentityPoint, ScalarFixed, ScalarVar};
@@ -247,6 +249,13 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
 
         s_g.constrain_equal(layouter.namespace(|| "s*G = R + Hash(r||P||m)*P"), &rhs)?;
 
+        // Publicize the dynamic vp commitments with default value
+        publicize_default_dynamic_vp_commitments(
+            &mut layouter,
+            config.advices[0],
+            config.instances,
+        )?;
+
         Ok(())
     }
 
@@ -260,6 +269,10 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
 
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
+        let default_vp_cm: [pallas::Base; 2] =
+            ValidityPredicateCommitment::default().to_public_inputs();
+        public_inputs.extend(default_vp_cm);
+        public_inputs.extend(default_vp_cm);
         let padding = ValidityPredicatePublicInputs::get_public_input_padding(
             public_inputs.len(),
             &RandomSeed::random(&mut rng),
@@ -280,6 +293,7 @@ fn test_halo2_sig_verification_vp_circuit() {
     use crate::circuit::vp_examples::{
         receiver_vp::COMPRESSED_RECEIVER_VK, token::TokenAuthorization,
     };
+    use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
     use crate::note::tests::{random_input_note, random_output_note};
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
@@ -308,7 +322,11 @@ fn test_halo2_sig_verification_vp_circuit() {
     };
     let public_inputs = circuit.get_public_inputs(&mut rng);
 
-    let prover =
-        MockProver::<pallas::Base>::run(12, &circuit, vec![public_inputs.to_vec()]).unwrap();
+    let prover = MockProver::<pallas::Base>::run(
+        VP_CIRCUIT_PARAMS_SIZE,
+        &circuit,
+        vec![public_inputs.to_vec()],
+    )
+    .unwrap();
     assert_eq!(prover.verify(), Ok(()));
 }

@@ -1,8 +1,10 @@
 use crate::{
     circuit::{
+        blake2s::{vp_commitment_gadget, Blake2sChip},
         gadgets::{
-            assign_free_advice, assign_free_constant, poseidon_hash::poseidon_hash_gadget,
-            target_note_variable::get_owned_note_variable,
+            assign_free_advice, assign_free_constant,
+            poseidon_hash::poseidon_hash_gadget,
+            target_note_variable::{get_is_input_note_flag, get_owned_note_variable},
         },
         vp_circuit::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
@@ -13,11 +15,16 @@ use crate::{
             SignatureVerificationValidityPredicateCircuit, COMPRESSED_TOKEN_AUTH_VK,
         },
     },
-    constant::{NUM_NOTE, SETUP_PARAMS_MAP},
+    constant::{
+        NUM_NOTE, PRF_EXPAND_DYNAMIC_VP_1_CM_R, SETUP_PARAMS_MAP, VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_1,
+        VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_2, VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_1,
+        VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_2,
+    },
     merkle_tree::MerklePath,
     note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
     proof::Proof,
     utils::poseidon_hash_n,
+    vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use ff::Field;
@@ -62,6 +69,8 @@ pub struct TokenValidityPredicateCircuit {
     // The auth goes to app_data_dynamic and defines how to consume and create the note.
     pub auth: TokenAuthorization,
     pub receiver_vp_vk: pallas::Base,
+    // rseed is to generate the randomness for vp commitment
+    pub rseed: RandomSeed,
 }
 
 #[derive(Clone, Debug, Copy)]
@@ -88,6 +97,7 @@ impl Default for TokenValidityPredicateCircuit {
             token_name: "Token_name".to_string(),
             auth: TokenAuthorization::default(),
             receiver_vp_vk: pallas::Base::zero(),
+            rseed: RandomSeed::default(),
         }
     }
 }
@@ -157,7 +167,12 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
         let encoded_app_data_dynamic = poseidon_hash_gadget(
             config.note_conifg.poseidon_config,
             layouter.namespace(|| "app_data_dynamic encoding"),
-            [pk.inner().x(), pk.inner().y(), auth_vp_vk, receiver_vp_vk],
+            [
+                pk.inner().x(),
+                pk.inner().y(),
+                auth_vp_vk.clone(),
+                receiver_vp_vk.clone(),
+            ],
         )?;
 
         layouter.assign_region(
@@ -184,8 +199,76 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             |mut region| region.constrain_equal(is_merkle_checked.cell(), constant_one.cell()),
         )?;
 
-        // TODO: add the sender(authorization method included) vp commitment if it's an input note;
-        // Add the receiver(note encryption constraints included) vp commitment if it's an output note.
+        // VP Commitment
+        // Commt the sender(authorization method included) vp if it's an input note;
+        // Commit the receiver(note encryption constraints included) vp if it's an output note.
+        let first_dynamic_vp = {
+            let is_input_note = get_is_input_note_flag(
+                config.get_is_input_note_flag_config,
+                layouter.namespace(|| "get is_input_note_flag"),
+                &owned_note_pub_id,
+                &basic_variables.get_input_note_nfs(),
+                &basic_variables.get_output_note_cms(),
+            )?;
+            layouter.assign_region(
+                || "conditional select: ",
+                |mut region| {
+                    config.conditional_select_config.assign_region(
+                        &is_input_note,
+                        &auth_vp_vk,
+                        &receiver_vp_vk,
+                        0,
+                        &mut region,
+                    )
+                },
+            )?
+        };
+
+        // Construct a blake2s chip
+        let blake2s_chip = Blake2sChip::construct(config.blake2s_config);
+        let vp_cm_r = assign_free_advice(
+            layouter.namespace(|| "vp_cm_r"),
+            config.advices[0],
+            Value::known(self.rseed.get_vp_cm_r(PRF_EXPAND_DYNAMIC_VP_1_CM_R)),
+        )?;
+        let first_dynamic_vp_cm =
+            vp_commitment_gadget(&mut layouter, &blake2s_chip, first_dynamic_vp, vp_cm_r)?;
+
+        layouter.constrain_instance(
+            first_dynamic_vp_cm[0].cell(),
+            config.instances,
+            VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_1,
+        )?;
+        layouter.constrain_instance(
+            first_dynamic_vp_cm[1].cell(),
+            config.instances,
+            VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_2,
+        )?;
+
+        // Publicize the second dynamic vp commitment with default value
+        let vp_cm_fields: [pallas::Base; 2] =
+            ValidityPredicateCommitment::default().to_public_inputs();
+        let vp_cm_1 = assign_free_advice(
+            layouter.namespace(|| "vp_cm 1"),
+            config.advices[0],
+            Value::known(vp_cm_fields[0]),
+        )?;
+        let vp_cm_2 = assign_free_advice(
+            layouter.namespace(|| "vp_cm 2"),
+            config.advices[0],
+            Value::known(vp_cm_fields[1]),
+        )?;
+
+        layouter.constrain_instance(
+            vp_cm_1.cell(),
+            config.instances,
+            VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_1,
+        )?;
+        layouter.constrain_instance(
+            vp_cm_2.cell(),
+            config.instances,
+            VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_2,
+        )?;
 
         Ok(())
     }
@@ -200,6 +283,22 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
 
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
+        let dynamic_vp = if self.owned_note_pub_id == self.output_notes[0].commitment().get_x()
+            || self.owned_note_pub_id == self.output_notes[1].commitment().get_x()
+        {
+            self.receiver_vp_vk
+        } else {
+            self.auth.vk
+        };
+
+        let vp_com_r = self.rseed.get_vp_cm_r(PRF_EXPAND_DYNAMIC_VP_1_CM_R);
+        let vp_com: [pallas::Base; 2] =
+            ValidityPredicateCommitment::commit(&dynamic_vp, &vp_com_r).to_public_inputs();
+
+        public_inputs.extend(vp_com);
+        let default_vp_cm: [pallas::Base; 2] =
+            ValidityPredicateCommitment::default().to_public_inputs();
+        public_inputs.extend(default_vp_cm);
         let padding = ValidityPredicatePublicInputs::get_public_input_padding(
             public_inputs.len(),
             &RandomSeed::random(&mut rng),
@@ -264,6 +363,7 @@ pub fn generate_input_token_note_proving_info<R: RngCore>(
         token_name,
         auth,
         receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
+        rseed: RandomSeed::random(&mut rng),
     };
 
     // token auth VP
@@ -303,6 +403,7 @@ pub fn generate_output_token_note_proving_info<R: RngCore>(
         token_name,
         auth,
         receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
+        rseed: RandomSeed::random(&mut rng),
     };
 
     // receiver VP
@@ -322,6 +423,7 @@ pub fn generate_output_token_note_proving_info<R: RngCore>(
 
 #[test]
 fn test_halo2_token_vp_circuit() {
+    use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
     use crate::note::tests::{random_input_note, random_output_note};
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
@@ -345,12 +447,17 @@ fn test_halo2_token_vp_circuit() {
             token_name,
             auth,
             receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
+            rseed: RandomSeed::random(&mut rng),
         }
     };
 
     let public_inputs = circuit.get_public_inputs(&mut rng);
 
-    let prover =
-        MockProver::<pallas::Base>::run(12, &circuit, vec![public_inputs.to_vec()]).unwrap();
+    let prover = MockProver::<pallas::Base>::run(
+        VP_CIRCUIT_PARAMS_SIZE,
+        &circuit,
+        vec![public_inputs.to_vec()],
+    )
+    .unwrap();
     assert_eq!(prover.verify(), Ok(()));
 }

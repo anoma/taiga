@@ -1,5 +1,6 @@
 use crate::{
     circuit::{
+        blake2s::publicize_default_dynamic_vp_commitments,
         gadgets::{
             add::{AddChip, AddInstructions},
             assign_free_advice,
@@ -12,6 +13,7 @@ use crate::{
     constant::{NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_CUSTOM_PUBLIC_INPUT_BEGIN_IDX},
     note::{Note, RandomSeed},
     proof::Proof,
+    vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use halo2_proofs::{
@@ -57,11 +59,18 @@ impl ValidityPredicateCircuit for FieldAdditionValidityPredicateCircuit {
 
         let c = add_chip.add(layouter.namespace(|| "a + b = c"), &a, &b)?;
 
-        // Public c
+        // Publicize c
         layouter.constrain_instance(
             c.cell(),
             config.instances,
             VP_CIRCUIT_CUSTOM_PUBLIC_INPUT_BEGIN_IDX,
+        )?;
+
+        // Publicize the dynamic vp commitments with default value
+        publicize_default_dynamic_vp_commitments(
+            &mut layouter,
+            config.advices[0],
+            config.instances,
         )?;
 
         Ok(())
@@ -77,6 +86,10 @@ impl ValidityPredicateCircuit for FieldAdditionValidityPredicateCircuit {
 
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
+        let default_vp_cm: [pallas::Base; 2] =
+            ValidityPredicateCommitment::default().to_public_inputs();
+        public_inputs.extend(default_vp_cm);
+        public_inputs.extend(default_vp_cm);
         public_inputs.push(self.a + self.b);
         let padding = ValidityPredicatePublicInputs::get_public_input_padding(
             public_inputs.len(),
@@ -95,6 +108,7 @@ vp_circuit_impl!(FieldAdditionValidityPredicateCircuit);
 
 #[test]
 fn test_halo2_addition_vp_circuit() {
+    use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
     use crate::note::tests::{random_input_note, random_output_note};
     use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
@@ -120,7 +134,11 @@ fn test_halo2_addition_vp_circuit() {
     };
     let public_inputs = circuit.get_public_inputs(&mut rng);
 
-    let prover =
-        MockProver::<pallas::Base>::run(12, &circuit, vec![public_inputs.to_vec()]).unwrap();
+    let prover = MockProver::<pallas::Base>::run(
+        VP_CIRCUIT_PARAMS_SIZE,
+        &circuit,
+        vec![public_inputs.to_vec()],
+    )
+    .unwrap();
     assert_eq!(prover.verify(), Ok(()));
 }

@@ -1,5 +1,6 @@
 use crate::{
     circuit::{
+        blake2s::publicize_default_dynamic_vp_commitments,
         gadgets::{
             add::AddChip, assign_free_advice, poseidon_hash::poseidon_hash_gadget,
             target_note_variable::get_owned_note_variable,
@@ -16,6 +17,7 @@ use crate::{
     note_encryption::{NoteCiphertext, NotePlaintext, SecretKey},
     proof::Proof,
     utils::mod_r_p,
+    vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use group::Group;
@@ -212,6 +214,13 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             &mut message,
         )?;
 
+        // Publicize the dynamic vp commitments with default value
+        publicize_default_dynamic_vp_commitments(
+            &mut layouter,
+            config.advices[0],
+            config.instances,
+        )?;
+
         Ok(())
     }
 
@@ -225,6 +234,10 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
 
     fn get_public_inputs(&self, rng: impl RngCore) -> ValidityPredicatePublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
+        let default_vp_cm: [pallas::Base; 2] =
+            ValidityPredicateCommitment::default().to_public_inputs();
+        public_inputs.extend(default_vp_cm);
+        public_inputs.extend(default_vp_cm);
         let custom_public_input_padding =
             ValidityPredicatePublicInputs::get_custom_public_input_padding(
                 public_inputs.len(),
@@ -270,6 +283,7 @@ vp_circuit_impl!(ReceiverValidityPredicateCircuit);
 
 #[test]
 fn test_halo2_receiver_vp_circuit() {
+    use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
     use crate::{
         note::tests::{random_input_note, random_output_note},
         utils::poseidon_hash_n,
@@ -314,8 +328,12 @@ fn test_halo2_receiver_vp_circuit() {
     };
     let public_inputs = circuit.get_public_inputs(&mut rng);
 
-    let prover =
-        MockProver::<pallas::Base>::run(12, &circuit, vec![public_inputs.to_vec()]).unwrap();
+    let prover = MockProver::<pallas::Base>::run(
+        VP_CIRCUIT_PARAMS_SIZE,
+        &circuit,
+        vec![public_inputs.to_vec()],
+    )
+    .unwrap();
     assert_eq!(prover.verify(), Ok(()));
 
     let de_cipher = public_inputs.decrypt(rcv_sk).unwrap();

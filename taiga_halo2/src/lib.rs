@@ -17,4 +17,5 @@ pub mod transaction;
 pub mod transparent_ptx;
 pub mod utils;
 pub mod value_commitment;
+pub mod vp_commitment;
 pub mod vp_vk;

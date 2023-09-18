@@ -1,4 +1,5 @@
-use crate::circuit::gadgets::add::AddChip;
+use crate::circuit::blake2s::{vp_commitment_gadget, Blake2sChip, Blake2sConfig};
+use crate::circuit::gadgets::{add::AddChip, assign_free_advice};
 use crate::circuit::hash_to_curve::HashToCurveConfig;
 use crate::circuit::integrity::{check_input_note, check_output_note, compute_value_commitment};
 use crate::circuit::merkle_circuit::{
@@ -7,16 +8,17 @@ use crate::circuit::merkle_circuit::{
 use crate::circuit::note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig};
 use crate::constant::{
     NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases,
-    ACTION_ANCHOR_PUBLIC_INPUT_ROW_IDX, ACTION_NET_VALUE_CM_X_PUBLIC_INPUT_ROW_IDX,
-    ACTION_NET_VALUE_CM_Y_PUBLIC_INPUT_ROW_IDX, ACTION_NF_PUBLIC_INPUT_ROW_IDX,
-    ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX, TAIGA_COMMITMENT_TREE_DEPTH,
+    ACTION_ANCHOR_PUBLIC_INPUT_ROW_IDX, ACTION_INPUT_VP_CM_1_ROW_IDX, ACTION_INPUT_VP_CM_2_ROW_IDX,
+    ACTION_NET_VALUE_CM_X_PUBLIC_INPUT_ROW_IDX, ACTION_NET_VALUE_CM_Y_PUBLIC_INPUT_ROW_IDX,
+    ACTION_NF_PUBLIC_INPUT_ROW_IDX, ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX,
+    ACTION_OUTPUT_VP_CM_1_ROW_IDX, ACTION_OUTPUT_VP_CM_2_ROW_IDX, TAIGA_COMMITMENT_TREE_DEPTH,
 };
 use crate::merkle_tree::LR;
 use crate::note::Note;
 
 use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
 use halo2_proofs::{
-    circuit::{floor_planner, Layouter},
+    circuit::{floor_planner, Layouter, Value},
     plonk::{Advice, Circuit, Column, ConstraintSystem, Constraints, Error, Instance, Selector},
     poly::Rotation,
 };
@@ -30,6 +32,7 @@ pub struct ActionConfig {
     merkle_config: MerklePoseidonConfig,
     merkle_path_selector: Selector,
     hash_to_curve_config: HashToCurveConfig,
+    blake2s_config: Blake2sConfig<pallas::Base>,
 }
 
 /// The Action circuit.
@@ -43,6 +46,10 @@ pub struct ActionCircuit {
     pub output_note: Note,
     /// random scalar for net value commitment
     pub rcv: pallas::Scalar,
+    /// The randomness for input note application vp commitment
+    pub input_vp_cm_r: pallas::Base,
+    /// The randomness for output note application vp commitment
+    pub output_vp_cm_r: pallas::Base,
 }
 
 impl Circuit<pallas::Base> for ActionCircuit {
@@ -101,6 +108,8 @@ impl Circuit<pallas::Base> for ActionCircuit {
         let hash_to_curve_config =
             HashToCurveConfig::configure(meta, advices, note_config.poseidon_config.clone());
 
+        let blake2s_config = Blake2sConfig::configure(meta, advices);
+
         Self::Config {
             instances,
             advices,
@@ -108,6 +117,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             merkle_config,
             merkle_path_selector,
             hash_to_curve_config,
+            blake2s_config,
         }
     }
 
@@ -139,6 +149,9 @@ impl Circuit<pallas::Base> for ActionCircuit {
         // Construct a merkle chip
         let merkle_chip = MerklePoseidonChip::construct(config.merkle_config);
 
+        // Construct a blake2s chip
+        let blake2s_chip = Blake2sChip::construct(config.blake2s_config);
+
         // Input note
         // Check the input note commitment
         let input_note_variables = check_input_note(
@@ -162,8 +175,6 @@ impl Circuit<pallas::Base> for ActionCircuit {
             &self.merkle_path,
         )?;
 
-        // TODO: user send address VP commitment and application VP commitment
-
         // Output note
         let output_note_vars = check_output_note(
             layouter.namespace(|| "check output note"),
@@ -177,10 +188,6 @@ impl Circuit<pallas::Base> for ActionCircuit {
             input_note_variables.nf,
             ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX,
         )?;
-
-        // TODO: application VP commitment
-
-        // TODO: add note verifiable encryption
 
         // compute and public net value commitment(input_value_commitment - output_value_commitment)
         let cv_net = compute_value_commitment(
@@ -229,6 +236,52 @@ impl Circuit<pallas::Base> for ActionCircuit {
                 root.copy_advice(|| "root", &mut region, config.advices[2], 0)?;
                 config.merkle_path_selector.enable(&mut region, 0)
             },
+        )?;
+
+        // Input note application VP commitment
+        let input_vp_cm_r = assign_free_advice(
+            layouter.namespace(|| "witness input_vp_cm_r"),
+            config.advices[0],
+            Value::known(self.input_vp_cm_r),
+        )?;
+        let input_vp_commitment = vp_commitment_gadget(
+            &mut layouter,
+            &blake2s_chip,
+            input_note_variables.note_variables.app_vk.clone(),
+            input_vp_cm_r,
+        )?;
+        layouter.constrain_instance(
+            input_vp_commitment[0].cell(),
+            config.instances,
+            ACTION_INPUT_VP_CM_1_ROW_IDX,
+        )?;
+        layouter.constrain_instance(
+            input_vp_commitment[1].cell(),
+            config.instances,
+            ACTION_INPUT_VP_CM_2_ROW_IDX,
+        )?;
+
+        // Output note application VP commitment
+        let output_vp_cm_r = assign_free_advice(
+            layouter.namespace(|| "witness output_vp_cm_r"),
+            config.advices[0],
+            Value::known(self.output_vp_cm_r),
+        )?;
+        let output_vp_commitment = vp_commitment_gadget(
+            &mut layouter,
+            &blake2s_chip,
+            output_note_vars.note_variables.app_vk.clone(),
+            output_vp_cm_r,
+        )?;
+        layouter.constrain_instance(
+            output_vp_commitment[0].cell(),
+            config.instances,
+            ACTION_OUTPUT_VP_CM_1_ROW_IDX,
+        )?;
+        layouter.constrain_instance(
+            output_vp_commitment[1].cell(),
+            config.instances,
+            ACTION_OUTPUT_VP_CM_2_ROW_IDX,
         )?;
 
         Ok(())

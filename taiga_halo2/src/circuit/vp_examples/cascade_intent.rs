@@ -6,6 +6,7 @@
 ///
 use crate::{
     circuit::{
+        blake2s::publicize_default_dynamic_vp_commitments,
         gadgets::{
             assign_free_advice,
             target_note_variable::{get_is_input_note_flag, get_owned_note_variable},
@@ -19,6 +20,7 @@ use crate::{
     note::{Note, RandomSeed},
     nullifier::{Nullifier, NullifierKeyContainer},
     proof::Proof,
+    vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use halo2_proofs::{
@@ -105,6 +107,13 @@ impl ValidityPredicateCircuit for CascadeIntentValidityPredicateCircuit {
             },
         )?;
 
+        // Publicize the dynamic vp commitments with default value
+        publicize_default_dynamic_vp_commitments(
+            &mut layouter,
+            config.advices[0],
+            config.instances,
+        )?;
+
         Ok(())
     }
 
@@ -118,6 +127,10 @@ impl ValidityPredicateCircuit for CascadeIntentValidityPredicateCircuit {
 
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
+        let default_vp_cm: [pallas::Base; 2] =
+            ValidityPredicateCommitment::default().to_public_inputs();
+        public_inputs.extend(default_vp_cm);
+        public_inputs.extend(default_vp_cm);
         let padding = ValidityPredicatePublicInputs::get_public_input_padding(
             public_inputs.len(),
             &RandomSeed::random(&mut rng),
@@ -156,6 +169,7 @@ pub fn create_intent_note<R: RngCore>(
 
 #[test]
 fn test_halo2_cascade_intent_vp_circuit() {
+    use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
     use crate::note::tests::{random_input_note, random_output_note};
     use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
@@ -183,7 +197,11 @@ fn test_halo2_cascade_intent_vp_circuit() {
     };
     let public_inputs = circuit.get_public_inputs(&mut rng);
 
-    let prover =
-        MockProver::<pallas::Base>::run(12, &circuit, vec![public_inputs.to_vec()]).unwrap();
+    let prover = MockProver::<pallas::Base>::run(
+        VP_CIRCUIT_PARAMS_SIZE,
+        &circuit,
+        vec![public_inputs.to_vec()],
+    )
+    .unwrap();
     assert_eq!(prover.verify(), Ok(()));
 }
