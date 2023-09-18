@@ -54,9 +54,9 @@ pub struct ShieldedPartialTxBundle {
 #[cfg_attr(feature = "nif", derive(NifStruct))]
 #[cfg_attr(feature = "nif", module = "Taiga.Transaction.Result")]
 pub struct ShieldedResult {
-    anchors: Vec<pallas::Base>,
-    nullifiers: Vec<Nullifier>,
-    output_cms: Vec<pallas::Base>,
+    pub anchors: Vec<pallas::Base>,
+    pub nullifiers: Vec<Nullifier>,
+    pub output_cms: Vec<pallas::Base>,
 }
 
 #[derive(Debug, Clone)]
