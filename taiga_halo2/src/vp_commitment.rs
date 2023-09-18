@@ -3,13 +3,14 @@ use blake2s_simd::Params;
 use byteorder::{ByteOrder, LittleEndian};
 use ff::PrimeField;
 #[cfg(feature = "nif")]
-use rustler::{Decoder, Encoder, Env, NifResult, Term};
+use rustler::NifTuple;
 #[cfg(feature = "serde")]
 use serde;
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "nif", derive(NifTuple))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ValidityPredicateCommitment([u8; 32]);
+pub struct ValidityPredicateCommitment(Vec<u8>);
 
 impl ValidityPredicateCommitment {
     pub fn commit<F: PrimeField>(vp: &F, rcm: &F) -> Self {
@@ -20,22 +21,22 @@ impl ValidityPredicateCommitment {
             .update(vp.to_repr().as_ref())
             .update(rcm.to_repr().as_ref())
             .finalize();
-        Self(hash.as_bytes().try_into().unwrap())
+        Self(hash.as_bytes().to_vec())
     }
 
     pub fn to_bytes(&self) -> [u8; 32] {
-        self.0
+        self.0.clone().try_into().unwrap()
     }
 
     pub fn from_bytes(bytes: [u8; 32]) -> Self {
-        Self(bytes)
+        Self(bytes.to_vec())
     }
 
     pub fn from_public_inputs<F: PrimeField>(public_inputs: &[F; 2]) -> Self {
         let mut bytes: [u8; 32] = [0; 32];
         bytes[0..16].copy_from_slice(&public_inputs[0].to_repr().as_ref()[0..16]);
-        bytes[16..].copy_from_slice(&public_inputs[1].to_repr().as_ref()[0..16]);
-        Self(bytes)
+        bytes[16..32].copy_from_slice(&public_inputs[1].to_repr().as_ref()[0..16]);
+        Self(bytes.to_vec())
     }
 
     pub fn to_public_inputs<F: PrimeField>(&self) -> [F; 2] {
@@ -45,20 +46,8 @@ impl ValidityPredicateCommitment {
     }
 }
 
-#[cfg(feature = "nif")]
-impl Encoder for ValidityPredicateCommitment {
-    fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
-        self.0.to_vec().encode(env)
-    }
-}
-
-#[cfg(feature = "nif")]
-impl<'a> Decoder<'a> for ValidityPredicateCommitment {
-    fn decode(term: Term<'a>) -> NifResult<Self> {
-        let val: Vec<u8> = Decoder::decode(term)?;
-        let val_array = val
-            .try_into()
-            .map_err(|_e| rustler::Error::Atom("failure to decode"))?;
-        Ok(ValidityPredicateCommitment(val_array))
+impl Default for ValidityPredicateCommitment {
+    fn default() -> ValidityPredicateCommitment {
+        ValidityPredicateCommitment([0u8; 32].to_vec())
     }
 }

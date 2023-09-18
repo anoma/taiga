@@ -20,7 +20,7 @@ use serde;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// The action result used in transaction.
-#[derive(Copy, Debug, Clone)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "nif", derive(NifStruct))]
 #[cfg_attr(feature = "nif", module = "Taiga.Action.Instance")]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
