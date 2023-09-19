@@ -1,25 +1,31 @@
 use crate::circuit::blake2s::{vp_commitment_gadget, Blake2sChip, Blake2sConfig};
-use crate::circuit::gadgets::{add::AddChip, assign_free_advice};
+use crate::circuit::gadgets::assign_free_advice;
 use crate::circuit::hash_to_curve::HashToCurveConfig;
 use crate::circuit::integrity::{check_input_note, check_output_note, compute_value_commitment};
 use crate::circuit::merkle_circuit::{
     merkle_poseidon_gadget, MerklePoseidonChip, MerklePoseidonConfig,
 };
-use crate::circuit::note_circuit::{NoteChip, NoteCommitmentChip, NoteConfig};
 use crate::constant::{
-    NoteCommitmentDomain, NoteCommitmentHashDomain, TaigaFixedBases,
-    ACTION_ANCHOR_PUBLIC_INPUT_ROW_IDX, ACTION_INPUT_VP_CM_1_ROW_IDX, ACTION_INPUT_VP_CM_2_ROW_IDX,
-    ACTION_NET_VALUE_CM_X_PUBLIC_INPUT_ROW_IDX, ACTION_NET_VALUE_CM_Y_PUBLIC_INPUT_ROW_IDX,
-    ACTION_NF_PUBLIC_INPUT_ROW_IDX, ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX,
-    ACTION_OUTPUT_VP_CM_1_ROW_IDX, ACTION_OUTPUT_VP_CM_2_ROW_IDX, TAIGA_COMMITMENT_TREE_DEPTH,
+    TaigaFixedBases, ACTION_ANCHOR_PUBLIC_INPUT_ROW_IDX, ACTION_INPUT_VP_CM_1_ROW_IDX,
+    ACTION_INPUT_VP_CM_2_ROW_IDX, ACTION_NET_VALUE_CM_X_PUBLIC_INPUT_ROW_IDX,
+    ACTION_NET_VALUE_CM_Y_PUBLIC_INPUT_ROW_IDX, ACTION_NF_PUBLIC_INPUT_ROW_IDX,
+    ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX, ACTION_OUTPUT_VP_CM_1_ROW_IDX,
+    ACTION_OUTPUT_VP_CM_2_ROW_IDX, TAIGA_COMMITMENT_TREE_DEPTH,
 };
 use crate::merkle_tree::LR;
 use crate::note::Note;
 
-use halo2_gadgets::{ecc::chip::EccChip, sinsemilla::chip::SinsemillaChip};
+use halo2_gadgets::{
+    ecc::chip::{EccChip, EccConfig},
+    poseidon::{primitives as poseidon, Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig},
+    utilities::lookup_range_check::LookupRangeCheckConfig,
+};
 use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
-    plonk::{Advice, Circuit, Column, ConstraintSystem, Constraints, Error, Instance, Selector},
+    plonk::{
+        Advice, Circuit, Column, ConstraintSystem, Constraints, Error, Instance, Selector,
+        TableColumn,
+    },
     poly::Rotation,
 };
 use pasta_curves::pallas;
@@ -28,7 +34,9 @@ use pasta_curves::pallas;
 pub struct ActionConfig {
     instances: Column<Instance>,
     advices: [Column<Advice>; 10],
-    note_config: NoteConfig,
+    table_idx: TableColumn,
+    ecc_config: EccConfig<TaigaFixedBases>,
+    poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
     merkle_config: MerklePoseidonConfig,
     merkle_path_selector: Selector,
     hash_to_curve_config: HashToCurveConfig,
@@ -81,6 +89,33 @@ impl Circuit<pallas::Base> for ActionCircuit {
             meta.enable_equality(*advice);
         }
 
+        let table_idx = meta.lookup_table_column();
+
+        let range_check = LookupRangeCheckConfig::configure(meta, advices[9], table_idx);
+
+        let lagrange_coeffs = [
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+            meta.fixed_column(),
+        ];
+        meta.enable_constant(lagrange_coeffs[0]);
+
+        let ecc_config =
+            EccChip::<TaigaFixedBases>::configure(meta, advices, lagrange_coeffs, range_check);
+
+        let poseidon_config = PoseidonChip::configure::<poseidon::P128Pow5T3>(
+            meta,
+            advices[6..9].try_into().unwrap(),
+            advices[5],
+            lagrange_coeffs[2..5].try_into().unwrap(),
+            lagrange_coeffs[5..8].try_into().unwrap(),
+        );
+
         let merkle_path_selector = meta.selector();
         meta.create_gate("merkle path check", |meta| {
             let merkle_path_selector = meta.query_selector(merkle_path_selector);
@@ -97,23 +132,23 @@ impl Circuit<pallas::Base> for ActionCircuit {
             )
         });
 
-        let note_config = NoteChip::configure(meta, instances, advices);
-
         let merkle_config = MerklePoseidonChip::configure(
             meta,
             advices[..5].try_into().unwrap(),
-            note_config.poseidon_config.clone(),
+            poseidon_config.clone(),
         );
 
         let hash_to_curve_config =
-            HashToCurveConfig::configure(meta, advices, note_config.poseidon_config.clone());
+            HashToCurveConfig::configure(meta, advices, poseidon_config.clone());
 
         let blake2s_config = Blake2sConfig::configure(meta, advices);
 
         Self::Config {
             instances,
             advices,
-            note_config,
+            table_idx,
+            ecc_config,
+            poseidon_config,
             merkle_config,
             merkle_path_selector,
             hash_to_curve_config,
@@ -126,25 +161,23 @@ impl Circuit<pallas::Base> for ActionCircuit {
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<(), Error> {
-        // Load the Sinsemilla generator lookup table used by the whole circuit.
-        SinsemillaChip::<NoteCommitmentHashDomain, NoteCommitmentDomain, TaigaFixedBases>::load(
-            config.note_config.sinsemilla_config.clone(),
-            &mut layouter,
-        )?;
-
-        // Construct a Sinsemilla chip
-        let sinsemilla_chip =
-            SinsemillaChip::construct(config.note_config.sinsemilla_config.clone());
-
         // Construct an ECC chip
-        let ecc_chip = EccChip::construct(config.note_config.ecc_config);
-
-        // Construct a NoteCommit chip
-        let note_commit_chip =
-            NoteCommitmentChip::construct(config.note_config.note_commit_config.clone());
-
-        // Construct an add chip
-        let add_chip = AddChip::<pallas::Base>::construct(config.note_config.add_config, ());
+        let ecc_chip = EccChip::construct(config.ecc_config);
+        layouter.assign_table(
+            || "table_idx",
+            |mut table| {
+                // We generate the row values lazily (we only need them during keygen).
+                for index in 0..(1 << 10) {
+                    table.assign_cell(
+                        || "table_idx",
+                        config.table_idx,
+                        index,
+                        || Value::known(pallas::Base::from(index as u64)),
+                    )?;
+                }
+                Ok(())
+            },
+        )?;
 
         // Construct a merkle chip
         let merkle_chip = MerklePoseidonChip::construct(config.merkle_config);
@@ -158,11 +191,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             layouter.namespace(|| "check input note"),
             config.advices,
             config.instances,
-            ecc_chip.clone(),
-            sinsemilla_chip.clone(),
-            note_commit_chip.clone(),
-            config.note_config.poseidon_config.clone(),
-            add_chip,
+            config.poseidon_config.clone(),
             self.input_note,
             ACTION_NF_PUBLIC_INPUT_ROW_IDX,
         )?;
@@ -171,7 +200,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
         let root = merkle_poseidon_gadget(
             layouter.namespace(|| "poseidon merkle"),
             merkle_chip,
-            input_note_variables.cm_x,
+            input_note_variables.cm,
             &self.merkle_path,
         )?;
 
@@ -180,10 +209,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             layouter.namespace(|| "check output note"),
             config.advices,
             config.instances,
-            ecc_chip.clone(),
-            sinsemilla_chip,
-            note_commit_chip,
-            config.note_config.poseidon_config,
+            config.poseidon_config,
             self.output_note,
             input_note_variables.nf,
             ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX,

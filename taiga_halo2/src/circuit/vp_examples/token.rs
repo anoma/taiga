@@ -135,7 +135,7 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
         )?;
 
         // Construct an ECC chip
-        let ecc_chip = EccChip::construct(config.note_conifg.ecc_config);
+        let ecc_chip = EccChip::construct(config.ecc_config);
 
         let pk = NonIdentityPoint::new(
             ecc_chip,
@@ -165,7 +165,7 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
 
         // Decode the app_data_dynamic, and check the app_data_dynamic encoding
         let encoded_app_data_dynamic = poseidon_hash_gadget(
-            config.note_conifg.poseidon_config,
+            config.poseidon_config,
             layouter.namespace(|| "app_data_dynamic encoding"),
             [
                 pk.inner().x(),
@@ -283,8 +283,8 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
 
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
-        let dynamic_vp = if self.owned_note_pub_id == self.output_notes[0].commitment().get_x()
-            || self.owned_note_pub_id == self.output_notes[1].commitment().get_x()
+        let dynamic_vp = if self.owned_note_pub_id == self.output_notes[0].commitment().inner()
+            || self.owned_note_pub_id == self.output_notes[1].commitment().inner()
         {
             self.receiver_vp_vk
         } else {
@@ -394,7 +394,7 @@ pub fn generate_output_token_note_proving_info<R: RngCore>(
     input_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
 ) -> OutputNoteProvingInfo {
-    let owned_note_pub_id = output_note.commitment().get_x();
+    let owned_note_pub_id = output_note.commitment().inner();
     // token VP
     let token_vp = TokenValidityPredicateCircuit {
         owned_note_pub_id,

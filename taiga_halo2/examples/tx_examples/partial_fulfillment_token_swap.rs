@@ -38,6 +38,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
     pallas::Scalar,
     NullifierKeyContainer,
     pallas::Base,
+    pallas::Base,
     Nullifier,
 ) {
     let input_auth = TokenAuthorization::from_sk_vk(&input_auth_sk, &COMPRESSED_TOKEN_AUTH_VK);
@@ -48,14 +49,14 @@ pub fn create_token_intent_ptx<R: RngCore>(
         create_random_token_note(&mut rng, &sell.name, sell.value, rho, input_nk, &input_auth);
 
     // output intent note
-    // Use the same address as that in the input note. They can be different.
-    let receiver_address = input_note.get_address();
+    let input_note_nk_com = input_note.get_nk_commitment();
     let input_note_nf = input_note.get_nf().unwrap();
     let intent_note = create_intent_note(
         &mut rng,
         &sell,
         &buy,
-        receiver_address,
+        input_note_nk_com,
+        input_note.app_data_dynamic,
         input_note_nf,
         input_nk,
     );
@@ -85,12 +86,13 @@ pub fn create_token_intent_ptx<R: RngCore>(
     // Create the intent note proving info
     let intent_note_proving_info = {
         let intent_vp = PartialFulfillmentIntentValidityPredicateCircuit {
-            owned_note_pub_id: intent_note.commitment().get_x(),
+            owned_note_pub_id: intent_note.commitment().inner(),
             input_notes,
             output_notes,
             sell: sell.clone(),
             buy,
-            receiver_address,
+            receiver_nk_com: input_note_nk_com,
+            receiver_app_data_dynamic: input_note.app_data_dynamic,
         };
 
         OutputNoteProvingInfo::new(intent_note, Box::new(intent_vp), vec![])
@@ -118,7 +120,14 @@ pub fn create_token_intent_ptx<R: RngCore>(
         &mut rng,
     );
 
-    (ptx, r, input_nk, receiver_address, rho)
+    (
+        ptx,
+        r,
+        input_nk,
+        input_note_nk_com,
+        input_note.app_data_dynamic,
+        rho,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -130,11 +139,20 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     returned_note_value: u64,
     input_rho: Nullifier,
     input_nk: NullifierKeyContainer, // NullifierKeyContainer::Key
-    input_address: pallas::Base,
+    receiver_nk_com: pallas::Base,
+    receiver_app_data_dynamic: pallas::Base,
     output_auth_pk: pallas::Point,
 ) -> (ShieldedPartialTransaction, pallas::Scalar) {
     // input intent note
-    let intent_note = create_intent_note(&mut rng, &sell, &buy, input_address, input_rho, input_nk);
+    let intent_note = create_intent_note(
+        &mut rng,
+        &sell,
+        &buy,
+        receiver_nk_com,
+        receiver_app_data_dynamic,
+        input_rho,
+        input_nk,
+    );
 
     // output notes
     let input_note_nf = intent_note.get_nf().unwrap();
@@ -147,8 +165,6 @@ pub fn consume_token_intent_ptx<R: RngCore>(
         input_nk,
         &output_auth,
     );
-    let address = bought_note.get_address();
-    assert_eq!(address, input_address);
 
     // padding the zero note
     let padding_input_note = Note::random_padding_input_note(&mut rng);
@@ -176,7 +192,8 @@ pub fn consume_token_intent_ptx<R: RngCore>(
             output_notes,
             sell: sell.clone(),
             buy: buy.clone(),
-            receiver_address: input_address,
+            receiver_nk_com,
+            receiver_app_data_dynamic,
         };
 
         InputNoteProvingInfo::new(
@@ -238,7 +255,7 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
         name: "eth".to_string(),
         value: 10u64,
     };
-    let (alice_ptx, alice_r, intent_nk, receiver_address, intent_rho) =
+    let (alice_ptx, alice_r, intent_nk, receiver_nk_com, receiver_app_data_dynamic, intent_rho) =
         create_token_intent_ptx(&mut rng, sell.clone(), buy.clone(), alice_auth_sk, alice_nk);
 
     // Bob creates the partial transaction with 1 DOLPHIN input and 5 BTC output
@@ -268,7 +285,8 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
         1u64,
         intent_rho,
         intent_nk,
-        receiver_address,
+        receiver_nk_com,
+        receiver_app_data_dynamic,
         alice_auth_pk,
     );
 

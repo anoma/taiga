@@ -1,12 +1,10 @@
 use std::hash::Hash;
 
-use crate::constant::GENERATOR;
 use crate::{
     note::NoteCommitment,
-    utils::{extract_p, mod_r_p, prf_nf},
+    utils::{poseidon_hash_n, prf_nf},
 };
 use halo2_proofs::arithmetic::Field;
-use pasta_curves::group::cofactor::CofactorCurveAffine;
 use pasta_curves::group::ff::PrimeField;
 use pasta_curves::pallas;
 use rand::RngCore;
@@ -42,8 +40,8 @@ impl Nullifier {
         Self(nf)
     }
 
-    // cm is a point
-    // $nf =Extract_P([PRF_{nk}(\rho) + \psi \ mod \ q] * K + cm)$
+    // cm is a field element
+    // nf = poseidon_hash(nk || \rho || \psi || note_cm)
     pub fn derive(
         nk: &NullifierKeyContainer,
         rho: &pallas::Base,
@@ -53,11 +51,7 @@ impl Nullifier {
         match nk {
             NullifierKeyContainer::Commitment(_) => None,
             NullifierKeyContainer::Key(key) => {
-                let k = GENERATOR.to_curve();
-
-                let nf = Nullifier(extract_p(
-                    &(k * mod_r_p(prf_nf(*key, *rho) + psi) + cm.inner()),
-                ));
+                let nf = Nullifier(poseidon_hash_n([*key, *rho, *psi, cm.inner()]));
                 Some(nf)
             }
         }

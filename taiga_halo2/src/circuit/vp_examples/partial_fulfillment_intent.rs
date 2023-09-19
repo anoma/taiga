@@ -49,30 +49,30 @@ pub struct PartialFulfillmentIntentValidityPredicateCircuit {
     pub output_notes: [Note; NUM_NOTE],
     pub sell: Token,
     pub buy: Token,
-    // address = Com(app_data_dynamic, nk_com). From `Note::get_address`
-    pub receiver_address: pallas::Base,
+    pub receiver_nk_com: pallas::Base,
+    pub receiver_app_data_dynamic: pallas::Base,
 }
 
 impl PartialFulfillmentIntentValidityPredicateCircuit {
     pub fn encode_app_data_static(
         sell: &Token,
         buy: &Token,
-        receiver_address: pallas::Base,
+        receiver_nk_com: pallas::Base,
+        receiver_app_data_dynamic: pallas::Base,
     ) -> pallas::Base {
         let sold_token = transfrom_token_name_to_token_property(&sell.name);
         let sold_token_value = pallas::Base::from(sell.value);
         let bought_token = transfrom_token_name_to_token_property(&buy.name);
         let bought_token_value = pallas::Base::from(buy.value);
-        poseidon_hash_n::<8>([
+        poseidon_hash_n([
             sold_token,
             sold_token_value,
             bought_token,
             bought_token_value,
             // Assuming the sold_token and bought_token have the same TOKEN_VK
             TOKEN_VK.get_compressed(),
-            receiver_address,
-            pallas::Base::zero(),
-            pallas::Base::zero(),
+            receiver_nk_com,
+            receiver_app_data_dynamic,
         ])
     }
 }
@@ -124,21 +124,21 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
             Value::known(pallas::Base::from(self.buy.value)),
         )?;
 
-        let receiver_address = assign_free_advice(
-            layouter.namespace(|| "witness receiver address"),
+        let receiver_nk_com = assign_free_advice(
+            layouter.namespace(|| "witness receiver nk_com"),
             config.advices[0],
-            Value::known(self.receiver_address),
+            Value::known(self.receiver_nk_com),
         )?;
 
-        let padding_zero = assign_free_constant(
-            layouter.namespace(|| "zero"),
+        let receiver_app_data_dynamic = assign_free_advice(
+            layouter.namespace(|| "witness receiver app_data_dynamic"),
             config.advices[0],
-            pallas::Base::zero(),
+            Value::known(self.receiver_app_data_dynamic),
         )?;
 
         // Encode the app_data_static of intent note
         let encoded_app_data_static = poseidon_hash_gadget(
-            config.note_conifg.poseidon_config,
+            config.poseidon_config,
             layouter.namespace(|| "app_data_static encoding"),
             [
                 sold_token.clone(),
@@ -146,9 +146,8 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
                 bought_token.clone(),
                 bought_token_value.clone(),
                 token_vp_vk.clone(),
-                receiver_address.clone(),
-                padding_zero.clone(),
-                padding_zero,
+                receiver_nk_com.clone(),
+                receiver_app_data_dynamic.clone(),
             ],
         )?;
 
@@ -259,15 +258,32 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
                 },
             )?;
 
+            // check nk_com
             layouter.assign_region(
-                || "conditional equal: check bought token address",
+                || "conditional equal: check bought token nk_com",
                 |mut region| {
                     config.conditional_equal_config.assign_region(
                         &is_input_note,
-                        &receiver_address,
+                        &receiver_nk_com,
                         &basic_variables.output_note_variables[0]
                             .note_variables
-                            .address,
+                            .nk_com,
+                        0,
+                        &mut region,
+                    )
+                },
+            )?;
+
+            // check app_data_dynamic
+            layouter.assign_region(
+                || "conditional equal: check bought token app_data_dynamic",
+                |mut region| {
+                    config.conditional_equal_config.assign_region(
+                        &is_input_note,
+                        &receiver_app_data_dynamic,
+                        &basic_variables.output_note_variables[0]
+                            .note_variables
+                            .app_data_dynamic,
                         0,
                         &mut region,
                     )
@@ -325,14 +341,29 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
             )?;
 
             layouter.assign_region(
-                || "conditional equal: check returned token address",
+                || "conditional equal: check returned token nk_com",
                 |mut region| {
                     config.conditional_equal_config.assign_region(
                         &is_partial_fulfillment,
-                        &receiver_address,
+                        &receiver_nk_com,
                         &basic_variables.output_note_variables[1]
                             .note_variables
-                            .address,
+                            .nk_com,
+                        0,
+                        &mut region,
+                    )
+                },
+            )?;
+
+            layouter.assign_region(
+                || "conditional equal: check returned token app_data_dynamic",
+                |mut region| {
+                    config.conditional_equal_config.assign_region(
+                        &is_partial_fulfillment,
+                        &receiver_app_data_dynamic,
+                        &basic_variables.output_note_variables[1]
+                            .note_variables
+                            .app_data_dynamic,
                         0,
                         &mut region,
                     )
@@ -425,14 +456,16 @@ pub fn create_intent_note<R: RngCore>(
     mut rng: R,
     sell: &Token,
     buy: &Token,
-    receiver_address: pallas::Base,
+    receiver_nk_com: pallas::Base,
+    receiver_app_data_dynamic: pallas::Base,
     rho: Nullifier,
     nk: NullifierKeyContainer,
 ) -> Note {
     let app_data_static = PartialFulfillmentIntentValidityPredicateCircuit::encode_app_data_static(
         sell,
         buy,
-        receiver_address,
+        receiver_nk_com,
+        receiver_app_data_dynamic,
     );
     let rseed = RandomSeed::random(&mut rng);
     Note::new(
@@ -470,10 +503,18 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
     sold_note.note_type.app_vk = *COMPRESSED_TOKEN_VK;
     sold_note.note_type.app_data_static = transfrom_token_name_to_token_property(&sell.name);
     sold_note.value = sell.value;
-    let receiver_address = sold_note.get_address();
+    let receiver_nk_com = sold_note.get_nk_commitment();
     let rho = Nullifier::new(pallas::Base::random(&mut rng));
     let nk = NullifierKeyContainer::random_key(&mut rng);
-    let intent_note = create_intent_note(&mut rng, &sell, &buy, receiver_address, rho, nk);
+    let intent_note = create_intent_note(
+        &mut rng,
+        &sell,
+        &buy,
+        receiver_nk_com,
+        sold_note.app_data_dynamic,
+        rho,
+        nk,
+    );
     // Creating intent test
     {
         let input_padding_note = Note::random_padding_input_note(&mut rng);
@@ -483,12 +524,13 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
         let output_notes = [intent_note, output_padding_note];
 
         let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
-            owned_note_pub_id: intent_note.commitment().get_x(),
+            owned_note_pub_id: intent_note.commitment().inner(),
             input_notes,
             output_notes,
             sell: sell.clone(),
             buy: buy.clone(),
-            receiver_address,
+            receiver_nk_com,
+            receiver_app_data_dynamic: sold_note.app_data_dynamic,
         };
         let public_inputs = circuit.get_public_inputs(&mut rng);
 
@@ -527,7 +569,8 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
                     output_notes,
                     sell: sell.clone(),
                     buy: buy.clone(),
-                    receiver_address,
+                    receiver_nk_com,
+                    receiver_app_data_dynamic: sold_note.app_data_dynamic,
                 };
                 let public_inputs = circuit.get_public_inputs(&mut rng);
 
@@ -555,7 +598,8 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
                     output_notes,
                     sell,
                     buy,
-                    receiver_address,
+                    receiver_nk_com,
+                    receiver_app_data_dynamic: sold_note.app_data_dynamic,
                 };
                 let public_inputs = circuit.get_public_inputs(&mut rng);
 

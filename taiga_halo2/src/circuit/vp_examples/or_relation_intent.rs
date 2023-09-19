@@ -6,7 +6,7 @@ use crate::{
     circuit::{
         blake2s::publicize_default_dynamic_vp_commitments,
         gadgets::{
-            assign_free_advice, assign_free_constant,
+            assign_free_advice,
             poseidon_hash::poseidon_hash_gadget,
             target_note_variable::{get_is_input_note_flag, get_owned_note_variable},
         },
@@ -55,28 +55,29 @@ pub struct OrRelationIntentValidityPredicateCircuit {
     pub output_notes: [Note; NUM_NOTE],
     pub condition1: Condition,
     pub condition2: Condition,
-    pub receiver_address: pallas::Base,
+    pub receiver_nk_com: pallas::Base,
+    pub receiver_app_data_dynamic: pallas::Base,
 }
 
 impl OrRelationIntentValidityPredicateCircuit {
     pub fn encode_app_data_static(
         condition1: &Condition,
         condition2: &Condition,
-        receiver_address: pallas::Base,
+        receiver_nk_com: pallas::Base,
+        receiver_app_data_dynamic: pallas::Base,
     ) -> pallas::Base {
         let token_property_1 = transfrom_token_name_to_token_property(&condition1.token_name);
         let token_value_1 = pallas::Base::from(condition1.token_value);
         let token_property_2 = transfrom_token_name_to_token_property(&condition2.token_name);
         let token_value_2 = pallas::Base::from(condition2.token_value);
-        poseidon_hash_n::<8>([
+        poseidon_hash_n([
             token_property_1,
             token_value_1,
             token_property_2,
             token_value_2,
             TOKEN_VK.get_compressed(),
-            receiver_address,
-            pallas::Base::zero(),
-            pallas::Base::zero(),
+            receiver_nk_com,
+            receiver_app_data_dynamic,
         ])
     }
 }
@@ -132,21 +133,21 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
             Value::known(pallas::Base::from(self.condition2.token_value)),
         )?;
 
-        let receiver_address = assign_free_advice(
-            layouter.namespace(|| "witness receiver address"),
+        let receiver_nk_com = assign_free_advice(
+            layouter.namespace(|| "witness receiver nk_com"),
             config.advices[0],
-            Value::known(self.receiver_address),
+            Value::known(self.receiver_nk_com),
         )?;
 
-        let padding_zero = assign_free_constant(
-            layouter.namespace(|| "zero"),
+        let receiver_app_data_dynamic = assign_free_advice(
+            layouter.namespace(|| "witness receiver app_data_dynamic"),
             config.advices[0],
-            pallas::Base::zero(),
+            Value::known(self.receiver_app_data_dynamic),
         )?;
 
         // Encode the app_data_static of intent note
         let encoded_app_data_static = poseidon_hash_gadget(
-            config.note_conifg.poseidon_config,
+            config.poseidon_config,
             layouter.namespace(|| "encode app_data_static"),
             [
                 token_property_1.clone(),
@@ -154,9 +155,8 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
                 token_property_2.clone(),
                 token_value_2.clone(),
                 token_vp_vk.clone(),
-                receiver_address.clone(),
-                padding_zero.clone(),
-                padding_zero,
+                receiver_nk_com.clone(),
+                receiver_app_data_dynamic.clone(),
             ],
         )?;
 
@@ -192,16 +192,32 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
             },
         )?;
 
-        // check the address of output note
+        // check nk_com
         layouter.assign_region(
-            || "conditional equal: check address",
+            || "conditional equal: check nk_com",
             |mut region| {
                 config.conditional_equal_config.assign_region(
                     &is_input_note,
-                    &receiver_address,
+                    &receiver_nk_com,
                     &basic_variables.output_note_variables[0]
                         .note_variables
-                        .address,
+                        .nk_com,
+                    0,
+                    &mut region,
+                )
+            },
+        )?;
+
+        // check app_data_dynamic
+        layouter.assign_region(
+            || "conditional equal: check app_data_dynamic",
+            |mut region| {
+                config.conditional_equal_config.assign_region(
+                    &is_input_note,
+                    &receiver_app_data_dynamic,
+                    &basic_variables.output_note_variables[0]
+                        .note_variables
+                        .app_data_dynamic,
                     0,
                     &mut region,
                 )
@@ -272,14 +288,16 @@ pub fn create_intent_note<R: RngCore>(
     mut rng: R,
     condition1: &Condition,
     condition2: &Condition,
-    receiver_address: pallas::Base,
+    receiver_nk_com: pallas::Base,
+    receiver_app_data_dynamic: pallas::Base,
     rho: Nullifier,
     nk: NullifierKeyContainer,
 ) -> Note {
     let app_data_static = OrRelationIntentValidityPredicateCircuit::encode_app_data_static(
         condition1,
         condition2,
-        receiver_address,
+        receiver_nk_com,
+        receiver_app_data_dynamic,
     );
     let rseed = RandomSeed::random(&mut rng);
     Note::new(
@@ -323,15 +341,16 @@ fn test_halo2_or_relation_intent_vp_circuit() {
         output_notes[0].note_type.app_data_static =
             transfrom_token_name_to_token_property(&condition1.token_name);
         output_notes[0].value = condition1.token_value;
-        let receiver_address = output_notes[0].get_address();
 
         let rho = Nullifier::new(pallas::Base::random(&mut rng));
         let nk = NullifierKeyContainer::random_key(&mut rng);
+        let nk_com = output_notes[0].get_nk_commitment();
         let intent_note = create_intent_note(
             &mut rng,
             &condition1,
             &condition2,
-            receiver_address,
+            nk_com,
+            output_notes[0].app_data_dynamic,
             rho,
             nk,
         );
@@ -343,7 +362,8 @@ fn test_halo2_or_relation_intent_vp_circuit() {
             output_notes,
             condition1,
             condition2,
-            receiver_address,
+            receiver_nk_com: nk_com,
+            receiver_app_data_dynamic: output_notes[0].app_data_dynamic,
         }
     };
     let public_inputs = circuit.get_public_inputs(&mut rng);

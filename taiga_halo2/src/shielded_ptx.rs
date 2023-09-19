@@ -232,7 +232,7 @@ impl Executable for ShieldedPartialTransaction {
     fn get_output_cms(&self) -> Vec<pallas::Base> {
         self.actions
             .iter()
-            .map(|action| action.action_instance.cm_x)
+            .map(|action| action.action_instance.cm)
             .collect()
     }
 
@@ -536,12 +536,12 @@ pub mod testing {
             dynamic_vps.clone(),
         );
 
-        trivial_vp_circuit.owned_note_pub_id = output_note_1.commitment().get_x();
+        trivial_vp_circuit.owned_note_pub_id = output_note_1.commitment().inner();
         let output_application_vp_1 = Box::new(trivial_vp_circuit.clone());
         let output_note_proving_info_1 =
             OutputNoteProvingInfo::new(output_note_1, output_application_vp_1, dynamic_vps.clone());
 
-        trivial_vp_circuit.owned_note_pub_id = output_note_2.commitment().get_x();
+        trivial_vp_circuit.owned_note_pub_id = output_note_2.commitment().inner();
         let output_application_vp_2 = Box::new(trivial_vp_circuit);
         let output_note_proving_info_2 =
             OutputNoteProvingInfo::new(output_note_2, output_application_vp_2, dynamic_vps);
