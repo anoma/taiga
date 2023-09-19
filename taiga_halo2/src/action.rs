@@ -1,7 +1,7 @@
 use crate::{
     circuit::action_circuit::ActionCircuit,
     constant::{PRF_EXPAND_INPUT_VP_CM_R, PRF_EXPAND_OUTPUT_VP_CM_R},
-    merkle_tree::{MerklePath, Node},
+    merkle_tree::{Anchor, MerklePath, Node},
     note::{InputNoteProvingInfo, Note, NoteCommitment, OutputNoteProvingInfo, RandomSeed},
     nullifier::Nullifier,
     value_commitment::ValueCommitment,
@@ -26,7 +26,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionInstance {
     /// The root of the note commitment Merkle tree.
-    pub anchor: pallas::Base,
+    pub anchor: Anchor,
     /// The nullifier of input note.
     pub nf: Nullifier,
     /// The commitment to the output note.
@@ -55,7 +55,7 @@ impl ActionInstance {
         let output_vp_commitment = self.output_vp_commitment.to_public_inputs();
         vec![
             self.nf.inner(),
-            self.anchor,
+            self.anchor.inner(),
             self.cm.inner(),
             self.cv_net.get_x(),
             self.cv_net.get_y(),
@@ -70,8 +70,7 @@ impl ActionInstance {
 #[cfg(feature = "borsh")]
 impl BorshSerialize for ActionInstance {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        use ff::PrimeField;
-        writer.write_all(&self.anchor.to_repr())?;
+        writer.write_all(&self.anchor.to_bytes())?;
         writer.write_all(&self.nf.to_bytes())?;
         writer.write_all(&self.cm.to_bytes())?;
         writer.write_all(&self.cv_net.to_bytes())?;
@@ -84,10 +83,9 @@ impl BorshSerialize for ActionInstance {
 #[cfg(feature = "borsh")]
 impl BorshDeserialize for ActionInstance {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        use ff::PrimeField;
         use std::io;
         let anchor_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let anchor = Option::from(pallas::Base::from_repr(anchor_bytes))
+        let anchor = Option::from(Anchor::from_bytes(anchor_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "anchor not in field"))?;
         let nf_bytes = <[u8; 32]>::deserialize_reader(reader)?;
         let nf = Option::from(Nullifier::from_bytes(nf_bytes))
@@ -170,7 +168,7 @@ impl ActionInfo {
         let cm = self.output_note.commitment();
         let anchor = {
             let cm_node = Node::from(&self.input_note);
-            self.input_merkle_path.root(cm_node).inner()
+            self.input_merkle_path.root(cm_node)
         };
 
         let rcv = self.get_rcv();

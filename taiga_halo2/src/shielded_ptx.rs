@@ -6,6 +6,7 @@ use crate::constant::{
 };
 use crate::error::TransactionError;
 use crate::executable::Executable;
+use crate::merkle_tree::Anchor;
 use crate::note::{InputNoteProvingInfo, NoteCommitment, OutputNoteProvingInfo};
 use crate::nullifier::Nullifier;
 use crate::proof::Proof;
@@ -243,7 +244,7 @@ impl Executable for ShieldedPartialTransaction {
             .collect()
     }
 
-    fn get_anchors(&self) -> Vec<pallas::Base> {
+    fn get_anchors(&self) -> Vec<Anchor> {
         self.actions
             .iter()
             .map(|action| action.action_instance.anchor)

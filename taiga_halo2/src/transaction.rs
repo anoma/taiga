@@ -2,16 +2,14 @@ use crate::binding_signature::{BindingSignature, BindingSigningKey, BindingVerif
 use crate::constant::TRANSACTION_BINDING_HASH_PERSONALIZATION;
 use crate::error::TransactionError;
 use crate::executable::Executable;
+use crate::merkle_tree::Anchor;
 use crate::note::NoteCommitment;
 use crate::nullifier::Nullifier;
 use crate::shielded_ptx::ShieldedPartialTransaction;
 use crate::transparent_ptx::{OutputResource, TransparentPartialTransaction};
 use crate::value_commitment::ValueCommitment;
 use blake2b_simd::Params as Blake2bParams;
-use pasta_curves::{
-    group::{ff::PrimeField, Group},
-    pallas,
-};
+use pasta_curves::{group::Group, pallas};
 use rand::{CryptoRng, RngCore};
 
 #[cfg(feature = "nif")]
@@ -55,7 +53,7 @@ pub struct ShieldedPartialTxBundle {
 #[cfg_attr(feature = "nif", derive(NifStruct))]
 #[cfg_attr(feature = "nif", module = "Taiga.Transaction.Result")]
 pub struct ShieldedResult {
-    pub anchors: Vec<pallas::Base>,
+    pub anchors: Vec<Anchor>,
     pub nullifiers: Vec<Nullifier>,
     pub output_cms: Vec<NoteCommitment>,
 }
@@ -195,7 +193,7 @@ impl Transaction {
                 h.update(&vc.to_bytes());
             });
             bundle.get_anchors().iter().for_each(|anchor| {
-                h.update(&anchor.to_repr());
+                h.update(&anchor.to_bytes());
             });
         }
 
@@ -211,7 +209,7 @@ impl Transaction {
                 h.update(&vc.to_bytes());
             });
             bundle.get_anchors().iter().for_each(|anchor| {
-                h.update(&anchor.to_repr());
+                h.update(&anchor.to_bytes());
             });
         }
 
@@ -313,7 +311,7 @@ impl ShieldedPartialTxBundle {
             .collect()
     }
 
-    pub fn get_anchors(&self) -> Vec<pallas::Base> {
+    pub fn get_anchors(&self) -> Vec<Anchor> {
         self.partial_txs
             .iter()
             .flat_map(|ptx| ptx.get_anchors())
@@ -374,7 +372,7 @@ impl TransparentPartialTxBundle {
             .collect()
     }
 
-    pub fn get_anchors(&self) -> Vec<pallas::Base> {
+    pub fn get_anchors(&self) -> Vec<Anchor> {
         self.partial_txs
             .iter()
             .flat_map(|ptx| ptx.get_anchors())
