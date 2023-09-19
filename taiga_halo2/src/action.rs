@@ -2,7 +2,7 @@ use crate::{
     circuit::action_circuit::ActionCircuit,
     constant::{PRF_EXPAND_INPUT_VP_CM_R, PRF_EXPAND_OUTPUT_VP_CM_R},
     merkle_tree::{MerklePath, Node},
-    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
+    note::{InputNoteProvingInfo, Note, NoteCommitment, OutputNoteProvingInfo, RandomSeed},
     nullifier::Nullifier,
     value_commitment::ValueCommitment,
     vp_commitment::ValidityPredicateCommitment,
@@ -30,7 +30,7 @@ pub struct ActionInstance {
     /// The nullifier of input note.
     pub nf: Nullifier,
     /// The commitment to the output note.
-    pub cm: pallas::Base,
+    pub cm: NoteCommitment,
     /// net value commitment
     pub cv_net: ValueCommitment,
     /// The commitment to input note application(static) vp
@@ -56,7 +56,7 @@ impl ActionInstance {
         vec![
             self.nf.inner(),
             self.anchor,
-            self.cm,
+            self.cm.inner(),
             self.cv_net.get_x(),
             self.cv_net.get_y(),
             input_vp_commitment[0],
@@ -73,7 +73,7 @@ impl BorshSerialize for ActionInstance {
         use ff::PrimeField;
         writer.write_all(&self.anchor.to_repr())?;
         writer.write_all(&self.nf.to_bytes())?;
-        writer.write_all(&self.cm.to_repr())?;
+        writer.write_all(&self.cm.to_bytes())?;
         writer.write_all(&self.cv_net.to_bytes())?;
         writer.write_all(&self.input_vp_commitment.to_bytes())?;
         writer.write_all(&self.output_vp_commitment.to_bytes())?;
@@ -93,7 +93,7 @@ impl BorshDeserialize for ActionInstance {
         let nf = Option::from(Nullifier::from_bytes(nf_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "nf not in field"))?;
         let cm_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let cm = Option::from(pallas::Base::from_repr(cm_bytes))
+        let cm = Option::from(NoteCommitment::from_bytes(cm_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "cm not in field"))?;
         let cv_net_bytes = <[u8; 32]>::deserialize_reader(reader)?;
         let cv_net = Option::from(ValueCommitment::from_bytes(cv_net_bytes))
@@ -167,9 +167,9 @@ impl ActionInfo {
             "The nf of input note should be equal to the rho of output note"
         );
 
-        let cm = self.output_note.commitment().inner();
+        let cm = self.output_note.commitment();
         let anchor = {
-            let cm_node = Node::from_note(&self.input_note);
+            let cm_node = Node::from(&self.input_note);
             self.input_merkle_path.root(cm_node).inner()
         };
 

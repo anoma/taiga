@@ -6,7 +6,7 @@ use crate::constant::{
 };
 use crate::error::TransactionError;
 use crate::executable::Executable;
-use crate::note::{InputNoteProvingInfo, OutputNoteProvingInfo};
+use crate::note::{InputNoteProvingInfo, NoteCommitment, OutputNoteProvingInfo};
 use crate::nullifier::Nullifier;
 use crate::proof::Proof;
 use crate::value_commitment::ValueCommitment;
@@ -184,7 +184,7 @@ impl ShieldedPartialTransaction {
             }
 
             // Check the owned_note_id that vp uses is consistent with the cm from the action circuit
-            if owned_note_id != *action_cm {
+            if owned_note_id != action_cm.inner() {
                 return Err(TransactionError::InconsistentOwnedNotePubID);
             }
         }
@@ -229,7 +229,7 @@ impl Executable for ShieldedPartialTransaction {
             .collect()
     }
 
-    fn get_output_cms(&self) -> Vec<pallas::Base> {
+    fn get_output_cms(&self) -> Vec<NoteCommitment> {
         self.actions
             .iter()
             .map(|action| action.action_instance.cm)
@@ -388,7 +388,7 @@ impl NoteVPVerifyingInfoSet {
         nfs
     }
 
-    pub fn get_note_commitments(&self) -> Vec<[pallas::Base; NUM_NOTE]> {
+    pub fn get_note_commitments(&self) -> Vec<[NoteCommitment; NUM_NOTE]> {
         let mut cms = vec![self.app_vp_verifying_info.get_note_commitments()];
         self.app_dynamic_vp_verifying_info
             .iter()

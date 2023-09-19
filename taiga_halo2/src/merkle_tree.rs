@@ -93,7 +93,7 @@ impl MerklePath {
 impl Default for MerklePath {
     fn default() -> MerklePath {
         let merkle_path = (0..TAIGA_COMMITMENT_TREE_DEPTH)
-            .map(|_| (Node::new(pallas::Base::one()), L))
+            .map(|_| (Node::from(pallas::Base::one()), L))
             .collect();
         Self::from_path(merkle_path)
     }
@@ -105,18 +105,6 @@ impl Default for MerklePath {
 pub struct Node(pallas::Base);
 
 impl Node {
-    pub fn new(v: pallas::Base) -> Self {
-        Self(v)
-    }
-
-    pub fn from_note(n: &Note) -> Self {
-        Self(n.commitment().inner())
-    }
-
-    pub fn from_note_commitment(n: &NoteCommitment) -> Self {
-        Self(n.inner())
-    }
-
     pub fn rand(rng: &mut impl RngCore) -> Self {
         Self(pallas::Base::random(rng))
     }
@@ -127,6 +115,24 @@ impl Node {
 
     pub fn combine(left: &Node, right: &Node) -> Node {
         Self(poseidon_hash(left.inner(), right.inner()))
+    }
+}
+
+impl From<pallas::Base> for Node {
+    fn from(node: pallas::Base) -> Node {
+        Node(node)
+    }
+}
+
+impl From<&Note> for Node {
+    fn from(note: &Note) -> Node {
+        Node(note.commitment().inner())
+    }
+}
+
+impl From<NoteCommitment> for Node {
+    fn from(cm: NoteCommitment) -> Node {
+        Node(cm.inner())
     }
 }
 

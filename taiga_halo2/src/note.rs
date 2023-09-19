@@ -48,6 +48,12 @@ impl NoteCommitment {
     }
 }
 
+impl From<pallas::Base> for NoteCommitment {
+    fn from(cm: pallas::Base) -> Self {
+        NoteCommitment(cm)
+    }
+}
+
 #[cfg(feature = "borsh")]
 impl BorshSerialize for NoteCommitment {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {

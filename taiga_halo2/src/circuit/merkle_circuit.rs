@@ -188,11 +188,11 @@ fn test_halo2_merkle_circuit() {
             )?;
 
             let expected_root = {
-                let root = self.merkle_path.root(Node::new(self.leaf)).inner();
+                let root = self.merkle_path.root(Node::from(self.leaf));
                 assign_free_advice(
                     layouter.namespace(|| "witness leaf"),
                     config.advices[0],
-                    Value::known(root),
+                    Value::known(root.inner()),
                 )?
             };
             layouter.assign_region(

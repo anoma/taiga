@@ -1,4 +1,3 @@
-use crate::circuit::vamp_ir_utils::{get_circuit_assignments, parse, VariableAssignmentError};
 use crate::{
     circuit::{
         blake2s::publicize_default_dynamic_vp_commitments,
@@ -14,6 +13,7 @@ use crate::{
             target_note_variable::{GetIsInputNoteFlagConfig, GetOwnedNoteVariableConfig},
         },
         integrity::{check_input_note, check_output_note},
+        vamp_ir_utils::{get_circuit_assignments, parse, VariableAssignmentError},
     },
     constant::{
         TaigaFixedBases, NOTE_ENCRYPTION_CIPHERTEXT_NUM, NUM_NOTE, SETUP_PARAMS_MAP,
@@ -24,14 +24,13 @@ use crate::{
         VP_CIRCUIT_OWNED_NOTE_PUB_ID_PUBLIC_INPUT_IDX, VP_CIRCUIT_PARAMS_SIZE,
         VP_CIRCUIT_PUBLIC_INPUT_NUM,
     },
-    note::{Note, RandomSeed},
+    note::{Note, NoteCommitment, RandomSeed},
     note_encryption::{NoteCiphertext, SecretKey},
     proof::Proof,
     utils::mod_r_p,
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use dyn_clone::{clone_trait_object, DynClone};
-//use ff::PrimeField;
 use group::cofactor::CofactorCurveAffine;
 use halo2_gadgets::{
     ecc::chip::EccChip,
@@ -165,12 +164,14 @@ impl VPVerifyingInfo {
         ]
     }
 
-    pub fn get_note_commitments(&self) -> [pallas::Base; NUM_NOTE] {
+    pub fn get_note_commitments(&self) -> [NoteCommitment; NUM_NOTE] {
         [
             self.public_inputs
-                .get_from_index(VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX),
+                .get_from_index(VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX)
+                .into(),
             self.public_inputs
-                .get_from_index(VP_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX),
+                .get_from_index(VP_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX)
+                .into(),
         ]
     }
 

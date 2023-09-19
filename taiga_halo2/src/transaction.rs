@@ -2,6 +2,7 @@ use crate::binding_signature::{BindingSignature, BindingSigningKey, BindingVerif
 use crate::constant::TRANSACTION_BINDING_HASH_PERSONALIZATION;
 use crate::error::TransactionError;
 use crate::executable::Executable;
+use crate::note::NoteCommitment;
 use crate::nullifier::Nullifier;
 use crate::shielded_ptx::ShieldedPartialTransaction;
 use crate::transparent_ptx::{OutputResource, TransparentPartialTransaction};
@@ -56,7 +57,7 @@ pub struct ShieldedPartialTxBundle {
 pub struct ShieldedResult {
     pub anchors: Vec<pallas::Base>,
     pub nullifiers: Vec<Nullifier>,
-    pub output_cms: Vec<pallas::Base>,
+    pub output_cms: Vec<NoteCommitment>,
 }
 
 #[derive(Debug, Clone)]
@@ -187,8 +188,8 @@ impl Transaction {
             bundle.get_nullifiers().iter().for_each(|nf| {
                 h.update(&nf.to_bytes());
             });
-            bundle.get_output_cms().iter().for_each(|cm_x| {
-                h.update(&cm_x.to_repr());
+            bundle.get_output_cms().iter().for_each(|cm| {
+                h.update(&cm.to_bytes());
             });
             bundle.get_value_commitments().iter().for_each(|vc| {
                 h.update(&vc.to_bytes());
@@ -204,7 +205,7 @@ impl Transaction {
                 h.update(&nf.to_bytes());
             });
             bundle.get_output_cms().iter().for_each(|cm| {
-                h.update(&cm.to_repr());
+                h.update(&cm.to_bytes());
             });
             bundle.get_value_commitments().iter().for_each(|vc| {
                 h.update(&vc.to_bytes());
@@ -305,7 +306,7 @@ impl ShieldedPartialTxBundle {
             .collect()
     }
 
-    pub fn get_output_cms(&self) -> Vec<pallas::Base> {
+    pub fn get_output_cms(&self) -> Vec<NoteCommitment> {
         self.partial_txs
             .iter()
             .flat_map(|ptx| ptx.get_output_cms())
@@ -366,7 +367,7 @@ impl TransparentPartialTxBundle {
             .collect()
     }
 
-    pub fn get_output_cms(&self) -> Vec<pallas::Base> {
+    pub fn get_output_cms(&self) -> Vec<NoteCommitment> {
         self.partial_txs
             .iter()
             .flat_map(|ptx| ptx.get_output_cms())
