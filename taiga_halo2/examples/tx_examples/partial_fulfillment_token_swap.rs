@@ -44,7 +44,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
     let input_auth = TokenAuthorization::from_sk_vk(&input_auth_sk, &COMPRESSED_TOKEN_AUTH_VK);
 
     // input note
-    let rho = Nullifier::new(pallas::Base::random(&mut rng));
+    let rho = Nullifier::from(pallas::Base::random(&mut rng));
     let input_note =
         create_random_token_note(&mut rng, &sell.name, sell.value, rho, input_nk, &input_auth);
 

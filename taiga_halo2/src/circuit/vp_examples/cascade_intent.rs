@@ -179,7 +179,7 @@ fn test_halo2_cascade_intent_vp_circuit() {
     let circuit = {
         let cascade_input_note = random_input_note(&mut rng);
         let cascade_note_cm = cascade_input_note.commitment().inner();
-        let rho = Nullifier::new(pallas::Base::random(&mut rng));
+        let rho = Nullifier::from(pallas::Base::random(&mut rng));
         let nk = NullifierKeyContainer::random_key(&mut rng);
         let intent_note = create_intent_note(&mut rng, cascade_note_cm, rho, nk);
         let input_notes = [intent_note, cascade_input_note];

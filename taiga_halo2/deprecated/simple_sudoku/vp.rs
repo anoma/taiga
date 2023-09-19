@@ -139,7 +139,7 @@ mod tests {
         let value: u64 = 0;
         let nk = NullifierKeyContainer::random_key(&mut rng);
         let rseed = RandomSeed::random(&mut rng);
-        let rho = Nullifier::new(pallas::Base::random(&mut rng));
+        let rho = Nullifier::from(pallas::Base::random(&mut rng));
         Note::new(
             vp_vk,
             app_data_static,

@@ -430,7 +430,7 @@ pub mod testing {
             // The encoding method is flexible and defined in the application vp.
             // Use poseidon hash to encode the two dynamic VPs here
             let app_data_dynamic = poseidon_hash(app_dynamic_vp_vk[0], app_dynamic_vp_vk[1]);
-            let rho = Nullifier::new(pallas::Base::random(&mut rng));
+            let rho = Nullifier::from(pallas::Base::random(&mut rng));
             let value = 5000u64;
             let nk = NullifierKeyContainer::random_key(&mut rng);
             let rseed = RandomSeed::random(&mut rng);
@@ -471,7 +471,7 @@ pub mod testing {
         let input_note_2 = {
             let app_data_static = pallas::Base::one();
             let app_data_dynamic = pallas::Base::zero();
-            let rho = Nullifier::new(pallas::Base::random(&mut rng));
+            let rho = Nullifier::from(pallas::Base::random(&mut rng));
             let value = 10u64;
             let nk = NullifierKeyContainer::random_key(&mut rng);
             let rseed = RandomSeed::random(&mut rng);

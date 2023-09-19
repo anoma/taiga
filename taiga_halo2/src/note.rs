@@ -192,7 +192,7 @@ impl Note {
         let app_data_static = pallas::Base::random(&mut rng);
         let note_type = NoteType::new(app_vk, app_data_static);
         let app_data_dynamic = pallas::Base::random(&mut rng);
-        let rho = Nullifier::new(pallas::Base::random(&mut rng));
+        let rho = Nullifier::from(pallas::Base::random(&mut rng));
         let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
         let rseed = RandomSeed::random(&mut rng);
         Note {

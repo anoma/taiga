@@ -35,13 +35,7 @@ pub enum NullifierKeyContainer {
 }
 
 impl Nullifier {
-    // for test
-    pub fn new(nf: pallas::Base) -> Self {
-        Self(nf)
-    }
-
-    // cm is a field element
-    // nf = poseidon_hash(nk || \rho || \psi || note_cm)
+    // nf = poseidon_hash(nk || \rho || \psi || note_cm), in which note_cm is a field element
     pub fn derive(
         nk: &NullifierKeyContainer,
         rho: &pallas::Base,
@@ -67,6 +61,12 @@ impl Nullifier {
 
     pub fn from_bytes(bytes: [u8; 32]) -> CtOption<Self> {
         pallas::Base::from_repr(bytes).map(Nullifier)
+    }
+}
+
+impl From<pallas::Base> for Nullifier {
+    fn from(cm: pallas::Base) -> Self {
+        Nullifier(cm)
     }
 }
 
@@ -164,7 +164,7 @@ pub mod tests {
     use super::{Nullifier, NullifierKeyContainer};
 
     pub fn random_nullifier<R: RngCore>(mut rng: R) -> Nullifier {
-        Nullifier::new(pallas::Base::random(&mut rng))
+        Nullifier::from(pallas::Base::random(&mut rng))
     }
 
     pub fn random_nullifier_key<R: RngCore>(mut rng: R) -> NullifierKeyContainer {
