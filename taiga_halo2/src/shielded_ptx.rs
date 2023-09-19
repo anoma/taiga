@@ -1,4 +1,4 @@
-use crate::action::{ActionInfo, ActionInstance};
+use crate::action::{ActionInfo, ActionPublicInputs};
 use crate::circuit::vp_circuit::{VPVerifyingInfo, ValidityPredicate};
 use crate::constant::{
     ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, MAX_DYNAMIC_VP_NUM,
@@ -39,7 +39,7 @@ pub struct ShieldedPartialTransaction {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionVerifyingInfo {
     action_proof: Proof,
-    action_instance: ActionInstance,
+    action_instance: ActionPublicInputs,
 }
 
 #[derive(Debug, Clone)]

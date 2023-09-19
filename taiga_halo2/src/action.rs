@@ -19,12 +19,12 @@ use serde;
 #[cfg(feature = "borsh")]
 use borsh::{BorshDeserialize, BorshSerialize};
 
-/// The action result used in transaction.
+/// The public inputs of action proof.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "nif", derive(NifStruct))]
-#[cfg_attr(feature = "nif", module = "Taiga.Action.Instance")]
+#[cfg_attr(feature = "nif", module = "Taiga.Action.PublicInputs")]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ActionInstance {
+pub struct ActionPublicInputs {
     /// The root of the note commitment Merkle tree.
     pub anchor: Anchor,
     /// The nullifier of input note.
@@ -39,7 +39,7 @@ pub struct ActionInstance {
     pub output_vp_commitment: ValidityPredicateCommitment,
 }
 
-/// The information to build ActionInstance and ActionCircuit.
+/// The information to build ActionPublicInputs and ActionCircuit.
 #[derive(Clone)]
 pub struct ActionInfo {
     input_note: Note,
@@ -49,7 +49,7 @@ pub struct ActionInfo {
     rseed: RandomSeed,
 }
 
-impl ActionInstance {
+impl ActionPublicInputs {
     pub fn to_instance(&self) -> Vec<pallas::Base> {
         let input_vp_commitment = self.input_vp_commitment.to_public_inputs();
         let output_vp_commitment = self.output_vp_commitment.to_public_inputs();
@@ -68,7 +68,7 @@ impl ActionInstance {
 }
 
 #[cfg(feature = "borsh")]
-impl BorshSerialize for ActionInstance {
+impl BorshSerialize for ActionPublicInputs {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         writer.write_all(&self.anchor.to_bytes())?;
         writer.write_all(&self.nf.to_bytes())?;
@@ -81,7 +81,7 @@ impl BorshSerialize for ActionInstance {
 }
 
 #[cfg(feature = "borsh")]
-impl BorshDeserialize for ActionInstance {
+impl BorshDeserialize for ActionPublicInputs {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         use std::io;
         let anchor_bytes = <[u8; 32]>::deserialize_reader(reader)?;
@@ -103,7 +103,7 @@ impl BorshDeserialize for ActionInstance {
         let output_vp_commitment =
             ValidityPredicateCommitment::from_bytes(output_vp_commitment_bytes);
 
-        Ok(ActionInstance {
+        Ok(ActionPublicInputs {
             anchor,
             nf,
             cm,
@@ -158,7 +158,7 @@ impl ActionInfo {
         self.rseed.get_vp_cm_r(PRF_EXPAND_OUTPUT_VP_CM_R)
     }
 
-    pub fn build(&self) -> (ActionInstance, ActionCircuit) {
+    pub fn build(&self) -> (ActionPublicInputs, ActionCircuit) {
         let nf = self.input_note.get_nf().unwrap();
         assert_eq!(
             nf, self.output_note.rho,
@@ -182,7 +182,7 @@ impl ActionInfo {
         let output_vp_commitment =
             ValidityPredicateCommitment::commit(&self.output_note.get_app_vk(), &output_vp_cm_r);
 
-        let action = ActionInstance {
+        let action = ActionPublicInputs {
             nf,
             cm,
             anchor,
