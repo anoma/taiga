@@ -52,7 +52,7 @@ pub fn create_token_swap_ptx<R: RngCore>(
     output_value: u64,
     output_auth_pk: pallas::Point,
     output_nk_com: NullifierKeyContainer, // NullifierKeyContainer::Commitment
-) -> (ShieldedPartialTransaction, pallas::Scalar) {
+) -> ShieldedPartialTransaction {
     let input_auth = TokenAuthorization::from_sk_vk(&input_auth_sk, &COMPRESSED_TOKEN_AUTH_VK);
 
     // input note

@@ -10,7 +10,7 @@ use pasta_curves::{group::Curve, pallas};
 use rand::{CryptoRng, RngCore};
 use taiga_halo2::{
     nullifier::NullifierKeyContainer,
-    transaction::{ShieldedPartialTxBundle, Transaction},
+    transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
 };
 
 pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
@@ -21,7 +21,7 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
     let alice_auth_pk = generator * alice_auth_sk;
     let alice_nk = NullifierKeyContainer::random_key(&mut rng);
 
-    let (alice_ptx, alice_r) = create_token_swap_ptx(
+    let alice_ptx = create_token_swap_ptx(
         &mut rng,
         "btc",
         5,
@@ -38,7 +38,7 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
     let bob_auth_pk = generator * bob_auth_sk;
     let bob_nk = NullifierKeyContainer::random_key(&mut rng);
 
-    let (bob_ptx, bob_r) = create_token_swap_ptx(
+    let bob_ptx = create_token_swap_ptx(
         &mut rng,
         "eth",
         10,
@@ -55,7 +55,7 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
     let carol_auth_pk = generator * carol_auth_sk;
     let carol_nk = NullifierKeyContainer::random_key(&mut rng);
 
-    let (carol_ptx, carol_r) = create_token_swap_ptx(
+    let carol_ptx = create_token_swap_ptx(
         &mut rng,
         "xan",
         15,
@@ -69,12 +69,8 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
 
     // Solver creates the final transaction
     let shielded_tx_bundle = ShieldedPartialTxBundle::build(vec![alice_ptx, bob_ptx, carol_ptx]);
-    Transaction::build(
-        &mut rng,
-        Some(shielded_tx_bundle),
-        None,
-        vec![alice_r, bob_r, carol_r],
-    )
+    let transparent_ptx_bundle = TransparentPartialTxBundle::default();
+    Transaction::build(&mut rng, shielded_tx_bundle, transparent_ptx_bundle)
 }
 
 #[test]

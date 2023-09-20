@@ -19,7 +19,7 @@ use taiga_halo2::{
     note::{InputNoteProvingInfo, OutputNoteProvingInfo},
     nullifier::{Nullifier, NullifierKeyContainer},
     shielded_ptx::ShieldedPartialTransaction,
-    transaction::{ShieldedPartialTxBundle, Transaction},
+    transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
 };
 
 pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
@@ -71,7 +71,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
     // The first partial transaction:
     // Alice consumes 1 "BTC" and 2 "ETH".
     // Alice creates a cascade intent note and 1 "BTC" to Bob.
-    let (ptx_1, r_1) = {
+    let ptx_1 = {
         let input_notes = [input_note_1, input_note_2];
         let output_notes = [output_note_1, cascade_intent_note];
         // Create the input note proving info
@@ -128,7 +128,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
     // The second partial transaction:
     // Alice consumes the intent note and 3 "XAN";
     // Alice creates 2 "ETH" and 3 "XAN" to Bob
-    let (ptx_2, r_2) = {
+    let ptx_2 = {
         let input_notes = [cascade_intent_note, input_note_3];
         let output_notes = [output_note_2, output_note_3];
         // Create the input note proving info
@@ -185,7 +185,8 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
 
     // Create the final transaction
     let shielded_tx_bundle = ShieldedPartialTxBundle::build(vec![ptx_1, ptx_2]);
-    Transaction::build(&mut rng, Some(shielded_tx_bundle), None, vec![r_1, r_2])
+    let transparent_ptx_bundle = TransparentPartialTxBundle::default();
+    Transaction::build(&mut rng, shielded_tx_bundle, transparent_ptx_bundle)
 }
 
 #[test]

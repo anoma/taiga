@@ -23,6 +23,8 @@ use serde;
 
 #[cfg(feature = "borsh")]
 use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(feature = "borsh")]
+use ff::PrimeField;
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -30,6 +32,7 @@ pub struct ShieldedPartialTransaction {
     actions: [ActionVerifyingInfo; NUM_NOTE],
     inputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
     outputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
+    binding_sig_r: pallas::Scalar,
 }
 
 #[derive(Debug, Clone)]
@@ -62,6 +65,7 @@ struct ShieldedPartialTransactionProxy {
     actions: Vec<ActionVerifyingInfo>,
     inputs: Vec<NoteVPVerifyingInfoSet>,
     outputs: Vec<NoteVPVerifyingInfoSet>,
+    binding_sig_r: pallas::Scalar,
 }
 
 impl ShieldedPartialTransaction {
@@ -69,7 +73,7 @@ impl ShieldedPartialTransaction {
         input_info: [InputNoteProvingInfo; NUM_NOTE],
         output_info: [OutputNoteProvingInfo; NUM_NOTE],
         mut rng: R,
-    ) -> (Self, pallas::Scalar) {
+    ) -> Self {
         let inputs: Vec<NoteVPVerifyingInfoSet> = input_info
             .iter()
             .map(|input_note| {
@@ -99,14 +103,12 @@ impl ShieldedPartialTransaction {
             })
             .collect();
 
-        (
-            Self {
-                actions: actions.try_into().unwrap(),
-                inputs: inputs.try_into().unwrap(),
-                outputs: outputs.try_into().unwrap(),
-            },
-            rcv_sum,
-        )
+        Self {
+            actions: actions.try_into().unwrap(),
+            inputs: inputs.try_into().unwrap(),
+            outputs: outputs.try_into().unwrap(),
+            binding_sig_r: rcv_sum,
+        }
     }
 
     // verify zk proof
@@ -198,7 +200,12 @@ impl ShieldedPartialTransaction {
             actions: self.actions.to_vec(),
             inputs: self.inputs.to_vec(),
             outputs: self.outputs.to_vec(),
+            binding_sig_r: self.binding_sig_r,
         }
+    }
+
+    pub fn get_binding_sig_r(&self) -> pallas::Scalar {
+        self.binding_sig_r
     }
 }
 
@@ -211,6 +218,7 @@ impl ShieldedPartialTransactionProxy {
             actions,
             inputs,
             outputs,
+            binding_sig_r: self.binding_sig_r,
         })
     }
 }
@@ -267,6 +275,8 @@ impl BorshSerialize for ShieldedPartialTransaction {
             output.serialize(writer)?;
         }
 
+        writer.write_all(&self.binding_sig_r.to_repr())?;
+
         Ok(())
     }
 }
@@ -283,10 +293,19 @@ impl BorshDeserialize for ShieldedPartialTransaction {
         let outputs: Vec<_> = (0..NUM_NOTE)
             .map(|_| NoteVPVerifyingInfoSet::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
+        let binding_sig_r_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let binding_sig_r = Option::from(pallas::Scalar::from_repr(binding_sig_r_bytes))
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "binding_sig_r not in field",
+                )
+            })?;
         Ok(ShieldedPartialTransaction {
             actions: actions.try_into().unwrap(),
             inputs: inputs.try_into().unwrap(),
             outputs: outputs.try_into().unwrap(),
+            binding_sig_r,
         })
     }
 }
@@ -414,7 +433,7 @@ pub mod testing {
     use pasta_curves::pallas;
     use rand::rngs::OsRng;
 
-    pub fn create_shielded_ptx() -> (ShieldedPartialTransaction, pallas::Scalar) {
+    pub fn create_shielded_ptx() -> ShieldedPartialTransaction {
         let mut rng = OsRng;
 
         // Create empty VP circuit without note info
