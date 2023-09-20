@@ -315,7 +315,7 @@ impl GetIsInputNoteFlagConfig {
         let is_input_note_flag = owned_note_pub_id
             .value()
             .zip(input_note_nfs[0].value())
-            .zip(input_note_nfs[0].value())
+            .zip(input_note_nfs[1].value())
             .map(
                 |((&owned_note_pub_id, &input_note_nf_1), &input_note_nf_2)| {
                     if owned_note_pub_id == input_note_nf_1 || owned_note_pub_id == input_note_nf_2
