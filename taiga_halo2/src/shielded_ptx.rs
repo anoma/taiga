@@ -1,4 +1,4 @@
-use crate::action::{ActionInfo, ActionInstance};
+use crate::action::{ActionInfo, ActionPublicInputs};
 use crate::circuit::vp_circuit::{VPVerifyingInfo, ValidityPredicate};
 use crate::constant::{
     ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, MAX_DYNAMIC_VP_NUM,
@@ -6,7 +6,8 @@ use crate::constant::{
 };
 use crate::error::TransactionError;
 use crate::executable::Executable;
-use crate::note::{InputNoteProvingInfo, OutputNoteProvingInfo};
+use crate::merkle_tree::Anchor;
+use crate::note::{InputNoteProvingInfo, NoteCommitment, OutputNoteProvingInfo};
 use crate::nullifier::Nullifier;
 use crate::proof::Proof;
 use crate::value_commitment::ValueCommitment;
@@ -38,7 +39,7 @@ pub struct ShieldedPartialTransaction {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionVerifyingInfo {
     action_proof: Proof,
-    action_instance: ActionInstance,
+    action_instance: ActionPublicInputs,
 }
 
 #[derive(Debug, Clone)]
@@ -184,7 +185,7 @@ impl ShieldedPartialTransaction {
             }
 
             // Check the owned_note_id that vp uses is consistent with the cm from the action circuit
-            if owned_note_id != *action_cm {
+            if owned_note_id != action_cm.inner() {
                 return Err(TransactionError::InconsistentOwnedNotePubID);
             }
         }
@@ -229,7 +230,7 @@ impl Executable for ShieldedPartialTransaction {
             .collect()
     }
 
-    fn get_output_cms(&self) -> Vec<pallas::Base> {
+    fn get_output_cms(&self) -> Vec<NoteCommitment> {
         self.actions
             .iter()
             .map(|action| action.action_instance.cm)
@@ -243,7 +244,7 @@ impl Executable for ShieldedPartialTransaction {
             .collect()
     }
 
-    fn get_anchors(&self) -> Vec<pallas::Base> {
+    fn get_anchors(&self) -> Vec<Anchor> {
         self.actions
             .iter()
             .map(|action| action.action_instance.anchor)
@@ -388,7 +389,7 @@ impl NoteVPVerifyingInfoSet {
         nfs
     }
 
-    pub fn get_note_commitments(&self) -> Vec<[pallas::Base; NUM_NOTE]> {
+    pub fn get_note_commitments(&self) -> Vec<[NoteCommitment; NUM_NOTE]> {
         let mut cms = vec![self.app_vp_verifying_info.get_note_commitments()];
         self.app_dynamic_vp_verifying_info
             .iter()
@@ -430,7 +431,7 @@ pub mod testing {
             // The encoding method is flexible and defined in the application vp.
             // Use poseidon hash to encode the two dynamic VPs here
             let app_data_dynamic = poseidon_hash(app_dynamic_vp_vk[0], app_dynamic_vp_vk[1]);
-            let rho = Nullifier::new(pallas::Base::random(&mut rng));
+            let rho = Nullifier::from(pallas::Base::random(&mut rng));
             let value = 5000u64;
             let nk = NullifierKeyContainer::random_key(&mut rng);
             let rseed = RandomSeed::random(&mut rng);
@@ -471,7 +472,7 @@ pub mod testing {
         let input_note_2 = {
             let app_data_static = pallas::Base::one();
             let app_data_dynamic = pallas::Base::zero();
-            let rho = Nullifier::new(pallas::Base::random(&mut rng));
+            let rho = Nullifier::from(pallas::Base::random(&mut rng));
             let value = 10u64;
             let nk = NullifierKeyContainer::random_key(&mut rng);
             let rseed = RandomSeed::random(&mut rng);

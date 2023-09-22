@@ -22,7 +22,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
     let mut rng = OsRng;
     let action_info = {
         let input_note = {
-            let rho = Nullifier::new(pallas::Base::random(&mut rng));
+            let rho = Nullifier::from(pallas::Base::random(&mut rng));
             let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
             let note_type = {
                 let app_vk = pallas::Base::random(&mut rng);

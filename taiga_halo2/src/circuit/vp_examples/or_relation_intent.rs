@@ -342,7 +342,7 @@ fn test_halo2_or_relation_intent_vp_circuit() {
             transfrom_token_name_to_token_property(&condition1.token_name);
         output_notes[0].value = condition1.token_value;
 
-        let rho = Nullifier::new(pallas::Base::random(&mut rng));
+        let rho = Nullifier::from(pallas::Base::random(&mut rng));
         let nk = NullifierKeyContainer::random_key(&mut rng);
         let nk_com = output_notes[0].get_nk_commitment();
         let intent_note = create_intent_note(

@@ -9,12 +9,47 @@ use halo2_proofs::arithmetic::Field;
 use pasta_curves::pallas;
 use rand::distributions::{Distribution, Standard};
 use rand::{Rng, RngCore};
+#[cfg(feature = "nif")]
+use rustler::NifTuple;
+use subtle::CtOption;
 
 #[cfg(feature = "serde")]
 use serde;
 
 #[cfg(feature = "borsh")]
 use borsh::{BorshDeserialize, BorshSerialize};
+
+/// The root of the note commitment Merkletree.
+#[derive(Eq, PartialEq, Clone, Copy, Debug)]
+#[cfg_attr(feature = "nif", derive(NifTuple))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Anchor(pallas::Base);
+
+impl Anchor {
+    pub fn inner(&self) -> pallas::Base {
+        self.0
+    }
+
+    pub fn to_bytes(&self) -> [u8; 32] {
+        self.0.to_repr()
+    }
+
+    pub fn from_bytes(bytes: [u8; 32]) -> CtOption<Self> {
+        pallas::Base::from_repr(bytes).map(Anchor)
+    }
+}
+
+impl From<pallas::Base> for Anchor {
+    fn from(anchor: pallas::Base) -> Anchor {
+        Anchor(anchor)
+    }
+}
+
+impl From<Node> for Anchor {
+    fn from(node: Node) -> Anchor {
+        Anchor(node.0)
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Copy, Hash, Default)]
 #[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
@@ -70,7 +105,7 @@ impl MerklePath {
     }
 
     /// Returns the root of the tree corresponding to this path applied to `leaf`.
-    pub fn root(&self, leaf: Node) -> Node {
+    pub fn root(&self, leaf: Node) -> Anchor {
         let mut root = leaf;
         for val in self.merkle_path.iter() {
             root = match val.1 {
@@ -78,7 +113,7 @@ impl MerklePath {
                 L => Node::combine(&val.0, &root),
             }
         }
-        root
+        root.into()
     }
 
     /// Returns the input parameters for merkle tree gadget.
@@ -93,7 +128,7 @@ impl MerklePath {
 impl Default for MerklePath {
     fn default() -> MerklePath {
         let merkle_path = (0..TAIGA_COMMITMENT_TREE_DEPTH)
-            .map(|_| (Node::new(pallas::Base::one()), L))
+            .map(|_| (Node::from(pallas::Base::one()), L))
             .collect();
         Self::from_path(merkle_path)
     }
@@ -105,18 +140,6 @@ impl Default for MerklePath {
 pub struct Node(pallas::Base);
 
 impl Node {
-    pub fn new(v: pallas::Base) -> Self {
-        Self(v)
-    }
-
-    pub fn from_note(n: &Note) -> Self {
-        Self(n.commitment().inner())
-    }
-
-    pub fn from_note_commitment(n: &NoteCommitment) -> Self {
-        Self(n.inner())
-    }
-
     pub fn rand(rng: &mut impl RngCore) -> Self {
         Self(pallas::Base::random(rng))
     }
@@ -127,6 +150,24 @@ impl Node {
 
     pub fn combine(left: &Node, right: &Node) -> Node {
         Self(poseidon_hash(left.inner(), right.inner()))
+    }
+}
+
+impl From<pallas::Base> for Node {
+    fn from(node: pallas::Base) -> Node {
+        Node(node)
+    }
+}
+
+impl From<&Note> for Node {
+    fn from(note: &Note) -> Node {
+        Node(note.commitment().inner())
+    }
+}
+
+impl From<NoteCommitment> for Node {
+    fn from(cm: NoteCommitment) -> Node {
+        Node(cm.inner())
     }
 }
 

@@ -30,7 +30,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
     let bob_auth = TokenAuthorization::random(&mut rng);
     let bob_nk_com = NullifierKeyContainer::random_commitment(&mut rng);
 
-    let rho = Nullifier::new(pallas::Base::random(&mut rng));
+    let rho = Nullifier::from(pallas::Base::random(&mut rng));
     let input_note_1 = create_random_token_note(&mut rng, "btc", 1u64, rho, alice_nk, &alice_auth);
     let output_note_1 = create_random_token_note(
         &mut rng,

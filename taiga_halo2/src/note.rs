@@ -48,6 +48,12 @@ impl NoteCommitment {
     }
 }
 
+impl From<pallas::Base> for NoteCommitment {
+    fn from(cm: pallas::Base) -> Self {
+        NoteCommitment(cm)
+    }
+}
+
 #[cfg(feature = "borsh")]
 impl BorshSerialize for NoteCommitment {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
@@ -186,7 +192,7 @@ impl Note {
         let app_data_static = pallas::Base::random(&mut rng);
         let note_type = NoteType::new(app_vk, app_data_static);
         let app_data_dynamic = pallas::Base::random(&mut rng);
-        let rho = Nullifier::new(pallas::Base::random(&mut rng));
+        let rho = Nullifier::from(pallas::Base::random(&mut rng));
         let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
         let rseed = RandomSeed::random(&mut rng);
         Note {

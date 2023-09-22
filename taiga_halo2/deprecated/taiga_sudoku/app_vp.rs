@@ -602,7 +602,7 @@ pub mod tests {
     };
 
     pub fn random_input_note<R: RngCore>(mut rng: R) -> Note {
-        let rho = Nullifier::new(pallas::Base::random(&mut rng));
+        let rho = Nullifier::from(pallas::Base::random(&mut rng));
         let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
         let note_type = {
             let app_vk = pallas::Base::random(&mut rng);
