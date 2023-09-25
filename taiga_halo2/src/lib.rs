@@ -13,6 +13,7 @@ pub mod note_encryption;
 pub mod nullifier;
 pub mod proof;
 pub mod shielded_ptx;
+pub mod taiga_api;
 pub mod transaction;
 pub mod transparent_ptx;
 pub mod utils;
