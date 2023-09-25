@@ -24,7 +24,7 @@ use taiga_halo2::{
     note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
     nullifier::{Nullifier, NullifierKeyContainer},
     shielded_ptx::ShieldedPartialTransaction,
-    transaction::{ShieldedPartialTxBundle, Transaction},
+    transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
 };
 
 pub fn create_token_intent_ptx<R: RngCore>(
@@ -37,7 +37,6 @@ pub fn create_token_intent_ptx<R: RngCore>(
     input_nk: NullifierKeyContainer, // NullifierKeyContainer::Key
 ) -> (
     ShieldedPartialTransaction,
-    pallas::Scalar,
     NullifierKeyContainer,
     pallas::Base,
     pallas::Base,
@@ -122,7 +121,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
     );
 
     // Create shielded partial tx
-    let (ptx, r) = ShieldedPartialTransaction::build(
+    let ptx = ShieldedPartialTransaction::build(
         [input_note_proving_info, padding_input_note_proving_info],
         [intent_note_proving_info, padding_output_note_proving_info],
         &mut rng,
@@ -130,7 +129,6 @@ pub fn create_token_intent_ptx<R: RngCore>(
 
     (
         ptx,
-        r,
         input_nk,
         input_note_nk_com,
         input_note.app_data_dynamic,
@@ -150,7 +148,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     output_token: &str,
     output_value: u64,
     output_auth_pk: pallas::Point,
-) -> (ShieldedPartialTransaction, pallas::Scalar) {
+) -> ShieldedPartialTransaction {
     // input intent note
     let intent_note = create_intent_note(
         &mut rng,
@@ -252,7 +250,7 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
         token_name: "monkey".to_string(),
         token_value: 2u64,
     };
-    let (alice_ptx, alice_r, intent_nk, receiver_nk_com, receiver_app_data_dynamic, intent_rho) =
+    let (alice_ptx, intent_nk, receiver_nk_com, receiver_app_data_dynamic, intent_rho) =
         create_token_intent_ptx(
             &mut rng,
             condition1.clone(),
@@ -268,7 +266,7 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
     let bob_auth_pk = generator * bob_auth_sk;
     let bob_nk = NullifierKeyContainer::random_key(&mut rng);
 
-    let (bob_ptx, bob_r) = create_token_swap_ptx(
+    let bob_ptx = create_token_swap_ptx(
         &mut rng,
         "dolphin",
         1,
@@ -282,7 +280,7 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
 
     // Solver/Bob creates the partial transaction to consume the intent note
     // The bob_ptx and solver_ptx can be merged to one ptx.
-    let (solver_ptx, solver_r) = consume_token_intent_ptx(
+    let solver_ptx = consume_token_intent_ptx(
         &mut rng,
         condition1,
         condition2,
@@ -297,12 +295,8 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
 
     // Solver creates the final transaction
     let shielded_tx_bundle = ShieldedPartialTxBundle::build(vec![alice_ptx, bob_ptx, solver_ptx]);
-    Transaction::build(
-        &mut rng,
-        Some(shielded_tx_bundle),
-        None,
-        vec![alice_r, bob_r, solver_r],
-    )
+    let transparent_ptx_bundle = TransparentPartialTxBundle::default();
+    Transaction::build(&mut rng, shielded_tx_bundle, transparent_ptx_bundle)
 }
 
 #[test]
