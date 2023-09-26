@@ -112,7 +112,7 @@ impl ShieldedPartialTransaction {
     }
 
     // verify zk proof
-    fn verify_proof(&self) -> Result<(), Error> {
+    pub fn verify_proof(&self) -> Result<(), TransactionError> {
         // Verify action proofs
         for verifying_info in self.actions.iter() {
             verifying_info.verify()?;

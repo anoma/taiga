@@ -42,6 +42,7 @@ pub struct ShieldedPartialTxBundle(Vec<ShieldedPartialTransaction>);
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "nif", derive(NifStruct))]
 #[cfg_attr(feature = "nif", module = "Taiga.Transaction.Result")]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 pub struct ShieldedResult {
     pub anchors: Vec<Anchor>,
     pub nullifiers: Vec<Nullifier>,
@@ -219,7 +220,7 @@ impl ShieldedPartialTxBundle {
         })
     }
 
-    pub fn build(partial_txs: Vec<ShieldedPartialTransaction>) -> Self {
+    pub fn new(partial_txs: Vec<ShieldedPartialTransaction>) -> Self {
         Self(partial_txs)
     }
 
@@ -275,7 +276,7 @@ impl TransparentPartialTxBundle {
         self.0.is_empty()
     }
 
-    pub fn build(partial_txs: Vec<TransparentPartialTransaction>) -> Self {
+    pub fn new(partial_txs: Vec<TransparentPartialTransaction>) -> Self {
         Self(partial_txs)
     }
 
@@ -328,7 +329,7 @@ pub mod testing {
             let ptx = create_shielded_ptx();
             bundle.push(ptx);
         }
-        ShieldedPartialTxBundle::build(bundle)
+        ShieldedPartialTxBundle::new(bundle)
     }
 
     #[test]

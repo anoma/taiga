@@ -16,6 +16,8 @@ pub enum TransactionError {
     InconsistentOutputNoteCommitment,
     /// Owned note public id is not consistent between the action and the vp.
     InconsistentOwnedNotePubID,
+    /// IO error
+    IoError(std::io::Error),
 }
 
 impl Display for TransactionError {
@@ -34,6 +36,7 @@ impl Display for TransactionError {
             InconsistentOwnedNotePubID => {
                 f.write_str("Owned note public id is not consistent between the action and the vp")
             }
+            IoError(e) => f.write_str(&format!("IoError error: {e}")),
         }
     }
 }
@@ -41,5 +44,11 @@ impl Display for TransactionError {
 impl From<PlonkError> for TransactionError {
     fn from(e: PlonkError) -> Self {
         TransactionError::Proof(e)
+    }
+}
+
+impl From<std::io::Error> for TransactionError {
+    fn from(e: std::io::Error) -> Self {
+        TransactionError::IoError(e)
     }
 }
