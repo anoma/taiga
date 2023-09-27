@@ -1,19 +1,83 @@
 #[cfg(feature = "borsh")]
 use crate::{
     error::TransactionError,
-    note::Note,
     transaction::{ShieldedResult, TransparentResult},
 };
 use crate::{
+    note::{Note, RandomSeed},
+    nullifier::{Nullifier, NullifierKeyContainer},
     shielded_ptx::ShieldedPartialTransaction,
     transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
 };
+use pasta_curves::pallas;
 use rand::rngs::OsRng;
 
 pub const NOTE_SIZE: usize = 234;
 
 #[cfg(feature = "borsh")]
 use borsh::{BorshDeserialize, BorshSerialize};
+
+/// Create a note
+/// app_vk is the compressed verifying key of application(static) VP
+/// app_data_static is the encoded data that is defined in application vp
+/// app_data_dynamic is the data defined in application vp and will NOT be used to derive type
+/// value is the quantity of notes
+/// nk is the nullifier key
+/// rho is the old nullifier
+/// is_merkle_checked is true for normal notes, false for intent(ephemeral) notes
+///
+/// In practice, input notes are fetched and decrypted from blockchain storage.
+/// The create_input_note API is only for test.
+pub fn create_input_note(
+    app_vk: pallas::Base,
+    app_data_static: pallas::Base,
+    app_data_dynamic: pallas::Base,
+    value: u64,
+    nk: pallas::Base,
+    is_merkle_checked: bool,
+) -> Note {
+    let rng = OsRng;
+    let nk_container = NullifierKeyContainer::from_key(nk);
+    let rho = Nullifier::default();
+    let rseed = RandomSeed::random(rng);
+    Note::new(
+        app_vk,
+        app_data_static,
+        app_data_dynamic,
+        value,
+        nk_container,
+        rho,
+        is_merkle_checked,
+        rseed,
+    )
+}
+
+///
+pub fn create_output_note(
+    app_vk: pallas::Base,
+    app_data_static: pallas::Base,
+    app_data_dynamic: pallas::Base,
+    value: u64,
+    // The owner of output note has the nullifer key and exposes the nullifier_key commitment to output creator.
+    nk_com: pallas::Base,
+    // TODO: remove the input_nf, and get it at run time.
+    input_nf: Nullifier,
+    is_merkle_checked: bool,
+) -> Note {
+    let rng = OsRng;
+    let nk_container = NullifierKeyContainer::from_commitment(nk_com);
+    let rseed = RandomSeed::random(rng);
+    Note::new(
+        app_vk,
+        app_data_static,
+        app_data_dynamic,
+        value,
+        nk_container,
+        input_nf,
+        is_merkle_checked,
+        rseed,
+    )
+}
 
 /// Note borsh serialization
 ///
