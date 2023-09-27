@@ -120,6 +120,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
     let ptx = ShieldedPartialTransaction::build(
         [input_note_proving_info, padding_input_note_proving_info],
         [intent_note_proving_info, padding_output_note_proving_info],
+        vec![],
         &mut rng,
     );
 
@@ -243,6 +244,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     ShieldedPartialTransaction::build(
         [intent_note_proving_info, padding_input_note_proving_info],
         [bought_note_proving_info, returned_note_proving_info],
+        vec![],
         &mut rng,
     )
 }

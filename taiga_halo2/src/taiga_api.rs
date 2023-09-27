@@ -70,6 +70,7 @@ pub fn note_deserialize(bytes: Vec<u8>) -> std::io::Result<Note> {
 /// | output2 dynamic vp num(by borsh)  | u32                   | 4             |
 /// | output2 dynamic vp proofs         | VPVerifyingInfo       | 158216 * num  |
 /// | binding_sig_r                     | pallas::Scalar        | 32            |
+/// | hints                             | Vec<u8>               | -             |
 ///
 /// Note: Ultimately, vp proofs won't go to the ptx. It's verifier proofs instead.
 /// The verifier proof may have a much smaller size since the verifier verifying-key

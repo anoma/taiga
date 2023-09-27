@@ -33,6 +33,7 @@ pub struct ShieldedPartialTransaction {
     inputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
     outputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
     binding_sig_r: pallas::Scalar,
+    hints: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -66,12 +67,14 @@ struct ShieldedPartialTransactionProxy {
     inputs: Vec<NoteVPVerifyingInfoSet>,
     outputs: Vec<NoteVPVerifyingInfoSet>,
     binding_sig_r: pallas::Scalar,
+    hints: Vec<u8>,
 }
 
 impl ShieldedPartialTransaction {
     pub fn build<R: RngCore>(
         input_info: [InputNoteProvingInfo; NUM_NOTE],
         output_info: [OutputNoteProvingInfo; NUM_NOTE],
+        hints: Vec<u8>,
         mut rng: R,
     ) -> Self {
         let inputs: Vec<NoteVPVerifyingInfoSet> = input_info
@@ -108,6 +111,7 @@ impl ShieldedPartialTransaction {
             inputs: inputs.try_into().unwrap(),
             outputs: outputs.try_into().unwrap(),
             binding_sig_r: rcv_sum,
+            hints,
         }
     }
 
@@ -201,11 +205,16 @@ impl ShieldedPartialTransaction {
             inputs: self.inputs.to_vec(),
             outputs: self.outputs.to_vec(),
             binding_sig_r: self.binding_sig_r,
+            hints: self.hints.clone(),
         }
     }
 
     pub fn get_binding_sig_r(&self) -> pallas::Scalar {
         self.binding_sig_r
+    }
+
+    pub fn get_hints(&self) -> Vec<u8> {
+        self.hints.clone()
     }
 }
 
@@ -219,6 +228,7 @@ impl ShieldedPartialTransactionProxy {
             inputs,
             outputs,
             binding_sig_r: self.binding_sig_r,
+            hints: self.hints.clone(),
         })
     }
 }
@@ -277,6 +287,8 @@ impl BorshSerialize for ShieldedPartialTransaction {
 
         writer.write_all(&self.binding_sig_r.to_repr())?;
 
+        self.hints.serialize(writer)?;
+
         Ok(())
     }
 }
@@ -301,11 +313,13 @@ impl BorshDeserialize for ShieldedPartialTransaction {
                     "binding_sig_r not in field",
                 )
             })?;
+        let hints = Vec::<u8>::deserialize_reader(reader)?;
         Ok(ShieldedPartialTransaction {
             actions: actions.try_into().unwrap(),
             inputs: inputs.try_into().unwrap(),
             outputs: outputs.try_into().unwrap(),
             binding_sig_r,
+            hints,
         })
     }
 }
@@ -572,6 +586,7 @@ pub mod testing {
         ShieldedPartialTransaction::build(
             [input_note_proving_info_1, input_note_proving_info_2],
             [output_note_proving_info_1, output_note_proving_info_2],
+            vec![],
             &mut rng,
         )
     }
