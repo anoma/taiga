@@ -51,6 +51,12 @@ impl From<Node> for Anchor {
     }
 }
 
+impl Hash for Anchor {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.to_repr().hash(state);
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Copy, Hash, Default)]
 #[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
