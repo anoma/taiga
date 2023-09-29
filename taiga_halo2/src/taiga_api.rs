@@ -1,5 +1,7 @@
 #[cfg(feature = "borsh")]
 use crate::{
+    action::ActionInfo,
+    circuit::vp_bytecode::ApplicationByteCode,
     error::TransactionError,
     transaction::{ShieldedResult, TransparentResult},
 };
@@ -173,13 +175,17 @@ pub fn transaction_deserialize(bytes: Vec<u8>) -> std::io::Result<Transaction> {
     BorshDeserialize::deserialize(&mut bytes.as_ref())
 }
 
-/// TODO: Create a shielded partial transaction
-///
-// pub fn create_shielded_partial_transaction(
-
-// ) -> ShieldedPartialTransaction {
-
-// }
+/// Create a shielded partial transaction from vp bytecode
+#[cfg(feature = "borsh")]
+pub fn create_shielded_partial_transaction(
+    actions: Vec<ActionInfo>,
+    input_note_app: Vec<ApplicationByteCode>,
+    output_note_app: Vec<ApplicationByteCode>,
+    hints: Vec<u8>,
+) -> ShieldedPartialTransaction {
+    let rng = OsRng;
+    ShieldedPartialTransaction::from_bytecode(actions, input_note_app, output_note_app, hints, rng)
+}
 
 /// Create a transaction from partial transactions
 ///
@@ -240,7 +246,6 @@ pub mod tests {
     };
     use rand::rngs::OsRng;
 
-    #[cfg(feature = "borsh")]
     #[test]
     fn note_borsh_serialization_api_test() {
         let mut rng = OsRng;
@@ -257,5 +262,107 @@ pub mod tests {
             let de_output_note = note_deserialize(bytes).unwrap();
             assert_eq!(output_note, de_output_note);
         }
+    }
+
+    #[ignore]
+    #[test]
+    fn ptx_example_test() {
+        use crate::action::ActionInfo;
+        use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
+        use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
+        use crate::merkle_tree::{MerklePath, Node};
+        use crate::note::{
+            tests::{random_input_note, random_output_note},
+            RandomSeed,
+        };
+
+        let mut rng = OsRng;
+
+        // construct notes
+        let input_note_1 = random_input_note(&mut rng);
+        let input_note_1_nf = input_note_1.get_nf().unwrap();
+        let output_note_1 = random_output_note(&mut rng, input_note_1_nf);
+        let merkle_path_1 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+        let anchor_1 = {
+            let cm_note = Node::from(&input_note_1);
+            merkle_path_1.root(cm_note)
+        };
+        let rseed_1 = RandomSeed::random(&mut rng);
+        let action_1 = ActionInfo::new(
+            input_note_1,
+            merkle_path_1,
+            anchor_1,
+            output_note_1,
+            rseed_1,
+        );
+
+        let input_note_2 = random_input_note(&mut rng);
+        let input_note_2_nf = input_note_2.get_nf().unwrap();
+        let output_note_2 = random_output_note(&mut rng, input_note_2_nf);
+        let merkle_path_2 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+        let anchor_2 = {
+            let cm_note = Node::from(&input_note_2);
+            merkle_path_2.root(cm_note)
+        };
+        let rseed_2 = RandomSeed::random(&mut rng);
+        let action_2 = ActionInfo::new(
+            input_note_2,
+            merkle_path_2,
+            anchor_2,
+            output_note_2,
+            rseed_2,
+        );
+
+        // construct applications
+        let input_note_1_app = {
+            let app_vp = TrivialValidityPredicateCircuit::new(
+                input_note_1_nf.inner(),
+                [input_note_1, input_note_2],
+                [output_note_1, output_note_2],
+            );
+
+            ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
+        };
+
+        let input_note_2_app = {
+            let app_vp = TrivialValidityPredicateCircuit::new(
+                input_note_2_nf.inner(),
+                [input_note_1, input_note_2],
+                [output_note_1, output_note_2],
+            );
+
+            ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
+        };
+
+        let output_note_1_app = {
+            let app_vp = TrivialValidityPredicateCircuit::new(
+                output_note_1.commitment().inner(),
+                [input_note_1, input_note_2],
+                [output_note_1, output_note_2],
+            );
+
+            ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
+        };
+
+        let output_note_2_app = {
+            let app_vp = TrivialValidityPredicateCircuit::new(
+                output_note_2.commitment().inner(),
+                [input_note_1, input_note_2],
+                [output_note_1, output_note_2],
+            );
+
+            ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
+        };
+
+        // construct ptx
+        let ptx = create_shielded_partial_transaction(
+            vec![action_1, action_2],
+            vec![input_note_1_app, input_note_2_app],
+            vec![output_note_1_app, output_note_2_app],
+            vec![],
+        );
+
+        let ptx_bytes = partial_transaction_serialize(&ptx).unwrap();
+        verify_shielded_partial_transaction(ptx_bytes).unwrap();
     }
 }
