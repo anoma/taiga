@@ -172,9 +172,11 @@ impl rustler::Encoder for Transaction {
             transaction().encode(env),
             self.shielded_ptx_bundle.encode(env),
             borsh::to_vec(&self.transparent_ptx_bundle)
-                .unwrap_or(vec![])
+                .unwrap_or_default()
                 .encode(env),
-            borsh::to_vec(&self.signature).unwrap_or(vec![]).encode(env),
+            borsh::to_vec(&self.signature)
+                .unwrap_or_default()
+                .encode(env),
         )
             .encode(env)
     }
