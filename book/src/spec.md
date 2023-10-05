@@ -95,7 +95,7 @@ Note commitments are stored in a global commitment tree. The global commitment t
 |`cm` |$E_p$|$cm = \mathrm{NoteCom}(note, rcm\_{note})$|
 
 ### 2.4 Nullifier
-Note nullifiers are stored in a global nullifier set. Adding a note's nullifier to the set invalidates the note. We use the same nullifier derivation algorithm as in Orchard: $\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = \mathrm{Extract}([PRF^{nf}_{nk}(ρ) + ψ \mod{q}]K + cm)$.
+Note nullifiers are stored in a global nullifier set. Adding a note's nullifier to the set invalidates the note. We use the same nullifier derivation algorithm as in Orchard: $\mathrm{DeriveNullifier}_{nk}(ρ, ψ, cm) = PRF^{nf}_{nk}(ρ, ψ, cm)$.
 
 |Name|Type/size|Description|
 |-|-|-|
