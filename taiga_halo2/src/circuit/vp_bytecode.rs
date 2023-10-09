@@ -4,25 +4,30 @@ use crate::circuit::{
 };
 use crate::shielded_ptx::NoteVPVerifyingInfoSet;
 use borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(feature = "serde")]
+use serde;
 use std::path::PathBuf;
 
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ValidityPredicateRepresentation {
     // vampir has a unified circuit representation.
     VampIR(Vec<u8>),
     // Native halo2 circuits don't have a unified representatioin, enumerate the vp circuit examples for the moment.
     // TODO: figure out if we can have a unified circuit presentation. In theory, it's possible to separate the circuit system and proving system.
     Trivial,
-    // TODO: add other vp examples here if needed
+    // TODO: add other vp types here if needed
 }
 
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ValidityPredicateByteCode {
     circuit: ValidityPredicateRepresentation,
     inputs: Vec<u8>,
 }
 
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ApplicationByteCode {
     app_vp_bytecode: ValidityPredicateByteCode,
     dynamic_vp_bytecode: Vec<ValidityPredicateByteCode>,

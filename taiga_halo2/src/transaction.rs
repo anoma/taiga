@@ -43,6 +43,7 @@ pub struct ShieldedPartialTxBundle(Vec<ShieldedPartialTransaction>);
 #[cfg_attr(feature = "nif", derive(NifStruct))]
 #[cfg_attr(feature = "nif", module = "Taiga.Transaction.Result")]
 #[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ShieldedResult {
     pub anchors: Vec<Anchor>,
     pub nullifiers: Vec<Nullifier>,
