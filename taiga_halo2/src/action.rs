@@ -1,7 +1,7 @@
 use crate::{
     circuit::action_circuit::ActionCircuit,
     constant::{PRF_EXPAND_INPUT_VP_CM_R, PRF_EXPAND_OUTPUT_VP_CM_R},
-    merkle_tree::{Anchor, MerklePath, Node},
+    merkle_tree::{Anchor, MerklePath},
     note::{InputNoteProvingInfo, Note, NoteCommitment, OutputNoteProvingInfo, RandomSeed},
     nullifier::Nullifier,
     value_commitment::ValueCommitment,
@@ -44,6 +44,7 @@ pub struct ActionPublicInputs {
 pub struct ActionInfo {
     input_note: Note,
     input_merkle_path: MerklePath,
+    input_anchor: Anchor,
     output_note: Note,
     // rseed is to generate the randomness of the value commitment and vp commitments
     rseed: RandomSeed,
@@ -118,12 +119,14 @@ impl ActionInfo {
     pub fn new(
         input_note: Note,
         input_merkle_path: MerklePath,
+        input_anchor: Anchor,
         output_note: Note,
         rseed: RandomSeed,
     ) -> Self {
         Self {
             input_note,
             input_merkle_path,
+            input_anchor,
             output_note,
             rseed,
         }
@@ -138,6 +141,7 @@ impl ActionInfo {
         Self {
             input_note: input.note,
             input_merkle_path: input.merkle_path,
+            input_anchor: input.anchor,
             output_note: output.note,
             rseed,
         }
@@ -166,10 +170,6 @@ impl ActionInfo {
         );
 
         let cm = self.output_note.commitment();
-        let anchor = {
-            let cm_node = Node::from(&self.input_note);
-            self.input_merkle_path.root(cm_node)
-        };
 
         let rcv = self.get_rcv();
         let cv_net = ValueCommitment::new(&self.input_note, &self.output_note, &rcv);
@@ -185,7 +185,7 @@ impl ActionInfo {
         let action = ActionPublicInputs {
             nf,
             cm,
-            anchor,
+            anchor: self.input_anchor,
             cv_net,
             input_vp_commitment,
             output_vp_commitment,
@@ -208,7 +208,7 @@ impl ActionInfo {
 pub mod tests {
     use super::ActionInfo;
     use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
-    use crate::merkle_tree::MerklePath;
+    use crate::merkle_tree::{MerklePath, Node};
     use crate::note::tests::{random_input_note, random_output_note};
     use crate::note::RandomSeed;
     use rand::RngCore;
@@ -217,7 +217,17 @@ pub mod tests {
         let input_note = random_input_note(&mut rng);
         let output_note = random_output_note(&mut rng, input_note.get_nf().unwrap());
         let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+        let input_anchor = {
+            let cm_note = Node::from(&input_note);
+            input_merkle_path.root(cm_note)
+        };
         let rseed = RandomSeed::random(&mut rng);
-        ActionInfo::new(input_note, input_merkle_path, output_note, rseed)
+        ActionInfo::new(
+            input_note,
+            input_merkle_path,
+            input_anchor,
+            output_note,
+            rseed,
+        )
     }
 }

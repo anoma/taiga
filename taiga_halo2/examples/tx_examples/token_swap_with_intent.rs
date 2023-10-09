@@ -20,7 +20,7 @@ use taiga_halo2::{
         },
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
-    merkle_tree::MerklePath,
+    merkle_tree::{Anchor, MerklePath},
     note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
     nullifier::{Nullifier, NullifierKeyContainer},
     shielded_ptx::ShieldedPartialTransaction,
@@ -72,6 +72,8 @@ pub fn create_token_intent_ptx<R: RngCore>(
     let padding_input_note = Note::random_padding_input_note(&mut rng);
     let padding_input_note_nf = padding_input_note.get_nf().unwrap();
     let padding_output_note = Note::random_padding_output_note(&mut rng, padding_input_note_nf);
+    // Fetch a valid anchor for padding input notes
+    let anchor = Anchor::from(pallas::Base::random(&mut rng));
 
     let input_notes = [input_note, padding_input_note];
     let output_notes = [intent_note, padding_output_note];
@@ -109,6 +111,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
     let padding_input_note_proving_info = InputNoteProvingInfo::create_padding_note_proving_info(
         padding_input_note,
         merkle_path,
+        anchor,
         input_notes,
         output_notes,
     );
@@ -182,6 +185,9 @@ pub fn consume_token_intent_ptx<R: RngCore>(
 
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
+    // Fetch a valid anchor for dummy notes
+    let anchor = Anchor::from(pallas::Base::random(&mut rng));
+
     // Create the intent note proving info
     let intent_note_proving_info = {
         let intent_vp = OrRelationIntentValidityPredicateCircuit {
@@ -197,6 +203,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
         InputNoteProvingInfo::new(
             intent_note,
             merkle_path.clone(),
+            Some(anchor),
             Box::new(intent_vp),
             vec![],
         )
@@ -216,6 +223,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     let padding_input_note_proving_info = InputNoteProvingInfo::create_padding_note_proving_info(
         padding_input_note,
         merkle_path,
+        anchor,
         input_notes,
         output_notes,
     );

@@ -381,6 +381,7 @@ pub fn generate_input_token_note_proving_info<R: RngCore>(
     InputNoteProvingInfo::new(
         input_note,
         merkle_path,
+        None,
         Box::new(token_vp),
         vec![Box::new(token_auth_vp)],
     )

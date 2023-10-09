@@ -20,7 +20,7 @@ use taiga_halo2::{
         },
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
-    merkle_tree::MerklePath,
+    merkle_tree::{Anchor, MerklePath},
     note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
     nullifier::{Nullifier, NullifierKeyContainer},
     shielded_ptx::ShieldedPartialTransaction,
@@ -70,6 +70,9 @@ pub fn create_token_intent_ptx<R: RngCore>(
 
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
+    // Fetch a valid anchor for dummy notes
+    let anchor = Anchor::from(pallas::Base::random(&mut rng));
+
     // Create the input note proving info
     let input_note_proving_info = generate_input_token_note_proving_info(
         &mut rng,
@@ -101,6 +104,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
     let padding_input_note_proving_info = InputNoteProvingInfo::create_padding_note_proving_info(
         padding_input_note,
         merkle_path,
+        anchor,
         input_notes,
         output_notes,
     );
@@ -182,6 +186,9 @@ pub fn consume_token_intent_ptx<R: RngCore>(
 
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
+    // Fetch a valid anchor for dummy notes
+    let anchor = Anchor::from(pallas::Base::random(&mut rng));
+
     // Create the intent note proving info
     let intent_note_proving_info = {
         let intent_vp = PartialFulfillmentIntentValidityPredicateCircuit {
@@ -197,6 +204,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
         InputNoteProvingInfo::new(
             intent_note,
             merkle_path.clone(),
+            Some(anchor),
             Box::new(intent_vp),
             vec![],
         )
@@ -216,6 +224,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     let padding_input_note_proving_info = InputNoteProvingInfo::create_padding_note_proving_info(
         padding_input_note,
         merkle_path,
+        anchor,
         input_notes,
         output_notes,
     );
