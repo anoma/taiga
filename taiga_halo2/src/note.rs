@@ -7,7 +7,7 @@ use crate::{
         NUM_NOTE, POSEIDON_TO_CURVE_INPUT_LEN, PRF_EXPAND_PERSONALIZATION, PRF_EXPAND_PSI,
         PRF_EXPAND_PUBLIC_INPUT_PADDING, PRF_EXPAND_RCM, PRF_EXPAND_VCM_R,
     },
-    merkle_tree::MerklePath,
+    merkle_tree::{Anchor, MerklePath, Node},
     nullifier::{Nullifier, NullifierKeyContainer},
     utils::{poseidon_hash_n, poseidon_to_curve},
 };
@@ -126,6 +126,7 @@ pub struct RandomSeed([u8; 32]);
 pub struct InputNoteProvingInfo {
     pub note: Note,
     pub merkle_path: MerklePath,
+    pub anchor: Anchor,
     application_vp: Box<ValidityPredicate>,
     dynamic_vps: Vec<Box<ValidityPredicate>>,
 }
@@ -488,12 +489,22 @@ impl InputNoteProvingInfo {
     pub fn new(
         note: Note,
         merkle_path: MerklePath,
+        // If no custom anchor is provided then the standard one is calculated from the note and path.
+        custom_anchor: Option<Anchor>,
         application_vp: Box<ValidityPredicate>,
         dynamic_vps: Vec<Box<ValidityPredicate>>,
     ) -> Self {
+        let anchor = match custom_anchor {
+            Some(anchor) => anchor,
+            None => {
+                let cm_note = Node::from(&note);
+                merkle_path.root(cm_note)
+            }
+        };
         Self {
             note,
             merkle_path,
+            anchor,
             application_vp,
             dynamic_vps,
         }
@@ -510,6 +521,7 @@ impl InputNoteProvingInfo {
     pub fn create_padding_note_proving_info(
         padding_note: Note,
         merkle_path: MerklePath,
+        anchor: Anchor,
         input_notes: [Note; NUM_NOTE],
         output_notes: [Note; NUM_NOTE],
     ) -> Self {
@@ -518,7 +530,7 @@ impl InputNoteProvingInfo {
             input_notes,
             output_notes,
         });
-        InputNoteProvingInfo::new(padding_note, merkle_path, trivail_vp, vec![])
+        InputNoteProvingInfo::new(padding_note, merkle_path, Some(anchor), trivail_vp, vec![])
     }
 }
 
@@ -613,7 +625,7 @@ pub mod tests {
         let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         let application_vp = Box::new(random_trivial_vp_circuit(&mut rng));
         let dynamic_vps = vec![];
-        InputNoteProvingInfo::new(note, merkle_path, application_vp, dynamic_vps)
+        InputNoteProvingInfo::new(note, merkle_path, None, application_vp, dynamic_vps)
     }
 
     pub fn random_output_proving_info<R: RngCore>(

@@ -542,6 +542,7 @@ pub mod testing {
         let input_note_proving_info_1 = InputNoteProvingInfo::new(
             input_note_1,
             merkle_path.clone(),
+            None,
             input_application_vp_1,
             trivial_dynamic_vps.clone(),
         );
@@ -552,6 +553,7 @@ pub mod testing {
         let input_note_proving_info_2 = InputNoteProvingInfo::new(
             input_note_2,
             merkle_path,
+            None,
             input_application_vp_2,
             dynamic_vps.clone(),
         );

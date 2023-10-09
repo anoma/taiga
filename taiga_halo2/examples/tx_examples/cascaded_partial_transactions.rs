@@ -15,7 +15,7 @@ use taiga_halo2::{
         },
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
-    merkle_tree::MerklePath,
+    merkle_tree::{Anchor, MerklePath},
     note::{InputNoteProvingInfo, OutputNoteProvingInfo},
     nullifier::{Nullifier, NullifierKeyContainer},
     shielded_ptx::ShieldedPartialTransaction,
@@ -67,6 +67,9 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
     );
 
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+
+    // Fetch a valid anchor for dummy notes
+    let anchor = Anchor::from(pallas::Base::random(&mut rng));
 
     // The first partial transaction:
     // Alice consumes 1 "BTC" and 2 "ETH".
@@ -143,6 +146,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
             InputNoteProvingInfo::new(
                 cascade_intent_note,
                 merkle_path.clone(),
+                Some(anchor),
                 Box::new(intent_vp),
                 vec![],
             )
