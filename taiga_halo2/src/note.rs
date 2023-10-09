@@ -489,11 +489,12 @@ impl InputNoteProvingInfo {
     pub fn new(
         note: Note,
         merkle_path: MerklePath,
-        anchor: Option<Anchor>,
+        // If no custom anchor is provided then the standard one is calculated from the note and path.
+        custom_anchor: Option<Anchor>,
         application_vp: Box<ValidityPredicate>,
         dynamic_vps: Vec<Box<ValidityPredicate>>,
     ) -> Self {
-        let anchor = match anchor {
+        let anchor = match custom_anchor {
             Some(anchor) => anchor,
             None => {
                 let cm_note = Node::from(&note);
