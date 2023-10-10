@@ -283,6 +283,7 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
 }
 
 vp_circuit_impl!(OrRelationIntentValidityPredicateCircuit);
+vp_verifying_info_impl!(OrRelationIntentValidityPredicateCircuit);
 
 pub fn create_intent_note<R: RngCore>(
     mut rng: R,

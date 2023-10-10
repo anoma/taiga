@@ -145,6 +145,7 @@ impl ValidityPredicateCircuit for CascadeIntentValidityPredicateCircuit {
 }
 
 vp_circuit_impl!(CascadeIntentValidityPredicateCircuit);
+vp_verifying_info_impl!(CascadeIntentValidityPredicateCircuit);
 
 pub fn create_intent_note<R: RngCore>(
     mut rng: R,

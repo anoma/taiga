@@ -313,6 +313,7 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
 }
 
 vp_circuit_impl!(TokenValidityPredicateCircuit);
+vp_verifying_info_impl!(TokenValidityPredicateCircuit);
 
 impl TokenAuthorization {
     pub fn new(pk: pallas::Point, vk: pallas::Base) -> Self {

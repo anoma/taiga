@@ -3,19 +3,19 @@ use crate::{
         VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
         ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
     },
-    constant::{NUM_NOTE, SETUP_PARAMS_MAP},
+    constant::{NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_PARAMS_SIZE},
     note::{Note, RandomSeed},
     proof::Proof,
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
-use halo2_proofs::plonk::{keygen_pk, keygen_vk};
+use halo2_proofs::plonk::{keygen_pk, keygen_vk, ProvingKey};
 use halo2_proofs::{
     circuit::{floor_planner, Layouter},
     plonk::{Circuit, ConstraintSystem, Error},
 };
 use lazy_static::lazy_static;
-use pasta_curves::pallas;
+use pasta_curves::{pallas, vesta};
 use rand::{rngs::OsRng, RngCore};
 #[cfg(feature = "nif")]
 use rustler::{Decoder, Encoder, Env, NifResult, NifStruct, Term};
@@ -29,8 +29,18 @@ pub mod signature_verification;
 pub mod token;
 
 lazy_static! {
-    pub static ref TRIVIAL_VP_VK: ValidityPredicateVerifyingKey =
-        TrivialValidityPredicateCircuit::default().get_vp_vk();
+    pub static ref TRIVIAL_VP_VK: ValidityPredicateVerifyingKey = {
+        let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
+        let empty_circuit = TrivialValidityPredicateCircuit::default();
+        let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
+        ValidityPredicateVerifyingKey::from_vk(vk)
+    };
+    pub static ref TRIVIAL_VP_PK: ProvingKey<vesta::Affine> = {
+        let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
+        let empty_circuit = TrivialValidityPredicateCircuit::default();
+        keygen_pk(params, TRIVIAL_VP_VK.get_vk().unwrap(), &empty_circuit)
+            .expect("keygen_pk should not fail")
+    };
     pub static ref COMPRESSED_TRIVIAL_VP_VK: pallas::Base = TRIVIAL_VP_VK.get_compressed();
 }
 
@@ -130,6 +140,31 @@ impl ValidityPredicateCircuit for TrivialValidityPredicateCircuit {
 }
 
 vp_circuit_impl!(TrivialValidityPredicateCircuit);
+
+impl ValidityPredicateVerifyingInfo for TrivialValidityPredicateCircuit {
+    fn get_verifying_info(&self) -> VPVerifyingInfo {
+        let mut rng = OsRng;
+        let params = SETUP_PARAMS_MAP.get(&15).unwrap();
+        let public_inputs = self.get_public_inputs(&mut rng);
+        let proof = Proof::create(
+            &TRIVIAL_VP_PK,
+            params,
+            self.clone(),
+            &[public_inputs.inner()],
+            &mut rng,
+        )
+        .unwrap();
+        VPVerifyingInfo {
+            vk: TRIVIAL_VP_PK.get_vk().clone(),
+            proof,
+            public_inputs,
+        }
+    }
+
+    fn get_vp_vk(&self) -> ValidityPredicateVerifyingKey {
+        TRIVIAL_VP_VK.clone()
+    }
+}
 
 #[cfg(test)]
 pub mod tests {

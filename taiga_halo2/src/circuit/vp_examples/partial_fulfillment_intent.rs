@@ -451,6 +451,7 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
 }
 
 vp_circuit_impl!(PartialFulfillmentIntentValidityPredicateCircuit);
+vp_verifying_info_impl!(PartialFulfillmentIntentValidityPredicateCircuit);
 
 pub fn create_intent_note<R: RngCore>(
     mut rng: R,

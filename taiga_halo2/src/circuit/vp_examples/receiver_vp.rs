@@ -280,6 +280,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
 }
 
 vp_circuit_impl!(ReceiverValidityPredicateCircuit);
+vp_verifying_info_impl!(ReceiverValidityPredicateCircuit);
 
 #[test]
 fn test_halo2_receiver_vp_circuit() {
