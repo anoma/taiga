@@ -13,7 +13,7 @@ use taiga_halo2::{
         ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, SETUP_PARAMS_MAP,
         TAIGA_COMMITMENT_TREE_DEPTH,
     },
-    merkle_tree::{Anchor, MerklePath},
+    merkle_tree::{MerklePath, Node},
     note::{Note, NoteType, RandomSeed},
     nullifier::{Nullifier, NullifierKeyContainer},
 };
@@ -66,7 +66,10 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
             }
         };
         let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let anchor = Anchor::from(pallas::Base::random(&mut rng));
+        let anchor = {
+            let cm_note = Node::from(&input_note);
+            input_merkle_path.root(cm_note)
+        };
         let rseed = RandomSeed::random(&mut rng);
         ActionInfo::new(input_note, input_merkle_path, anchor, output_note, rseed)
     };
