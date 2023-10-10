@@ -44,9 +44,11 @@ harness = false
 
 [[example]]
 name = "tx_examples"
+required-features = ["examples"]
 
 [features]
 default = []
 nif = ["dep:rustler", "borsh", "pasta_curves/repr-erlang"]
 serde = ["dep:serde", "pasta_curves/serde"]
 borsh = ["dep:borsh"]
+examples = []

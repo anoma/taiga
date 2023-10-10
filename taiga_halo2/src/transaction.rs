@@ -338,7 +338,7 @@ pub mod testing {
 
         let rng = OsRng;
 
-        let shielded_ptx_bundle = create_shielded_ptx_bundle(2);
+        let shielded_ptx_bundle = create_shielded_ptx_bundle(1);
         // TODO: add transparent_ptx_bundle test
         let transparent_ptx_bundle = TransparentPartialTxBundle::default();
         let tx = Transaction::build(rng, shielded_ptx_bundle, transparent_ptx_bundle);

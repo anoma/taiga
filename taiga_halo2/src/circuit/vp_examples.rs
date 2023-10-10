@@ -20,12 +20,19 @@ use rand::{rngs::OsRng, RngCore};
 #[cfg(feature = "nif")]
 use rustler::{Decoder, Encoder, Env, NifResult, NifStruct, Term};
 
+#[cfg(feature = "examples")]
 pub mod cascade_intent;
+#[cfg(feature = "examples")]
 mod field_addition;
+#[cfg(feature = "examples")]
 pub mod or_relation_intent;
+#[cfg(feature = "examples")]
 pub mod partial_fulfillment_intent;
+#[cfg(feature = "examples")]
 pub mod receiver_vp;
+#[cfg(feature = "examples")]
 pub mod signature_verification;
+#[cfg(feature = "examples")]
 pub mod token;
 
 lazy_static! {
