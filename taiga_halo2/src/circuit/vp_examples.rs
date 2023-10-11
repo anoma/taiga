@@ -1,3 +1,5 @@
+#[cfg(feature = "borsh")]
+use crate::circuit::vp_bytecode::{ValidityPredicateByteCode, ValidityPredicateRepresentation};
 use crate::{
     circuit::vp_circuit::{
         VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
@@ -9,6 +11,8 @@ use crate::{
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
+#[cfg(feature = "borsh")]
+use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_proofs::plonk::{keygen_pk, keygen_vk, ProvingKey};
 use halo2_proofs::{
     circuit::{floor_planner, Layouter},
@@ -82,12 +86,72 @@ impl TrivialValidityPredicateCircuit {
         }
     }
 
+    // Only for test
+    #[cfg(feature = "borsh")]
+    pub fn to_bytecode(&self) -> ValidityPredicateByteCode {
+        ValidityPredicateByteCode::new(ValidityPredicateRepresentation::Trivial, self.to_bytes())
+    }
+
+    // Only for test
+    #[cfg(feature = "borsh")]
+    pub fn to_bytes(&self) -> Vec<u8> {
+        borsh::to_vec(&self).unwrap()
+    }
+
+    // Only for test
+    #[cfg(feature = "borsh")]
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
+        BorshDeserialize::deserialize(&mut bytes.as_ref()).unwrap()
+    }
+
     fn to_proxy(&self) -> TrivialValidtyPredicateCircuitProxy {
         TrivialValidtyPredicateCircuitProxy {
             owned_note_pub_id: self.owned_note_pub_id,
             input_notes: self.input_notes.to_vec(),
             output_notes: self.output_notes.to_vec(),
         }
+    }
+}
+
+#[cfg(feature = "borsh")]
+impl BorshSerialize for TrivialValidityPredicateCircuit {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        use ff::PrimeField;
+        writer.write_all(&self.owned_note_pub_id.to_repr())?;
+        for input in self.input_notes.iter() {
+            input.serialize(writer)?;
+        }
+
+        for output in self.output_notes.iter() {
+            output.serialize(writer)?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(feature = "borsh")]
+impl BorshDeserialize for TrivialValidityPredicateCircuit {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        use ff::PrimeField;
+        let owned_note_pub_id_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let owned_note_pub_id = Option::from(pallas::Base::from_repr(owned_note_pub_id_bytes))
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "owned_note_pub_id not in field",
+                )
+            })?;
+        let input_notes: Vec<_> = (0..NUM_NOTE)
+            .map(|_| Note::deserialize_reader(reader))
+            .collect::<Result<_, _>>()?;
+        let output_notes: Vec<_> = (0..NUM_NOTE)
+            .map(|_| Note::deserialize_reader(reader))
+            .collect::<Result<_, _>>()?;
+        Ok(Self {
+            owned_note_pub_id,
+            input_notes: input_notes.try_into().unwrap(),
+            output_notes: output_notes.try_into().unwrap(),
+        })
     }
 }
 

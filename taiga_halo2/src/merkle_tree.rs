@@ -57,6 +57,26 @@ impl Hash for Anchor {
     }
 }
 
+#[cfg(feature = "borsh")]
+impl BorshSerialize for Anchor {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        writer.write_all(&self.0.to_repr())?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "borsh")]
+impl BorshDeserialize for Anchor {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let mut repr = [0u8; 32];
+        reader.read_exact(&mut repr)?;
+        let value = Option::from(pallas::Base::from_repr(repr)).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "Anchor not in field")
+        })?;
+        Ok(Self(value))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Copy, Hash, Default)]
 #[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

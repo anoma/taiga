@@ -134,6 +134,7 @@ pub fn create_token_swap_ptx<R: RngCore>(
     ShieldedPartialTransaction::build(
         [input_note_proving_info, padding_input_note_proving_info],
         [output_note_proving_info, padding_output_note_proving_info],
+        vec![],
         &mut rng,
     )
 }

@@ -124,6 +124,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
         ShieldedPartialTransaction::build(
             [input_note_1_proving_info, input_note_2_proving_info],
             [output_note_1_proving_info, intent_note_proving_info],
+            vec![],
             &mut rng,
         )
     };
@@ -183,12 +184,13 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
         ShieldedPartialTransaction::build(
             [intent_note_proving_info, input_note_3_proving_info],
             [output_note_2_proving_info, output_note_3_proving_info],
+            vec![],
             &mut rng,
         )
     };
 
     // Create the final transaction
-    let shielded_tx_bundle = ShieldedPartialTxBundle::build(vec![ptx_1, ptx_2]);
+    let shielded_tx_bundle = ShieldedPartialTxBundle::new(vec![ptx_1, ptx_2]);
     let transparent_ptx_bundle = TransparentPartialTxBundle::default();
     Transaction::build(&mut rng, shielded_tx_bundle, transparent_ptx_bundle)
 }

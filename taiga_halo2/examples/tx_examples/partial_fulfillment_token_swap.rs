@@ -120,6 +120,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
     let ptx = ShieldedPartialTransaction::build(
         [input_note_proving_info, padding_input_note_proving_info],
         [intent_note_proving_info, padding_output_note_proving_info],
+        vec![],
         &mut rng,
     );
 
@@ -243,6 +244,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     ShieldedPartialTransaction::build(
         [intent_note_proving_info, padding_input_note_proving_info],
         [bought_note_proving_info, returned_note_proving_info],
+        vec![],
         &mut rng,
     )
 }
@@ -298,7 +300,7 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
     );
 
     // Solver creates the final transaction
-    let shielded_tx_bundle = ShieldedPartialTxBundle::build(vec![alice_ptx, bob_ptx, solver_ptx]);
+    let shielded_tx_bundle = ShieldedPartialTxBundle::new(vec![alice_ptx, bob_ptx, solver_ptx]);
     let transparent_ptx_bundle = TransparentPartialTxBundle::default();
     Transaction::build(&mut rng, shielded_tx_bundle, transparent_ptx_bundle)
 }
