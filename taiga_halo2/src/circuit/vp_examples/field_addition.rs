@@ -105,6 +105,7 @@ impl ValidityPredicateCircuit for FieldAdditionValidityPredicateCircuit {
 }
 
 vp_circuit_impl!(FieldAdditionValidityPredicateCircuit);
+vp_verifying_info_impl!(FieldAdditionValidityPredicateCircuit);
 
 #[test]
 fn test_halo2_addition_vp_circuit() {

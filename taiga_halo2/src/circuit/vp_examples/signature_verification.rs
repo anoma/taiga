@@ -287,6 +287,7 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
 }
 
 vp_circuit_impl!(SignatureVerificationValidityPredicateCircuit);
+vp_verifying_info_impl!(SignatureVerificationValidityPredicateCircuit);
 
 #[test]
 fn test_halo2_sig_verification_vp_circuit() {

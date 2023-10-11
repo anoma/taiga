@@ -702,6 +702,7 @@ impl BasicValidityPredicateVariables {
     }
 }
 
+// Default Circuit trait implementation
 #[macro_export]
 macro_rules! vp_circuit_impl {
     ($name:ident) => {
@@ -734,7 +735,13 @@ macro_rules! vp_circuit_impl {
                 Ok(())
             }
         }
+    };
+}
 
+// Default ValidityPredicateVerifyingInfo trait implementation
+#[macro_export]
+macro_rules! vp_verifying_info_impl {
+    ($name:ident) => {
         impl ValidityPredicateVerifyingInfo for $name {
             fn get_verifying_info(&self) -> VPVerifyingInfo {
                 let mut rng = OsRng;

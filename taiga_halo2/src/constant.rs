@@ -119,11 +119,12 @@ pub const VP_CIRCUIT_PARAMS_SIZE: u32 = PARAMS_SIZE;
 lazy_static! {
     pub static ref SETUP_PARAMS_MAP: HashMap<u32, Params<vesta::Affine>> = {
         let mut m = HashMap::new();
-        #[allow(clippy::single_element_loop)]
-        for circuit_size in [PARAMS_SIZE] {
-            let params = Params::new(circuit_size);
-            m.insert(circuit_size, params);
-        }
+        let params_15 = {
+            let bytes = include_bytes!("../params/params_15");
+            Params::<vesta::Affine>::read(&mut &bytes[..]).unwrap()
+        };
+
+        m.insert(PARAMS_SIZE, params_15);
         m
     };
 }
@@ -6088,6 +6089,8 @@ impl FixedPoint<pallas::Affine> for Short {
     }
 }
 
+pub const MAX_DYNAMIC_VP_NUM: usize = 2;
+
 #[ignore]
 #[test]
 fn r_u_z_generate() {
@@ -6113,4 +6116,51 @@ fn r_u_z_generate() {
     println!("]");
 }
 
-pub const MAX_DYNAMIC_VP_NUM: usize = 2;
+#[ignore]
+#[test]
+fn export_params() {
+    use std::io::Write;
+
+    let params: Params<vesta::Affine> = Params::new(PARAMS_SIZE);
+    let mut bytes = vec![];
+    params.write(&mut bytes).unwrap();
+    let mut file = std::fs::File::create("./params/params_15")
+        .unwrap_or_else(|err| panic!("cannot create params_15 with {}", err));
+    file.write_all(&bytes).unwrap();
+}
+
+// It takes 4 seconds to generate one proving key.
+// It may be fine to generate the key once when compiling.
+// Consider loading the key from file when the keys are stablized.
+// #[ignore]
+// #[test]
+// fn export_action_proving_key() {
+//     use std::io::Write;
+
+//     let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
+//     let empty_circuit: ActionCircuit = Default::default();
+//     let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
+//     let pk = keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail");
+//     let mut bytes = vec![];
+//     pk.write(&mut bytes).unwrap();
+//     let mut file = std::fs::File::create("./params/action_proving_key")
+//         .unwrap_or_else(|err| panic!("cannot create action_proving_key with {}", err));
+//     file.write_all(&bytes).unwrap();
+// }
+
+// #[ignore]
+// #[test]
+// fn export_trivial_vp_proving_key() {
+//     use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
+//     use std::io::Write;
+
+//     let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
+//     let empty_circuit = TrivialValidityPredicateCircuit::default();
+//     let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
+//     let pk = keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail");
+//     let mut bytes = vec![];
+//     pk.write(&mut bytes).unwrap();
+//     let mut file = std::fs::File::create("./params/trivial_vp_proving_key")
+//         .unwrap_or_else(|err| panic!("cannot create trivial_vp_proving_key with {}", err));
+//     file.write_all(&bytes).unwrap();
+// }
