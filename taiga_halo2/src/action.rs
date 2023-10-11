@@ -208,7 +208,7 @@ impl ActionInfo {
 pub mod tests {
     use super::ActionInfo;
     use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
-    use crate::merkle_tree::{MerklePath, Node};
+    use crate::merkle_tree::MerklePath;
     use crate::note::tests::{random_input_note, random_output_note};
     use crate::note::RandomSeed;
     use rand::RngCore;
@@ -217,10 +217,7 @@ pub mod tests {
         let input_note = random_input_note(&mut rng);
         let output_note = random_output_note(&mut rng, input_note.get_nf().unwrap());
         let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let input_anchor = {
-            let cm_note = Node::from(&input_note);
-            input_merkle_path.root(cm_note)
-        };
+        let input_anchor = input_note.calculate_root(&input_merkle_path);
         let rseed = RandomSeed::random(&mut rng);
         ActionInfo::new(
             input_note,

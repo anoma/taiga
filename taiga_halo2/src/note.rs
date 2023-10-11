@@ -279,6 +279,11 @@ impl Note {
     pub fn get_rcm(&self) -> pallas::Base {
         self.rcm
     }
+
+    pub fn calculate_root(&self, path: &MerklePath) -> Anchor {
+        let cm_node = Node::from(self);
+        path.root(cm_node)
+    }
 }
 
 #[cfg(feature = "borsh")]
@@ -496,10 +501,7 @@ impl InputNoteProvingInfo {
     ) -> Self {
         let anchor = match custom_anchor {
             Some(anchor) => anchor,
-            None => {
-                let cm_note = Node::from(&note);
-                merkle_path.root(cm_note)
-            }
+            None => note.calculate_root(&merkle_path),
         };
         Self {
             note,
