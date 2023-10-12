@@ -3,7 +3,7 @@
 /// Bob has 5 "ETH" and wants 1 "BTC".
 /// The Solver/Bob can partially fulfill Alice's intent and return 1 "BTC" back to Alice.
 ///
-use crate::token::{create_random_token_note, create_token_swap_ptx};
+use crate::token::create_token_swap_ptx;
 use group::Group;
 use halo2_proofs::arithmetic::Field;
 use pasta_curves::{group::Curve, pallas};
@@ -14,10 +14,7 @@ use taiga_halo2::{
             create_intent_note, PartialFulfillmentIntentValidityPredicateCircuit,
         },
         signature_verification::COMPRESSED_TOKEN_AUTH_VK,
-        token::{
-            generate_input_token_note_proving_info, generate_output_token_note_proving_info, Token,
-            TokenAuthorization,
-        },
+        token::{Token, TokenAuthorization},
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
@@ -44,7 +41,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
 
     // input note
     let rho = Nullifier::from(pallas::Base::random(&mut rng));
-    let input_note = create_random_token_note(&mut rng, &sell, rho, input_nk, &input_auth);
+    let input_note = sell.create_random_token_note(&mut rng, rho, input_nk, &input_auth);
 
     // output intent note
     let input_note_nk_com = input_note.get_nk_commitment();
@@ -64,7 +61,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
     let padding_input_note_nf = padding_input_note.get_nf().unwrap();
     let padding_output_note = Note::random_padding_output_note(&mut rng, padding_input_note_nf);
 
-    let input_notes = [input_note, padding_input_note];
+    let input_notes = [*input_note.note(), padding_input_note];
     let output_notes = [intent_note, padding_output_note];
 
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
@@ -73,10 +70,8 @@ pub fn create_token_intent_ptx<R: RngCore>(
     let anchor = Anchor::from(pallas::Base::random(&mut rng));
 
     // Create the input note proving info
-    let input_note_proving_info = generate_input_token_note_proving_info(
+    let input_note_proving_info = input_note.generate_input_token_note_proving_info(
         &mut rng,
-        input_note,
-        sell.name(),
         input_auth,
         input_auth_sk,
         merkle_path.clone(),
@@ -160,21 +155,15 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     let input_note_nf = intent_note.get_nf().unwrap();
     let output_auth = TokenAuthorization::new(output_auth_pk, *COMPRESSED_TOKEN_AUTH_VK);
     let bought_token = Token::new(buy.name().inner(), bought_note_value);
-    let bought_note = create_random_token_note(
-        &mut rng,
-        &bought_token,
-        input_note_nf,
-        input_nk,
-        &output_auth,
-    );
+    let bought_note =
+        bought_token.create_random_token_note(&mut rng, input_note_nf, input_nk, &output_auth);
 
     // padding the zero note
     let padding_input_note = Note::random_padding_input_note(&mut rng);
     let padding_input_note_nf = padding_input_note.get_nf().unwrap();
     let returned_token = Token::new(sell.name().inner(), returned_note_value);
-    let returned_note = create_random_token_note(
+    let returned_note = returned_token.create_random_token_note(
         &mut rng,
-        &returned_token,
         padding_input_note_nf,
         input_nk,
         &output_auth,
@@ -182,7 +171,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     // let padding_output_note = Note::random_padding_input_note(&mut rng, padding_input_note_nf);
 
     let input_notes = [intent_note, padding_input_note];
-    let output_notes = [bought_note, returned_note];
+    let output_notes = [*bought_note.note(), *returned_note.note()];
 
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
@@ -211,10 +200,8 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     };
 
     // Create the output note proving info
-    let bought_note_proving_info = generate_output_token_note_proving_info(
+    let bought_note_proving_info = bought_note.generate_output_token_note_proving_info(
         &mut rng,
-        bought_note,
-        buy.name(),
         output_auth,
         input_notes,
         output_notes,
@@ -230,10 +217,8 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     );
 
     // Create the returned note proving info
-    let returned_note_proving_info = generate_output_token_note_proving_info(
+    let returned_note_proving_info = returned_note.generate_output_token_note_proving_info(
         &mut rng,
-        returned_note,
-        sell.name(),
         output_auth,
         input_notes,
         output_notes,

@@ -3,7 +3,7 @@
 /// Bob has 1 "DOLPHIN" and wants 5 "BTC".
 /// The Solver/Bob matches Alice's intent and creates the final tx.
 ///
-use crate::token::{create_random_token_note, create_token_swap_ptx};
+use crate::token::create_token_swap_ptx;
 use group::Group;
 use halo2_proofs::arithmetic::Field;
 use pasta_curves::{group::Curve, pallas};
@@ -12,10 +12,7 @@ use taiga_halo2::{
     circuit::vp_examples::{
         or_relation_intent::{create_intent_note, OrRelationIntentValidityPredicateCircuit},
         signature_verification::COMPRESSED_TOKEN_AUTH_VK,
-        token::{
-            generate_input_token_note_proving_info, generate_output_token_note_proving_info, Token,
-            TokenAuthorization,
-        },
+        token::{Token, TokenAuthorization},
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
@@ -43,7 +40,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
 
     // input note
     let rho = Nullifier::from(pallas::Base::random(&mut rng));
-    let input_note = create_random_token_note(&mut rng, &input_token, rho, input_nk, &input_auth);
+    let input_note = input_token.create_random_token_note(&mut rng, rho, input_nk, &input_auth);
 
     // output intent note
     let input_note_nf = input_note.get_nf().unwrap();
@@ -65,16 +62,14 @@ pub fn create_token_intent_ptx<R: RngCore>(
     // Fetch a valid anchor for padding input notes
     let anchor = Anchor::from(pallas::Base::random(&mut rng));
 
-    let input_notes = [input_note, padding_input_note];
+    let input_notes = [*input_note.note(), padding_input_note];
     let output_notes = [intent_note, padding_output_note];
 
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
     // Create the input note proving info
-    let input_note_proving_info = generate_input_token_note_proving_info(
+    let input_note_proving_info = input_note.generate_input_token_note_proving_info(
         &mut rng,
-        input_note,
-        input_token.name(),
         input_auth,
         input_auth_sk,
         merkle_path.clone(),
@@ -156,9 +151,8 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     // output note
     let input_note_nf = intent_note.get_nf().unwrap();
     let output_auth = TokenAuthorization::new(output_auth_pk, *COMPRESSED_TOKEN_AUTH_VK);
-    let output_note = create_random_token_note(
+    let output_note = output_token.create_random_token_note(
         &mut rng,
-        &output_token,
         input_note_nf,
         input_nk.to_commitment(),
         &output_auth,
@@ -170,7 +164,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     let padding_output_note = Note::random_padding_output_note(&mut rng, padding_input_note_nf);
 
     let input_notes = [intent_note, padding_input_note];
-    let output_notes = [output_note, padding_output_note];
+    let output_notes = [*output_note.note(), padding_output_note];
 
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
@@ -199,10 +193,8 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     };
 
     // Create the output note proving info
-    let output_note_proving_info = generate_output_token_note_proving_info(
+    let output_note_proving_info = output_note.generate_output_token_note_proving_info(
         &mut rng,
-        output_note,
-        output_token.name(),
         output_auth,
         input_notes,
         output_notes,
