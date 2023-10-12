@@ -10,8 +10,8 @@ use taiga_halo2::{
         cascade_intent::{create_intent_note, CascadeIntentValidityPredicateCircuit},
         signature_verification::COMPRESSED_TOKEN_AUTH_VK,
         token::{
-            generate_input_token_note_proving_info, generate_output_token_note_proving_info,
-            TokenAuthorization,
+            generate_input_token_note_proving_info, generate_output_token_note_proving_info, Token,
+            TokenAuthorization, TokenName,
         },
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
@@ -31,18 +31,35 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
     let bob_nk_com = NullifierKeyContainer::random_commitment(&mut rng);
 
     let rho = Nullifier::from(pallas::Base::random(&mut rng));
-    let input_note_1 = create_random_token_note(&mut rng, "btc", 1u64, rho, alice_nk, &alice_auth);
+    let input_note_1 = create_random_token_note(
+        &mut rng,
+        &Token::new("btc".to_string(), 1u64),
+        rho,
+        alice_nk,
+        &alice_auth,
+    );
     let output_note_1 = create_random_token_note(
         &mut rng,
-        "btc",
-        1u64,
+        &Token::new("btc".to_string(), 1u64),
         input_note_1.get_nf().unwrap(),
         bob_nk_com,
         &bob_auth,
     );
-    let input_note_2 = create_random_token_note(&mut rng, "eth", 2u64, rho, alice_nk, &alice_auth);
+    let input_note_2 = create_random_token_note(
+        &mut rng,
+        &Token::new("eth".to_string(), 2u64),
+        rho,
+        alice_nk,
+        &alice_auth,
+    );
 
-    let input_note_3 = create_random_token_note(&mut rng, "xan", 3u64, rho, alice_nk, &alice_auth);
+    let input_note_3 = create_random_token_note(
+        &mut rng,
+        &Token::new("xan".to_string(), 3u64),
+        rho,
+        alice_nk,
+        &alice_auth,
+    );
     let cascade_intent_note = create_intent_note(
         &mut rng,
         input_note_3.commitment().inner(),
@@ -51,16 +68,14 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
     );
     let output_note_2 = create_random_token_note(
         &mut rng,
-        "eth",
-        2u64,
+        &Token::new("eth".to_string(), 2u64),
         cascade_intent_note.get_nf().unwrap(),
         bob_nk_com,
         &bob_auth,
     );
     let output_note_3 = create_random_token_note(
         &mut rng,
-        "xan",
-        3u64,
+        &Token::new("xan".to_string(), 3u64),
         input_note_3.get_nf().unwrap(),
         bob_nk_com,
         &bob_auth,
@@ -81,7 +96,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
         let input_note_1_proving_info = generate_input_token_note_proving_info(
             &mut rng,
             input_note_1,
-            "btc".to_string(),
+            &TokenName("btc".to_string()),
             alice_auth,
             alice_auth_sk,
             merkle_path.clone(),
@@ -91,7 +106,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
         let input_note_2_proving_info = generate_input_token_note_proving_info(
             &mut rng,
             input_note_2,
-            "eth".to_string(),
+            &TokenName("eth".to_string()),
             alice_auth,
             alice_auth_sk,
             merkle_path.clone(),
@@ -103,7 +118,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
         let output_note_1_proving_info = generate_output_token_note_proving_info(
             &mut rng,
             output_note_1,
-            "btc".to_string(),
+            &TokenName("btc".to_string()),
             bob_auth,
             input_notes,
             output_notes,
@@ -155,7 +170,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
         let input_note_3_proving_info = generate_input_token_note_proving_info(
             &mut rng,
             input_note_3,
-            "xan".to_string(),
+            &TokenName("xan".to_string()),
             alice_auth,
             alice_auth_sk,
             merkle_path,
@@ -166,7 +181,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
         let output_note_2_proving_info = generate_output_token_note_proving_info(
             &mut rng,
             output_note_2,
-            "eth".to_string(),
+            &TokenName("eth".to_string()),
             bob_auth,
             input_notes,
             output_notes,
@@ -174,7 +189,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
         let output_note_3_proving_info = generate_output_token_note_proving_info(
             &mut rng,
             output_note_3,
-            "xan".to_string(),
+            &TokenName("xan".to_string()),
             bob_auth,
             input_notes,
             output_notes,

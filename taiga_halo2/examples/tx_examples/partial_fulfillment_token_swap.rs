@@ -44,8 +44,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
 
     // input note
     let rho = Nullifier::from(pallas::Base::random(&mut rng));
-    let input_note =
-        create_random_token_note(&mut rng, &sell.name, sell.value, rho, input_nk, &input_auth);
+    let input_note = create_random_token_note(&mut rng, &sell, rho, input_nk, &input_auth);
 
     // output intent note
     let input_note_nk_com = input_note.get_nk_commitment();
@@ -77,7 +76,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
     let input_note_proving_info = generate_input_token_note_proving_info(
         &mut rng,
         input_note,
-        sell.name.clone(),
+        sell.name(),
         input_auth,
         input_auth_sk,
         merkle_path.clone(),
@@ -160,10 +159,10 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     // output notes
     let input_note_nf = intent_note.get_nf().unwrap();
     let output_auth = TokenAuthorization::new(output_auth_pk, *COMPRESSED_TOKEN_AUTH_VK);
+    let bought_token = Token::new(buy.name().inner(), bought_note_value);
     let bought_note = create_random_token_note(
         &mut rng,
-        &buy.name,
-        bought_note_value,
+        &bought_token,
         input_note_nf,
         input_nk,
         &output_auth,
@@ -172,10 +171,10 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     // padding the zero note
     let padding_input_note = Note::random_padding_input_note(&mut rng);
     let padding_input_note_nf = padding_input_note.get_nf().unwrap();
+    let returned_token = Token::new(sell.name().inner(), returned_note_value);
     let returned_note = create_random_token_note(
         &mut rng,
-        &sell.name,
-        returned_note_value,
+        &returned_token,
         padding_input_note_nf,
         input_nk,
         &output_auth,
@@ -215,7 +214,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     let bought_note_proving_info = generate_output_token_note_proving_info(
         &mut rng,
         bought_note,
-        buy.name,
+        buy.name(),
         output_auth,
         input_notes,
         output_notes,
@@ -234,7 +233,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     let returned_note_proving_info = generate_output_token_note_proving_info(
         &mut rng,
         returned_note,
-        sell.name,
+        sell.name(),
         output_auth,
         input_notes,
         output_notes,
@@ -256,14 +255,8 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
     let alice_auth_sk = pallas::Scalar::random(&mut rng);
     let alice_auth_pk = generator * alice_auth_sk;
     let alice_nk = NullifierKeyContainer::random_key(&mut rng);
-    let sell = Token {
-        name: "btc".to_string(),
-        value: 2u64,
-    };
-    let buy = Token {
-        name: "eth".to_string(),
-        value: 10u64,
-    };
+    let sell = Token::new("btc".to_string(), 2u64);
+    let buy = Token::new("eth".to_string(), 10u64);
     let (alice_ptx, intent_nk, receiver_nk_com, receiver_app_data_dynamic, intent_rho) =
         create_token_intent_ptx(&mut rng, sell.clone(), buy.clone(), alice_auth_sk, alice_nk);
 
@@ -271,15 +264,15 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
     let bob_auth_sk = pallas::Scalar::random(&mut rng);
     let bob_auth_pk = generator * bob_auth_sk;
     let bob_nk = NullifierKeyContainer::random_key(&mut rng);
+    let eth_token = Token::new("eth".to_string(), 5);
+    let btc_token = Token::new("btc".to_string(), 1);
 
     let bob_ptx = create_token_swap_ptx(
         &mut rng,
-        "eth",
-        5,
+        eth_token,
         bob_auth_sk,
         bob_nk,
-        "btc",
-        1,
+        btc_token,
         bob_auth_pk,
         bob_nk.to_commitment(),
     );

@@ -55,6 +55,10 @@ impl TokenName {
         bytes[..self.0.len()].copy_from_slice(self.0.as_bytes());
         pallas::Base::from_repr(bytes).unwrap()
     }
+
+    pub fn inner(&self) -> String {
+        self.0.clone()
+    }
 }
 
 #[derive(Clone, Debug, Default)]

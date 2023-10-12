@@ -9,12 +9,17 @@ use halo2_proofs::arithmetic::Field;
 use pasta_curves::{group::Curve, pallas};
 use rand::{CryptoRng, RngCore};
 use taiga_halo2::{
+    circuit::vp_examples::token::Token,
     nullifier::NullifierKeyContainer,
     transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
 };
 
 pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
     let generator = pallas::Point::generator().to_affine();
+
+    let btc_token = Token::new("btc".to_string(), 5);
+    let eth_token = Token::new("eth".to_string(), 10);
+    let xan_token = Token::new("xan".to_string(), 15);
 
     // Alice creates the partial transaction
     let alice_auth_sk = pallas::Scalar::random(&mut rng);
@@ -23,12 +28,10 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
 
     let alice_ptx = create_token_swap_ptx(
         &mut rng,
-        "btc",
-        5,
+        btc_token.clone(),
         alice_auth_sk,
         alice_nk,
-        "eth",
-        10,
+        eth_token.clone(),
         alice_auth_pk,
         alice_nk.to_commitment(),
     );
@@ -40,12 +43,10 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
 
     let bob_ptx = create_token_swap_ptx(
         &mut rng,
-        "eth",
-        10,
+        eth_token,
         bob_auth_sk,
         bob_nk,
-        "xan",
-        15,
+        xan_token.clone(),
         bob_auth_pk,
         bob_nk.to_commitment(),
     );
@@ -57,12 +58,10 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
 
     let carol_ptx = create_token_swap_ptx(
         &mut rng,
-        "xan",
-        15,
+        xan_token,
         carol_auth_sk,
         carol_nk,
-        "btc",
-        5,
+        btc_token,
         carol_auth_pk,
         carol_nk.to_commitment(),
     );
