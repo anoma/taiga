@@ -22,6 +22,7 @@ use crate::{
     },
     merkle_tree::MerklePath,
     note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
+    nullifier::{Nullifier, NullifierKeyContainer},
     proof::Proof,
     utils::poseidon_hash_n,
     vp_commitment::ValidityPredicateCommitment,
@@ -89,6 +90,137 @@ impl Token {
 
     pub fn encode_value(&self) -> pallas::Base {
         pallas::Base::from(self.value)
+    }
+
+    pub fn create_random_token_note<R: RngCore>(
+        &self,
+        mut rng: R,
+        rho: Nullifier,
+        nk_container: NullifierKeyContainer,
+        auth: &TokenAuthorization,
+    ) -> TokenNote {
+        let app_data_static = self.encode_name();
+        let app_data_dynamic = auth.to_app_data_dynamic();
+        let rseed = RandomSeed::random(&mut rng);
+        let note = Note::new(
+            *COMPRESSED_TOKEN_VK,
+            app_data_static,
+            app_data_dynamic,
+            self.value(),
+            nk_container,
+            rho,
+            true,
+            rseed,
+        );
+
+        TokenNote {
+            token_name: self.name().clone(),
+            note,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct TokenNote {
+    token_name: TokenName,
+    note: Note,
+}
+
+impl std::ops::Deref for TokenNote {
+    type Target = Note;
+
+    fn deref(&self) -> &Self::Target {
+        &self.note
+    }
+}
+
+impl TokenNote {
+    pub fn token_name(&self) -> &TokenName {
+        &self.token_name
+    }
+
+    pub fn note(&self) -> &Note {
+        &self.note
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn generate_input_token_note_proving_info<R: RngCore>(
+        &self,
+        mut rng: R,
+        auth: TokenAuthorization,
+        auth_sk: pallas::Scalar,
+        merkle_path: MerklePath,
+        input_notes: [Note; NUM_NOTE],
+        output_notes: [Note; NUM_NOTE],
+    ) -> InputNoteProvingInfo {
+        let TokenNote { token_name, note } = self;
+        // token VP
+        let nf = note.get_nf().unwrap().inner();
+        let token_vp = TokenValidityPredicateCircuit {
+            owned_note_pub_id: nf,
+            input_notes,
+            output_notes,
+            token_name: token_name.clone(),
+            auth,
+            receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
+            rseed: RandomSeed::random(&mut rng),
+        };
+
+        // token auth VP
+        let token_auth_vp = SignatureVerificationValidityPredicateCircuit::from_sk_and_sign(
+            &mut rng,
+            nf,
+            input_notes,
+            output_notes,
+            auth.vk,
+            auth_sk,
+            *COMPRESSED_RECEIVER_VK,
+        );
+
+        // input note proving info
+        InputNoteProvingInfo::new(
+            *note,
+            merkle_path,
+            None,
+            Box::new(token_vp),
+            vec![Box::new(token_auth_vp)],
+        )
+    }
+
+    pub fn generate_output_token_note_proving_info<R: RngCore>(
+        &self,
+        mut rng: R,
+        auth: TokenAuthorization,
+        input_notes: [Note; NUM_NOTE],
+        output_notes: [Note; NUM_NOTE],
+    ) -> OutputNoteProvingInfo {
+        let TokenNote { token_name, note } = self;
+
+        let owned_note_pub_id = note.commitment().inner();
+        // token VP
+        let token_vp = TokenValidityPredicateCircuit {
+            owned_note_pub_id,
+            input_notes,
+            output_notes,
+            token_name: token_name.clone(),
+            auth,
+            receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
+            rseed: RandomSeed::random(&mut rng),
+        };
+
+        // receiver VP
+        let receiver_vp = ReceiverValidityPredicateCircuit {
+            owned_note_pub_id,
+            input_notes,
+            output_notes,
+            vp_vk: *COMPRESSED_RECEIVER_VK,
+            nonce: pallas::Base::from_u128(rng.gen()),
+            sk: pallas::Base::random(&mut rng),
+            rcv_pk: auth.pk,
+            auth_vp_vk: *COMPRESSED_TOKEN_AUTH_VK,
+        };
+
+        OutputNoteProvingInfo::new(*note, Box::new(token_vp), vec![Box::new(receiver_vp)])
     }
 }
 
@@ -376,85 +508,6 @@ impl TokenAuthorization {
         let pk = generator * sk;
         Self { pk, vk: *vk }
     }
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn generate_input_token_note_proving_info<R: RngCore>(
-    mut rng: R,
-    input_note: Note,
-    token_name: &TokenName,
-    auth: TokenAuthorization,
-    auth_sk: pallas::Scalar,
-    merkle_path: MerklePath,
-    input_notes: [Note; NUM_NOTE],
-    output_notes: [Note; NUM_NOTE],
-) -> InputNoteProvingInfo {
-    // token VP
-    let nf = input_note.get_nf().unwrap().inner();
-    let token_vp = TokenValidityPredicateCircuit {
-        owned_note_pub_id: nf,
-        input_notes,
-        output_notes,
-        token_name: token_name.clone(),
-        auth,
-        receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
-        rseed: RandomSeed::random(&mut rng),
-    };
-
-    // token auth VP
-    let token_auth_vp = SignatureVerificationValidityPredicateCircuit::from_sk_and_sign(
-        &mut rng,
-        nf,
-        input_notes,
-        output_notes,
-        auth.vk,
-        auth_sk,
-        *COMPRESSED_RECEIVER_VK,
-    );
-
-    // input note proving info
-    InputNoteProvingInfo::new(
-        input_note,
-        merkle_path,
-        None,
-        Box::new(token_vp),
-        vec![Box::new(token_auth_vp)],
-    )
-}
-
-pub fn generate_output_token_note_proving_info<R: RngCore>(
-    mut rng: R,
-    output_note: Note,
-    token_name: &TokenName,
-    auth: TokenAuthorization,
-    input_notes: [Note; NUM_NOTE],
-    output_notes: [Note; NUM_NOTE],
-) -> OutputNoteProvingInfo {
-    let owned_note_pub_id = output_note.commitment().inner();
-    // token VP
-    let token_vp = TokenValidityPredicateCircuit {
-        owned_note_pub_id,
-        input_notes,
-        output_notes,
-        token_name: token_name.clone(),
-        auth,
-        receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
-        rseed: RandomSeed::random(&mut rng),
-    };
-
-    // receiver VP
-    let receiver_vp = ReceiverValidityPredicateCircuit {
-        owned_note_pub_id,
-        input_notes,
-        output_notes,
-        vp_vk: *COMPRESSED_RECEIVER_VK,
-        nonce: pallas::Base::from_u128(rng.gen()),
-        sk: pallas::Base::random(&mut rng),
-        rcv_pk: auth.pk,
-        auth_vp_vk: *COMPRESSED_TOKEN_AUTH_VK,
-    };
-
-    OutputNoteProvingInfo::new(output_note, Box::new(token_vp), vec![Box::new(receiver_vp)])
 }
 
 #[test]
