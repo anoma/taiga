@@ -45,17 +45,47 @@ lazy_static! {
     pub static ref COMPRESSED_TOKEN_VK: pallas::Base = TOKEN_VK.get_compressed();
 }
 
-pub fn transfrom_token_name_to_token_property(token_name: &str) -> pallas::Base {
-    assert!(token_name.len() < 32);
-    let mut bytes: [u8; 32] = [0; 32];
-    bytes[..token_name.len()].copy_from_slice(token_name.as_bytes());
-    pallas::Base::from_repr(bytes).unwrap()
+#[derive(Clone, Debug, Default)]
+pub struct TokenName(String);
+
+impl TokenName {
+    pub fn encode(&self) -> pallas::Base {
+        assert!(self.0.len() < 32);
+        let mut bytes: [u8; 32] = [0; 32];
+        bytes[..self.0.len()].copy_from_slice(self.0.as_bytes());
+        pallas::Base::from_repr(bytes).unwrap()
+    }
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct Token {
-    pub name: String,
-    pub value: u64,
+    name: TokenName,
+    value: u64,
+}
+
+impl Token {
+    pub fn new(name: String, value: u64) -> Self {
+        Self {
+            name: TokenName(name),
+            value,
+        }
+    }
+
+    pub fn name(&self) -> &TokenName {
+        &self.name
+    }
+
+    pub fn value(&self) -> u64 {
+        self.value
+    }
+
+    pub fn encode_name(&self) -> pallas::Base {
+        self.name.encode()
+    }
+
+    pub fn encode_value(&self) -> pallas::Base {
+        pallas::Base::from(self.value)
+    }
 }
 
 // TokenValidityPredicateCircuit
@@ -65,7 +95,7 @@ pub struct TokenValidityPredicateCircuit {
     pub input_notes: [Note; NUM_NOTE],
     pub output_notes: [Note; NUM_NOTE],
     // The token_name goes to app_data_static. It can be extended to a list and embedded to app_data_static.
-    pub token_name: String,
+    pub token_name: TokenName,
     // The auth goes to app_data_dynamic and defines how to consume and create the note.
     pub auth: TokenAuthorization,
     pub receiver_vp_vk: pallas::Base,
@@ -94,7 +124,7 @@ impl Default for TokenValidityPredicateCircuit {
             owned_note_pub_id: pallas::Base::zero(),
             input_notes: [(); NUM_NOTE].map(|_| Note::default()),
             output_notes: [(); NUM_NOTE].map(|_| Note::default()),
-            token_name: "Token_name".to_string(),
+            token_name: TokenName("Token_name".to_string()),
             auth: TokenAuthorization::default(),
             receiver_vp_vk: pallas::Base::zero(),
             rseed: RandomSeed::default(),
@@ -115,7 +145,7 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
         let token_property = assign_free_advice(
             layouter.namespace(|| "witness token_property"),
             config.advices[0],
-            Value::known(transfrom_token_name_to_token_property(&self.token_name)),
+            Value::known(self.token_name.encode()),
         )?;
 
         // We can add more constraints on token_property or extend the token_properties.
@@ -348,7 +378,7 @@ impl TokenAuthorization {
 pub fn generate_input_token_note_proving_info<R: RngCore>(
     mut rng: R,
     input_note: Note,
-    token_name: String,
+    token_name: &TokenName,
     auth: TokenAuthorization,
     auth_sk: pallas::Scalar,
     merkle_path: MerklePath,
@@ -361,7 +391,7 @@ pub fn generate_input_token_note_proving_info<R: RngCore>(
         owned_note_pub_id: nf,
         input_notes,
         output_notes,
-        token_name,
+        token_name: token_name.clone(),
         auth,
         receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
         rseed: RandomSeed::random(&mut rng),
@@ -391,7 +421,7 @@ pub fn generate_input_token_note_proving_info<R: RngCore>(
 pub fn generate_output_token_note_proving_info<R: RngCore>(
     mut rng: R,
     output_note: Note,
-    token_name: String,
+    token_name: &TokenName,
     auth: TokenAuthorization,
     input_notes: [Note; NUM_NOTE],
     output_notes: [Note; NUM_NOTE],
@@ -402,7 +432,7 @@ pub fn generate_output_token_note_proving_info<R: RngCore>(
         owned_note_pub_id,
         input_notes,
         output_notes,
-        token_name,
+        token_name: token_name.clone(),
         auth,
         receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
         rseed: RandomSeed::random(&mut rng),
@@ -437,10 +467,9 @@ fn test_halo2_token_vp_circuit() {
             .iter()
             .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
             .collect::<Vec<_>>();
-        let token_name = "Token_name".to_string();
+        let token_name = TokenName("Token_name".to_string());
         let auth = TokenAuthorization::random(&mut rng);
-        input_notes[0].note_type.app_data_static =
-            transfrom_token_name_to_token_property(&token_name);
+        input_notes[0].note_type.app_data_static = token_name.encode();
         input_notes[0].app_data_dynamic = auth.to_app_data_dynamic();
         TokenValidityPredicateCircuit {
             owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
