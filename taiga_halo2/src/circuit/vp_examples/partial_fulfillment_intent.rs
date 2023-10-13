@@ -60,15 +60,11 @@ impl PartialFulfillmentIntentValidityPredicateCircuit {
         receiver_nk_com: pallas::Base,
         receiver_app_data_dynamic: pallas::Base,
     ) -> pallas::Base {
-        let sold_token = sell.encode_name();
-        let sold_token_value = sell.encode_value();
-        let bought_token = buy.encode_name();
-        let bought_token_value = buy.encode_value();
         poseidon_hash_n([
-            sold_token,
-            sold_token_value,
-            bought_token,
-            bought_token_value,
+            sell.encode_name(),
+            sell.encode_value(),
+            buy.encode_name(),
+            buy.encode_value(),
             // Assuming the sold_token and bought_token have the same TOKEN_VK
             TOKEN_VK.get_compressed(),
             receiver_nk_com,
@@ -483,37 +479,44 @@ pub fn create_intent_note<R: RngCore>(
 
 #[test]
 fn test_halo2_partial_fulfillment_intent_vp_circuit() {
+    use crate::circuit::vp_examples::{
+        signature_verification::COMPRESSED_TOKEN_AUTH_VK, token::TokenAuthorization,
+    };
     use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
-    use crate::{circuit::vp_examples::token::COMPRESSED_TOKEN_VK, note::tests::random_input_note};
     use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
 
-    let sell = Token::new("token1".to_string(), 2u64);
-    let buy = Token::new("token2".to_string(), 4u64);
+    let alice_sk = pallas::Scalar::random(&mut rng);
+    let alice_auth = TokenAuthorization::from_sk_vk(&alice_sk, &COMPRESSED_TOKEN_AUTH_VK);
 
-    let mut sold_note = random_input_note(&mut rng);
-    sold_note.note_type.app_vk = *COMPRESSED_TOKEN_VK;
-    sold_note.note_type.app_data_static = sell.encode_name();
-    sold_note.value = sell.value();
-    let receiver_nk_com = sold_note.get_nk_commitment();
-    let rho = Nullifier::random(&mut rng);
-    let nk = NullifierKeyContainer::random_key(&mut rng);
-    let intent_note = create_intent_note(
-        &mut rng,
-        &sell,
-        &buy,
-        receiver_nk_com,
-        sold_note.app_data_dynamic,
-        rho,
-        nk,
-    );
+    let alice_sell = Token::new("token1".to_string(), 2u64);
+    let alice_buy = Token::new("token2".to_string(), 4u64);
+    let alice_sold_note = {
+        let rho = Nullifier::random(&mut rng);
+        let nk = NullifierKeyContainer::random_key(&mut rng);
+        alice_sell.create_random_token_note(&mut rng, rho, nk, &alice_auth)
+    };
+    let intent_note = {
+        let rho = Nullifier::random(&mut rng);
+        let nk = NullifierKeyContainer::random_key(&mut rng);
+        create_intent_note(
+            &mut rng,
+            &alice_sell,
+            &alice_buy,
+            alice_sold_note.get_nk_commitment(),
+            alice_sold_note.app_data_dynamic,
+            rho,
+            nk,
+        )
+    };
+
     // Creating intent test
     {
         let input_padding_note = Note::random_padding_input_note(&mut rng);
-        let input_notes = [sold_note, input_padding_note];
+        let input_notes = [*alice_sold_note.note(), input_padding_note];
         let output_padding_note =
             Note::random_padding_output_note(&mut rng, input_padding_note.get_nf().unwrap());
         let output_notes = [intent_note, output_padding_note];
@@ -522,10 +525,10 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
             owned_note_pub_id: intent_note.commitment().inner(),
             input_notes,
             output_notes,
-            sell: sell.clone(),
-            buy: buy.clone(),
-            receiver_nk_com,
-            receiver_app_data_dynamic: sold_note.app_data_dynamic,
+            sell: alice_sell.clone(),
+            buy: alice_buy.clone(),
+            receiver_nk_com: alice_sold_note.get_nk_commitment(),
+            receiver_app_data_dynamic: alice_sold_note.app_data_dynamic,
         };
         let public_inputs = circuit.get_public_inputs(&mut rng);
 
@@ -535,75 +538,83 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
             vec![public_inputs.to_vec()],
         )
         .unwrap();
-        assert_eq!(prover.verify(), Ok(()));
+        prover.assert_satisfied();
     }
 
     // Consuming intent test
+    let input_padding_note = Note::random_padding_input_note(&mut rng);
+    let input_notes = [intent_note, input_padding_note];
+
+    // full fulfillment
     {
-        {
-            let input_padding_note = Note::random_padding_input_note(&mut rng);
-            let input_notes = [intent_note, input_padding_note];
-            let mut bought_note = sold_note;
-            bought_note.note_type.app_data_static = buy.encode_name();
-            bought_note.app_data_dynamic = sold_note.app_data_dynamic;
-            bought_note.nk_container = sold_note.nk_container;
+        let bob_sell = alice_buy.clone();
+        let bob_sold_note = bob_sell.create_random_token_note(
+            &mut rng,
+            alice_sold_note.rho,
+            alice_sold_note.nk_container,
+            &alice_auth,
+        );
 
-            // full fulfillment
-            {
-                bought_note.value = buy.value();
-                let output_padding_note = Note::random_padding_output_note(
-                    &mut rng,
-                    input_padding_note.get_nf().unwrap(),
-                );
-                let output_notes = [bought_note, output_padding_note];
+        let output_padding_note =
+            Note::random_padding_output_note(&mut rng, input_padding_note.get_nf().unwrap());
+        let output_notes = [*bob_sold_note.note(), output_padding_note];
 
-                let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
-                    owned_note_pub_id: intent_note.get_nf().unwrap().inner(),
-                    input_notes,
-                    output_notes,
-                    sell: sell.clone(),
-                    buy: buy.clone(),
-                    receiver_nk_com,
-                    receiver_app_data_dynamic: sold_note.app_data_dynamic,
-                };
-                let public_inputs = circuit.get_public_inputs(&mut rng);
+        let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
+            owned_note_pub_id: intent_note.get_nf().unwrap().inner(),
+            input_notes,
+            output_notes,
+            sell: alice_sell.clone(),
+            buy: alice_buy.clone(),
+            receiver_nk_com: alice_sold_note.get_nk_commitment(),
+            receiver_app_data_dynamic: alice_sold_note.app_data_dynamic,
+        };
+        let public_inputs = circuit.get_public_inputs(&mut rng);
 
-                let prover = MockProver::<pallas::Base>::run(
-                    VP_CIRCUIT_PARAMS_SIZE,
-                    &circuit,
-                    vec![public_inputs.to_vec()],
-                )
-                .unwrap();
-                assert_eq!(prover.verify(), Ok(()));
-            }
+        let prover = MockProver::<pallas::Base>::run(
+            VP_CIRCUIT_PARAMS_SIZE,
+            &circuit,
+            vec![public_inputs.to_vec()],
+        )
+        .unwrap();
+        prover.assert_satisfied();
+    }
 
-            // partial fulfillment
-            {
-                bought_note.value = 2u64;
-                let mut returned_note = bought_note;
-                returned_note.note_type.app_data_static = sell.encode_name();
-                returned_note.value = 1u64;
-                let output_notes = [bought_note, returned_note];
+    // partial fulfillment
+    {
+        let bob_sell = Token::new(alice_buy.name().inner().to_string(), 2u64);
+        let bob_sold_note = bob_sell.create_random_token_note(
+            &mut rng,
+            alice_sold_note.rho,
+            alice_sold_note.nk_container,
+            &alice_auth,
+        );
 
-                let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
-                    owned_note_pub_id: intent_note.get_nf().unwrap().inner(),
-                    input_notes,
-                    output_notes,
-                    sell,
-                    buy,
-                    receiver_nk_com,
-                    receiver_app_data_dynamic: sold_note.app_data_dynamic,
-                };
-                let public_inputs = circuit.get_public_inputs(&mut rng);
+        let bob_return = Token::new(alice_sell.name().inner().to_string(), 1u64);
+        let bob_returned_note = bob_return.create_random_token_note(
+            &mut rng,
+            alice_sold_note.rho,
+            alice_sold_note.nk_container,
+            &alice_auth,
+        );
+        let output_notes = [*bob_sold_note.note(), *bob_returned_note.note()];
 
-                let prover = MockProver::<pallas::Base>::run(
-                    VP_CIRCUIT_PARAMS_SIZE,
-                    &circuit,
-                    vec![public_inputs.to_vec()],
-                )
-                .unwrap();
-                assert_eq!(prover.verify(), Ok(()));
-            }
-        }
+        let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
+            owned_note_pub_id: intent_note.get_nf().unwrap().inner(),
+            input_notes,
+            output_notes,
+            sell: alice_sell,
+            buy: alice_buy,
+            receiver_nk_com: alice_sold_note.get_nk_commitment(),
+            receiver_app_data_dynamic: alice_sold_note.app_data_dynamic,
+        };
+        let public_inputs = circuit.get_public_inputs(&mut rng);
+
+        let prover = MockProver::<pallas::Base>::run(
+            VP_CIRCUIT_PARAMS_SIZE,
+            &circuit,
+            vec![public_inputs.to_vec()],
+        )
+        .unwrap();
+        prover.assert_satisfied();
     }
 }
