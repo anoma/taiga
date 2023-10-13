@@ -499,7 +499,7 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
     sold_note.note_type.app_data_static = sell.encode_name();
     sold_note.value = sell.value();
     let receiver_nk_com = sold_note.get_nk_commitment();
-    let rho = Nullifier::from(pallas::Base::random(&mut rng));
+    let rho = Nullifier::random(&mut rng);
     let nk = NullifierKeyContainer::random_key(&mut rng);
     let intent_note = create_intent_note(
         &mut rng,

@@ -62,6 +62,10 @@ impl Nullifier {
     pub fn from_bytes(bytes: [u8; 32]) -> CtOption<Self> {
         pallas::Base::from_repr(bytes).map(Nullifier)
     }
+
+    pub fn random(mut rng: impl RngCore) -> Self {
+        Self(pallas::Base::random(&mut rng))
+    }
 }
 
 impl From<pallas::Base> for Nullifier {
