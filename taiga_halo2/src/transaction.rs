@@ -6,7 +6,7 @@ use crate::merkle_tree::Anchor;
 use crate::note::NoteCommitment;
 use crate::nullifier::Nullifier;
 use crate::shielded_ptx::ShieldedPartialTransaction;
-use crate::transparent_ptx::{OutputResource, TransparentPartialTransaction};
+use crate::transparent_ptx::TransparentPartialTransaction;
 use crate::value_commitment::ValueCommitment;
 use blake2b_simd::Params as Blake2bParams;
 use pasta_curves::{group::Group, pallas};
@@ -32,6 +32,17 @@ pub struct Transaction {
     signature: BindingSignature,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "nif", derive(NifStruct))]
+#[cfg_attr(feature = "nif", module = "Taiga.Transaction.Result")]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TransactionResult {
+    pub anchors: Vec<Anchor>,
+    pub nullifiers: Vec<Nullifier>,
+    pub output_cms: Vec<NoteCommitment>,
+}
+
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "nif", derive(NifRecord))]
 #[cfg_attr(feature = "nif", tag = "bundle")]
@@ -39,28 +50,10 @@ pub struct Transaction {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ShieldedPartialTxBundle(Vec<ShieldedPartialTransaction>);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "nif", derive(NifStruct))]
-#[cfg_attr(feature = "nif", module = "Taiga.Transaction.Result")]
-#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ShieldedResult {
-    pub anchors: Vec<Anchor>,
-    pub nullifiers: Vec<Nullifier>,
-    pub output_cms: Vec<NoteCommitment>,
-}
-
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TransparentPartialTxBundle(Vec<TransparentPartialTransaction>);
-
-// TODO: add other outputs if needed.
-#[derive(Debug, Clone)]
-pub struct TransparentResult {
-    pub nullifiers: Vec<Nullifier>,
-    pub outputs: Vec<OutputResource>,
-}
 
 impl Transaction {
     // Generate the transaction
@@ -71,8 +64,7 @@ impl Transaction {
     ) -> Self {
         assert!(!(shielded_ptx_bundle.is_empty() && transparent_ptx_bundle.is_empty()));
         let shielded_sk = shielded_ptx_bundle.get_bindig_sig_r();
-        let transparent_sk = transparent_ptx_bundle.get_bindig_sig_r();
-        let binding_sk = BindingSigningKey::from(shielded_sk + transparent_sk);
+        let binding_sk = BindingSigningKey::from(shielded_sk);
         let sig_hash = Self::digest(&shielded_ptx_bundle, &transparent_ptx_bundle);
         let signature = binding_sk.sign(rng, &sig_hash);
 
@@ -84,14 +76,15 @@ impl Transaction {
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn execute(&self) -> Result<(ShieldedResult, TransparentResult), TransactionError> {
-        let shielded_result = self.shielded_ptx_bundle.execute()?;
-        let transparent_result = self.transparent_ptx_bundle.execute()?;
+    pub fn execute(&self) -> Result<TransactionResult, TransactionError> {
+        let mut result = self.shielded_ptx_bundle.execute()?;
+        let mut transparent_result = self.transparent_ptx_bundle.execute()?;
+        result.append(&mut transparent_result);
 
         // check balance
         self.verify_binding_sig()?;
 
-        Ok((shielded_result, transparent_result))
+        Ok(result)
     }
 
     fn verify_binding_sig(&self) -> Result<(), TransactionError> {
@@ -210,6 +203,14 @@ impl<'a> Decoder<'a> for Transaction {
     }
 }
 
+impl TransactionResult {
+    pub fn append(&mut self, result: &mut TransactionResult) {
+        self.anchors.append(&mut result.anchors);
+        self.nullifiers.append(&mut result.nullifiers);
+        self.output_cms.append(&mut result.output_cms);
+    }
+}
+
 impl ShieldedPartialTxBundle {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
@@ -230,13 +231,13 @@ impl ShieldedPartialTxBundle {
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn execute(&self) -> Result<ShieldedResult, TransactionError> {
+    pub fn execute(&self) -> Result<TransactionResult, TransactionError> {
         for partial_tx in self.0.iter() {
             partial_tx.execute()?;
         }
 
         // Return Nullifiers to check double-spent, NoteCommitments to store, anchors to check the root-existence
-        Ok(ShieldedResult {
+        Ok(TransactionResult {
             nullifiers: self.get_nullifiers(),
             output_cms: self.get_output_cms(),
             anchors: self.get_anchors(),
@@ -261,15 +262,6 @@ impl ShieldedPartialTxBundle {
     pub fn get_anchors(&self) -> Vec<Anchor> {
         self.0.iter().flat_map(|ptx| ptx.get_anchors()).collect()
     }
-
-    fn get_binding_vk(&self) -> BindingVerificationKey {
-        let vk = self
-            .get_value_commitments()
-            .iter()
-            .fold(pallas::Point::identity(), |acc, cv| acc + cv.inner());
-
-        BindingVerificationKey::from(vk)
-    }
 }
 
 impl TransparentPartialTxBundle {
@@ -285,20 +277,23 @@ impl TransparentPartialTxBundle {
         self.0.push(ptx);
     }
 
-    pub fn execute(&self) -> Result<TransparentResult, TransactionError> {
+    pub fn execute(&self) -> Result<TransactionResult, TransactionError> {
         for partial_tx in self.0.iter() {
             partial_tx.execute()?;
         }
 
-        Ok(TransparentResult {
-            nullifiers: vec![],
-            outputs: vec![],
+        Ok(TransactionResult {
+            nullifiers: self.get_nullifiers(),
+            output_cms: self.get_output_cms(),
+            anchors: self.get_anchors(),
         })
     }
 
     pub fn get_value_commitments(&self) -> Vec<ValueCommitment> {
-        // TODO: add the real value commitments
-        vec![]
+        self.0
+            .iter()
+            .flat_map(|ptx| ptx.get_value_commitments())
+            .collect()
     }
 
     pub fn get_nullifiers(&self) -> Vec<Nullifier> {
@@ -312,17 +307,13 @@ impl TransparentPartialTxBundle {
     pub fn get_anchors(&self) -> Vec<Anchor> {
         self.0.iter().flat_map(|ptx| ptx.get_anchors()).collect()
     }
-
-    pub fn get_bindig_sig_r(&self) -> pallas::Scalar {
-        // TODO: add the real r
-        pallas::Scalar::zero()
-    }
 }
 
 #[cfg(test)]
 pub mod testing {
     use crate::shielded_ptx::testing::create_shielded_ptx;
-    use crate::transaction::ShieldedPartialTxBundle;
+    use crate::transaction::{ShieldedPartialTxBundle, TransparentPartialTxBundle};
+    use crate::transparent_ptx::testing::create_transparent_ptx;
 
     pub fn create_shielded_ptx_bundle(num: usize) -> ShieldedPartialTxBundle {
         let mut bundle = vec![];
@@ -333,6 +324,15 @@ pub mod testing {
         ShieldedPartialTxBundle::new(bundle)
     }
 
+    pub fn create_transparent_ptx_bundle(num: usize) -> TransparentPartialTxBundle {
+        let mut bundle = vec![];
+        for _ in 0..num {
+            let ptx = create_transparent_ptx();
+            bundle.push(ptx);
+        }
+        TransparentPartialTxBundle::new(bundle)
+    }
+
     #[test]
     fn test_halo2_transaction() {
         use super::*;
@@ -341,17 +341,16 @@ pub mod testing {
         let rng = OsRng;
 
         let shielded_ptx_bundle = create_shielded_ptx_bundle(1);
-        // TODO: add transparent_ptx_bundle test
-        let transparent_ptx_bundle = TransparentPartialTxBundle::default();
+        let transparent_ptx_bundle = create_transparent_ptx_bundle(1);
         let tx = Transaction::build(rng, shielded_ptx_bundle, transparent_ptx_bundle);
-        let (_shielded_ret, _) = tx.execute().unwrap();
+        let _ret = tx.execute().unwrap();
 
         #[cfg(feature = "borsh")]
         {
             let borsh = borsh::to_vec(&tx).unwrap();
             let de_tx: Transaction = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
-            let (de_shielded_ret, _) = de_tx.execute().unwrap();
-            assert_eq!(_shielded_ret, de_shielded_ret);
+            let de_ret = de_tx.execute().unwrap();
+            assert_eq!(_ret, de_ret);
         }
     }
 }
