@@ -6,9 +6,8 @@ use crate::{
     circuit::{
         blake2s::publicize_default_dynamic_vp_commitments,
         gadgets::{
-            assign_free_advice, assign_free_constant,
-            mul::{MulChip, MulInstructions},
-            poseidon_hash::poseidon_hash_gadget,
+            assign_free_constant,
+            mul::MulChip,
             sub::{SubChip, SubInstructions},
             target_note_variable::{get_is_input_note_flag, get_owned_note_variable},
         },
@@ -16,18 +15,15 @@ use crate::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
         },
-        vp_examples::token::{Token, TOKEN_VK},
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::{Note, RandomSeed},
-    nullifier::{Nullifier, NullifierKeyContainer},
     proof::Proof,
-    utils::poseidon_hash_n,
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use halo2_proofs::{
-    circuit::{floor_planner, Layouter, Value},
+    circuit::{floor_planner, Layouter},
     plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
 use lazy_static::lazy_static;
@@ -35,42 +31,26 @@ use pasta_curves::pallas;
 use rand::rngs::OsRng;
 use rand::RngCore;
 
+mod swap;
+use swap::Swap;
+
+mod data_static;
+use data_static::PartialFulfillmentIntentDataStatic;
+
 lazy_static! {
     pub static ref PARTIAL_FULFILLMENT_INTENT_VK: ValidityPredicateVerifyingKey =
         PartialFulfillmentIntentValidityPredicateCircuit::default().get_vp_vk();
     pub static ref COMPRESSED_PARTIAL_FULFILLMENT_INTENT_VK: pallas::Base =
         PARTIAL_FULFILLMENT_INTENT_VK.get_compressed();
 }
+
 // PartialFulfillmentIntentValidityPredicateCircuit
 #[derive(Clone, Debug, Default)]
 pub struct PartialFulfillmentIntentValidityPredicateCircuit {
     pub owned_note_pub_id: pallas::Base,
     pub input_notes: [Note; NUM_NOTE],
     pub output_notes: [Note; NUM_NOTE],
-    pub sell: Token,
-    pub buy: Token,
-    pub receiver_nk_com: pallas::Base,
-    pub receiver_app_data_dynamic: pallas::Base,
-}
-
-impl PartialFulfillmentIntentValidityPredicateCircuit {
-    pub fn encode_app_data_static(
-        sell: &Token,
-        buy: &Token,
-        receiver_nk_com: pallas::Base,
-        receiver_app_data_dynamic: pallas::Base,
-    ) -> pallas::Base {
-        poseidon_hash_n([
-            sell.encode_name(),
-            sell.encode_value(),
-            buy.encode_name(),
-            buy.encode_value(),
-            // Assuming the sold_token and bought_token have the same TOKEN_VK
-            TOKEN_VK.get_compressed(),
-            receiver_nk_com,
-            receiver_app_data_dynamic,
-        ])
-    }
+    swap: Swap,
 }
 
 impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircuit {
@@ -81,7 +61,41 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
         mut layouter: impl Layouter<pallas::Base>,
         basic_variables: BasicValidityPredicateVariables,
     ) -> Result<(), Error> {
+        let sub_chip = SubChip::construct(config.sub_config.clone(), ());
+        let mul_chip = MulChip::construct(config.mul_config.clone());
+
         let owned_note_pub_id = basic_variables.get_owned_note_pub_id();
+
+        let app_data_static = self.swap.assign_app_data_static(
+            config.advices[0],
+            layouter.namespace(|| "assign app_data_static"),
+        )?;
+        let encoded_app_data_static = app_data_static.encode(
+            config.poseidon_config.clone(),
+            layouter.namespace(|| "encode app_data_static"),
+        )?;
+
+        // search target note and get the intent app_static_data
+        let owned_note_app_data_static = get_owned_note_variable(
+            config.get_owned_note_variable_config,
+            layouter.namespace(|| "get owned note app_data_static"),
+            &owned_note_pub_id,
+            &basic_variables.get_app_data_static_searchable_pairs(),
+        )?;
+
+        // Enforce consistency of app_data_static:
+        //  - as witnessed in the swap, and
+        //  - as encoded in the intent note
+        layouter.assign_region(
+            || "check app_data_static",
+            |mut region| {
+                region.constrain_equal(
+                    encoded_app_data_static.cell(),
+                    owned_note_app_data_static.cell(),
+                )
+            },
+        )?;
+
         let is_input_note = get_is_input_note_flag(
             config.get_is_input_note_flag_config,
             layouter.namespace(|| "get is_input_note_flag"),
@@ -89,325 +103,45 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
             &basic_variables.get_input_note_nfs(),
             &basic_variables.get_output_note_cms(),
         )?;
-
-        let token_vp_vk = assign_free_advice(
-            layouter.namespace(|| "witness token vp vk"),
-            config.advices[0],
-            Value::known(TOKEN_VK.get_compressed()),
+        // Conditional checks if is_input_note == 1
+        app_data_static.is_input_note_checks(
+            &is_input_note,
+            &basic_variables,
+            &config.conditional_equal_config,
+            layouter.namespace(|| "is_input_note checks"),
         )?;
 
-        let sold_token = assign_free_advice(
-            layouter.namespace(|| "witness sold_token"),
-            config.advices[0],
-            Value::known(self.sell.encode_name()),
-        )?;
-
-        let sold_token_value = assign_free_advice(
-            layouter.namespace(|| "witness sold_token_value"),
-            config.advices[0],
-            Value::known(self.sell.encode_value()),
-        )?;
-
-        let bought_token = assign_free_advice(
-            layouter.namespace(|| "witness bought_token"),
-            config.advices[0],
-            Value::known(self.buy.encode_name()),
-        )?;
-
-        let bought_token_value = assign_free_advice(
-            layouter.namespace(|| "witness bought_token_value"),
-            config.advices[0],
-            Value::known(self.buy.encode_value()),
-        )?;
-
-        let receiver_nk_com = assign_free_advice(
-            layouter.namespace(|| "witness receiver nk_com"),
-            config.advices[0],
-            Value::known(self.receiver_nk_com),
-        )?;
-
-        let receiver_app_data_dynamic = assign_free_advice(
-            layouter.namespace(|| "witness receiver app_data_dynamic"),
-            config.advices[0],
-            Value::known(self.receiver_app_data_dynamic),
-        )?;
-
-        // Encode the app_data_static of intent note
-        let encoded_app_data_static = poseidon_hash_gadget(
-            config.poseidon_config,
-            layouter.namespace(|| "app_data_static encoding"),
-            [
-                sold_token.clone(),
-                sold_token_value.clone(),
-                bought_token.clone(),
-                bought_token_value.clone(),
-                token_vp_vk.clone(),
-                receiver_nk_com.clone(),
-                receiver_app_data_dynamic.clone(),
-            ],
-        )?;
-
-        // search target note and get the intent app_static_data
-        let app_data_static = get_owned_note_variable(
-            config.get_owned_note_variable_config,
-            layouter.namespace(|| "get owned note app_data_static"),
-            &owned_note_pub_id,
-            &basic_variables.get_app_data_static_searchable_pairs(),
-        )?;
-
-        // check the app_data_static of intent note
-        layouter.assign_region(
-            || "check app_data_static",
-            |mut region| {
-                region.constrain_equal(encoded_app_data_static.cell(), app_data_static.cell())
-            },
-        )?;
-
-        // Create the intent note
-        {
-            // TODO: use a nor gate to replace the sub gate.
-            let sub_chip = SubChip::construct(config.sub_config.clone(), ());
+        let is_output_note = {
             let constant_one = assign_free_constant(
                 layouter.namespace(|| "one"),
                 config.advices[0],
                 pallas::Base::one(),
             )?;
-            let is_output_note = SubInstructions::sub(
+            // TODO: use a nor gate to replace the sub gate.
+            SubInstructions::sub(
                 &sub_chip,
                 layouter.namespace(|| "expected_sold_value - returned_value"),
                 &is_input_note,
                 &constant_one,
-            )?;
-            layouter.assign_region(
-                || "conditional equal: check sold token vp_vk",
-                |mut region| {
-                    config.conditional_equal_config.assign_region(
-                        &is_output_note,
-                        &token_vp_vk,
-                        &basic_variables.input_note_variables[0]
-                            .note_variables
-                            .app_vk,
-                        0,
-                        &mut region,
-                    )
-                },
-            )?;
+            )?
+        };
+        // Conditional checks if is_output_note == 1
+        app_data_static.is_output_note_checks(
+            &is_output_note,
+            &basic_variables,
+            &config.conditional_equal_config,
+            layouter.namespace(|| "is_output_note checks"),
+        )?;
 
-            layouter.assign_region(
-                || "conditional equal: check sold token app_data_static",
-                |mut region| {
-                    config.conditional_equal_config.assign_region(
-                        &is_output_note,
-                        &sold_token,
-                        &basic_variables.input_note_variables[0]
-                            .note_variables
-                            .app_data_static,
-                        0,
-                        &mut region,
-                    )
-                },
-            )?;
-
-            layouter.assign_region(
-                || "conditional equal: check sold token value",
-                |mut region| {
-                    config.conditional_equal_config.assign_region(
-                        &is_output_note,
-                        &sold_token_value,
-                        &basic_variables.input_note_variables[0].note_variables.value,
-                        0,
-                        &mut region,
-                    )
-                },
-            )?;
-        }
-
-        // Consume the intent note
-        {
-            layouter.assign_region(
-                || "conditional equal: check bought token vk",
-                |mut region| {
-                    config.conditional_equal_config.assign_region(
-                        &is_input_note,
-                        &token_vp_vk,
-                        &basic_variables.output_note_variables[0]
-                            .note_variables
-                            .app_vk,
-                        0,
-                        &mut region,
-                    )
-                },
-            )?;
-
-            layouter.assign_region(
-                || "conditional equal: check bought token vk",
-                |mut region| {
-                    config.conditional_equal_config.assign_region(
-                        &is_input_note,
-                        &bought_token,
-                        &basic_variables.output_note_variables[0]
-                            .note_variables
-                            .app_data_static,
-                        0,
-                        &mut region,
-                    )
-                },
-            )?;
-
-            // check nk_com
-            layouter.assign_region(
-                || "conditional equal: check bought token nk_com",
-                |mut region| {
-                    config.conditional_equal_config.assign_region(
-                        &is_input_note,
-                        &receiver_nk_com,
-                        &basic_variables.output_note_variables[0]
-                            .note_variables
-                            .nk_com,
-                        0,
-                        &mut region,
-                    )
-                },
-            )?;
-
-            // check app_data_dynamic
-            layouter.assign_region(
-                || "conditional equal: check bought token app_data_dynamic",
-                |mut region| {
-                    config.conditional_equal_config.assign_region(
-                        &is_input_note,
-                        &receiver_app_data_dynamic,
-                        &basic_variables.output_note_variables[0]
-                            .note_variables
-                            .app_data_dynamic,
-                        0,
-                        &mut region,
-                    )
-                },
-            )?;
-
-            let sub_chip = SubChip::construct(config.sub_config, ());
-            let mul_chip = MulChip::construct(config.mul_config);
-
-            let is_partial_fulfillment = SubInstructions::sub(
-                &sub_chip,
-                layouter.namespace(|| "expected_bought_token_value - actual_bought_token_value"),
-                &bought_token_value,
-                &basic_variables.output_note_variables[0]
-                    .note_variables
-                    .value,
-            )?;
-            let is_partial_fulfillment = MulInstructions::mul(
-                &mul_chip,
-                layouter.namespace(|| "is_input * is_partial_fulfillment"),
-                &is_input_note,
-                &is_partial_fulfillment,
-            )?;
-
-            // check returned token vk if it's partially fulfilled
-            layouter.assign_region(
-                || "conditional equal: check returned token vk",
-                |mut region| {
-                    config.conditional_equal_config.assign_region(
-                        &is_partial_fulfillment,
-                        &token_vp_vk,
-                        &basic_variables.output_note_variables[1]
-                            .note_variables
-                            .app_vk,
-                        0,
-                        &mut region,
-                    )
-                },
-            )?;
-
-            // check return token app_data_static if it's partially fulfilled
-            layouter.assign_region(
-                || "conditional equal: check returned token app_data_static",
-                |mut region| {
-                    config.conditional_equal_config.assign_region(
-                        &is_partial_fulfillment,
-                        &sold_token,
-                        &basic_variables.output_note_variables[1]
-                            .note_variables
-                            .app_data_static,
-                        0,
-                        &mut region,
-                    )
-                },
-            )?;
-
-            layouter.assign_region(
-                || "conditional equal: check returned token nk_com",
-                |mut region| {
-                    config.conditional_equal_config.assign_region(
-                        &is_partial_fulfillment,
-                        &receiver_nk_com,
-                        &basic_variables.output_note_variables[1]
-                            .note_variables
-                            .nk_com,
-                        0,
-                        &mut region,
-                    )
-                },
-            )?;
-
-            layouter.assign_region(
-                || "conditional equal: check returned token app_data_dynamic",
-                |mut region| {
-                    config.conditional_equal_config.assign_region(
-                        &is_partial_fulfillment,
-                        &receiver_app_data_dynamic,
-                        &basic_variables.output_note_variables[1]
-                            .note_variables
-                            .app_data_dynamic,
-                        0,
-                        &mut region,
-                    )
-                },
-            )?;
-
-            // value check
-            {
-                let actual_sold_value = SubInstructions::sub(
-                    &sub_chip,
-                    layouter.namespace(|| "expected_sold_value - returned_value"),
-                    &sold_token_value,
-                    &basic_variables.output_note_variables[1]
-                        .note_variables
-                        .value,
-                )?;
-
-                // check (expected_bought_value * actual_sold_value) == (expected_sold_value * actual_bought_value)
-                // if it's partially fulfilled
-                let expected_bought_mul_actual_sold_value = MulInstructions::mul(
-                    &mul_chip,
-                    layouter.namespace(|| "expected_bought_value * actual_sold_value"),
-                    &bought_token_value,
-                    &actual_sold_value,
-                )?;
-                let expected_sold_mul_actual_bought_value = MulInstructions::mul(
-                    &mul_chip,
-                    layouter.namespace(|| "expected_sold_value * actual_bought_value"),
-                    &sold_token_value,
-                    &basic_variables.output_note_variables[0]
-                        .note_variables
-                        .value,
-                )?;
-
-                layouter.assign_region(
-                    || "conditional equal: expected_bought_value * actual_sold_value == expected_sold_value * actual_bought_value",
-                    |mut region| {
-                        config.conditional_equal_config.assign_region(
-                            &is_partial_fulfillment,
-                            &expected_bought_mul_actual_sold_value,
-                            &expected_sold_mul_actual_bought_value,
-                            0,
-                            &mut region,
-                        )
-                    },
-                )?;
-            }
-        }
+        // Conditional checks if is_partial_fulfillment == 1
+        app_data_static.is_partial_fulfillment_checks(
+            &is_input_note,
+            &basic_variables,
+            &config.conditional_equal_config,
+            &sub_chip,
+            &mul_chip,
+            layouter.namespace(|| "is_partial_fulfillment checks"),
+        )?;
 
         // Publicize the dynamic vp commitments with default value
         publicize_default_dynamic_vp_commitments(
@@ -449,86 +183,48 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
 vp_circuit_impl!(PartialFulfillmentIntentValidityPredicateCircuit);
 vp_verifying_info_impl!(PartialFulfillmentIntentValidityPredicateCircuit);
 
-pub fn create_intent_note<R: RngCore>(
-    mut rng: R,
-    sell: &Token,
-    buy: &Token,
-    receiver_nk_com: pallas::Base,
-    receiver_app_data_dynamic: pallas::Base,
-    rho: Nullifier,
-    nk: NullifierKeyContainer,
-) -> Note {
-    let app_data_static = PartialFulfillmentIntentValidityPredicateCircuit::encode_app_data_static(
-        sell,
-        buy,
-        receiver_nk_com,
-        receiver_app_data_dynamic,
-    );
-    let rseed = RandomSeed::random(&mut rng);
-    Note::new(
-        *COMPRESSED_PARTIAL_FULFILLMENT_INTENT_VK,
-        app_data_static,
-        pallas::Base::zero(),
-        1u64,
-        nk,
-        rho,
-        false,
-        rseed,
-    )
-}
-
-#[test]
-fn test_halo2_partial_fulfillment_intent_vp_circuit() {
+#[cfg(test)]
+mod tests {
+    use super::*;
     use crate::circuit::vp_examples::{
-        signature_verification::COMPRESSED_TOKEN_AUTH_VK, token::TokenAuthorization,
+        signature_verification::COMPRESSED_TOKEN_AUTH_VK,
+        token::{Token, TokenAuthorization},
     };
     use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
     use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
+    use rand::RngCore;
 
-    let mut rng = OsRng;
+    // Generate a swap, along with its corresponding intent note and authorisation
+    fn swap(mut rng: impl RngCore, sell: Token, buy: Token) -> Swap {
+        let sk = pallas::Scalar::random(&mut rng);
+        let auth = TokenAuthorization::from_sk_vk(&sk, &COMPRESSED_TOKEN_AUTH_VK);
 
-    let alice_sk = pallas::Scalar::random(&mut rng);
-    let alice_auth = TokenAuthorization::from_sk_vk(&alice_sk, &COMPRESSED_TOKEN_AUTH_VK);
+        Swap::random(&mut rng, sell, buy, auth)
+    }
 
-    let alice_sell = Token::new("token1".to_string(), 2u64);
-    let alice_buy = Token::new("token2".to_string(), 4u64);
-    let alice_sold_note = {
-        let rho = Nullifier::random(&mut rng);
-        let nk = NullifierKeyContainer::random_key(&mut rng);
-        alice_sell.create_random_token_note(&mut rng, rho, nk, &alice_auth)
-    };
-    let intent_note = {
-        let rho = Nullifier::random(&mut rng);
-        let nk = NullifierKeyContainer::random_key(&mut rng);
-        create_intent_note(
-            &mut rng,
-            &alice_sell,
-            &alice_buy,
-            alice_sold_note.get_nk_commitment(),
-            alice_sold_note.app_data_dynamic,
-            rho,
-            nk,
-        )
-    };
+    #[test]
+    fn create_intent() {
+        let mut rng = OsRng;
+        let sell = Token::new("token1".to_string(), 2u64);
+        let buy = Token::new("token2".to_string(), 4u64);
 
-    // Creating intent test
-    {
+        let swap = swap(&mut rng, sell, buy);
+        let intent_note = swap.create_intent_note(&mut rng);
+
         let input_padding_note = Note::random_padding_input_note(&mut rng);
-        let input_notes = [*alice_sold_note.note(), input_padding_note];
         let output_padding_note =
             Note::random_padding_output_note(&mut rng, input_padding_note.get_nf().unwrap());
+
+        let input_notes = [*swap.sell.note(), input_padding_note];
         let output_notes = [intent_note, output_padding_note];
 
         let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
             owned_note_pub_id: intent_note.commitment().inner(),
             input_notes,
             output_notes,
-            sell: alice_sell.clone(),
-            buy: alice_buy.clone(),
-            receiver_nk_com: alice_sold_note.get_nk_commitment(),
-            receiver_app_data_dynamic: alice_sold_note.app_data_dynamic,
+            swap,
         };
         let public_inputs = circuit.get_public_inputs(&mut rng);
 
@@ -541,32 +237,23 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
         prover.assert_satisfied();
     }
 
-    // Consuming intent test
-    let input_padding_note = Note::random_padding_input_note(&mut rng);
-    let input_notes = [intent_note, input_padding_note];
+    #[test]
+    fn full_fulfillment() {
+        let mut rng = OsRng;
+        let sell = Token::new("token1".to_string(), 2u64);
+        let buy = Token::new("token2".to_string(), 4u64);
 
-    // full fulfillment
-    {
-        let bob_sell = alice_buy.clone();
-        let bob_sold_note = bob_sell.create_random_token_note(
-            &mut rng,
-            alice_sold_note.rho,
-            alice_sold_note.nk_container,
-            &alice_auth,
-        );
+        let swap = swap(&mut rng, sell, buy);
+        let intent_note = swap.create_intent_note(&mut rng);
 
-        let output_padding_note =
-            Note::random_padding_output_note(&mut rng, input_padding_note.get_nf().unwrap());
-        let output_notes = [*bob_sold_note.note(), output_padding_note];
+        let bob_sell = swap.buy.clone();
+        let (input_notes, output_notes) = swap.fill(&mut rng, intent_note, bob_sell);
 
         let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
             owned_note_pub_id: intent_note.get_nf().unwrap().inner(),
             input_notes,
             output_notes,
-            sell: alice_sell.clone(),
-            buy: alice_buy.clone(),
-            receiver_nk_com: alice_sold_note.get_nk_commitment(),
-            receiver_app_data_dynamic: alice_sold_note.app_data_dynamic,
+            swap,
         };
         let public_inputs = circuit.get_public_inputs(&mut rng);
 
@@ -579,33 +266,23 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
         prover.assert_satisfied();
     }
 
-    // partial fulfillment
-    {
-        let bob_sell = Token::new(alice_buy.name().inner().to_string(), 2u64);
-        let bob_sold_note = bob_sell.create_random_token_note(
-            &mut rng,
-            alice_sold_note.rho,
-            alice_sold_note.nk_container,
-            &alice_auth,
-        );
+    #[test]
+    fn partial_fulfillment() {
+        let mut rng = OsRng;
+        let sell = Token::new("token1".to_string(), 2u64);
+        let buy = Token::new("token2".to_string(), 4u64);
 
-        let bob_return = Token::new(alice_sell.name().inner().to_string(), 1u64);
-        let bob_returned_note = bob_return.create_random_token_note(
-            &mut rng,
-            alice_sold_note.rho,
-            alice_sold_note.nk_container,
-            &alice_auth,
-        );
-        let output_notes = [*bob_sold_note.note(), *bob_returned_note.note()];
+        let swap = swap(&mut rng, sell, buy);
+        let intent_note = swap.create_intent_note(&mut rng);
+
+        let bob_sell = Token::new(swap.buy.name().inner().to_string(), 2u64);
+        let (input_notes, output_notes) = swap.fill(&mut rng, intent_note, bob_sell);
 
         let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
             owned_note_pub_id: intent_note.get_nf().unwrap().inner(),
             input_notes,
             output_notes,
-            sell: alice_sell,
-            buy: alice_buy,
-            receiver_nk_com: alice_sold_note.get_nk_commitment(),
-            receiver_app_data_dynamic: alice_sold_note.app_data_dynamic,
+            swap,
         };
         let public_inputs = circuit.get_public_inputs(&mut rng);
 

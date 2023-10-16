@@ -46,7 +46,7 @@ lazy_static! {
     pub static ref COMPRESSED_TOKEN_VK: pallas::Base = TOKEN_VK.get_compressed();
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct TokenName(String);
 
 impl TokenName {
@@ -137,6 +137,14 @@ impl std::ops::Deref for TokenNote {
 impl TokenNote {
     pub fn token_name(&self) -> &TokenName {
         &self.token_name
+    }
+
+    pub fn encode_name(&self) -> pallas::Base {
+        self.token_name.encode()
+    }
+
+    pub fn encode_value(&self) -> pallas::Base {
+        pallas::Base::from(self.note().value)
     }
 
     pub fn note(&self) -> &Note {
