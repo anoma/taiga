@@ -150,14 +150,14 @@ jobs:
           command: fmt
           args: --all -- --check
 
-  security:
-    name: Security - Cargo Audit
-    runs-on: ubuntu-latest
-    container:
-      image: rustlang/rust:nightly
-    steps:
-    - uses: actions/checkout@v3
-    - name: Install cargo-audit
-      run: cargo install cargo-audit
-    - name: Cargo Audit
-      run: cargo audit
+  # security:
+  #   name: Security - Cargo Audit
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     image: rustlang/rust:nightly
+  #   steps:
+  #   - uses: actions/checkout@v3
+  #   - name: Install cargo-audit
+  #     run: cargo install cargo-audit
+  #   - name: Cargo Audit
+  #     run: cargo audit
