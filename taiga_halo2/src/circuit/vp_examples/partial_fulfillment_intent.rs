@@ -31,8 +31,8 @@ use pasta_curves::pallas;
 use rand::rngs::OsRng;
 use rand::RngCore;
 
-mod swap;
-use swap::Swap;
+pub mod swap;
+pub use swap::Swap;
 
 mod data_static;
 use data_static::PartialFulfillmentIntentDataStatic;
@@ -50,7 +50,7 @@ pub struct PartialFulfillmentIntentValidityPredicateCircuit {
     pub owned_note_pub_id: pallas::Base,
     pub input_notes: [Note; NUM_NOTE],
     pub output_notes: [Note; NUM_NOTE],
-    swap: Swap,
+    pub swap: Swap,
 }
 
 impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircuit {
@@ -206,6 +206,8 @@ mod tests {
 
     #[test]
     fn create_intent() {
+        use crate::nullifier::Nullifier;
+
         let mut rng = OsRng;
         let sell = Token::new("token1".to_string(), 2u64);
         let buy = Token::new("token2".to_string(), 4u64);
@@ -214,8 +216,8 @@ mod tests {
         let intent_note = swap.create_intent_note(&mut rng);
 
         let input_padding_note = Note::random_padding_input_note(&mut rng);
-        let output_padding_note =
-            Note::random_padding_output_note(&mut rng, input_padding_note.get_nf().unwrap());
+        let nf = Nullifier::random(&mut rng);
+        let output_padding_note = Note::random_padding_output_note(&mut rng, nf);
 
         let input_notes = [*swap.sell.note(), input_padding_note];
         let output_notes = [intent_note, output_padding_note];

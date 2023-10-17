@@ -15,18 +15,18 @@ use halo2_proofs::{
 use pasta_curves::pallas;
 
 #[derive(Clone, Debug)]
-pub(super) struct PartialFulfillmentIntentDataStatic {
-    pub(super) token_vp_vk: AssignedCell<pallas::Base, pallas::Base>,
-    pub(super) sold_token: AssignedCell<pallas::Base, pallas::Base>,
-    pub(super) sold_token_value: AssignedCell<pallas::Base, pallas::Base>,
-    pub(super) bought_token: AssignedCell<pallas::Base, pallas::Base>,
-    pub(super) bought_token_value: AssignedCell<pallas::Base, pallas::Base>,
-    pub(super) receiver_nk_com: AssignedCell<pallas::Base, pallas::Base>,
-    pub(super) receiver_app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
+pub struct PartialFulfillmentIntentDataStatic {
+    pub token_vp_vk: AssignedCell<pallas::Base, pallas::Base>,
+    pub sold_token: AssignedCell<pallas::Base, pallas::Base>,
+    pub sold_token_value: AssignedCell<pallas::Base, pallas::Base>,
+    pub bought_token: AssignedCell<pallas::Base, pallas::Base>,
+    pub bought_token_value: AssignedCell<pallas::Base, pallas::Base>,
+    pub receiver_nk_com: AssignedCell<pallas::Base, pallas::Base>,
+    pub receiver_app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
 }
 
 impl PartialFulfillmentIntentDataStatic {
-    pub(super) fn encode(
+    pub fn encode(
         &self,
         config: PoseidonConfig<pallas::Base, 3, 2>,
         mut layouter: impl Layouter<pallas::Base>,
@@ -48,7 +48,7 @@ impl PartialFulfillmentIntentDataStatic {
     }
 
     /// Checks to be enforced if `is_input_note == 1`
-    pub(super) fn is_input_note_checks(
+    pub fn is_input_note_checks(
         &self,
         is_input_note: &AssignedCell<pallas::Base, pallas::Base>,
         basic_variables: &BasicValidityPredicateVariables,
@@ -121,7 +121,7 @@ impl PartialFulfillmentIntentDataStatic {
     }
 
     /// Checks to be enforced if `is_output_note == 1`
-    pub(super) fn is_output_note_checks(
+    pub fn is_output_note_checks(
         &self,
         is_output_note: &AssignedCell<pallas::Base, pallas::Base>,
         basic_variables: &BasicValidityPredicateVariables,
@@ -175,7 +175,7 @@ impl PartialFulfillmentIntentDataStatic {
     }
 
     /// Checks to be enforced if `is_partial_fulfillment == 1`
-    pub(super) fn is_partial_fulfillment_checks(
+    pub fn is_partial_fulfillment_checks(
         &self,
         is_input_note: &AssignedCell<pallas::Base, pallas::Base>,
         basic_variables: &BasicValidityPredicateVariables,

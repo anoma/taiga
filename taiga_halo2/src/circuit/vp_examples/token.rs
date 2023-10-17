@@ -122,8 +122,8 @@ impl Token {
 
 #[derive(Clone, Debug, Default)]
 pub struct TokenNote {
-    token_name: TokenName,
-    note: Note,
+    pub token_name: TokenName,
+    pub note: Note,
 }
 
 impl std::ops::Deref for TokenNote {

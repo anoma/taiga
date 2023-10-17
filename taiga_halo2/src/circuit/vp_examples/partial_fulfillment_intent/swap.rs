@@ -17,14 +17,14 @@ use pasta_curves::pallas;
 use rand::RngCore;
 
 #[derive(Clone, Debug, Default)]
-pub(super) struct Swap {
-    pub(super) sell: TokenNote,
-    pub(super) buy: Token,
-    pub(super) auth: TokenAuthorization,
+pub struct Swap {
+    pub sell: TokenNote,
+    pub buy: Token,
+    pub auth: TokenAuthorization,
 }
 
 impl Swap {
-    pub(super) fn random(
+    pub fn random(
         mut rng: impl RngCore,
         sell: Token,
         buy: Token,
@@ -45,7 +45,7 @@ impl Swap {
     /// - completely fills the swap using a single `TokenNote`, or
     /// - partially fills the swap, producing a `TokenNote` and a
     ///   returned note.
-    pub(super) fn fill(
+    pub fn fill(
         &self,
         mut rng: impl RngCore,
         intent_note: Note,
@@ -88,7 +88,7 @@ impl Swap {
         (input_notes, output_notes)
     }
 
-    pub(super) fn encode_app_data_static(&self) -> pallas::Base {
+    pub fn encode_app_data_static(&self) -> pallas::Base {
         poseidon_hash_n([
             self.sell.encode_name(),
             self.sell.encode_value(),
@@ -101,7 +101,7 @@ impl Swap {
         ])
     }
 
-    pub(super) fn create_intent_note<R: RngCore>(&self, mut rng: R) -> Note {
+    pub fn create_intent_note<R: RngCore>(&self, mut rng: R) -> Note {
         let rseed = RandomSeed::random(&mut rng);
 
         Note::new(
@@ -117,7 +117,7 @@ impl Swap {
     }
 
     /// Assign variables encoded in app_static_data
-    pub(super) fn assign_app_data_static(
+    pub fn assign_app_data_static(
         &self,
         column: Column<Advice>,
         mut layouter: impl Layouter<pallas::Base>,
