@@ -14,7 +14,7 @@ use crate::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
         },
-        vp_examples::token::{transfrom_token_name_to_token_property, TOKEN_VK},
+        vp_examples::token::{Token, TOKEN_VK},
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::{Note, RandomSeed},
@@ -40,36 +40,29 @@ lazy_static! {
         OR_RELATION_INTENT_VK.get_compressed();
 }
 
-// Token swap condition
-#[derive(Clone, Debug, Default)]
-pub struct Condition {
-    pub token_name: String,
-    pub token_value: u64,
-}
-
 // OrRelationIntentValidityPredicateCircuit
 #[derive(Clone, Debug, Default)]
 pub struct OrRelationIntentValidityPredicateCircuit {
     pub owned_note_pub_id: pallas::Base,
     pub input_notes: [Note; NUM_NOTE],
     pub output_notes: [Note; NUM_NOTE],
-    pub condition1: Condition,
-    pub condition2: Condition,
+    pub token_1: Token,
+    pub token_2: Token,
     pub receiver_nk_com: pallas::Base,
     pub receiver_app_data_dynamic: pallas::Base,
 }
 
 impl OrRelationIntentValidityPredicateCircuit {
     pub fn encode_app_data_static(
-        condition1: &Condition,
-        condition2: &Condition,
+        token_1: &Token,
+        token_2: &Token,
         receiver_nk_com: pallas::Base,
         receiver_app_data_dynamic: pallas::Base,
     ) -> pallas::Base {
-        let token_property_1 = transfrom_token_name_to_token_property(&condition1.token_name);
-        let token_value_1 = pallas::Base::from(condition1.token_value);
-        let token_property_2 = transfrom_token_name_to_token_property(&condition2.token_name);
-        let token_value_2 = pallas::Base::from(condition2.token_value);
+        let token_property_1 = token_1.encode_name();
+        let token_value_1 = token_1.encode_value();
+        let token_property_2 = token_2.encode_name();
+        let token_value_2 = token_2.encode_value();
         poseidon_hash_n([
             token_property_1,
             token_value_1,
@@ -106,31 +99,27 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
         )?;
 
         let token_property_1 = assign_free_advice(
-            layouter.namespace(|| "witness token name in condition1"),
+            layouter.namespace(|| "witness token name in token_1"),
             config.advices[0],
-            Value::known(transfrom_token_name_to_token_property(
-                &self.condition1.token_name,
-            )),
+            Value::known(self.token_1.encode_name()),
         )?;
 
         let token_value_1 = assign_free_advice(
-            layouter.namespace(|| "witness token value in condition1"),
+            layouter.namespace(|| "witness token value in token_1"),
             config.advices[0],
-            Value::known(pallas::Base::from(self.condition1.token_value)),
+            Value::known(self.token_1.encode_value()),
         )?;
 
         let token_property_2 = assign_free_advice(
-            layouter.namespace(|| "witness token name in condition2"),
+            layouter.namespace(|| "witness token name in token_2"),
             config.advices[0],
-            Value::known(transfrom_token_name_to_token_property(
-                &self.condition2.token_name,
-            )),
+            Value::known(self.token_2.encode_name()),
         )?;
 
         let token_value_2 = assign_free_advice(
-            layouter.namespace(|| "witness token value in condition2"),
+            layouter.namespace(|| "witness token value in token_2"),
             config.advices[0],
-            Value::known(pallas::Base::from(self.condition2.token_value)),
+            Value::known(self.token_2.encode_value()),
         )?;
 
         let receiver_nk_com = assign_free_advice(
@@ -287,16 +276,16 @@ vp_verifying_info_impl!(OrRelationIntentValidityPredicateCircuit);
 
 pub fn create_intent_note<R: RngCore>(
     mut rng: R,
-    condition1: &Condition,
-    condition2: &Condition,
+    token_1: &Token,
+    token_2: &Token,
     receiver_nk_com: pallas::Base,
     receiver_app_data_dynamic: pallas::Base,
     rho: Nullifier,
     nk: NullifierKeyContainer,
 ) -> Note {
     let app_data_static = OrRelationIntentValidityPredicateCircuit::encode_app_data_static(
-        condition1,
-        condition2,
+        token_1,
+        token_2,
         receiver_nk_com,
         receiver_app_data_dynamic,
     );
@@ -330,26 +319,19 @@ fn test_halo2_or_relation_intent_vp_circuit() {
             let padding_rho = random_nullifier(&mut rng);
             random_output_note(&mut rng, padding_rho)
         });
-        let condition1 = Condition {
-            token_name: "token1".to_string(),
-            token_value: 1u64,
-        };
-        let condition2 = Condition {
-            token_name: "token2".to_string(),
-            token_value: 2u64,
-        };
+        let token_1 = Token::new("token1".to_string(), 1u64);
+        let token_2 = Token::new("token2".to_string(), 2u64);
         output_notes[0].note_type.app_vk = *COMPRESSED_TOKEN_VK;
-        output_notes[0].note_type.app_data_static =
-            transfrom_token_name_to_token_property(&condition1.token_name);
-        output_notes[0].value = condition1.token_value;
+        output_notes[0].note_type.app_data_static = token_1.encode_name();
+        output_notes[0].value = token_1.value();
 
         let rho = Nullifier::from(pallas::Base::random(&mut rng));
         let nk = NullifierKeyContainer::random_key(&mut rng);
         let nk_com = output_notes[0].get_nk_commitment();
         let intent_note = create_intent_note(
             &mut rng,
-            &condition1,
-            &condition2,
+            &token_1,
+            &token_2,
             nk_com,
             output_notes[0].app_data_dynamic,
             rho,
@@ -361,8 +343,8 @@ fn test_halo2_or_relation_intent_vp_circuit() {
             owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
             input_notes,
             output_notes,
-            condition1,
-            condition2,
+            token_1,
+            token_2,
             receiver_nk_com: nk_com,
             receiver_app_data_dynamic: output_notes[0].app_data_dynamic,
         }

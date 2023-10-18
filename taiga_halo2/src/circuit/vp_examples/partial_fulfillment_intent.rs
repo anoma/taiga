@@ -16,7 +16,7 @@ use crate::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
         },
-        vp_examples::token::{transfrom_token_name_to_token_property, Token, TOKEN_VK},
+        vp_examples::token::{Token, TOKEN_VK},
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::{Note, RandomSeed},
@@ -60,10 +60,10 @@ impl PartialFulfillmentIntentValidityPredicateCircuit {
         receiver_nk_com: pallas::Base,
         receiver_app_data_dynamic: pallas::Base,
     ) -> pallas::Base {
-        let sold_token = transfrom_token_name_to_token_property(&sell.name);
-        let sold_token_value = pallas::Base::from(sell.value);
-        let bought_token = transfrom_token_name_to_token_property(&buy.name);
-        let bought_token_value = pallas::Base::from(buy.value);
+        let sold_token = sell.encode_name();
+        let sold_token_value = sell.encode_value();
+        let bought_token = buy.encode_name();
+        let bought_token_value = buy.encode_value();
         poseidon_hash_n([
             sold_token,
             sold_token_value,
@@ -103,25 +103,25 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
         let sold_token = assign_free_advice(
             layouter.namespace(|| "witness sold_token"),
             config.advices[0],
-            Value::known(transfrom_token_name_to_token_property(&self.sell.name)),
+            Value::known(self.sell.encode_name()),
         )?;
 
         let sold_token_value = assign_free_advice(
             layouter.namespace(|| "witness sold_token_value"),
             config.advices[0],
-            Value::known(pallas::Base::from(self.sell.value)),
+            Value::known(self.sell.encode_value()),
         )?;
 
         let bought_token = assign_free_advice(
             layouter.namespace(|| "witness bought_token"),
             config.advices[0],
-            Value::known(transfrom_token_name_to_token_property(&self.buy.name)),
+            Value::known(self.buy.encode_name()),
         )?;
 
         let bought_token_value = assign_free_advice(
             layouter.namespace(|| "witness bought_token_value"),
             config.advices[0],
-            Value::known(pallas::Base::from(self.buy.value)),
+            Value::known(self.buy.encode_value()),
         )?;
 
         let receiver_nk_com = assign_free_advice(
@@ -491,19 +491,13 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
 
     let mut rng = OsRng;
 
-    let sell = Token {
-        name: "token1".to_string(),
-        value: 2u64,
-    };
-    let buy = Token {
-        name: "token2".to_string(),
-        value: 4u64,
-    };
+    let sell = Token::new("token1".to_string(), 2u64);
+    let buy = Token::new("token2".to_string(), 4u64);
 
     let mut sold_note = random_input_note(&mut rng);
     sold_note.note_type.app_vk = *COMPRESSED_TOKEN_VK;
-    sold_note.note_type.app_data_static = transfrom_token_name_to_token_property(&sell.name);
-    sold_note.value = sell.value;
+    sold_note.note_type.app_data_static = sell.encode_name();
+    sold_note.value = sell.value();
     let receiver_nk_com = sold_note.get_nk_commitment();
     let rho = Nullifier::from(pallas::Base::random(&mut rng));
     let nk = NullifierKeyContainer::random_key(&mut rng);
@@ -550,14 +544,13 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
             let input_padding_note = Note::random_padding_input_note(&mut rng);
             let input_notes = [intent_note, input_padding_note];
             let mut bought_note = sold_note;
-            bought_note.note_type.app_data_static =
-                transfrom_token_name_to_token_property(&buy.name);
+            bought_note.note_type.app_data_static = buy.encode_name();
             bought_note.app_data_dynamic = sold_note.app_data_dynamic;
             bought_note.nk_container = sold_note.nk_container;
 
             // full fulfillment
             {
-                bought_note.value = buy.value;
+                bought_note.value = buy.value();
                 let output_padding_note = Note::random_padding_output_note(
                     &mut rng,
                     input_padding_note.get_nf().unwrap(),
@@ -588,8 +581,7 @@ fn test_halo2_partial_fulfillment_intent_vp_circuit() {
             {
                 bought_note.value = 2u64;
                 let mut returned_note = bought_note;
-                returned_note.note_type.app_data_static =
-                    transfrom_token_name_to_token_property(&sell.name);
+                returned_note.note_type.app_data_static = sell.encode_name();
                 returned_note.value = 1u64;
                 let output_notes = [bought_note, returned_note];
 

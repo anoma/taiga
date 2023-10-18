@@ -1,7 +1,6 @@
 /// The example shows how to cascade the partial transactions by intents.
 /// Alice wants to spend 1 "BTC", 2 "ETH" and 3 "XAN" simultaneously
 ///
-use crate::token::create_random_token_note;
 use halo2_proofs::arithmetic::Field;
 use pasta_curves::pallas;
 use rand::{CryptoRng, RngCore};
@@ -9,10 +8,7 @@ use taiga_halo2::{
     circuit::vp_examples::{
         cascade_intent::{create_intent_note, CascadeIntentValidityPredicateCircuit},
         signature_verification::COMPRESSED_TOKEN_AUTH_VK,
-        token::{
-            generate_input_token_note_proving_info, generate_output_token_note_proving_info,
-            TokenAuthorization,
-        },
+        token::{Token, TokenAuthorization},
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
@@ -31,36 +27,36 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
     let bob_nk_com = NullifierKeyContainer::random_commitment(&mut rng);
 
     let rho = Nullifier::from(pallas::Base::random(&mut rng));
-    let input_note_1 = create_random_token_note(&mut rng, "btc", 1u64, rho, alice_nk, &alice_auth);
-    let output_note_1 = create_random_token_note(
+    let input_token_1 = Token::new("btc".to_string(), 1u64);
+    let input_note_1 = input_token_1.create_random_token_note(&mut rng, rho, alice_nk, &alice_auth);
+    let output_token_1 = Token::new("btc".to_string(), 1u64);
+    let output_note_1 = output_token_1.create_random_token_note(
         &mut rng,
-        "btc",
-        1u64,
         input_note_1.get_nf().unwrap(),
         bob_nk_com,
         &bob_auth,
     );
-    let input_note_2 = create_random_token_note(&mut rng, "eth", 2u64, rho, alice_nk, &alice_auth);
+    let input_token_2 = Token::new("eth".to_string(), 2u64);
+    let input_note_2 = input_token_2.create_random_token_note(&mut rng, rho, alice_nk, &alice_auth);
 
-    let input_note_3 = create_random_token_note(&mut rng, "xan", 3u64, rho, alice_nk, &alice_auth);
+    let input_token_3 = Token::new("xan".to_string(), 3u64);
+    let input_note_3 = input_token_3.create_random_token_note(&mut rng, rho, alice_nk, &alice_auth);
     let cascade_intent_note = create_intent_note(
         &mut rng,
         input_note_3.commitment().inner(),
         input_note_2.get_nf().unwrap(),
         alice_nk,
     );
-    let output_note_2 = create_random_token_note(
+    let output_token_2 = Token::new("eth".to_string(), 2u64);
+    let output_note_2 = output_token_2.create_random_token_note(
         &mut rng,
-        "eth",
-        2u64,
         cascade_intent_note.get_nf().unwrap(),
         bob_nk_com,
         &bob_auth,
     );
-    let output_note_3 = create_random_token_note(
+    let output_token_3 = Token::new("xan".to_string(), 3u64);
+    let output_note_3 = output_token_3.create_random_token_note(
         &mut rng,
-        "xan",
-        3u64,
         input_note_3.get_nf().unwrap(),
         bob_nk_com,
         &bob_auth,
@@ -75,23 +71,19 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
     // Alice consumes 1 "BTC" and 2 "ETH".
     // Alice creates a cascade intent note and 1 "BTC" to Bob.
     let ptx_1 = {
-        let input_notes = [input_note_1, input_note_2];
-        let output_notes = [output_note_1, cascade_intent_note];
+        let input_notes = [*input_note_1.note(), *input_note_2.note()];
+        let output_notes = [*output_note_1.note(), cascade_intent_note];
         // Create the input note proving info
-        let input_note_1_proving_info = generate_input_token_note_proving_info(
+        let input_note_1_proving_info = input_note_1.generate_input_token_note_proving_info(
             &mut rng,
-            input_note_1,
-            "btc".to_string(),
             alice_auth,
             alice_auth_sk,
             merkle_path.clone(),
             input_notes,
             output_notes,
         );
-        let input_note_2_proving_info = generate_input_token_note_proving_info(
+        let input_note_2_proving_info = input_note_2.generate_input_token_note_proving_info(
             &mut rng,
-            input_note_2,
-            "eth".to_string(),
             alice_auth,
             alice_auth_sk,
             merkle_path.clone(),
@@ -100,10 +92,8 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
         );
 
         // Create the output note proving info
-        let output_note_1_proving_info = generate_output_token_note_proving_info(
+        let output_note_1_proving_info = output_note_1.generate_output_token_note_proving_info(
             &mut rng,
-            output_note_1,
-            "btc".to_string(),
             bob_auth,
             input_notes,
             output_notes,
@@ -133,8 +123,8 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
     // Alice consumes the intent note and 3 "XAN";
     // Alice creates 2 "ETH" and 3 "XAN" to Bob
     let ptx_2 = {
-        let input_notes = [cascade_intent_note, input_note_3];
-        let output_notes = [output_note_2, output_note_3];
+        let input_notes = [cascade_intent_note, *input_note_3.note()];
+        let output_notes = [*output_note_2.note(), *output_note_3.note()];
         // Create the input note proving info
         let intent_note_proving_info = {
             let intent_vp = CascadeIntentValidityPredicateCircuit {
@@ -152,10 +142,8 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
                 vec![],
             )
         };
-        let input_note_3_proving_info = generate_input_token_note_proving_info(
+        let input_note_3_proving_info = input_note_3.generate_input_token_note_proving_info(
             &mut rng,
-            input_note_3,
-            "xan".to_string(),
             alice_auth,
             alice_auth_sk,
             merkle_path,
@@ -163,18 +151,14 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
             output_notes,
         );
         // Create the output note proving info
-        let output_note_2_proving_info = generate_output_token_note_proving_info(
+        let output_note_2_proving_info = output_note_2.generate_output_token_note_proving_info(
             &mut rng,
-            output_note_2,
-            "eth".to_string(),
             bob_auth,
             input_notes,
             output_notes,
         );
-        let output_note_3_proving_info = generate_output_token_note_proving_info(
+        let output_note_3_proving_info = output_note_3.generate_output_token_note_proving_info(
             &mut rng,
-            output_note_3,
-            "xan".to_string(),
             bob_auth,
             input_notes,
             output_notes,
