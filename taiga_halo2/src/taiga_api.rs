@@ -1,9 +1,7 @@
 #[cfg(feature = "borsh")]
 use crate::{
-    action::ActionInfo,
-    circuit::vp_bytecode::ApplicationByteCode,
-    error::TransactionError,
-    transaction::{ShieldedResult, TransparentResult},
+    action::ActionInfo, circuit::vp_bytecode::ApplicationByteCode, error::TransactionError,
+    transaction::TransactionResult,
 };
 use crate::{
     note::{Note, RandomSeed},
@@ -203,7 +201,7 @@ pub fn create_transaction(
 
 /// Verify a transaction and return the results
 ///
-/// ShieldedResult layout:
+/// TransactionResult layout:
 /// | Parameters     | type         | size(bytes)|
 /// |       -        |    -         |   -        |
 /// | anchor num     | u32          | 4          |
@@ -213,12 +211,8 @@ pub fn create_transaction(
 /// | output cm num  | u32          | 4          |
 /// | output cms     | pallas::Base | 32 * num   |
 ///
-/// Note: TransparentResult is empty
-///
 #[cfg(feature = "borsh")]
-pub fn verify_transaction(
-    tx_bytes: Vec<u8>,
-) -> Result<(ShieldedResult, TransparentResult), TransactionError> {
+pub fn verify_transaction(tx_bytes: Vec<u8>) -> Result<TransactionResult, TransactionError> {
     // Decode the tx
     let tx = transaction_deserialize(tx_bytes)?;
 

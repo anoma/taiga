@@ -18,6 +18,10 @@ pub enum TransactionError {
     InconsistentOwnedNotePubID,
     /// IO error
     IoError(std::io::Error),
+    /// Transparent resource nullifier key is missing
+    MissingTransparentResourceNullifierKey,
+    /// Transparent resource merkle path is missing
+    MissingTransparentResourceMerklePath,
 }
 
 impl Display for TransactionError {
@@ -37,6 +41,12 @@ impl Display for TransactionError {
                 f.write_str("Owned note public id is not consistent between the action and the vp")
             }
             IoError(e) => f.write_str(&format!("IoError error: {e}")),
+            MissingTransparentResourceNullifierKey => {
+                f.write_str("Transparent resource nullifier key is missing")
+            }
+            MissingTransparentResourceMerklePath => {
+                f.write_str("Transparent resource merkle path is missing")
+            }
         }
     }
 }
