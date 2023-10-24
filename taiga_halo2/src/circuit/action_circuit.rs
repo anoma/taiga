@@ -30,6 +30,8 @@ use halo2_proofs::{
 };
 use pasta_curves::pallas;
 
+use crate::circuit::note_commitment::{NoteCommitChip, NoteCommitConfig};
+
 #[derive(Clone, Debug)]
 pub struct ActionConfig {
     instances: Column<Instance>,
@@ -41,6 +43,7 @@ pub struct ActionConfig {
     merkle_path_selector: Selector,
     hash_to_curve_config: HashToCurveConfig,
     blake2s_config: Blake2sConfig<pallas::Base>,
+    note_commit_config: NoteCommitConfig,
 }
 
 /// The Action circuit.
@@ -143,6 +146,12 @@ impl Circuit<pallas::Base> for ActionCircuit {
 
         let blake2s_config = Blake2sConfig::configure(meta, advices);
 
+        let note_commit_config = NoteCommitChip::configure(
+            meta,
+            advices[0..3].try_into().unwrap(),
+            poseidon_config.clone(),
+        );
+
         Self::Config {
             instances,
             advices,
@@ -153,6 +162,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             merkle_path_selector,
             hash_to_curve_config,
             blake2s_config,
+            note_commit_config,
         }
     }
 
@@ -185,13 +195,16 @@ impl Circuit<pallas::Base> for ActionCircuit {
         // Construct a blake2s chip
         let blake2s_chip = Blake2sChip::construct(config.blake2s_config);
 
+        // Construct a note_commit chip
+        let note_commit_chip = NoteCommitChip::construct(config.note_commit_config);
+
         // Input note
         // Check the input note commitment
         let input_note_variables = check_input_note(
             layouter.namespace(|| "check input note"),
             config.advices,
             config.instances,
-            config.poseidon_config.clone(),
+            note_commit_chip.clone(),
             self.input_note,
             ACTION_NF_PUBLIC_INPUT_ROW_IDX,
         )?;
@@ -209,7 +222,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             layouter.namespace(|| "check output note"),
             config.advices,
             config.instances,
-            config.poseidon_config,
+            note_commit_chip,
             self.output_note,
             input_note_variables.nf,
             ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX,

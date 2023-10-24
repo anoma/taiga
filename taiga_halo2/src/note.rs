@@ -229,6 +229,11 @@ impl Note {
 
     // note_commitment = poseidon_hash(app_vk || app_data_static || app_data_dynamic || nk_commitment || rho || psi || is_merkle_checked || value || rcm)
     pub fn commitment(&self) -> NoteCommitment {
+        let compose_is_merkle_checked_value = if self.is_merkle_checked {
+            pallas::Base::from_u128(1 << 64).square() + pallas::Base::from(self.value)
+        } else {
+            pallas::Base::from(self.value)
+        };
         let ret = poseidon_hash_n([
             self.get_app_vk(),
             self.get_app_data_static(),
@@ -236,8 +241,7 @@ impl Note {
             self.get_nk_commitment(),
             self.rho.inner(),
             self.psi,
-            pallas::Base::from(self.is_merkle_checked as u64),
-            pallas::Base::from(self.value),
+            compose_is_merkle_checked_value,
             self.rcm,
         ]);
         NoteCommitment(ret)
