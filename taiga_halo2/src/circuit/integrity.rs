@@ -10,6 +10,7 @@ use crate::utils::poseidon_to_curve;
 use halo2_gadgets::{
     ecc::{chip::EccChip, FixedPoint, NonIdentityPoint, Point, ScalarFixed, ScalarVar},
     poseidon::Pow5Config as PoseidonConfig,
+    utilities::lookup_range_check::LookupRangeCheckConfig,
 };
 use halo2_proofs::{
     circuit::{AssignedCell, Layouter, Value},
@@ -89,11 +90,11 @@ pub fn check_input_note(
         Value::known(input_note.get_app_data_static()),
     )?;
 
-    // Witness value(u64)
-    let value = assign_free_advice(
-        layouter.namespace(|| "witness value"),
-        advices[0],
-        Value::known(pallas::Base::from(input_note.value)),
+    // Witness and range check the value(u64)
+    let value = value_range_check(
+        layouter.namespace(|| "value range check"),
+        note_commit_chip.get_lookup_config(),
+        input_note.value,
     )?;
 
     // Witness rho
@@ -210,11 +211,11 @@ pub fn check_output_note(
         Value::known(output_note.get_app_data_static()),
     )?;
 
-    // Witness value(u64)
-    let value = assign_free_advice(
-        layouter.namespace(|| "witness value"),
-        advices[0],
-        Value::known(pallas::Base::from(output_note.value)),
+    // Witness and range check the value(u64)
+    let value = value_range_check(
+        layouter.namespace(|| "value range check"),
+        note_commit_chip.get_lookup_config(),
+        output_note.value,
     )?;
 
     // Witness rcm
@@ -391,6 +392,27 @@ pub fn compute_value_commitment(
     )?;
 
     commitment_v.add(layouter.namespace(|| "net value commitment"), &blind)
+}
+
+fn value_range_check<const K: usize>(
+    mut layouter: impl Layouter<pallas::Base>,
+    lookup_config: &LookupRangeCheckConfig<pallas::Base, K>,
+    value: u64,
+) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
+    let zs = lookup_config.witness_check(
+        layouter.namespace(|| "6 * K(10) bits range check"),
+        Value::known(pallas::Base::from(value)),
+        6,
+        false,
+    )?;
+
+    lookup_config.copy_short_check(
+        layouter.namespace(|| "4 bits range check"),
+        zs[6].clone(),
+        4,
+    )?;
+
+    Ok(zs[0].clone())
 }
 
 #[test]

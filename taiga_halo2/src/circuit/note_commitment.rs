@@ -1,6 +1,9 @@
 use crate::circuit::gadgets::poseidon_hash::poseidon_hash_gadget;
 use group::ff::PrimeField;
-use halo2_gadgets::{poseidon::Pow5Config as PoseidonConfig, utilities::bool_check};
+use halo2_gadgets::{
+    poseidon::Pow5Config as PoseidonConfig,
+    utilities::{bool_check, lookup_range_check::LookupRangeCheckConfig},
+};
 use halo2_proofs::{
     circuit::{AssignedCell, Layouter},
     plonk::{Advice, Column, ConstraintSystem, Constraints, Error, Selector},
@@ -92,6 +95,7 @@ impl ComposeMerkleCheckValue {
 pub struct NoteCommitConfig {
     compose_config: ComposeMerkleCheckValue,
     poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
+    lookup_config: LookupRangeCheckConfig<pallas::Base, 10>,
 }
 
 #[derive(Clone, Debug)]
@@ -104,6 +108,7 @@ impl NoteCommitChip {
         meta: &mut ConstraintSystem<pallas::Base>,
         advices: [Column<Advice>; 3],
         poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
+        lookup_config: LookupRangeCheckConfig<pallas::Base, 10>,
     ) -> NoteCommitConfig {
         let two_pow_128 = pallas::Base::from_u128(1 << 64).square();
         let compose_config = ComposeMerkleCheckValue::configure(
@@ -117,6 +122,7 @@ impl NoteCommitChip {
         NoteCommitConfig {
             compose_config,
             poseidon_config,
+            lookup_config,
         }
     }
 
@@ -126,6 +132,10 @@ impl NoteCommitChip {
 
     pub fn get_poseidon_config(&self) -> PoseidonConfig<pallas::Base, 3, 2> {
         self.config.poseidon_config.clone()
+    }
+
+    pub fn get_lookup_config(&self) -> &LookupRangeCheckConfig<pallas::Base, 10> {
+        &self.config.lookup_config
     }
 }
 

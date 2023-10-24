@@ -401,6 +401,7 @@ impl ValidityPredicateConfig {
             meta,
             advices[0..3].try_into().unwrap(),
             poseidon_config.clone(),
+            range_check,
         );
         Self {
             advices,
