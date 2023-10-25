@@ -22,6 +22,8 @@ pub enum TransactionError {
     MissingTransparentResourceNullifierKey,
     /// Transparent resource merkle path is missing
     MissingTransparentResourceMerklePath,
+    /// Shielded partial Tx binding signature r is missing
+    MissingPartialTxBindingSignatureR,
 }
 
 impl Display for TransactionError {
@@ -46,6 +48,9 @@ impl Display for TransactionError {
             }
             MissingTransparentResourceMerklePath => {
                 f.write_str("Transparent resource merkle path is missing")
+            }
+            MissingPartialTxBindingSignatureR => {
+                f.write_str("Shielded partial Tx binding signature r is missing")
             }
         }
     }

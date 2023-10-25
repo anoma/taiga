@@ -176,7 +176,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
     // Create the final transaction
     let shielded_tx_bundle = ShieldedPartialTxBundle::new(vec![ptx_1, ptx_2]);
     let transparent_ptx_bundle = TransparentPartialTxBundle::default();
-    Transaction::build(&mut rng, shielded_tx_bundle, transparent_ptx_bundle)
+    Transaction::build(&mut rng, shielded_tx_bundle, transparent_ptx_bundle).unwrap()
 }
 
 #[test]
