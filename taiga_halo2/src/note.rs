@@ -9,6 +9,7 @@ use crate::{
     },
     merkle_tree::{Anchor, MerklePath, Node},
     nullifier::{Nullifier, NullifierKeyContainer},
+    shielded_ptx::NoteVPVerifyingInfoSet,
     utils::{poseidon_hash_n, poseidon_to_curve},
 };
 use blake2b_simd::Params as Blake2bParams;
@@ -122,18 +123,9 @@ pub struct NoteType {
 #[derive(Copy, Clone, Debug, Default)]
 pub struct RandomSeed([u8; 32]);
 
+/// NoteValidityPredicates includes one application(static) VP and a few dynamic VPs.
 #[derive(Clone)]
-pub struct InputNoteProvingInfo {
-    pub note: Note,
-    pub merkle_path: MerklePath,
-    pub anchor: Anchor,
-    application_vp: Box<ValidityPredicate>,
-    dynamic_vps: Vec<Box<ValidityPredicate>>,
-}
-
-#[derive(Clone)]
-pub struct OutputNoteProvingInfo {
-    pub note: Note,
+pub struct NoteValidityPredicates {
     application_vp: Box<ValidityPredicate>,
     dynamic_vps: Vec<Box<ValidityPredicate>>,
 }
@@ -490,96 +482,71 @@ impl RandomSeed {
     }
 }
 
-impl InputNoteProvingInfo {
+impl NoteValidityPredicates {
     pub fn new(
-        note: Note,
-        merkle_path: MerklePath,
-        // If no custom anchor is provided then the standard one is calculated from the note and path.
-        custom_anchor: Option<Anchor>,
         application_vp: Box<ValidityPredicate>,
         dynamic_vps: Vec<Box<ValidityPredicate>>,
     ) -> Self {
-        let anchor = match custom_anchor {
-            Some(anchor) => anchor,
-            None => note.calculate_root(&merkle_path),
-        };
         Self {
-            note,
-            merkle_path,
-            anchor,
             application_vp,
             dynamic_vps,
         }
     }
 
-    pub fn get_application_vp(&self) -> Box<ValidityPredicate> {
-        self.application_vp.clone()
+    // Generate vp proofs
+    pub fn build(&self) -> NoteVPVerifyingInfoSet {
+        let app_vp_verifying_info = self.application_vp.get_verifying_info();
+
+        let app_dynamic_vp_verifying_info = self
+            .dynamic_vps
+            .iter()
+            .map(|verifying_info| verifying_info.get_verifying_info())
+            .collect();
+
+        NoteVPVerifyingInfoSet::new(app_vp_verifying_info, app_dynamic_vp_verifying_info)
     }
 
-    pub fn get_dynamic_vps(&self) -> Vec<Box<ValidityPredicate>> {
-        self.dynamic_vps.clone()
-    }
-
-    pub fn create_padding_note_proving_info(
-        padding_note: Note,
-        merkle_path: MerklePath,
-        anchor: Anchor,
+    // Create an input padding note vps
+    pub fn create_input_padding_note_vps(
+        note: &Note,
         input_notes: [Note; NUM_NOTE],
-        output_notes: [Note; NUM_NOTE],
+        outputs_notes: [Note; NUM_NOTE],
     ) -> Self {
-        let trivail_vp = Box::new(TrivialValidityPredicateCircuit {
-            owned_note_pub_id: padding_note.get_nf().unwrap().inner(),
+        let note_id = note.get_nf().unwrap().inner();
+        let application_vp = Box::new(TrivialValidityPredicateCircuit::new(
+            note_id,
             input_notes,
-            output_notes,
-        });
-        InputNoteProvingInfo::new(padding_note, merkle_path, Some(anchor), trivail_vp, vec![])
-    }
-}
-
-impl OutputNoteProvingInfo {
-    pub fn new(
-        note: Note,
-        application_vp: Box<ValidityPredicate>,
-        dynamic_vps: Vec<Box<ValidityPredicate>>,
-    ) -> Self {
+            outputs_notes,
+        ));
         Self {
-            note,
             application_vp,
-            dynamic_vps,
+            dynamic_vps: vec![],
         }
     }
 
-    pub fn get_application_vp(&self) -> Box<ValidityPredicate> {
-        self.application_vp.clone()
-    }
-
-    pub fn get_dynamic_vps(&self) -> Vec<Box<ValidityPredicate>> {
-        self.dynamic_vps.clone()
-    }
-
-    pub fn create_padding_note_proving_info(
-        padding_note: Note,
+    // Create an output padding note vps
+    pub fn create_output_padding_note_vps(
+        note: &Note,
         input_notes: [Note; NUM_NOTE],
-        output_notes: [Note; NUM_NOTE],
+        outputs_notes: [Note; NUM_NOTE],
     ) -> Self {
-        let trivail_vp = Box::new(TrivialValidityPredicateCircuit {
-            owned_note_pub_id: padding_note.commitment().inner(),
+        let note_id = note.commitment().inner();
+        let application_vp = Box::new(TrivialValidityPredicateCircuit::new(
+            note_id,
             input_notes,
-            output_notes,
-        });
-        OutputNoteProvingInfo::new(padding_note, trivail_vp, vec![])
+            outputs_notes,
+        ));
+        Self {
+            application_vp,
+            dynamic_vps: vec![],
+        }
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use super::{InputNoteProvingInfo, Note, NoteType, OutputNoteProvingInfo, RandomSeed};
-    use crate::{
-        circuit::vp_examples::tests::random_trivial_vp_circuit,
-        constant::TAIGA_COMMITMENT_TREE_DEPTH,
-        merkle_tree::MerklePath,
-        nullifier::{tests::*, Nullifier, NullifierKeyContainer},
-    };
+    use super::{Note, NoteType, RandomSeed};
+    use crate::nullifier::{tests::*, Nullifier, NullifierKeyContainer};
     use halo2_proofs::arithmetic::Field;
     use pasta_curves::pallas;
     use rand::{Rng, RngCore};
@@ -619,28 +586,6 @@ pub mod tests {
             psi: rseed.get_psi(&rho),
             rcm: rseed.get_rcm(&rho),
             rho,
-        }
-    }
-
-    pub fn random_input_proving_info<R: RngCore>(mut rng: R) -> InputNoteProvingInfo {
-        let note = random_input_note(&mut rng);
-        let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let application_vp = Box::new(random_trivial_vp_circuit(&mut rng));
-        let dynamic_vps = vec![];
-        InputNoteProvingInfo::new(note, merkle_path, None, application_vp, dynamic_vps)
-    }
-
-    pub fn random_output_proving_info<R: RngCore>(
-        mut rng: R,
-        rho: Nullifier,
-    ) -> OutputNoteProvingInfo {
-        let note = random_output_note(&mut rng, rho);
-        let application_vp = Box::new(random_trivial_vp_circuit(&mut rng));
-        let dynamic_vps = vec![];
-        OutputNoteProvingInfo {
-            note,
-            application_vp,
-            dynamic_vps,
         }
     }
 

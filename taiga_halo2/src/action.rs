@@ -2,13 +2,12 @@ use crate::{
     circuit::action_circuit::ActionCircuit,
     constant::{PRF_EXPAND_INPUT_VP_CM_R, PRF_EXPAND_OUTPUT_VP_CM_R},
     merkle_tree::{Anchor, MerklePath},
-    note::{InputNoteProvingInfo, Note, NoteCommitment, OutputNoteProvingInfo, RandomSeed},
+    note::{Note, NoteCommitment, RandomSeed},
     nullifier::Nullifier,
     value_commitment::ValueCommitment,
     vp_commitment::ValidityPredicateCommitment,
 };
 use pasta_curves::pallas;
-use rand::RngCore;
 
 #[cfg(feature = "nif")]
 use rustler::NifStruct;
@@ -128,21 +127,6 @@ impl ActionInfo {
             input_merkle_path,
             input_anchor,
             output_note,
-            rseed,
-        }
-    }
-
-    pub fn from_proving_info<R: RngCore>(
-        input: InputNoteProvingInfo,
-        output: OutputNoteProvingInfo,
-        mut rng: R,
-    ) -> Self {
-        let rseed = RandomSeed::random(&mut rng);
-        Self {
-            input_note: input.note,
-            input_merkle_path: input.merkle_path,
-            input_anchor: input.anchor,
-            output_note: output.note,
             rseed,
         }
     }

@@ -9,6 +9,7 @@ use halo2_proofs::arithmetic::Field;
 use pasta_curves::{group::Curve, pallas};
 use rand::{CryptoRng, RngCore};
 use taiga_halo2::{
+    action::ActionInfo,
     circuit::vp_examples::{
         partial_fulfillment_intent::{PartialFulfillmentIntentValidityPredicateCircuit, Swap},
         signature_verification::COMPRESSED_TOKEN_AUTH_VK,
@@ -16,7 +17,7 @@ use taiga_halo2::{
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
-    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
+    note::{Note, NoteValidityPredicates, RandomSeed},
     nullifier::NullifierKeyContainer,
     shielded_ptx::ShieldedPartialTransaction,
     transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
@@ -42,54 +43,77 @@ pub fn create_token_intent_ptx<R: RngCore>(
 
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
-    // Fetch a valid anchor for dummy notes
-    let anchor = Anchor::from(pallas::Base::random(&mut rng));
+    // Create action pairs
+    let actions = {
+        let rseed_1 = RandomSeed::random(&mut rng);
+        let anchor_1 = swap.sell.calculate_root(&merkle_path);
+        let action_1 = ActionInfo::new(
+            *swap.sell.note(),
+            merkle_path.clone(),
+            anchor_1,
+            intent_note,
+            rseed_1,
+        );
 
-    // Create the input note proving info
-    let input_note_proving_info = swap.sell.generate_input_token_note_proving_info(
-        &mut rng,
-        input_auth,
-        input_auth_sk,
-        merkle_path.clone(),
-        input_notes,
-        output_notes,
-    );
-
-    // Create the intent note proving info
-    let intent_note_proving_info = {
-        let intent_vp = PartialFulfillmentIntentValidityPredicateCircuit {
-            owned_note_pub_id: intent_note.commitment().inner(),
-            input_notes,
-            output_notes,
-            swap: swap.clone(),
-        };
-
-        OutputNoteProvingInfo::new(intent_note, Box::new(intent_vp), vec![])
+        // Fetch a valid anchor for dummy notes
+        let anchor_2 = Anchor::from(pallas::Base::random(&mut rng));
+        let rseed_2 = RandomSeed::random(&mut rng);
+        let action_2 = ActionInfo::new(
+            padding_input_note,
+            merkle_path,
+            anchor_2,
+            padding_output_note,
+            rseed_2,
+        );
+        vec![action_1, action_2]
     };
 
-    // Create the padding input note proving info
-    let padding_input_note_proving_info = InputNoteProvingInfo::create_padding_note_proving_info(
-        padding_input_note,
-        merkle_path,
-        anchor,
-        input_notes,
-        output_notes,
-    );
+    // Create VPs
+    let (input_vps, output_vps) = {
+        // Create the input token vps
+        let input_token_vps = swap.sell.generate_input_token_vps(
+            &mut rng,
+            input_auth,
+            input_auth_sk,
+            input_notes,
+            output_notes,
+        );
 
-    // Create the padding output note proving info
-    let padding_output_note_proving_info = OutputNoteProvingInfo::create_padding_note_proving_info(
-        padding_output_note,
-        input_notes,
-        output_notes,
-    );
+        // Create the intent vps
+        let intent_vps = {
+            let intent_vp = PartialFulfillmentIntentValidityPredicateCircuit {
+                owned_note_pub_id: intent_note.commitment().inner(),
+                input_notes,
+                output_notes,
+                swap: swap.clone(),
+            };
+
+            NoteValidityPredicates::new(Box::new(intent_vp), vec![])
+        };
+
+        // Create the padding input vps
+        let padding_input_vps = NoteValidityPredicates::create_input_padding_note_vps(
+            &padding_input_note,
+            input_notes,
+            output_notes,
+        );
+
+        // Create the padding output vps
+        let padding_output_vps = NoteValidityPredicates::create_output_padding_note_vps(
+            &padding_output_note,
+            input_notes,
+            output_notes,
+        );
+
+        (
+            vec![input_token_vps, padding_input_vps],
+            vec![intent_vps, padding_output_vps],
+        )
+    };
 
     // Create shielded partial tx
-    let ptx = ShieldedPartialTransaction::build(
-        [input_note_proving_info, padding_input_note_proving_info],
-        [intent_note_proving_info, padding_output_note_proving_info],
-        vec![],
-        &mut rng,
-    );
+    let ptx = ShieldedPartialTransaction::build(actions, input_vps, output_vps, vec![], &mut rng)
+        .unwrap();
 
     (ptx, swap, intent_note)
 }
@@ -113,54 +137,71 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     // Fetch a valid anchor for dummy notes
     let anchor = Anchor::from(pallas::Base::random(&mut rng));
 
-    // Create the intent note proving info
-    let intent_note_proving_info = {
-        let intent_vp = PartialFulfillmentIntentValidityPredicateCircuit {
-            owned_note_pub_id: intent_note.get_nf().unwrap().inner(),
-            input_notes,
-            output_notes,
-            swap: swap.clone(),
-        };
-
-        InputNoteProvingInfo::new(
+    // Create action pairs
+    let actions = {
+        let rseed_1 = RandomSeed::random(&mut rng);
+        let action_1 = ActionInfo::new(
             intent_note,
             merkle_path.clone(),
-            Some(anchor),
-            Box::new(intent_vp),
-            vec![],
+            anchor,
+            bought_note,
+            rseed_1,
+        );
+
+        let rseed_2 = RandomSeed::random(&mut rng);
+        let action_2 = ActionInfo::new(
+            padding_input_note,
+            merkle_path,
+            anchor,
+            returned_note,
+            rseed_2,
+        );
+        vec![action_1, action_2]
+    };
+
+    // Create VPs
+    let (input_vps, output_vps) = {
+        // Create intent vps
+        let intent_vps = {
+            let intent_vp = PartialFulfillmentIntentValidityPredicateCircuit {
+                owned_note_pub_id: intent_note.get_nf().unwrap().inner(),
+                input_notes,
+                output_notes,
+                swap: swap.clone(),
+            };
+
+            NoteValidityPredicates::new(Box::new(intent_vp), vec![])
+        };
+
+        // Create bought_note_vps
+        let bought_note_vps = TokenNote {
+            token_name: swap.buy.name().clone(),
+            note: bought_note,
+        }
+        .generate_output_token_vps(&mut rng, output_auth, input_notes, output_notes);
+
+        // Create the padding input vps
+        let padding_input_vps = NoteValidityPredicates::create_input_padding_note_vps(
+            &padding_input_note,
+            input_notes,
+            output_notes,
+        );
+
+        // Create returned_note_vps
+        let returned_note_vps = TokenNote {
+            token_name: swap.sell.token_name().clone(),
+            note: returned_note,
+        }
+        .generate_output_token_vps(&mut rng, output_auth, input_notes, output_notes);
+
+        (
+            vec![intent_vps, padding_input_vps],
+            vec![bought_note_vps, returned_note_vps],
         )
     };
 
-    // Create the output note proving info
-    let bought_note_proving_info = TokenNote {
-        token_name: swap.buy.name().clone(),
-        note: bought_note,
-    }
-    .generate_output_token_note_proving_info(&mut rng, output_auth, input_notes, output_notes);
-
-    // Create the padding input note proving info
-    let padding_input_note_proving_info = InputNoteProvingInfo::create_padding_note_proving_info(
-        padding_input_note,
-        merkle_path,
-        anchor,
-        input_notes,
-        output_notes,
-    );
-
-    // Create the returned note proving info
-    let returned_note_proving_info = TokenNote {
-        token_name: swap.sell.token_name().clone(),
-        note: returned_note,
-    }
-    .generate_output_token_note_proving_info(&mut rng, output_auth, input_notes, output_notes);
-
     // Create shielded partial tx
-    ShieldedPartialTransaction::build(
-        [intent_note_proving_info, padding_input_note_proving_info],
-        [bought_note_proving_info, returned_note_proving_info],
-        vec![],
-        &mut rng,
-    )
+    ShieldedPartialTransaction::build(actions, input_vps, output_vps, vec![], &mut rng).unwrap()
 }
 
 pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {

@@ -20,8 +20,7 @@ use crate::{
         VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_2, VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_1,
         VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_2,
     },
-    merkle_tree::MerklePath,
-    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
+    note::{Note, NoteValidityPredicates, RandomSeed},
     nullifier::{Nullifier, NullifierKeyContainer},
     proof::Proof,
     utils::poseidon_hash_n,
@@ -151,16 +150,14 @@ impl TokenNote {
         &self.note
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn generate_input_token_note_proving_info<R: RngCore>(
+    pub fn generate_input_token_vps<R: RngCore>(
         &self,
         mut rng: R,
         auth: TokenAuthorization,
         auth_sk: pallas::Scalar,
-        merkle_path: MerklePath,
         input_notes: [Note; NUM_NOTE],
         output_notes: [Note; NUM_NOTE],
-    ) -> InputNoteProvingInfo {
+    ) -> NoteValidityPredicates {
         let TokenNote { token_name, note } = self;
         // token VP
         let nf = note.get_nf().unwrap().inner();
@@ -185,23 +182,16 @@ impl TokenNote {
             *COMPRESSED_RECEIVER_VK,
         );
 
-        // input note proving info
-        InputNoteProvingInfo::new(
-            *note,
-            merkle_path,
-            None,
-            Box::new(token_vp),
-            vec![Box::new(token_auth_vp)],
-        )
+        NoteValidityPredicates::new(Box::new(token_vp), vec![Box::new(token_auth_vp)])
     }
 
-    pub fn generate_output_token_note_proving_info<R: RngCore>(
+    pub fn generate_output_token_vps<R: RngCore>(
         &self,
         mut rng: R,
         auth: TokenAuthorization,
         input_notes: [Note; NUM_NOTE],
         output_notes: [Note; NUM_NOTE],
-    ) -> OutputNoteProvingInfo {
+    ) -> NoteValidityPredicates {
         let TokenNote { token_name, note } = self;
 
         let owned_note_pub_id = note.commitment().inner();
@@ -228,7 +218,7 @@ impl TokenNote {
             auth_vp_vk: *COMPRESSED_TOKEN_AUTH_VK,
         };
 
-        OutputNoteProvingInfo::new(*note, Box::new(token_vp), vec![Box::new(receiver_vp)])
+        NoteValidityPredicates::new(Box::new(token_vp), vec![Box::new(receiver_vp)])
     }
 }
 

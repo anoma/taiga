@@ -4,13 +4,14 @@ use pasta_curves::pallas;
 use rand::RngCore;
 
 use taiga_halo2::{
+    action::ActionInfo,
     circuit::vp_examples::{
         signature_verification::COMPRESSED_TOKEN_AUTH_VK,
         token::{Token, TokenAuthorization},
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
-    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
+    note::{Note, NoteValidityPredicates, RandomSeed},
     nullifier::{Nullifier, NullifierKeyContainer},
     shielded_ptx::ShieldedPartialTransaction,
 };
@@ -48,48 +49,66 @@ pub fn create_token_swap_ptx<R: RngCore>(
     // Generate proving info
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
-    // Fetch a valid anchor for padding input notes
-    let anchor = Anchor::from(pallas::Base::random(&mut rng));
+    // Create action pairs
+    let actions = {
+        let rseed_1 = RandomSeed::random(&mut rng);
+        let anchor_1 = input_note.calculate_root(&merkle_path);
+        let action_1 = ActionInfo::new(
+            *input_note.note(),
+            merkle_path.clone(),
+            anchor_1,
+            *output_note.note(),
+            rseed_1,
+        );
 
-    // Create the input note proving info
-    let input_note_proving_info = input_note.generate_input_token_note_proving_info(
-        &mut rng,
-        input_auth,
-        input_auth_sk,
-        merkle_path.clone(),
-        input_notes,
-        output_notes,
-    );
+        // Fetch a valid anchor for padding input notes
+        let anchor_2 = Anchor::from(pallas::Base::random(&mut rng));
+        let rseed_2 = RandomSeed::random(&mut rng);
+        let action_2 = ActionInfo::new(
+            padding_input_note,
+            merkle_path,
+            anchor_2,
+            padding_output_note,
+            rseed_2,
+        );
+        vec![action_1, action_2]
+    };
 
-    // Create the output note proving info
-    let output_note_proving_info = output_note.generate_output_token_note_proving_info(
-        &mut rng,
-        output_auth,
-        input_notes,
-        output_notes,
-    );
+    // Create VPs
+    let (input_vps, output_vps) = {
+        // Create the input token vps
+        let input_token_vps = input_note.generate_input_token_vps(
+            &mut rng,
+            input_auth,
+            input_auth_sk,
+            input_notes,
+            output_notes,
+        );
 
-    // Create the padding input note proving info
-    let padding_input_note_proving_info = InputNoteProvingInfo::create_padding_note_proving_info(
-        padding_input_note,
-        merkle_path,
-        anchor,
-        input_notes,
-        output_notes,
-    );
+        // Create the output token vps
+        let output_token_vps =
+            output_note.generate_output_token_vps(&mut rng, output_auth, input_notes, output_notes);
 
-    // Create the padding output note proving info
-    let padding_output_note_proving_info = OutputNoteProvingInfo::create_padding_note_proving_info(
-        padding_output_note,
-        input_notes,
-        output_notes,
-    );
+        // Create the padding input vps
+        let padding_input_vps = NoteValidityPredicates::create_input_padding_note_vps(
+            &padding_input_note,
+            input_notes,
+            output_notes,
+        );
+
+        // Create the padding output vps
+        let padding_output_vps = NoteValidityPredicates::create_output_padding_note_vps(
+            &padding_output_note,
+            input_notes,
+            output_notes,
+        );
+
+        (
+            vec![input_token_vps, padding_input_vps],
+            vec![output_token_vps, padding_output_vps],
+        )
+    };
 
     // Create shielded partial tx
-    ShieldedPartialTransaction::build(
-        [input_note_proving_info, padding_input_note_proving_info],
-        [output_note_proving_info, padding_output_note_proving_info],
-        vec![],
-        &mut rng,
-    )
+    ShieldedPartialTransaction::build(actions, input_vps, output_vps, vec![], &mut rng).unwrap()
 }
