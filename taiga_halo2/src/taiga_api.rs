@@ -265,10 +265,7 @@ pub mod tests {
         use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
         use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
         use crate::merkle_tree::MerklePath;
-        use crate::note::{
-            tests::{random_input_note, random_output_note},
-            RandomSeed,
-        };
+        use crate::note::tests::{random_input_note, random_output_note};
 
         let mut rng = OsRng;
 
@@ -277,29 +274,13 @@ pub mod tests {
         let input_note_1_nf = input_note_1.get_nf().unwrap();
         let output_note_1 = random_output_note(&mut rng, input_note_1_nf);
         let merkle_path_1 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let anchor_1 = input_note_1.calculate_root(&merkle_path_1);
-        let rseed_1 = RandomSeed::random(&mut rng);
-        let action_1 = ActionInfo::new(
-            input_note_1,
-            merkle_path_1,
-            anchor_1,
-            output_note_1,
-            rseed_1,
-        );
+        let action_1 = ActionInfo::new(input_note_1, merkle_path_1, None, output_note_1, &mut rng);
 
         let input_note_2 = random_input_note(&mut rng);
         let input_note_2_nf = input_note_2.get_nf().unwrap();
         let output_note_2 = random_output_note(&mut rng, input_note_2_nf);
         let merkle_path_2 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let anchor_2 = input_note_2.calculate_root(&merkle_path_2);
-        let rseed_2 = RandomSeed::random(&mut rng);
-        let action_2 = ActionInfo::new(
-            input_note_2,
-            merkle_path_2,
-            anchor_2,
-            output_note_2,
-            rseed_2,
-        );
+        let action_2 = ActionInfo::new(input_note_2, merkle_path_2, None, output_note_2, &mut rng);
 
         // construct applications
         let input_note_1_app = {

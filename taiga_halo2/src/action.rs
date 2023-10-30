@@ -8,6 +8,7 @@ use crate::{
     vp_commitment::ValidityPredicateCommitment,
 };
 use pasta_curves::pallas;
+use rand::RngCore;
 
 #[cfg(feature = "nif")]
 use rustler::NifStruct;
@@ -115,19 +116,26 @@ impl BorshDeserialize for ActionPublicInputs {
 }
 
 impl ActionInfo {
-    pub fn new(
+    // The dummy input note must provide a valid custom_anchor, but a random merkle path
+    // The normal input note only needs to provide a valid merkle path. The anchor will be calculated from the note and path.
+    pub fn new<R: RngCore>(
         input_note: Note,
         input_merkle_path: MerklePath,
-        input_anchor: Anchor,
+        custom_anchor: Option<Anchor>,
         output_note: Note,
-        rseed: RandomSeed,
+        mut rng: R,
     ) -> Self {
+        let input_anchor = match custom_anchor {
+            Some(anchor) => anchor,
+            None => input_note.calculate_root(&input_merkle_path),
+        };
+
         Self {
             input_note,
             input_merkle_path,
             input_anchor,
             output_note,
-            rseed,
+            rseed: RandomSeed::random(&mut rng),
         }
     }
 
@@ -194,21 +202,12 @@ pub mod tests {
     use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
     use crate::merkle_tree::MerklePath;
     use crate::note::tests::{random_input_note, random_output_note};
-    use crate::note::RandomSeed;
     use rand::RngCore;
 
     pub fn random_action_info<R: RngCore>(mut rng: R) -> ActionInfo {
         let input_note = random_input_note(&mut rng);
         let output_note = random_output_note(&mut rng, input_note.get_nf().unwrap());
         let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let input_anchor = input_note.calculate_root(&input_merkle_path);
-        let rseed = RandomSeed::random(&mut rng);
-        ActionInfo::new(
-            input_note,
-            input_merkle_path,
-            input_anchor,
-            output_note,
-            rseed,
-        )
+        ActionInfo::new(input_note, input_merkle_path, None, output_note, &mut rng)
     }
 }

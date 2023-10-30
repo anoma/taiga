@@ -17,7 +17,7 @@ use taiga_halo2::{
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
-    note::{Note, NoteValidityPredicates, RandomSeed},
+    note::{Note, NoteValidityPredicates},
     nullifier::{Nullifier, NullifierKeyContainer},
     shielded_ptx::ShieldedPartialTransaction,
     transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
@@ -68,25 +68,22 @@ pub fn create_token_intent_ptx<R: RngCore>(
 
     // Create action pairs
     let actions = {
-        let rseed_1 = RandomSeed::random(&mut rng);
-        let anchor_1 = input_note.calculate_root(&merkle_path);
         let action_1 = ActionInfo::new(
             *input_note.note(),
             merkle_path.clone(),
-            anchor_1,
+            None,
             intent_note,
-            rseed_1,
+            &mut rng,
         );
 
         // Fetch a valid anchor for padding input notes
-        let anchor_2 = Anchor::from(pallas::Base::random(&mut rng));
-        let rseed_2 = RandomSeed::random(&mut rng);
+        let anchor = Anchor::from(pallas::Base::random(&mut rng));
         let action_2 = ActionInfo::new(
             padding_input_note,
             merkle_path,
-            anchor_2,
+            Some(anchor),
             padding_output_note,
-            rseed_2,
+            &mut rng,
         );
         vec![action_1, action_2]
     };
@@ -198,22 +195,20 @@ pub fn consume_token_intent_ptx<R: RngCore>(
 
     // Create action pairs
     let actions = {
-        let rseed_1 = RandomSeed::random(&mut rng);
         let action_1 = ActionInfo::new(
             intent_note,
             merkle_path.clone(),
-            anchor,
+            Some(anchor),
             *output_note.note(),
-            rseed_1,
+            &mut rng,
         );
 
-        let rseed_2 = RandomSeed::random(&mut rng);
         let action_2 = ActionInfo::new(
             padding_input_note,
             merkle_path,
-            anchor,
+            Some(anchor),
             padding_output_note,
-            rseed_2,
+            &mut rng,
         );
         vec![action_1, action_2]
     };

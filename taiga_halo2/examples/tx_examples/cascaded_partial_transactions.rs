@@ -13,7 +13,7 @@ use taiga_halo2::{
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
-    note::{NoteValidityPredicates, RandomSeed},
+    note::NoteValidityPredicates,
     nullifier::{Nullifier, NullifierKeyContainer},
     shielded_ptx::ShieldedPartialTransaction,
     transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
@@ -74,24 +74,20 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
     let ptx_1 = {
         // Create action pairs
         let actions = {
-            let rseed_1 = RandomSeed::random(&mut rng);
-            let anchor_1 = input_note_1.calculate_root(&merkle_path);
             let action_1 = ActionInfo::new(
                 *input_note_1.note(),
                 merkle_path.clone(),
-                anchor_1,
+                None,
                 *output_note_1.note(),
-                rseed_1,
+                &mut rng,
             );
 
-            let rseed_2 = RandomSeed::random(&mut rng);
-            let anchor_2 = input_note_2.calculate_root(&merkle_path);
             let action_2 = ActionInfo::new(
                 *input_note_2.note(),
                 merkle_path.clone(),
-                anchor_2,
+                None,
                 cascade_intent_note,
-                rseed_2,
+                &mut rng,
             );
             vec![action_1, action_2]
         };
@@ -155,23 +151,20 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
     let ptx_2 = {
         // Create action pairs
         let actions = {
-            let rseed_1 = RandomSeed::random(&mut rng);
             let action_1 = ActionInfo::new(
                 cascade_intent_note,
                 merkle_path.clone(),
-                anchor,
+                Some(anchor),
                 *output_note_2.note(),
-                rseed_1,
+                &mut rng,
             );
 
-            let rseed_2 = RandomSeed::random(&mut rng);
-            let anchor_2 = input_note_3.calculate_root(&merkle_path);
             let action_2 = ActionInfo::new(
                 *input_note_3.note(),
                 merkle_path,
-                anchor_2,
+                None,
                 *output_note_3.note(),
-                rseed_2,
+                &mut rng,
             );
             vec![action_1, action_2]
         };

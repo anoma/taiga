@@ -535,15 +535,7 @@ pub mod testing {
 
         // Construct action pair
         let merkle_path_1 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let anchor_1 = input_note_1.calculate_root(&merkle_path_1);
-        let rseed_1 = RandomSeed::random(&mut rng);
-        let action_1 = ActionInfo::new(
-            input_note_1,
-            merkle_path_1,
-            anchor_1,
-            output_note_1,
-            rseed_1,
-        );
+        let action_1 = ActionInfo::new(input_note_1, merkle_path_1, None, output_note_1, &mut rng);
 
         // Generate notes
         let input_note_2 = {
@@ -587,15 +579,7 @@ pub mod testing {
 
         // Construct action pair
         let merkle_path_2 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let anchor_2 = input_note_2.calculate_root(&merkle_path_2);
-        let rseed_2 = RandomSeed::random(&mut rng);
-        let action_2 = ActionInfo::new(
-            input_note_2,
-            merkle_path_2,
-            anchor_2,
-            output_note_2,
-            rseed_2,
-        );
+        let action_2 = ActionInfo::new(input_note_2, merkle_path_2, None, output_note_2, &mut rng);
 
         // Create vp circuit and fill the note info
         let mut trivial_vp_circuit = TrivialValidityPredicateCircuit {
