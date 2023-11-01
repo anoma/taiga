@@ -18,7 +18,7 @@ use crate::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::{Note, RandomSeed},
-    nullifier::{Nullifier, NullifierKeyContainer},
+    nullifier::Nullifier,
     proof::Proof,
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
@@ -150,13 +150,13 @@ vp_verifying_info_impl!(CascadeIntentValidityPredicateCircuit);
 pub fn create_intent_note<R: RngCore>(
     mut rng: R,
     cascade_note_cm: pallas::Base,
-    rho: Nullifier,
-    nk: NullifierKeyContainer,
+    nk: pallas::Base,
 ) -> Note {
     let app_data_static =
         CascadeIntentValidityPredicateCircuit::encode_app_data_static(cascade_note_cm);
     let rseed = RandomSeed::random(&mut rng);
-    Note::new(
+    let rho = Nullifier::random(&mut rng);
+    Note::new_input_note(
         *COMPRESSED_CASCADE_INTENT_VK,
         app_data_static,
         pallas::Base::zero(),
@@ -180,9 +180,8 @@ fn test_halo2_cascade_intent_vp_circuit() {
     let circuit = {
         let cascade_input_note = random_input_note(&mut rng);
         let cascade_note_cm = cascade_input_note.commitment().inner();
-        let rho = Nullifier::from(pallas::Base::random(&mut rng));
-        let nk = NullifierKeyContainer::random_key(&mut rng);
-        let intent_note = create_intent_note(&mut rng, cascade_note_cm, rho, nk);
+        let nk = pallas::Base::random(&mut rng);
+        let intent_note = create_intent_note(&mut rng, cascade_note_cm, nk);
         let input_notes = [intent_note, cascade_input_note];
         let output_notes = input_notes
             .iter()

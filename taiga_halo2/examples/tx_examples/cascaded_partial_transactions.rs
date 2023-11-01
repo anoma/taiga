@@ -14,7 +14,6 @@ use taiga_halo2::{
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
     note::NoteValidityPredicates,
-    nullifier::{Nullifier, NullifierKeyContainer},
     shielded_ptx::ShieldedPartialTransaction,
     transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
 };
@@ -22,46 +21,29 @@ use taiga_halo2::{
 pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
     let alice_auth_sk = pallas::Scalar::random(&mut rng);
     let alice_auth = TokenAuthorization::from_sk_vk(&alice_auth_sk, &COMPRESSED_TOKEN_AUTH_VK);
-    let alice_nk = NullifierKeyContainer::random_key(&mut rng);
+    let alice_nk = pallas::Base::random(&mut rng);
 
     let bob_auth = TokenAuthorization::random(&mut rng);
-    let bob_nk_com = NullifierKeyContainer::random_commitment(&mut rng);
+    let bob_nk_com = pallas::Base::random(&mut rng);
 
-    let rho = Nullifier::from(pallas::Base::random(&mut rng));
     let input_token_1 = Token::new("btc".to_string(), 1u64);
-    let input_note_1 = input_token_1.create_random_token_note(&mut rng, rho, alice_nk, &alice_auth);
+    let input_note_1 =
+        input_token_1.create_random_input_token_note(&mut rng, alice_nk, &alice_auth);
     let output_token_1 = Token::new("btc".to_string(), 1u64);
-    let output_note_1 = output_token_1.create_random_token_note(
-        &mut rng,
-        input_note_1.get_nf().unwrap(),
-        bob_nk_com,
-        &bob_auth,
-    );
+    let mut output_note_1 = output_token_1.create_random_output_token_note(bob_nk_com, &bob_auth);
     let input_token_2 = Token::new("eth".to_string(), 2u64);
-    let input_note_2 = input_token_2.create_random_token_note(&mut rng, rho, alice_nk, &alice_auth);
+    let input_note_2 =
+        input_token_2.create_random_input_token_note(&mut rng, alice_nk, &alice_auth);
 
     let input_token_3 = Token::new("xan".to_string(), 3u64);
-    let input_note_3 = input_token_3.create_random_token_note(&mut rng, rho, alice_nk, &alice_auth);
-    let cascade_intent_note = create_intent_note(
-        &mut rng,
-        input_note_3.commitment().inner(),
-        input_note_2.get_nf().unwrap(),
-        alice_nk,
-    );
+    let input_note_3 =
+        input_token_3.create_random_input_token_note(&mut rng, alice_nk, &alice_auth);
+    let mut cascade_intent_note =
+        create_intent_note(&mut rng, input_note_3.commitment().inner(), alice_nk);
     let output_token_2 = Token::new("eth".to_string(), 2u64);
-    let output_note_2 = output_token_2.create_random_token_note(
-        &mut rng,
-        cascade_intent_note.get_nf().unwrap(),
-        bob_nk_com,
-        &bob_auth,
-    );
+    let mut output_note_2 = output_token_2.create_random_output_token_note(bob_nk_com, &bob_auth);
     let output_token_3 = Token::new("xan".to_string(), 3u64);
-    let output_note_3 = output_token_3.create_random_token_note(
-        &mut rng,
-        input_note_3.get_nf().unwrap(),
-        bob_nk_com,
-        &bob_auth,
-    );
+    let mut output_note_3 = output_token_3.create_random_output_token_note(bob_nk_com, &bob_auth);
 
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
@@ -78,7 +60,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
                 *input_note_1.note(),
                 merkle_path.clone(),
                 None,
-                *output_note_1.note(),
+                &mut output_note_1.note,
                 &mut rng,
             );
 
@@ -86,7 +68,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
                 *input_note_2.note(),
                 merkle_path.clone(),
                 None,
-                cascade_intent_note,
+                &mut cascade_intent_note,
                 &mut rng,
             );
             vec![action_1, action_2]
@@ -155,7 +137,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
                 cascade_intent_note,
                 merkle_path.clone(),
                 Some(anchor),
-                *output_note_2.note(),
+                &mut output_note_2.note,
                 &mut rng,
             );
 
@@ -163,7 +145,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
                 *input_note_3.note(),
                 merkle_path,
                 None,
-                *output_note_3.note(),
+                &mut output_note_3.note,
                 &mut rng,
             );
             vec![action_1, action_2]

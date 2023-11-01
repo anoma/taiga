@@ -470,7 +470,7 @@ pub mod testing {
         constant::TAIGA_COMMITMENT_TREE_DEPTH,
         merkle_tree::MerklePath,
         note::{Note, NoteValidityPredicates, RandomSeed},
-        nullifier::{Nullifier, NullifierKeyContainer},
+        nullifier::Nullifier,
         shielded_ptx::ShieldedPartialTransaction,
         utils::poseidon_hash,
     };
@@ -497,10 +497,10 @@ pub mod testing {
             let app_data_dynamic = poseidon_hash(app_dynamic_vp_vk[0], app_dynamic_vp_vk[1]);
             let rho = Nullifier::from(pallas::Base::random(&mut rng));
             let value = 5000u64;
-            let nk = NullifierKeyContainer::random_key(&mut rng);
+            let nk = pallas::Base::random(&mut rng);
             let rseed = RandomSeed::random(&mut rng);
             let is_merkle_checked = true;
-            Note::new(
+            Note::new_input_note(
                 compressed_trivial_vp_vk,
                 app_data_static,
                 app_data_dynamic,
@@ -511,31 +511,33 @@ pub mod testing {
                 rseed,
             )
         };
-        let output_note_1 = {
+        let mut output_note_1 = {
             let app_data_static = pallas::Base::zero();
             // TODO: add real application dynamic VPs and encode them to app_data_dynamic later.
             // If the dynamic VP is not used, set app_data_dynamic pallas::Base::zero() by default.
             let app_data_dynamic = pallas::Base::zero();
-            let rho = input_note_1.get_nf().unwrap();
             let value = 5000u64;
-            let nk_com = NullifierKeyContainer::random_commitment(&mut rng);
-            let rseed = RandomSeed::random(&mut rng);
+            let nk_com = pallas::Base::random(&mut rng);
             let is_merkle_checked = true;
-            Note::new(
+            Note::new_output_note(
                 compressed_trivial_vp_vk,
                 app_data_static,
                 app_data_dynamic,
                 value,
                 nk_com,
-                rho,
                 is_merkle_checked,
-                rseed,
             )
         };
 
         // Construct action pair
         let merkle_path_1 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let action_1 = ActionInfo::new(input_note_1, merkle_path_1, None, output_note_1, &mut rng);
+        let action_1 = ActionInfo::new(
+            input_note_1,
+            merkle_path_1,
+            None,
+            &mut output_note_1,
+            &mut rng,
+        );
 
         // Generate notes
         let input_note_2 = {
@@ -543,10 +545,10 @@ pub mod testing {
             let app_data_dynamic = pallas::Base::zero();
             let rho = Nullifier::from(pallas::Base::random(&mut rng));
             let value = 10u64;
-            let nk = NullifierKeyContainer::random_key(&mut rng);
+            let nk = pallas::Base::random(&mut rng);
             let rseed = RandomSeed::random(&mut rng);
             let is_merkle_checked = true;
-            Note::new(
+            Note::new_input_note(
                 compressed_trivial_vp_vk,
                 app_data_static,
                 app_data_dynamic,
@@ -557,29 +559,31 @@ pub mod testing {
                 rseed,
             )
         };
-        let output_note_2 = {
+        let mut output_note_2 = {
             let app_data_static = pallas::Base::one();
             let app_data_dynamic = pallas::Base::zero();
-            let rho = input_note_2.get_nf().unwrap();
             let value = 10u64;
-            let nk_com = NullifierKeyContainer::random_commitment(&mut rng);
-            let rseed = RandomSeed::random(&mut rng);
+            let nk_com = pallas::Base::random(&mut rng);
             let is_merkle_checked = true;
-            Note::new(
+            Note::new_output_note(
                 compressed_trivial_vp_vk,
                 app_data_static,
                 app_data_dynamic,
                 value,
                 nk_com,
-                rho,
                 is_merkle_checked,
-                rseed,
             )
         };
 
         // Construct action pair
         let merkle_path_2 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let action_2 = ActionInfo::new(input_note_2, merkle_path_2, None, output_note_2, &mut rng);
+        let action_2 = ActionInfo::new(
+            input_note_2,
+            merkle_path_2,
+            None,
+            &mut output_note_2,
+            &mut rng,
+        );
 
         // Create vp circuit and fill the note info
         let mut trivial_vp_circuit = TrivialValidityPredicateCircuit {

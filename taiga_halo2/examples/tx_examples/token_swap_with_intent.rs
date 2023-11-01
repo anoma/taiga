@@ -18,7 +18,7 @@ use taiga_halo2::{
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
     note::{Note, NoteValidityPredicates},
-    nullifier::{Nullifier, NullifierKeyContainer},
+    nullifier::NullifierKeyContainer,
     shielded_ptx::ShieldedPartialTransaction,
     transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
 };
@@ -29,40 +29,33 @@ pub fn create_token_intent_ptx<R: RngCore>(
     token_2: Token,
     input_token: Token,
     input_auth_sk: pallas::Scalar,
-    input_nk: NullifierKeyContainer, // NullifierKeyContainer::Key
+    input_nk: pallas::Base,
 ) -> (
     ShieldedPartialTransaction,
-    NullifierKeyContainer,
     pallas::Base,
     pallas::Base,
-    Nullifier,
+    pallas::Base,
 ) {
     let input_auth = TokenAuthorization::from_sk_vk(&input_auth_sk, &COMPRESSED_TOKEN_AUTH_VK);
 
     // input note
-    let rho = Nullifier::from(pallas::Base::random(&mut rng));
-    let input_note = input_token.create_random_token_note(&mut rng, rho, input_nk, &input_auth);
+    let input_note = input_token.create_random_input_token_note(&mut rng, input_nk, &input_auth);
 
     // output intent note
-    let input_note_nf = input_note.get_nf().unwrap();
     let input_note_nk_com = input_note.get_nk_commitment();
-    let intent_note = create_intent_note(
+    let mut intent_note = create_intent_note(
         &mut rng,
         &token_1,
         &token_2,
         input_note_nk_com,
         input_note.app_data_dynamic,
-        input_note_nf,
         input_nk,
     );
 
     // padding the zero notes
     let padding_input_note = Note::random_padding_input_note(&mut rng);
     let padding_input_note_nf = padding_input_note.get_nf().unwrap();
-    let padding_output_note = Note::random_padding_output_note(&mut rng, padding_input_note_nf);
-
-    let input_notes = [*input_note.note(), padding_input_note];
-    let output_notes = [intent_note, padding_output_note];
+    let mut padding_output_note = Note::random_padding_output_note(&mut rng, padding_input_note_nf);
 
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
@@ -72,7 +65,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
             *input_note.note(),
             merkle_path.clone(),
             None,
-            intent_note,
+            &mut intent_note,
             &mut rng,
         );
 
@@ -82,7 +75,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
             padding_input_note,
             merkle_path,
             Some(anchor),
-            padding_output_note,
+            &mut padding_output_note,
             &mut rng,
         );
         vec![action_1, action_2]
@@ -90,6 +83,8 @@ pub fn create_token_intent_ptx<R: RngCore>(
 
     // Create VPs
     let (input_vps, output_vps) = {
+        let input_notes = [*input_note.note(), padding_input_note];
+        let output_notes = [intent_note, padding_output_note];
         // Create the input note vps
         let input_note_vps = input_note.generate_input_token_vps(
             &mut rng,
@@ -143,7 +138,6 @@ pub fn create_token_intent_ptx<R: RngCore>(
         input_nk,
         input_note_nk_com,
         input_note.app_data_dynamic,
-        rho,
     )
 }
 
@@ -152,8 +146,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     mut rng: R,
     token_1: Token,
     token_2: Token,
-    input_rho: Nullifier,
-    input_nk: NullifierKeyContainer, // NullifierKeyContainer::Key
+    input_nk: pallas::Base,
     receiver_nk_com: pallas::Base,
     receiver_app_data_dynamic: pallas::Base,
     output_token: Token,
@@ -166,27 +159,19 @@ pub fn consume_token_intent_ptx<R: RngCore>(
         &token_2,
         receiver_nk_com,
         receiver_app_data_dynamic,
-        input_rho,
         input_nk,
     );
 
     // output note
     let input_note_nf = intent_note.get_nf().unwrap();
     let output_auth = TokenAuthorization::new(output_auth_pk, *COMPRESSED_TOKEN_AUTH_VK);
-    let output_note = output_token.create_random_token_note(
-        &mut rng,
-        input_note_nf,
-        input_nk.to_commitment(),
-        &output_auth,
-    );
+    let output_nk_com = NullifierKeyContainer::from_key(input_nk).get_commitment();
+    let mut output_note = output_token.create_random_output_token_note(output_nk_com, &output_auth);
 
     // padding the zero notes
     let padding_input_note = Note::random_padding_input_note(&mut rng);
     let padding_input_note_nf = padding_input_note.get_nf().unwrap();
-    let padding_output_note = Note::random_padding_output_note(&mut rng, padding_input_note_nf);
-
-    let input_notes = [intent_note, padding_input_note];
-    let output_notes = [*output_note.note(), padding_output_note];
+    let mut padding_output_note = Note::random_padding_output_note(&mut rng, padding_input_note_nf);
 
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
@@ -199,7 +184,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
             intent_note,
             merkle_path.clone(),
             Some(anchor),
-            *output_note.note(),
+            &mut output_note.note,
             &mut rng,
         );
 
@@ -207,7 +192,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
             padding_input_note,
             merkle_path,
             Some(anchor),
-            padding_output_note,
+            &mut padding_output_note,
             &mut rng,
         );
         vec![action_1, action_2]
@@ -215,6 +200,8 @@ pub fn consume_token_intent_ptx<R: RngCore>(
 
     // Create VPs
     let (input_vps, output_vps) = {
+        let input_notes = [intent_note, padding_input_note];
+        let output_notes = [*output_note.note(), padding_output_note];
         // Create intent vps
         let intent_vps = {
             let intent_vp = OrRelationIntentValidityPredicateCircuit {
@@ -264,11 +251,11 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
     // Alice creates the partial transaction with 5 BTC input and intent output
     let alice_auth_sk = pallas::Scalar::random(&mut rng);
     let alice_auth_pk = generator * alice_auth_sk;
-    let alice_nk = NullifierKeyContainer::random_key(&mut rng);
+    let alice_nk = pallas::Base::random(&mut rng);
     let token_1 = Token::new("dolphin".to_string(), 1u64);
     let token_2 = Token::new("monkey".to_string(), 2u64);
     let btc_token = Token::new("btc".to_string(), 5u64);
-    let (alice_ptx, intent_nk, receiver_nk_com, receiver_app_data_dynamic, intent_rho) =
+    let (alice_ptx, intent_nk, receiver_nk_com, receiver_app_data_dynamic) =
         create_token_intent_ptx(
             &mut rng,
             token_1.clone(),
@@ -287,10 +274,10 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
         &mut rng,
         token_1.clone(),
         bob_auth_sk,
-        bob_nk,
+        bob_nk.get_nk().unwrap(),
         btc_token,
         bob_auth_pk,
-        bob_nk.to_commitment(),
+        bob_nk.get_commitment(),
     );
 
     // Solver/Bob creates the partial transaction to consume the intent note
@@ -299,7 +286,6 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
         &mut rng,
         token_1.clone(),
         token_2,
-        intent_rho,
         intent_nk,
         receiver_nk_com,
         receiver_app_data_dynamic,

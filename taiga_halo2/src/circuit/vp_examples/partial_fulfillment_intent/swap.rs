@@ -6,9 +6,9 @@ use crate::{
     },
     constant::NUM_NOTE,
     note::{Note, RandomSeed},
-    nullifier::{Nullifier, NullifierKeyContainer},
     utils::poseidon_hash_n,
 };
+use halo2_proofs::arithmetic::Field;
 use halo2_proofs::{
     circuit::{Layouter, Value},
     plonk::{Advice, Column, Error},
@@ -33,9 +33,8 @@ impl Swap {
         assert_eq!(buy.value() % sell.value(), 0);
 
         let sell = {
-            let rho = Nullifier::random(&mut rng);
-            let nk = NullifierKeyContainer::random_key(&mut rng);
-            sell.create_random_token_note(&mut rng, rho, nk, &auth)
+            let nk = pallas::Base::random(&mut rng);
+            sell.create_random_input_token_note(&mut rng, nk, &auth)
         };
 
         Swap { sell, buy, auth }
@@ -56,10 +55,8 @@ impl Swap {
         let ratio = self.buy.value() / self.sell.value;
         assert_eq!(offer.value() % ratio, 0);
 
-        let offer_note = offer.create_random_token_note(
-            &mut rng,
-            intent_note.get_nf().unwrap(),
-            self.sell.note().nk_container,
+        let offer_note = offer.create_random_output_token_note(
+            self.sell.note().nk_container.get_commitment(),
             &self.auth,
         );
 
@@ -71,10 +68,8 @@ impl Swap {
             let returned_token =
                 Token::new(self.sell.token_name().inner().to_string(), returned_value);
             *returned_token
-                .create_random_token_note(
-                    &mut rng,
-                    input_padding_note.get_nf().unwrap(),
-                    self.sell.note().nk_container,
+                .create_random_output_token_note(
+                    self.sell.note().nk_container.get_commitment(),
                     &self.auth,
                 )
                 .note()
@@ -104,12 +99,12 @@ impl Swap {
     pub fn create_intent_note<R: RngCore>(&self, mut rng: R) -> Note {
         let rseed = RandomSeed::random(&mut rng);
 
-        Note::new(
+        Note::new_input_note(
             *COMPRESSED_PARTIAL_FULFILLMENT_INTENT_VK,
             self.encode_app_data_static(),
             pallas::Base::zero(),
             1u64,
-            self.sell.note().nk_container,
+            self.sell.note().nk_container.get_nk().unwrap(),
             self.sell.note().get_nf().unwrap(),
             false,
             rseed,

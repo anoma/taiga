@@ -118,11 +118,12 @@ impl BorshDeserialize for ActionPublicInputs {
 impl ActionInfo {
     // The dummy input note must provide a valid custom_anchor, but a random merkle path
     // The normal input note only needs to provide a valid merkle path. The anchor will be calculated from the note and path.
+    // The rho of output_note will be reset to the nullifier of input_note
     pub fn new<R: RngCore>(
         input_note: Note,
         input_merkle_path: MerklePath,
         custom_anchor: Option<Anchor>,
-        output_note: Note,
+        output_note: &mut Note,
         mut rng: R,
     ) -> Self {
         let input_anchor = match custom_anchor {
@@ -130,11 +131,13 @@ impl ActionInfo {
             None => input_note.calculate_root(&input_merkle_path),
         };
 
+        output_note.reset_rho(&input_note, &mut rng);
+
         Self {
             input_note,
             input_merkle_path,
             input_anchor,
-            output_note,
+            output_note: *output_note,
             rseed: RandomSeed::random(&mut rng),
         }
     }
@@ -206,8 +209,14 @@ pub mod tests {
 
     pub fn random_action_info<R: RngCore>(mut rng: R) -> ActionInfo {
         let input_note = random_input_note(&mut rng);
-        let output_note = random_output_note(&mut rng, input_note.get_nf().unwrap());
+        let mut output_note = random_output_note(&mut rng, input_note.get_nf().unwrap());
         let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        ActionInfo::new(input_note, input_merkle_path, None, output_note, &mut rng)
+        ActionInfo::new(
+            input_note,
+            input_merkle_path,
+            None,
+            &mut output_note,
+            &mut rng,
+        )
     }
 }

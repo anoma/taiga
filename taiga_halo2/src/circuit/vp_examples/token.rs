@@ -21,7 +21,7 @@ use crate::{
         VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_2,
     },
     note::{Note, NoteValidityPredicates, RandomSeed},
-    nullifier::{Nullifier, NullifierKeyContainer},
+    nullifier::Nullifier,
     proof::Proof,
     utils::poseidon_hash_n,
     vp_commitment::ValidityPredicateCommitment,
@@ -91,25 +91,47 @@ impl Token {
         pallas::Base::from(self.value)
     }
 
-    pub fn create_random_token_note<R: RngCore>(
+    pub fn create_random_input_token_note<R: RngCore>(
         &self,
         mut rng: R,
-        rho: Nullifier,
-        nk_container: NullifierKeyContainer,
+        nk: pallas::Base,
         auth: &TokenAuthorization,
     ) -> TokenNote {
         let app_data_static = self.encode_name();
         let app_data_dynamic = auth.to_app_data_dynamic();
         let rseed = RandomSeed::random(&mut rng);
-        let note = Note::new(
+        let rho = Nullifier::random(&mut rng);
+        let note = Note::new_input_note(
             *COMPRESSED_TOKEN_VK,
             app_data_static,
             app_data_dynamic,
             self.value(),
-            nk_container,
+            nk,
             rho,
             true,
             rseed,
+        );
+
+        TokenNote {
+            token_name: self.name().clone(),
+            note,
+        }
+    }
+
+    pub fn create_random_output_token_note(
+        &self,
+        nk_com: pallas::Base,
+        auth: &TokenAuthorization,
+    ) -> TokenNote {
+        let app_data_static = self.encode_name();
+        let app_data_dynamic = auth.to_app_data_dynamic();
+        let note = Note::new_output_note(
+            *COMPRESSED_TOKEN_VK,
+            app_data_static,
+            app_data_dynamic,
+            self.value(),
+            nk_com,
+            true,
         );
 
         TokenNote {

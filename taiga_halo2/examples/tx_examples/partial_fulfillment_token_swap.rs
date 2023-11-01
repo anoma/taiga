@@ -31,16 +31,12 @@ pub fn create_token_intent_ptx<R: RngCore>(
 ) -> (ShieldedPartialTransaction, Swap, Note) {
     let input_auth = TokenAuthorization::from_sk_vk(&input_auth_sk, &COMPRESSED_TOKEN_AUTH_VK);
     let swap = Swap::random(&mut rng, sell, buy, input_auth);
-    let intent_note = swap.create_intent_note(&mut rng);
+    let mut intent_note = swap.create_intent_note(&mut rng);
 
     // padding the zero notes
     let padding_input_note = Note::random_padding_input_note(&mut rng);
     let padding_input_note_nf = padding_input_note.get_nf().unwrap();
-    let padding_output_note = Note::random_padding_output_note(&mut rng, padding_input_note_nf);
-
-    let input_notes = [*swap.sell.note(), padding_input_note];
-    let output_notes = [intent_note, padding_output_note];
-
+    let mut padding_output_note = Note::random_padding_output_note(&mut rng, padding_input_note_nf);
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
     // Create action pairs
@@ -49,7 +45,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
             *swap.sell.note(),
             merkle_path.clone(),
             None,
-            intent_note,
+            &mut intent_note,
             &mut rng,
         );
 
@@ -59,7 +55,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
             padding_input_note,
             merkle_path,
             Some(anchor),
-            padding_output_note,
+            &mut padding_output_note,
             &mut rng,
         );
         vec![action_1, action_2]
@@ -67,6 +63,8 @@ pub fn create_token_intent_ptx<R: RngCore>(
 
     // Create VPs
     let (input_vps, output_vps) = {
+        let input_notes = [*swap.sell.note(), padding_input_note];
+        let output_notes = [intent_note, padding_output_note];
         // Create the input token vps
         let input_token_vps = swap.sell.generate_input_token_vps(
             &mut rng,
@@ -123,9 +121,9 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     offer: Token,
     output_auth_pk: pallas::Point,
 ) -> ShieldedPartialTransaction {
-    let (input_notes, output_notes) = swap.fill(&mut rng, intent_note, offer);
+    let (input_notes, [mut bought_note, mut returned_note]) =
+        swap.fill(&mut rng, intent_note, offer);
     let [intent_note, padding_input_note] = input_notes;
-    let [bought_note, returned_note] = output_notes;
 
     // output notes
     let output_auth = TokenAuthorization::new(output_auth_pk, *COMPRESSED_TOKEN_AUTH_VK);
@@ -140,7 +138,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
             intent_note,
             merkle_path.clone(),
             Some(anchor),
-            bought_note,
+            &mut bought_note,
             &mut rng,
         );
 
@@ -148,7 +146,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
             padding_input_note,
             merkle_path,
             Some(anchor),
-            returned_note,
+            &mut returned_note,
             &mut rng,
         );
         vec![action_1, action_2]
@@ -156,6 +154,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
 
     // Create VPs
     let (input_vps, output_vps) = {
+        let output_notes = [bought_note, returned_note];
         // Create intent vps
         let intent_vps = {
             let intent_vp = PartialFulfillmentIntentValidityPredicateCircuit {
@@ -223,10 +222,10 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
         &mut rng,
         offer.clone(),
         bob_auth_sk,
-        bob_nk,
+        bob_nk.get_nk().unwrap(),
         returned,
         bob_auth_pk,
-        bob_nk.to_commitment(),
+        bob_nk.get_commitment(),
     );
 
     // Solver/Bob creates the partial transaction to consume the intent note

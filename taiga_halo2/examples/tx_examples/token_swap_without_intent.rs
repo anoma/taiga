@@ -30,10 +30,10 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
         &mut rng,
         btc_token.clone(),
         alice_auth_sk,
-        alice_nk,
+        alice_nk.get_nk().unwrap(),
         eth_token.clone(),
         alice_auth_pk,
-        alice_nk.to_commitment(),
+        alice_nk.get_commitment(),
     );
 
     // Bob creates the partial transaction
@@ -45,10 +45,10 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
         &mut rng,
         eth_token,
         bob_auth_sk,
-        bob_nk,
+        bob_nk.get_nk().unwrap(),
         xan_token.clone(),
         bob_auth_pk,
-        bob_nk.to_commitment(),
+        bob_nk.get_commitment(),
     );
 
     // Carol creates the partial transaction
@@ -60,10 +60,10 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
         &mut rng,
         xan_token,
         carol_auth_sk,
-        carol_nk,
+        carol_nk.get_nk().unwrap(),
         btc_token,
         carol_auth_pk,
-        carol_nk.to_commitment(),
+        carol_nk.get_commitment(),
     );
 
     // Solver creates the final transaction

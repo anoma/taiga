@@ -43,7 +43,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
                 rho,
             }
         };
-        let output_note = {
+        let mut output_note = {
             let rho = input_note.get_nf().unwrap();
             let nk_com = NullifierKeyContainer::from_commitment(pallas::Base::random(&mut rng));
             let note_type = {
@@ -66,8 +66,13 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
             }
         };
         let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let anchor = input_note.calculate_root(&input_merkle_path);
-        ActionInfo::new(input_note, input_merkle_path, anchor, output_note, &mut rng)
+        ActionInfo::new(
+            input_note,
+            input_merkle_path,
+            None,
+            &mut output_note,
+            &mut rng,
+        )
     };
     let (action, action_circuit) = action_info.build();
     let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();

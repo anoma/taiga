@@ -132,12 +132,12 @@ pub struct NoteValidityPredicates {
 
 impl Note {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub fn new_input_note(
         app_vk: pallas::Base,
         app_data_static: pallas::Base,
         app_data_dynamic: pallas::Base,
         value: u64,
-        nk_container: NullifierKeyContainer,
+        nk: pallas::Base,
         rho: Nullifier,
         is_merkle_checked: bool,
         rseed: RandomSeed,
@@ -147,11 +147,34 @@ impl Note {
             note_type,
             app_data_dynamic,
             value,
-            nk_container,
+            nk_container: NullifierKeyContainer::Key(nk),
             is_merkle_checked,
             psi: rseed.get_psi(&rho),
             rcm: rseed.get_rcm(&rho),
             rho,
+        }
+    }
+
+    // The rho, psi, and rcm are not specified until the action is constructed.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_output_note(
+        app_vk: pallas::Base,
+        app_data_static: pallas::Base,
+        app_data_dynamic: pallas::Base,
+        value: u64,
+        nk_com: pallas::Base,
+        is_merkle_checked: bool,
+    ) -> Self {
+        let note_type = NoteType::new(app_vk, app_data_static);
+        Self {
+            note_type,
+            app_data_dynamic,
+            value,
+            nk_container: NullifierKeyContainer::Commitment(nk_com),
+            is_merkle_checked,
+            psi: pallas::Base::default(),
+            rcm: pallas::Base::default(),
+            rho: Nullifier::default(),
         }
     }
 
@@ -275,6 +298,14 @@ impl Note {
     pub fn calculate_root(&self, path: &MerklePath) -> Anchor {
         let cm_node = Node::from(self);
         path.root(cm_node)
+    }
+
+    pub fn reset_rho<R: RngCore>(&mut self, input_note: &Note, mut rng: R) {
+        let rseed = RandomSeed::random(&mut rng);
+
+        self.rho = input_note.get_nf().unwrap();
+        self.psi = rseed.get_psi(&self.rho);
+        self.rcm = rseed.get_rcm(&self.rho);
     }
 }
 
