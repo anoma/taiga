@@ -34,9 +34,8 @@ pub fn create_token_intent_ptx<R: RngCore>(
     let mut intent_note = swap.create_intent_note(&mut rng);
 
     // padding the zero notes
-    let padding_input_note = Note::random_padding_input_note(&mut rng);
-    let padding_input_note_nf = padding_input_note.get_nf().unwrap();
-    let mut padding_output_note = Note::random_padding_output_note(&mut rng, padding_input_note_nf);
+    let padding_input_note = Note::random_padding_note(&mut rng);
+    let mut padding_output_note = Note::random_padding_note(&mut rng);
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
     // Create action pairs

@@ -110,25 +110,22 @@ vp_verifying_info_impl!(FieldAdditionValidityPredicateCircuit);
 #[test]
 fn test_halo2_addition_vp_circuit() {
     use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
-    use crate::note::tests::{random_input_note, random_output_note};
+    use crate::note::tests::random_note;
     use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     let circuit = {
-        let input_notes = [(); NUM_NOTE].map(|_| random_input_note(&mut rng));
-        let output_notes = input_notes
-            .iter()
-            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
-            .collect::<Vec<_>>();
+        let input_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
+        let output_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
         let a = pallas::Base::random(&mut rng);
         let b = pallas::Base::random(&mut rng);
         let owned_note_pub_id = pallas::Base::random(&mut rng);
         FieldAdditionValidityPredicateCircuit {
             owned_note_pub_id,
             input_notes,
-            output_notes: output_notes.try_into().unwrap(),
+            output_notes,
             a,
             b,
         }

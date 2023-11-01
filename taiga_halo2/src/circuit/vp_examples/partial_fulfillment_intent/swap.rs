@@ -60,7 +60,7 @@ impl Swap {
             &self.auth,
         );
 
-        let input_padding_note = Note::random_padding_input_note(&mut rng);
+        let input_padding_note = Note::random_padding_note(&mut rng);
 
         let returned_note = if offer.value() < self.buy.value() {
             let filled_value = offer.value() / ratio;
@@ -74,7 +74,7 @@ impl Swap {
                 )
                 .note()
         } else {
-            Note::random_padding_output_note(&mut rng, input_padding_note.get_nf().unwrap())
+            Note::random_padding_note(&mut rng)
         };
 
         let input_notes = [intent_note, input_padding_note];

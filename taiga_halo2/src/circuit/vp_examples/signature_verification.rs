@@ -295,17 +295,14 @@ fn test_halo2_sig_verification_vp_circuit() {
         receiver_vp::COMPRESSED_RECEIVER_VK, token::TokenAuthorization,
     };
     use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
-    use crate::note::tests::{random_input_note, random_output_note};
+    use crate::note::tests::random_note;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     let circuit = {
-        let mut input_notes = [(); NUM_NOTE].map(|_| random_input_note(&mut rng));
-        let output_notes = input_notes
-            .iter()
-            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
-            .collect::<Vec<_>>();
+        let mut input_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
+        let output_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
         let sk = pallas::Scalar::random(&mut rng);
         let auth_vk = pallas::Base::random(&mut rng);
         let auth = TokenAuthorization::from_sk_vk(&sk, &auth_vk);
@@ -315,7 +312,7 @@ fn test_halo2_sig_verification_vp_circuit() {
             &mut rng,
             owned_note_pub_id,
             input_notes,
-            output_notes.try_into().unwrap(),
+            output_notes,
             auth_vk,
             sk,
             *COMPRESSED_RECEIVER_VK,

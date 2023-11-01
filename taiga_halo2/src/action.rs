@@ -204,12 +204,12 @@ pub mod tests {
     use super::ActionInfo;
     use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
     use crate::merkle_tree::MerklePath;
-    use crate::note::tests::{random_input_note, random_output_note};
+    use crate::note::tests::random_note;
     use rand::RngCore;
 
     pub fn random_action_info<R: RngCore>(mut rng: R) -> ActionInfo {
-        let input_note = random_input_note(&mut rng);
-        let mut output_note = random_output_note(&mut rng, input_note.get_nf().unwrap());
+        let input_note = random_note(&mut rng);
+        let mut output_note = random_note(&mut rng);
         let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         ActionInfo::new(
             input_note,

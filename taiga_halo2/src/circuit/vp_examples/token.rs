@@ -533,17 +533,14 @@ impl TokenAuthorization {
 #[test]
 fn test_halo2_token_vp_circuit() {
     use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
-    use crate::note::tests::{random_input_note, random_output_note};
+    use crate::note::tests::random_note;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     let circuit = {
-        let mut input_notes = [(); NUM_NOTE].map(|_| random_input_note(&mut rng));
-        let output_notes = input_notes
-            .iter()
-            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
-            .collect::<Vec<_>>();
+        let mut input_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
+        let output_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
         let token_name = TokenName("Token_name".to_string());
         let auth = TokenAuthorization::random(&mut rng);
         input_notes[0].note_type.app_data_static = token_name.encode();
@@ -551,7 +548,7 @@ fn test_halo2_token_vp_circuit() {
         TokenValidityPredicateCircuit {
             owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
             input_notes,
-            output_notes: output_notes.try_into().unwrap(),
+            output_notes,
             token_name,
             auth,
             receiver_vp_vk: *COMPRESSED_RECEIVER_VK,

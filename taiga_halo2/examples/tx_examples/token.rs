@@ -35,9 +35,8 @@ pub fn create_token_swap_ptx<R: RngCore>(
     let mut output_note = output_token.create_random_output_token_note(output_nk_com, &output_auth);
 
     // padding the zero notes
-    let padding_input_note = Note::random_padding_input_note(&mut rng);
-    let padding_input_note_nf = padding_input_note.get_nf().unwrap();
-    let mut padding_output_note = Note::random_padding_output_note(&mut rng, padding_input_note_nf);
+    let padding_input_note = Note::random_padding_note(&mut rng);
+    let mut padding_output_note = Note::random_padding_note(&mut rng);
 
     // Generate proving info
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);

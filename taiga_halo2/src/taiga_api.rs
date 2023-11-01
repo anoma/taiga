@@ -227,15 +227,14 @@ pub fn verify_shielded_partial_transaction(ptx_bytes: Vec<u8>) -> Result<(), Tra
 #[cfg(feature = "borsh")]
 pub mod tests {
     use crate::{
-        note::tests::{random_input_note, random_output_note},
-        taiga_api::*,
+        note::tests::random_note, nullifier::tests::random_nullifier_key_commitment, taiga_api::*,
     };
     use rand::rngs::OsRng;
 
     #[test]
     fn note_borsh_serialization_api_test() {
         let mut rng = OsRng;
-        let input_note = random_input_note(&mut rng);
+        let input_note = random_note(&mut rng);
         {
             let bytes = note_serialize(&input_note).unwrap();
             let de_input_note = note_deserialize(bytes).unwrap();
@@ -243,28 +242,29 @@ pub mod tests {
         }
 
         {
-            let output_note = random_output_note(&mut rng, input_note.rho);
+            let mut output_note = input_note;
+            output_note.nk_container = random_nullifier_key_commitment(&mut rng);
             let bytes = note_serialize(&output_note).unwrap();
             let de_output_note = note_deserialize(bytes).unwrap();
             assert_eq!(output_note, de_output_note);
         }
     }
 
-    #[ignore]
+    // #[ignore]
     #[test]
     fn ptx_example_test() {
         use crate::action::ActionInfo;
         use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
         use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
         use crate::merkle_tree::MerklePath;
-        use crate::note::tests::{random_input_note, random_output_note};
+        use crate::note::tests::random_note;
 
         let mut rng = OsRng;
 
         // construct notes
-        let input_note_1 = random_input_note(&mut rng);
+        let input_note_1 = random_note(&mut rng);
         let input_note_1_nf = input_note_1.get_nf().unwrap();
-        let mut output_note_1 = random_output_note(&mut rng, input_note_1_nf);
+        let mut output_note_1 = random_note(&mut rng);
         let merkle_path_1 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         let action_1 = ActionInfo::new(
             input_note_1,
@@ -274,9 +274,9 @@ pub mod tests {
             &mut rng,
         );
 
-        let input_note_2 = random_input_note(&mut rng);
+        let input_note_2 = random_note(&mut rng);
         let input_note_2_nf = input_note_2.get_nf().unwrap();
-        let mut output_note_2 = random_output_note(&mut rng, input_note_2_nf);
+        let mut output_note_2 = random_note(&mut rng);
         let merkle_path_2 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         let action_2 = ActionInfo::new(
             input_note_2,

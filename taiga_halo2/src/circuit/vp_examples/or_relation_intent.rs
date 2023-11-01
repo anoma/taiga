@@ -305,20 +305,14 @@ pub fn create_intent_note<R: RngCore>(
 #[test]
 fn test_halo2_or_relation_intent_vp_circuit() {
     use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
-    use crate::{
-        circuit::vp_examples::token::COMPRESSED_TOKEN_VK, note::tests::random_output_note,
-        nullifier::tests::random_nullifier,
-    };
+    use crate::{circuit::vp_examples::token::COMPRESSED_TOKEN_VK, note::tests::random_note};
     use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     let circuit = {
-        let mut output_notes = [(); NUM_NOTE].map(|_| {
-            let padding_rho = random_nullifier(&mut rng);
-            random_output_note(&mut rng, padding_rho)
-        });
+        let mut output_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
         let token_1 = Token::new("token1".to_string(), 1u64);
         let token_2 = Token::new("token2".to_string(), 2u64);
         output_notes[0].note_type.app_vk = *COMPRESSED_TOKEN_VK;
@@ -335,7 +329,7 @@ fn test_halo2_or_relation_intent_vp_circuit() {
             output_notes[0].app_data_dynamic,
             nk,
         );
-        let padding_input_note = Note::random_padding_input_note(&mut rng);
+        let padding_input_note = Note::random_padding_note(&mut rng);
         let input_notes = [intent_note, padding_input_note];
         OrRelationIntentValidityPredicateCircuit {
             owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),

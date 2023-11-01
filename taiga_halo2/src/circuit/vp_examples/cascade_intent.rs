@@ -171,27 +171,24 @@ pub fn create_intent_note<R: RngCore>(
 #[test]
 fn test_halo2_cascade_intent_vp_circuit() {
     use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
-    use crate::note::tests::{random_input_note, random_output_note};
+    use crate::note::tests::random_note;
     use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     let circuit = {
-        let cascade_input_note = random_input_note(&mut rng);
+        let cascade_input_note = random_note(&mut rng);
         let cascade_note_cm = cascade_input_note.commitment().inner();
         let nk = pallas::Base::random(&mut rng);
         let intent_note = create_intent_note(&mut rng, cascade_note_cm, nk);
         let input_notes = [intent_note, cascade_input_note];
-        let output_notes = input_notes
-            .iter()
-            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
-            .collect::<Vec<_>>();
+        let output_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
 
         CascadeIntentValidityPredicateCircuit {
             owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
             input_notes,
-            output_notes: output_notes.try_into().unwrap(),
+            output_notes,
             cascade_note_cm,
         }
     };

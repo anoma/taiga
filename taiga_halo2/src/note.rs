@@ -203,7 +203,7 @@ impl Note {
         }
     }
 
-    pub fn random_padding_input_note<R: RngCore>(mut rng: R) -> Self {
+    pub fn random_padding_note<R: RngCore>(mut rng: R) -> Self {
         let app_vk = *COMPRESSED_TRIVIAL_VP_VK;
         let app_data_static = pallas::Base::random(&mut rng);
         let note_type = NoteType::new(app_vk, app_data_static);
@@ -216,25 +216,6 @@ impl Note {
             app_data_dynamic,
             value: 0,
             nk_container: nk,
-            rho,
-            psi: rseed.get_psi(&rho),
-            rcm: rseed.get_rcm(&rho),
-            is_merkle_checked: false,
-        }
-    }
-
-    pub fn random_padding_output_note<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
-        let app_vk = *COMPRESSED_TRIVIAL_VP_VK;
-        let app_data_static = pallas::Base::random(&mut rng);
-        let note_type = NoteType::new(app_vk, app_data_static);
-        let app_data_dynamic = pallas::Base::random(&mut rng);
-        let nk_com = NullifierKeyContainer::from_commitment(pallas::Base::random(&mut rng));
-        let rseed = RandomSeed::random(&mut rng);
-        Note {
-            note_type,
-            app_data_dynamic,
-            value: 0,
-            nk_container: nk_com,
             rho,
             psi: rseed.get_psi(&rho),
             rcm: rseed.get_rcm(&rho),
@@ -577,7 +558,7 @@ impl NoteValidityPredicates {
 #[cfg(test)]
 pub mod tests {
     use super::{Note, NoteType, RandomSeed};
-    use crate::nullifier::{tests::*, Nullifier, NullifierKeyContainer};
+    use crate::nullifier::tests::*;
     use halo2_proofs::arithmetic::Field;
     use pasta_curves::pallas;
     use rand::{Rng, RngCore};
@@ -588,31 +569,14 @@ pub mod tests {
         NoteType::new(app_vk, app_data_static)
     }
 
-    pub fn random_input_note<R: RngCore>(mut rng: R) -> Note {
+    pub fn random_note<R: RngCore>(mut rng: R) -> Note {
         let rho = random_nullifier(&mut rng);
-        let nk = random_nullifier_key(&mut rng);
-        random_note_from_parts(&mut rng, rho, nk)
-    }
-
-    pub fn random_output_note<R: RngCore>(mut rng: R, rho: Nullifier) -> Note {
-        let nk_com = random_nullifier_key_commitment(&mut rng);
-        random_note_from_parts(&mut rng, rho, nk_com)
-    }
-
-    fn random_note_from_parts<R: RngCore>(
-        mut rng: R,
-        rho: Nullifier,
-        nk_container: NullifierKeyContainer,
-    ) -> Note {
-        let note_type = random_note_type(&mut rng);
-        let app_data_dynamic = pallas::Base::random(&mut rng);
-        let value: u64 = rng.gen();
         let rseed = RandomSeed::random(&mut rng);
         Note {
-            note_type,
-            app_data_dynamic,
-            value,
-            nk_container,
+            note_type: random_note_type(&mut rng),
+            app_data_dynamic: pallas::Base::random(&mut rng),
+            value: rng.gen(),
+            nk_container: random_nullifier_key(&mut rng),
             is_merkle_checked: true,
             psi: rseed.get_psi(&rho),
             rcm: rseed.get_rcm(&rho),
@@ -629,7 +593,7 @@ pub mod tests {
         use crate::note::NoteCommitment;
         let mut rng = OsRng;
 
-        let input_note = random_input_note(&mut rng);
+        let input_note = random_note(&mut rng);
         {
             // BorshSerialize
             let borsh = borsh::to_vec(&input_note).unwrap();
@@ -638,8 +602,9 @@ pub mod tests {
             assert_eq!(input_note, de_note);
         }
 
-        let output_note = random_output_note(&mut rng, input_note.rho);
+        let mut output_note = input_note;
         {
+            output_note.nk_container = random_nullifier_key_commitment(&mut rng);
             // BorshSerialize
             let borsh = borsh::to_vec(&output_note).unwrap();
             // BorshDeserialize
