@@ -59,20 +59,21 @@ impl Transaction {
     // Generate the transaction
     pub fn build<R: RngCore + CryptoRng>(
         rng: R,
-        shielded_ptx_bundle: ShieldedPartialTxBundle,
+        mut shielded_ptx_bundle: ShieldedPartialTxBundle,
         transparent_ptx_bundle: TransparentPartialTxBundle,
-    ) -> Self {
+    ) -> Result<Self, TransactionError> {
         assert!(!(shielded_ptx_bundle.is_empty() && transparent_ptx_bundle.is_empty()));
-        let shielded_sk = shielded_ptx_bundle.get_bindig_sig_r();
+        let shielded_sk = shielded_ptx_bundle.get_binding_sig_r()?;
         let binding_sk = BindingSigningKey::from(shielded_sk);
         let sig_hash = Self::digest(&shielded_ptx_bundle, &transparent_ptx_bundle);
         let signature = binding_sk.sign(rng, &sig_hash);
+        shielded_ptx_bundle.clean_private_info();
 
-        Self {
+        Ok(Self {
             shielded_ptx_bundle,
             transparent_ptx_bundle,
             signature,
-        }
+        })
     }
 
     #[allow(clippy::type_complexity)]
@@ -216,10 +217,21 @@ impl ShieldedPartialTxBundle {
         self.0.is_empty()
     }
 
-    pub fn get_bindig_sig_r(&self) -> pallas::Scalar {
-        self.0.iter().fold(pallas::Scalar::zero(), |acc, ptx| {
-            acc + ptx.get_binding_sig_r()
-        })
+    pub fn get_binding_sig_r(&self) -> Result<pallas::Scalar, TransactionError> {
+        let mut sum = pallas::Scalar::zero();
+        for ptx in self.0.iter() {
+            if let Some(r) = ptx.get_binding_sig_r() {
+                sum += r;
+            } else {
+                return Err(TransactionError::MissingPartialTxBindingSignatureR);
+            }
+        }
+
+        Ok(sum)
+    }
+
+    pub fn clean_private_info(&mut self) {
+        self.0.iter_mut().for_each(|ptx| ptx.clean_private_info());
     }
 
     pub fn new(partial_txs: Vec<ShieldedPartialTransaction>) -> Self {
@@ -342,7 +354,7 @@ pub mod testing {
 
         let shielded_ptx_bundle = create_shielded_ptx_bundle(1);
         let transparent_ptx_bundle = create_transparent_ptx_bundle(1);
-        let tx = Transaction::build(rng, shielded_ptx_bundle, transparent_ptx_bundle);
+        let tx = Transaction::build(rng, shielded_ptx_bundle, transparent_ptx_bundle).unwrap();
         let _ret = tx.execute().unwrap();
 
         #[cfg(feature = "borsh")]

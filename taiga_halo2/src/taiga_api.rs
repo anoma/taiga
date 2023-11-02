@@ -1,9 +1,9 @@
 #[cfg(feature = "borsh")]
 use crate::{
-    action::ActionInfo, circuit::vp_bytecode::ApplicationByteCode, error::TransactionError,
-    transaction::TransactionResult,
+    action::ActionInfo, circuit::vp_bytecode::ApplicationByteCode, transaction::TransactionResult,
 };
 use crate::{
+    error::TransactionError,
     note::{Note, RandomSeed},
     nullifier::{Nullifier, NullifierKeyContainer},
     shielded_ptx::ShieldedPartialTransaction,
@@ -133,7 +133,7 @@ pub fn note_deserialize(bytes: Vec<u8>) -> std::io::Result<Note> {
 /// | output2 static vp proof           | VPVerifyingInfo       | 158216        |
 /// | output2 dynamic vp num(by borsh)  | u32                   | 4             |
 /// | output2 dynamic vp proofs         | VPVerifyingInfo       | 158216 * num  |
-/// | binding_sig_r                     | pallas::Scalar        | 32            |
+/// | binding_sig_r                     | Option<pallas::Scalar>| 1 or (1 + 32) |
 /// | hints                             | Vec<u8>               | -             |
 ///
 /// Note: Ultimately, vp proofs won't go to the ptx. It's verifier proofs instead.
@@ -191,7 +191,7 @@ pub fn create_transaction(
     shielded_ptxs: Vec<ShieldedPartialTransaction>,
     // TODO: add transparent_ptxs
     // transparent_ptxs: Vec<TransparentPartialTransaction>,
-) -> Transaction {
+) -> Result<Transaction, TransactionError> {
     let rng = OsRng;
     let shielded_ptx_bundle = ShieldedPartialTxBundle::new(shielded_ptxs);
     // empty transparent_ptx_bundle

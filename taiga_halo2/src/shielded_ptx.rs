@@ -34,7 +34,7 @@ pub struct ShieldedPartialTransaction {
     actions: [ActionVerifyingInfo; NUM_NOTE],
     inputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
     outputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
-    binding_sig_r: pallas::Scalar,
+    binding_sig_r: Option<pallas::Scalar>,
     hints: Vec<u8>,
 }
 
@@ -68,7 +68,7 @@ struct ShieldedPartialTransactionProxy {
     actions: Vec<ActionVerifyingInfo>,
     inputs: Vec<NoteVPVerifyingInfoSet>,
     outputs: Vec<NoteVPVerifyingInfoSet>,
-    binding_sig_r: pallas::Scalar,
+    binding_sig_r: Option<pallas::Scalar>,
     hints: Vec<u8>,
 }
 
@@ -102,7 +102,7 @@ impl ShieldedPartialTransaction {
             actions: actions.try_into().unwrap(),
             inputs: inputs.try_into().unwrap(),
             outputs: outputs.try_into().unwrap(),
-            binding_sig_r: rcv_sum,
+            binding_sig_r: Some(rcv_sum),
             hints,
         }
     }
@@ -146,7 +146,7 @@ impl ShieldedPartialTransaction {
             actions: actions.try_into().unwrap(),
             inputs: inputs.try_into().unwrap(),
             outputs: outputs.try_into().unwrap(),
-            binding_sig_r: rcv_sum,
+            binding_sig_r: Some(rcv_sum),
             hints,
         }
     }
@@ -245,12 +245,17 @@ impl ShieldedPartialTransaction {
         }
     }
 
-    pub fn get_binding_sig_r(&self) -> pallas::Scalar {
+    pub fn get_binding_sig_r(&self) -> Option<pallas::Scalar> {
         self.binding_sig_r
     }
 
     pub fn get_hints(&self) -> Vec<u8> {
         self.hints.clone()
+    }
+
+    pub fn clean_private_info(&mut self) {
+        self.binding_sig_r = None;
+        self.hints = vec![];
     }
 }
 
@@ -309,6 +314,7 @@ impl Executable for ShieldedPartialTransaction {
 #[cfg(feature = "borsh")]
 impl BorshSerialize for ShieldedPartialTransaction {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        use byteorder::WriteBytesExt;
         for action in self.actions.iter() {
             action.serialize(writer)?;
         }
@@ -321,7 +327,16 @@ impl BorshSerialize for ShieldedPartialTransaction {
             output.serialize(writer)?;
         }
 
-        writer.write_all(&self.binding_sig_r.to_repr())?;
+        // Write binding_sig_r
+        match self.binding_sig_r {
+            None => {
+                writer.write_u8(0)?;
+            }
+            Some(r) => {
+                writer.write_u8(1)?;
+                writer.write_all(&r.to_repr())?;
+            }
+        };
 
         self.hints.serialize(writer)?;
 
@@ -332,6 +347,7 @@ impl BorshSerialize for ShieldedPartialTransaction {
 #[cfg(feature = "borsh")]
 impl BorshDeserialize for ShieldedPartialTransaction {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        use byteorder::ReadBytesExt;
         let actions: Vec<_> = (0..NUM_NOTE)
             .map(|_| ActionVerifyingInfo::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
@@ -341,14 +357,21 @@ impl BorshDeserialize for ShieldedPartialTransaction {
         let outputs: Vec<_> = (0..NUM_NOTE)
             .map(|_| NoteVPVerifyingInfoSet::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
-        let binding_sig_r_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let binding_sig_r = Option::from(pallas::Scalar::from_repr(binding_sig_r_bytes))
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "binding_sig_r not in field",
-                )
-            })?;
+        let binding_sig_r_type = reader.read_u8()?;
+        let binding_sig_r = if binding_sig_r_type == 0 {
+            None
+        } else {
+            let binding_sig_r_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+            let r =
+                Option::from(pallas::Scalar::from_repr(binding_sig_r_bytes)).ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "binding_sig_r not in field",
+                    )
+                })?;
+            Some(r)
+        };
+
         let hints = Vec::<u8>::deserialize_reader(reader)?;
         Ok(ShieldedPartialTransaction {
             actions: actions.try_into().unwrap(),
