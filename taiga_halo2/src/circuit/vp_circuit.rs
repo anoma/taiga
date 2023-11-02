@@ -13,6 +13,7 @@ use crate::{
             target_note_variable::{GetIsInputNoteFlagConfig, GetOwnedNoteVariableConfig},
         },
         integrity::{check_input_note, check_output_note},
+        note_commitment::{NoteCommitChip, NoteCommitConfig},
         vamp_ir_utils::{get_circuit_assignments, parse, VariableAssignmentError},
     },
     constant::{
@@ -323,6 +324,7 @@ pub struct ValidityPredicateConfig {
     pub sub_config: SubConfig,
     pub mul_config: MulConfig,
     pub blake2s_config: Blake2sConfig<pallas::Base>,
+    pub note_commit_config: NoteCommitConfig,
 }
 
 impl ValidityPredicateConfig {
@@ -395,6 +397,12 @@ impl ValidityPredicateConfig {
         let extended_or_relation_config =
             ExtendedOrRelationConfig::configure(meta, [advices[0], advices[1], advices[2]]);
         let blake2s_config = Blake2sConfig::configure(meta, advices);
+        let note_commit_config = NoteCommitChip::configure(
+            meta,
+            advices[0..3].try_into().unwrap(),
+            poseidon_config.clone(),
+            range_check,
+        );
         Self {
             advices,
             instances,
@@ -410,6 +418,7 @@ impl ValidityPredicateConfig {
             sub_config,
             mul_config,
             blake2s_config,
+            note_commit_config,
         }
     }
 }
@@ -444,6 +453,9 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVer
             },
         )?;
 
+        // Construct a note_commit chip
+        let note_commit_chip = NoteCommitChip::construct(config.note_commit_config.clone());
+
         let input_notes = self.get_input_notes();
         let output_notes = self.get_output_notes();
         let mut input_note_variables = vec![];
@@ -453,7 +465,7 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVer
                 layouter.namespace(|| "check input note"),
                 config.advices,
                 config.instances,
-                config.poseidon_config.clone(),
+                note_commit_chip.clone(),
                 input_notes[i],
                 i * 2,
             )?);
@@ -468,7 +480,7 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVer
                 layouter.namespace(|| "check output note"),
                 config.advices,
                 config.instances,
-                config.poseidon_config.clone(),
+                note_commit_chip.clone(),
                 output_notes[i],
                 old_nf,
                 i * 2 + 1,

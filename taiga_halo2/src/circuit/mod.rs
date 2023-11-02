@@ -8,6 +8,7 @@ pub mod vp_circuit;
 pub mod blake2s;
 pub mod curve;
 pub mod hash_to_curve;
+pub mod note_commitment;
 pub mod note_encryption_circuit;
 mod vamp_ir_utils;
 #[cfg(feature = "borsh")]

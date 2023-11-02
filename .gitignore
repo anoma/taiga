@@ -12,3 +12,5 @@ Cargo.lock
 book/book
 
 .DS_Store
+
+settings.json

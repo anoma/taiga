@@ -1,6 +1,7 @@
 use crate::circuit::{
     gadgets::{assign_free_advice, assign_free_constant, poseidon_hash::poseidon_hash_gadget},
     hash_to_curve::{hash_to_curve_circuit, HashToCurveConfig},
+    note_commitment::{note_commit, NoteCommitChip},
     vp_circuit::{InputNoteVariables, NoteVariables, OutputNoteVariables},
 };
 use crate::constant::{TaigaFixedBases, TaigaFixedBasesFull, POSEIDON_TO_CURVE_INPUT_LEN};
@@ -9,6 +10,7 @@ use crate::utils::poseidon_to_curve;
 use halo2_gadgets::{
     ecc::{chip::EccChip, FixedPoint, NonIdentityPoint, Point, ScalarFixed, ScalarVar},
     poseidon::Pow5Config as PoseidonConfig,
+    utilities::lookup_range_check::LookupRangeCheckConfig,
 };
 use halo2_proofs::{
     circuit::{AssignedCell, Layouter, Value},
@@ -17,39 +19,6 @@ use halo2_proofs::{
 use pasta_curves::group::Curve;
 use pasta_curves::pallas;
 use std::ops::Neg;
-
-#[allow(clippy::too_many_arguments)]
-pub fn note_commitment_circuit(
-    mut layouter: impl Layouter<pallas::Base>,
-    poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
-    app_vp: AssignedCell<pallas::Base, pallas::Base>,
-    app_data_static: AssignedCell<pallas::Base, pallas::Base>,
-    app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
-    nk_com: AssignedCell<pallas::Base, pallas::Base>,
-    rho: AssignedCell<pallas::Base, pallas::Base>,
-    psi: AssignedCell<pallas::Base, pallas::Base>,
-    value: AssignedCell<pallas::Base, pallas::Base>,
-    is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
-    rcm: AssignedCell<pallas::Base, pallas::Base>,
-) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
-    // TODO: compose the value and is_merkle_checked to one field in order to save one poseidon absorb
-    let poseidon_message = [
-        app_vp,
-        app_data_static,
-        app_data_dynamic,
-        nk_com,
-        rho,
-        psi,
-        is_merkle_checked,
-        value,
-        rcm,
-    ];
-    poseidon_hash_gadget(
-        poseidon_config,
-        layouter.namespace(|| "note commitment"),
-        poseidon_message,
-    )
-}
 
 // cm is a field element
 #[allow(clippy::too_many_arguments)]
@@ -75,8 +44,7 @@ pub fn check_input_note(
     mut layouter: impl Layouter<pallas::Base>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
-    // PoseidonChip can not be cloned, use PoseidonConfig temporarily
-    poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
+    note_commit_chip: NoteCommitChip,
     input_note: Note,
     nf_row_idx: usize,
 ) -> Result<InputNoteVariables, Error> {
@@ -96,7 +64,7 @@ pub fn check_input_note(
 
     // nk_com = Com_r(nk, zero)
     let nk_com = poseidon_hash_gadget(
-        poseidon_config.clone(),
+        note_commit_chip.get_poseidon_config(),
         layouter.namespace(|| "nk_com encoding"),
         [nk_var.clone(), zero_constant],
     )?;
@@ -122,11 +90,11 @@ pub fn check_input_note(
         Value::known(input_note.get_app_data_static()),
     )?;
 
-    // Witness value(u64)
-    let value = assign_free_advice(
-        layouter.namespace(|| "witness value"),
-        advices[0],
-        Value::known(pallas::Base::from(input_note.value)),
+    // Witness and range check the value(u64)
+    let value = value_range_check(
+        layouter.namespace(|| "value range check"),
+        note_commit_chip.get_lookup_config(),
+        input_note.value,
     )?;
 
     // Witness rho
@@ -151,6 +119,7 @@ pub fn check_input_note(
     )?;
 
     // Witness is_merkle_checked
+    // is_merkle_checked will be boolean-constrained in the note_commit.
     let is_merkle_checked = assign_free_advice(
         layouter.namespace(|| "witness is_merkle_checked"),
         advices[0],
@@ -158,9 +127,9 @@ pub fn check_input_note(
     )?;
 
     // Check note commitment
-    let cm = note_commitment_circuit(
+    let cm = note_commit(
         layouter.namespace(|| "note commitment"),
-        poseidon_config.clone(),
+        note_commit_chip.clone(),
         app_vk.clone(),
         app_data_static.clone(),
         app_data_dynamic.clone(),
@@ -175,7 +144,7 @@ pub fn check_input_note(
     // Generate nullifier
     let nf = nullifier_circuit(
         layouter.namespace(|| "Generate nullifier"),
-        poseidon_config,
+        note_commit_chip.get_poseidon_config(),
         nk_var,
         rho.clone(),
         psi.clone(),
@@ -209,9 +178,7 @@ pub fn check_output_note(
     mut layouter: impl Layouter<pallas::Base>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
-    // PoseidonChip can not be cloned, use PoseidonConfig temporarily
-    poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
-    // poseidon_chip: PoseidonChip<pallas::Base, 3, 2>,
+    note_commit_chip: NoteCommitChip,
     output_note: Note,
     old_nf: AssignedCell<pallas::Base, pallas::Base>,
     cm_row_idx: usize,
@@ -244,11 +211,11 @@ pub fn check_output_note(
         Value::known(output_note.get_app_data_static()),
     )?;
 
-    // Witness value(u64)
-    let value = assign_free_advice(
-        layouter.namespace(|| "witness value"),
-        advices[0],
-        Value::known(pallas::Base::from(output_note.value)),
+    // Witness and range check the value(u64)
+    let value = value_range_check(
+        layouter.namespace(|| "value range check"),
+        note_commit_chip.get_lookup_config(),
+        output_note.value,
     )?;
 
     // Witness rcm
@@ -266,6 +233,7 @@ pub fn check_output_note(
     )?;
 
     // Witness is_merkle_checked
+    // is_merkle_checked will be boolean-constrained in the note_commit.
     let is_merkle_checked = assign_free_advice(
         layouter.namespace(|| "witness is_merkle_checked"),
         advices[0],
@@ -273,9 +241,9 @@ pub fn check_output_note(
     )?;
 
     // Check note commitment
-    let cm = note_commitment_circuit(
+    let cm = note_commit(
         layouter.namespace(|| "note commitment"),
-        poseidon_config.clone(),
+        note_commit_chip,
         app_vk.clone(),
         app_data_static.clone(),
         app_data_dynamic.clone(),
@@ -424,6 +392,27 @@ pub fn compute_value_commitment(
     )?;
 
     commitment_v.add(layouter.namespace(|| "net value commitment"), &blind)
+}
+
+fn value_range_check<const K: usize>(
+    mut layouter: impl Layouter<pallas::Base>,
+    lookup_config: &LookupRangeCheckConfig<pallas::Base, K>,
+    value: u64,
+) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
+    let zs = lookup_config.witness_check(
+        layouter.namespace(|| "6 * K(10) bits range check"),
+        Value::known(pallas::Base::from(value)),
+        6,
+        false,
+    )?;
+
+    lookup_config.copy_short_check(
+        layouter.namespace(|| "4 bits range check"),
+        zs[6].clone(),
+        4,
+    )?;
+
+    Ok(zs[0].clone())
 }
 
 #[test]
