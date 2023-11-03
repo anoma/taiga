@@ -522,13 +522,13 @@ impl NoteValidityPredicates {
     pub fn create_input_padding_note_vps(
         note: &Note,
         input_notes: [Note; NUM_NOTE],
-        outputs_notes: [Note; NUM_NOTE],
+        output_notes: [Note; NUM_NOTE],
     ) -> Self {
         let note_id = note.get_nf().unwrap().inner();
         let application_vp = Box::new(TrivialValidityPredicateCircuit::new(
             note_id,
             input_notes,
-            outputs_notes,
+            output_notes,
         ));
         Self {
             application_vp,
@@ -540,13 +540,13 @@ impl NoteValidityPredicates {
     pub fn create_output_padding_note_vps(
         note: &Note,
         input_notes: [Note; NUM_NOTE],
-        outputs_notes: [Note; NUM_NOTE],
+        output_notes: [Note; NUM_NOTE],
     ) -> Self {
         let note_id = note.commitment().inner();
         let application_vp = Box::new(TrivialValidityPredicateCircuit::new(
             note_id,
             input_notes,
-            outputs_notes,
+            output_notes,
         ));
         Self {
             application_vp,
