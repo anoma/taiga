@@ -131,7 +131,7 @@ impl ActionInfo {
             None => input_note.calculate_root(&input_merkle_path),
         };
 
-        output_note.reset_rho(&input_note, &mut rng);
+        output_note.set_rho(&input_note, &mut rng);
 
         Self {
             input_note,

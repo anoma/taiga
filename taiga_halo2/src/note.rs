@@ -281,7 +281,7 @@ impl Note {
         path.root(cm_node)
     }
 
-    pub fn reset_rho<R: RngCore>(&mut self, input_note: &Note, mut rng: R) {
+    pub fn set_rho<R: RngCore>(&mut self, input_note: &Note, mut rng: R) {
         let rseed = RandomSeed::random(&mut rng);
 
         self.rho = input_note.get_nf().unwrap();

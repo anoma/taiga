@@ -33,7 +33,7 @@ impl TransparentPartialTransaction {
         outputs
             .iter_mut()
             .zip(inputs.iter())
-            .for_each(|(output, input)| output.note.reset_rho(&input.note, &mut rng));
+            .for_each(|(output, input)| output.note.set_rho(&input.note, &mut rng));
         Self {
             inputs,
             outputs,
