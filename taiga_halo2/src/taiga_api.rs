@@ -5,7 +5,7 @@ use crate::{
 use crate::{
     error::TransactionError,
     note::{Note, RandomSeed},
-    nullifier::{Nullifier, NullifierKeyContainer},
+    nullifier::Nullifier,
     shielded_ptx::ShieldedPartialTransaction,
     transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
 };
@@ -37,15 +37,14 @@ pub fn create_input_note(
     is_merkle_checked: bool,
 ) -> Note {
     let rng = OsRng;
-    let nk_container = NullifierKeyContainer::from_key(nk);
-    let rho = Nullifier::default();
+    let rho = Nullifier::random(rng);
     let rseed = RandomSeed::random(rng);
-    Note::new(
+    Note::new_input_note(
         app_vk,
         app_data_static,
         app_data_dynamic,
         value,
-        nk_container,
+        nk,
         rho,
         is_merkle_checked,
         rseed,
@@ -60,22 +59,15 @@ pub fn create_output_note(
     value: u64,
     // The owner of output note has the nullifer key and exposes the nullifier_key commitment to output creator.
     nk_com: pallas::Base,
-    // TODO: remove the input_nf, and get it at run time.
-    input_nf: Nullifier,
     is_merkle_checked: bool,
 ) -> Note {
-    let rng = OsRng;
-    let nk_container = NullifierKeyContainer::from_commitment(nk_com);
-    let rseed = RandomSeed::random(rng);
-    Note::new(
+    Note::new_output_note(
         app_vk,
         app_data_static,
         app_data_dynamic,
         value,
-        nk_container,
-        input_nf,
+        nk_com,
         is_merkle_checked,
-        rseed,
     )
 }
 
@@ -235,15 +227,14 @@ pub fn verify_shielded_partial_transaction(ptx_bytes: Vec<u8>) -> Result<(), Tra
 #[cfg(feature = "borsh")]
 pub mod tests {
     use crate::{
-        note::tests::{random_input_note, random_output_note},
-        taiga_api::*,
+        note::tests::random_note, nullifier::tests::random_nullifier_key_commitment, taiga_api::*,
     };
     use rand::rngs::OsRng;
 
     #[test]
     fn note_borsh_serialization_api_test() {
         let mut rng = OsRng;
-        let input_note = random_input_note(&mut rng);
+        let input_note = random_note(&mut rng);
         {
             let bytes = note_serialize(&input_note).unwrap();
             let de_input_note = note_deserialize(bytes).unwrap();
@@ -251,54 +242,48 @@ pub mod tests {
         }
 
         {
-            let output_note = random_output_note(&mut rng, input_note.rho);
+            let mut output_note = input_note;
+            output_note.nk_container = random_nullifier_key_commitment(&mut rng);
             let bytes = note_serialize(&output_note).unwrap();
             let de_output_note = note_deserialize(bytes).unwrap();
             assert_eq!(output_note, de_output_note);
         }
     }
 
-    #[ignore]
+    // #[ignore]
     #[test]
     fn ptx_example_test() {
         use crate::action::ActionInfo;
         use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
         use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
         use crate::merkle_tree::MerklePath;
-        use crate::note::{
-            tests::{random_input_note, random_output_note},
-            RandomSeed,
-        };
+        use crate::note::tests::random_note;
 
         let mut rng = OsRng;
 
         // construct notes
-        let input_note_1 = random_input_note(&mut rng);
+        let input_note_1 = random_note(&mut rng);
         let input_note_1_nf = input_note_1.get_nf().unwrap();
-        let output_note_1 = random_output_note(&mut rng, input_note_1_nf);
+        let mut output_note_1 = random_note(&mut rng);
         let merkle_path_1 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let anchor_1 = input_note_1.calculate_root(&merkle_path_1);
-        let rseed_1 = RandomSeed::random(&mut rng);
         let action_1 = ActionInfo::new(
             input_note_1,
             merkle_path_1,
-            anchor_1,
-            output_note_1,
-            rseed_1,
+            None,
+            &mut output_note_1,
+            &mut rng,
         );
 
-        let input_note_2 = random_input_note(&mut rng);
+        let input_note_2 = random_note(&mut rng);
         let input_note_2_nf = input_note_2.get_nf().unwrap();
-        let output_note_2 = random_output_note(&mut rng, input_note_2_nf);
+        let mut output_note_2 = random_note(&mut rng);
         let merkle_path_2 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let anchor_2 = input_note_2.calculate_root(&merkle_path_2);
-        let rseed_2 = RandomSeed::random(&mut rng);
         let action_2 = ActionInfo::new(
             input_note_2,
             merkle_path_2,
-            anchor_2,
-            output_note_2,
-            rseed_2,
+            None,
+            &mut output_note_2,
+            &mut rng,
         );
 
         // construct applications

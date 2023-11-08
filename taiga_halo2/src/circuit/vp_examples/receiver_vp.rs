@@ -285,21 +285,15 @@ vp_verifying_info_impl!(ReceiverValidityPredicateCircuit);
 #[test]
 fn test_halo2_receiver_vp_circuit() {
     use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
-    use crate::{
-        note::tests::{random_input_note, random_output_note},
-        utils::poseidon_hash_n,
-    };
+    use crate::{note::tests::random_note, utils::poseidon_hash_n};
     use ff::{Field, PrimeField};
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     let (circuit, rcv_sk) = {
-        let input_notes = [(); NUM_NOTE].map(|_| random_input_note(&mut rng));
-        let mut output_notes = input_notes
-            .iter()
-            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
-            .collect::<Vec<_>>();
+        let input_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
+        let mut output_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
         let nonce = pallas::Base::from_u128(23333u128);
         let sk = pallas::Base::random(&mut rng);
         let rcv_sk = pallas::Base::random(&mut rng);
@@ -317,7 +311,7 @@ fn test_halo2_receiver_vp_circuit() {
             ReceiverValidityPredicateCircuit {
                 owned_note_pub_id,
                 input_notes,
-                output_notes: output_notes.try_into().unwrap(),
+                output_notes,
                 vp_vk: *COMPRESSED_RECEIVER_VK,
                 nonce,
                 sk,

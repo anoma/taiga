@@ -9,6 +9,7 @@ use halo2_proofs::arithmetic::Field;
 use pasta_curves::{group::Curve, pallas};
 use rand::{CryptoRng, RngCore};
 use taiga_halo2::{
+    action::ActionInfo,
     circuit::vp_examples::{
         or_relation_intent::{create_intent_note, OrRelationIntentValidityPredicateCircuit},
         signature_verification::COMPRESSED_TOKEN_AUTH_VK,
@@ -16,8 +17,8 @@ use taiga_halo2::{
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
-    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo},
-    nullifier::{Nullifier, NullifierKeyContainer},
+    note::{Note, NoteValidityPredicates},
+    nullifier::NullifierKeyContainer,
     shielded_ptx::ShieldedPartialTransaction,
     transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
 };
@@ -28,100 +29,114 @@ pub fn create_token_intent_ptx<R: RngCore>(
     token_2: Token,
     input_token: Token,
     input_auth_sk: pallas::Scalar,
-    input_nk: NullifierKeyContainer, // NullifierKeyContainer::Key
+    input_nk: pallas::Base,
 ) -> (
     ShieldedPartialTransaction,
-    NullifierKeyContainer,
     pallas::Base,
     pallas::Base,
-    Nullifier,
+    pallas::Base,
 ) {
     let input_auth = TokenAuthorization::from_sk_vk(&input_auth_sk, &COMPRESSED_TOKEN_AUTH_VK);
 
     // input note
-    let rho = Nullifier::from(pallas::Base::random(&mut rng));
-    let input_note = input_token.create_random_token_note(&mut rng, rho, input_nk, &input_auth);
+    let input_note = input_token.create_random_input_token_note(&mut rng, input_nk, &input_auth);
 
     // output intent note
-    let input_note_nf = input_note.get_nf().unwrap();
     let input_note_nk_com = input_note.get_nk_commitment();
-    let intent_note = create_intent_note(
+    let mut intent_note = create_intent_note(
         &mut rng,
         &token_1,
         &token_2,
         input_note_nk_com,
         input_note.app_data_dynamic,
-        input_note_nf,
         input_nk,
     );
 
     // padding the zero notes
-    let padding_input_note = Note::random_padding_input_note(&mut rng);
-    let padding_input_note_nf = padding_input_note.get_nf().unwrap();
-    let padding_output_note = Note::random_padding_output_note(&mut rng, padding_input_note_nf);
-    // Fetch a valid anchor for padding input notes
-    let anchor = Anchor::from(pallas::Base::random(&mut rng));
-
-    let input_notes = [*input_note.note(), padding_input_note];
-    let output_notes = [intent_note, padding_output_note];
+    let padding_input_note = Note::random_padding_note(&mut rng);
+    let mut padding_output_note = Note::random_padding_note(&mut rng);
 
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
-    // Create the input note proving info
-    let input_note_proving_info = input_note.generate_input_token_note_proving_info(
-        &mut rng,
-        input_auth,
-        input_auth_sk,
-        merkle_path.clone(),
-        input_notes,
-        output_notes,
-    );
+    // Create action pairs
+    let actions = {
+        let action_1 = ActionInfo::new(
+            *input_note.note(),
+            merkle_path.clone(),
+            None,
+            &mut intent_note,
+            &mut rng,
+        );
 
-    // Create the intent note proving info
-    let intent_note_proving_info = {
-        let intent_vp = OrRelationIntentValidityPredicateCircuit {
-            owned_note_pub_id: intent_note.commitment().inner(),
-            input_notes,
-            output_notes,
-            token_1,
-            token_2,
-            receiver_nk_com: input_note_nk_com,
-            receiver_app_data_dynamic: input_note.app_data_dynamic,
-        };
-
-        OutputNoteProvingInfo::new(intent_note, Box::new(intent_vp), vec![])
+        // Fetch a valid anchor for padding input notes
+        let anchor = Anchor::from(pallas::Base::random(&mut rng));
+        let action_2 = ActionInfo::new(
+            padding_input_note,
+            merkle_path,
+            Some(anchor),
+            &mut padding_output_note,
+            &mut rng,
+        );
+        vec![action_1, action_2]
     };
 
-    // Create the padding input note proving info
-    let padding_input_note_proving_info = InputNoteProvingInfo::create_padding_note_proving_info(
-        padding_input_note,
-        merkle_path,
-        anchor,
-        input_notes,
-        output_notes,
-    );
+    // Create VPs
+    let (input_vps, output_vps) = {
+        let input_notes = [*input_note.note(), padding_input_note];
+        let output_notes = [intent_note, padding_output_note];
+        // Create the input note vps
+        let input_note_vps = input_note.generate_input_token_vps(
+            &mut rng,
+            input_auth,
+            input_auth_sk,
+            input_notes,
+            output_notes,
+        );
 
-    // Create the padding output note proving info
-    let padding_output_note_proving_info = OutputNoteProvingInfo::create_padding_note_proving_info(
-        padding_output_note,
-        input_notes,
-        output_notes,
-    );
+        // Create the intent note proving info
+        let intent_note_vps = {
+            let intent_vp = OrRelationIntentValidityPredicateCircuit {
+                owned_note_pub_id: intent_note.commitment().inner(),
+                input_notes,
+                output_notes,
+                token_1,
+                token_2,
+                receiver_nk_com: input_note_nk_com,
+                receiver_app_data_dynamic: input_note.app_data_dynamic,
+            };
+
+            NoteValidityPredicates::new(Box::new(intent_vp), vec![])
+        };
+
+        // Create the padding input vps
+        let padding_input_vps = NoteValidityPredicates::create_input_padding_note_vps(
+            &padding_input_note,
+            input_notes,
+            output_notes,
+        );
+
+        // Create the padding output vps
+        let padding_output_vps = NoteValidityPredicates::create_output_padding_note_vps(
+            &padding_output_note,
+            input_notes,
+            output_notes,
+        );
+
+        (
+            vec![input_note_vps, padding_input_vps],
+            vec![intent_note_vps, padding_output_vps],
+        )
+    };
 
     // Create shielded partial tx
-    let ptx = ShieldedPartialTransaction::build(
-        [input_note_proving_info, padding_input_note_proving_info],
-        [intent_note_proving_info, padding_output_note_proving_info],
-        vec![],
-        &mut rng,
-    );
+    let ptx = ShieldedPartialTransaction::build(actions, input_vps, output_vps, vec![], &mut rng)
+        .unwrap();
 
     (
         ptx,
         input_nk,
         input_note_nk_com,
         input_note.app_data_dynamic,
-        rho,
     )
 }
 
@@ -130,8 +145,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     mut rng: R,
     token_1: Token,
     token_2: Token,
-    input_rho: Nullifier,
-    input_nk: NullifierKeyContainer, // NullifierKeyContainer::Key
+    input_nk: pallas::Base,
     receiver_nk_com: pallas::Base,
     receiver_app_data_dynamic: pallas::Base,
     output_token: Token,
@@ -144,85 +158,89 @@ pub fn consume_token_intent_ptx<R: RngCore>(
         &token_2,
         receiver_nk_com,
         receiver_app_data_dynamic,
-        input_rho,
         input_nk,
     );
 
     // output note
     let input_note_nf = intent_note.get_nf().unwrap();
     let output_auth = TokenAuthorization::new(output_auth_pk, *COMPRESSED_TOKEN_AUTH_VK);
-    let output_note = output_token.create_random_token_note(
-        &mut rng,
-        input_note_nf,
-        input_nk.to_commitment(),
-        &output_auth,
-    );
+    let output_nk_com = NullifierKeyContainer::from_key(input_nk).get_commitment();
+    let mut output_note = output_token.create_random_output_token_note(output_nk_com, &output_auth);
 
     // padding the zero notes
-    let padding_input_note = Note::random_padding_input_note(&mut rng);
-    let padding_input_note_nf = padding_input_note.get_nf().unwrap();
-    let padding_output_note = Note::random_padding_output_note(&mut rng, padding_input_note_nf);
-
-    let input_notes = [intent_note, padding_input_note];
-    let output_notes = [*output_note.note(), padding_output_note];
+    let padding_input_note = Note::random_padding_note(&mut rng);
+    let mut padding_output_note = Note::random_padding_note(&mut rng);
 
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
     // Fetch a valid anchor for dummy notes
     let anchor = Anchor::from(pallas::Base::random(&mut rng));
 
-    // Create the intent note proving info
-    let intent_note_proving_info = {
-        let intent_vp = OrRelationIntentValidityPredicateCircuit {
-            owned_note_pub_id: input_note_nf.inner(),
-            input_notes,
-            output_notes,
-            token_1,
-            token_2,
-            receiver_nk_com,
-            receiver_app_data_dynamic,
-        };
-
-        InputNoteProvingInfo::new(
+    // Create action pairs
+    let actions = {
+        let action_1 = ActionInfo::new(
             intent_note,
             merkle_path.clone(),
             Some(anchor),
-            Box::new(intent_vp),
-            vec![],
+            &mut output_note.note,
+            &mut rng,
+        );
+
+        let action_2 = ActionInfo::new(
+            padding_input_note,
+            merkle_path,
+            Some(anchor),
+            &mut padding_output_note,
+            &mut rng,
+        );
+        vec![action_1, action_2]
+    };
+
+    // Create VPs
+    let (input_vps, output_vps) = {
+        let input_notes = [intent_note, padding_input_note];
+        let output_notes = [*output_note.note(), padding_output_note];
+        // Create intent vps
+        let intent_vps = {
+            let intent_vp = OrRelationIntentValidityPredicateCircuit {
+                owned_note_pub_id: input_note_nf.inner(),
+                input_notes,
+                output_notes,
+                token_1,
+                token_2,
+                receiver_nk_com,
+                receiver_app_data_dynamic,
+            };
+
+            NoteValidityPredicates::new(Box::new(intent_vp), vec![])
+        };
+
+        // Create the output token vps
+        let output_token_vps =
+            output_note.generate_output_token_vps(&mut rng, output_auth, input_notes, output_notes);
+
+        // Create the padding input vps
+        let padding_input_vps = NoteValidityPredicates::create_input_padding_note_vps(
+            &padding_input_note,
+            input_notes,
+            output_notes,
+        );
+
+        // Create the padding output vps
+        let padding_output_vps = NoteValidityPredicates::create_output_padding_note_vps(
+            &padding_output_note,
+            input_notes,
+            output_notes,
+        );
+
+        (
+            vec![intent_vps, padding_input_vps],
+            vec![output_token_vps, padding_output_vps],
         )
     };
 
-    // Create the output note proving info
-    let output_note_proving_info = output_note.generate_output_token_note_proving_info(
-        &mut rng,
-        output_auth,
-        input_notes,
-        output_notes,
-    );
-
-    // Create the padding input note proving info
-    let padding_input_note_proving_info = InputNoteProvingInfo::create_padding_note_proving_info(
-        padding_input_note,
-        merkle_path,
-        anchor,
-        input_notes,
-        output_notes,
-    );
-
-    // Create the padding output note proving info
-    let padding_output_note_proving_info = OutputNoteProvingInfo::create_padding_note_proving_info(
-        padding_output_note,
-        input_notes,
-        output_notes,
-    );
-
     // Create shielded partial tx
-    ShieldedPartialTransaction::build(
-        [intent_note_proving_info, padding_input_note_proving_info],
-        [output_note_proving_info, padding_output_note_proving_info],
-        vec![],
-        &mut rng,
-    )
+    ShieldedPartialTransaction::build(actions, input_vps, output_vps, vec![], &mut rng).unwrap()
 }
 
 pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
@@ -231,11 +249,11 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
     // Alice creates the partial transaction with 5 BTC input and intent output
     let alice_auth_sk = pallas::Scalar::random(&mut rng);
     let alice_auth_pk = generator * alice_auth_sk;
-    let alice_nk = NullifierKeyContainer::random_key(&mut rng);
+    let alice_nk = pallas::Base::random(&mut rng);
     let token_1 = Token::new("dolphin".to_string(), 1u64);
     let token_2 = Token::new("monkey".to_string(), 2u64);
     let btc_token = Token::new("btc".to_string(), 5u64);
-    let (alice_ptx, intent_nk, receiver_nk_com, receiver_app_data_dynamic, intent_rho) =
+    let (alice_ptx, intent_nk, receiver_nk_com, receiver_app_data_dynamic) =
         create_token_intent_ptx(
             &mut rng,
             token_1.clone(),
@@ -254,10 +272,10 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
         &mut rng,
         token_1.clone(),
         bob_auth_sk,
-        bob_nk,
+        bob_nk.get_nk().unwrap(),
         btc_token,
         bob_auth_pk,
-        bob_nk.to_commitment(),
+        bob_nk.get_commitment(),
     );
 
     // Solver/Bob creates the partial transaction to consume the intent note
@@ -266,7 +284,6 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
         &mut rng,
         token_1.clone(),
         token_2,
-        intent_rho,
         intent_nk,
         receiver_nk_com,
         receiver_app_data_dynamic,

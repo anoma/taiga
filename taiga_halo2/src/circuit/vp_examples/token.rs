@@ -20,9 +20,8 @@ use crate::{
         VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_2, VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_1,
         VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_2,
     },
-    merkle_tree::MerklePath,
-    note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
-    nullifier::{Nullifier, NullifierKeyContainer},
+    note::{Note, NoteValidityPredicates, RandomSeed},
+    nullifier::Nullifier,
     proof::Proof,
     utils::poseidon_hash_n,
     vp_commitment::ValidityPredicateCommitment,
@@ -92,25 +91,47 @@ impl Token {
         pallas::Base::from(self.value)
     }
 
-    pub fn create_random_token_note<R: RngCore>(
+    pub fn create_random_input_token_note<R: RngCore>(
         &self,
         mut rng: R,
-        rho: Nullifier,
-        nk_container: NullifierKeyContainer,
+        nk: pallas::Base,
         auth: &TokenAuthorization,
     ) -> TokenNote {
         let app_data_static = self.encode_name();
         let app_data_dynamic = auth.to_app_data_dynamic();
         let rseed = RandomSeed::random(&mut rng);
-        let note = Note::new(
+        let rho = Nullifier::random(&mut rng);
+        let note = Note::new_input_note(
             *COMPRESSED_TOKEN_VK,
             app_data_static,
             app_data_dynamic,
             self.value(),
-            nk_container,
+            nk,
             rho,
             true,
             rseed,
+        );
+
+        TokenNote {
+            token_name: self.name().clone(),
+            note,
+        }
+    }
+
+    pub fn create_random_output_token_note(
+        &self,
+        nk_com: pallas::Base,
+        auth: &TokenAuthorization,
+    ) -> TokenNote {
+        let app_data_static = self.encode_name();
+        let app_data_dynamic = auth.to_app_data_dynamic();
+        let note = Note::new_output_note(
+            *COMPRESSED_TOKEN_VK,
+            app_data_static,
+            app_data_dynamic,
+            self.value(),
+            nk_com,
+            true,
         );
 
         TokenNote {
@@ -151,16 +172,14 @@ impl TokenNote {
         &self.note
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn generate_input_token_note_proving_info<R: RngCore>(
+    pub fn generate_input_token_vps<R: RngCore>(
         &self,
         mut rng: R,
         auth: TokenAuthorization,
         auth_sk: pallas::Scalar,
-        merkle_path: MerklePath,
         input_notes: [Note; NUM_NOTE],
         output_notes: [Note; NUM_NOTE],
-    ) -> InputNoteProvingInfo {
+    ) -> NoteValidityPredicates {
         let TokenNote { token_name, note } = self;
         // token VP
         let nf = note.get_nf().unwrap().inner();
@@ -185,23 +204,16 @@ impl TokenNote {
             *COMPRESSED_RECEIVER_VK,
         );
 
-        // input note proving info
-        InputNoteProvingInfo::new(
-            *note,
-            merkle_path,
-            None,
-            Box::new(token_vp),
-            vec![Box::new(token_auth_vp)],
-        )
+        NoteValidityPredicates::new(Box::new(token_vp), vec![Box::new(token_auth_vp)])
     }
 
-    pub fn generate_output_token_note_proving_info<R: RngCore>(
+    pub fn generate_output_token_vps<R: RngCore>(
         &self,
         mut rng: R,
         auth: TokenAuthorization,
         input_notes: [Note; NUM_NOTE],
         output_notes: [Note; NUM_NOTE],
-    ) -> OutputNoteProvingInfo {
+    ) -> NoteValidityPredicates {
         let TokenNote { token_name, note } = self;
 
         let owned_note_pub_id = note.commitment().inner();
@@ -228,7 +240,7 @@ impl TokenNote {
             auth_vp_vk: *COMPRESSED_TOKEN_AUTH_VK,
         };
 
-        OutputNoteProvingInfo::new(*note, Box::new(token_vp), vec![Box::new(receiver_vp)])
+        NoteValidityPredicates::new(Box::new(token_vp), vec![Box::new(receiver_vp)])
     }
 }
 
@@ -521,17 +533,14 @@ impl TokenAuthorization {
 #[test]
 fn test_halo2_token_vp_circuit() {
     use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
-    use crate::note::tests::{random_input_note, random_output_note};
+    use crate::note::tests::random_note;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     let circuit = {
-        let mut input_notes = [(); NUM_NOTE].map(|_| random_input_note(&mut rng));
-        let output_notes = input_notes
-            .iter()
-            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
-            .collect::<Vec<_>>();
+        let mut input_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
+        let output_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
         let token_name = TokenName("Token_name".to_string());
         let auth = TokenAuthorization::random(&mut rng);
         input_notes[0].note_type.app_data_static = token_name.encode();
@@ -539,7 +548,7 @@ fn test_halo2_token_vp_circuit() {
         TokenValidityPredicateCircuit {
             owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
             input_notes,
-            output_notes: output_notes.try_into().unwrap(),
+            output_notes,
             token_name,
             auth,
             receiver_vp_vk: *COMPRESSED_RECEIVER_VK,

@@ -2,7 +2,7 @@ use crate::{
     circuit::action_circuit::ActionCircuit,
     constant::{PRF_EXPAND_INPUT_VP_CM_R, PRF_EXPAND_OUTPUT_VP_CM_R},
     merkle_tree::{Anchor, MerklePath},
-    note::{InputNoteProvingInfo, Note, NoteCommitment, OutputNoteProvingInfo, RandomSeed},
+    note::{Note, NoteCommitment, RandomSeed},
     nullifier::Nullifier,
     value_commitment::ValueCommitment,
     vp_commitment::ValidityPredicateCommitment,
@@ -116,34 +116,29 @@ impl BorshDeserialize for ActionPublicInputs {
 }
 
 impl ActionInfo {
-    pub fn new(
+    // The dummy input note must provide a valid custom_anchor, but a random merkle path
+    // The normal input note only needs to provide a valid merkle path. The anchor will be calculated from the note and path.
+    // The rho of output_note will be reset to the nullifier of input_note
+    pub fn new<R: RngCore>(
         input_note: Note,
         input_merkle_path: MerklePath,
-        input_anchor: Anchor,
-        output_note: Note,
-        rseed: RandomSeed,
+        custom_anchor: Option<Anchor>,
+        output_note: &mut Note,
+        mut rng: R,
     ) -> Self {
+        let input_anchor = match custom_anchor {
+            Some(anchor) => anchor,
+            None => input_note.calculate_root(&input_merkle_path),
+        };
+
+        output_note.set_rho(&input_note, &mut rng);
+
         Self {
             input_note,
             input_merkle_path,
             input_anchor,
-            output_note,
-            rseed,
-        }
-    }
-
-    pub fn from_proving_info<R: RngCore>(
-        input: InputNoteProvingInfo,
-        output: OutputNoteProvingInfo,
-        mut rng: R,
-    ) -> Self {
-        let rseed = RandomSeed::random(&mut rng);
-        Self {
-            input_note: input.note,
-            input_merkle_path: input.merkle_path,
-            input_anchor: input.anchor,
-            output_note: output.note,
-            rseed,
+            output_note: *output_note,
+            rseed: RandomSeed::random(&mut rng),
         }
     }
 
@@ -209,22 +204,19 @@ pub mod tests {
     use super::ActionInfo;
     use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
     use crate::merkle_tree::MerklePath;
-    use crate::note::tests::{random_input_note, random_output_note};
-    use crate::note::RandomSeed;
+    use crate::note::tests::random_note;
     use rand::RngCore;
 
     pub fn random_action_info<R: RngCore>(mut rng: R) -> ActionInfo {
-        let input_note = random_input_note(&mut rng);
-        let output_note = random_output_note(&mut rng, input_note.get_nf().unwrap());
+        let input_note = random_note(&mut rng);
+        let mut output_note = random_note(&mut rng);
         let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let input_anchor = input_note.calculate_root(&input_merkle_path);
-        let rseed = RandomSeed::random(&mut rng);
         ActionInfo::new(
             input_note,
             input_merkle_path,
-            input_anchor,
-            output_note,
-            rseed,
+            None,
+            &mut output_note,
+            &mut rng,
         )
     }
 }

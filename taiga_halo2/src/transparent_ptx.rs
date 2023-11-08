@@ -12,14 +12,34 @@ use serde;
 
 #[cfg(feature = "borsh")]
 use borsh::{BorshDeserialize, BorshSerialize};
+use rand::RngCore;
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TransparentPartialTransaction {
-    pub inputs: Vec<InputResource>,
-    pub outputs: Vec<OutputResource>,
-    pub hints: Vec<u8>,
+    inputs: Vec<InputResource>,
+    outputs: Vec<OutputResource>,
+    hints: Vec<u8>,
+}
+
+impl TransparentPartialTransaction {
+    pub fn new<R: RngCore>(
+        inputs: Vec<InputResource>,
+        mut outputs: Vec<OutputResource>,
+        hints: Vec<u8>,
+        mut rng: R,
+    ) -> Self {
+        outputs
+            .iter_mut()
+            .zip(inputs.iter())
+            .for_each(|(output, input)| output.note.set_rho(&input.note, &mut rng));
+        Self {
+            inputs,
+            outputs,
+            hints,
+        }
+    }
 }
 
 impl Executable for TransparentPartialTransaction {
@@ -102,9 +122,7 @@ pub struct OutputResource {
 #[cfg(test)]
 pub mod testing {
     use crate::{
-        constant::TAIGA_COMMITMENT_TREE_DEPTH,
-        merkle_tree::MerklePath,
-        note::tests::{random_input_note, random_output_note},
+        constant::TAIGA_COMMITMENT_TREE_DEPTH, merkle_tree::MerklePath, note::tests::random_note,
         transparent_ptx::*,
     };
     use rand::rngs::OsRng;
@@ -113,7 +131,7 @@ pub mod testing {
     pub fn create_transparent_ptx() -> TransparentPartialTransaction {
         let mut rng = OsRng;
         let input_resource_1 = {
-            let note = random_input_note(&mut rng);
+            let note = random_note(&mut rng);
             let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
             InputResource {
                 note,
@@ -121,7 +139,7 @@ pub mod testing {
             }
         };
         let output_resource_1 = {
-            let mut note = random_output_note(&mut rng, input_resource_1.note.rho);
+            let mut note = random_note(&mut rng);
             // Adjust the random note to keep the balance
             note.note_type = input_resource_1.note.note_type;
             note.value = input_resource_1.note.value;
@@ -129,7 +147,7 @@ pub mod testing {
         };
 
         let input_resource_2 = {
-            let mut note = random_input_note(&mut rng);
+            let mut note = random_note(&mut rng);
             note.is_merkle_checked = false;
             InputResource {
                 note,
@@ -137,17 +155,18 @@ pub mod testing {
             }
         };
         let output_resource_2 = {
-            let mut note = random_output_note(&mut rng, input_resource_2.note.rho);
+            let mut note = random_note(&mut rng);
             // Adjust the random note to keep the balance
             note.note_type = input_resource_2.note.note_type;
             note.value = input_resource_2.note.value;
             OutputResource { note }
         };
 
-        TransparentPartialTransaction {
-            inputs: vec![input_resource_1, input_resource_2],
-            outputs: vec![output_resource_1, output_resource_2],
-            hints: vec![],
-        }
+        TransparentPartialTransaction::new(
+            vec![input_resource_1, input_resource_2],
+            vec![output_resource_1, output_resource_2],
+            vec![],
+            &mut rng,
+        )
     }
 }

@@ -18,7 +18,7 @@ use crate::{
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
     note::{Note, RandomSeed},
-    nullifier::{Nullifier, NullifierKeyContainer},
+    nullifier::Nullifier,
     proof::Proof,
     utils::poseidon_hash_n,
     vp_commitment::ValidityPredicateCommitment,
@@ -280,8 +280,7 @@ pub fn create_intent_note<R: RngCore>(
     token_2: &Token,
     receiver_nk_com: pallas::Base,
     receiver_app_data_dynamic: pallas::Base,
-    rho: Nullifier,
-    nk: NullifierKeyContainer,
+    nk: pallas::Base,
 ) -> Note {
     let app_data_static = OrRelationIntentValidityPredicateCircuit::encode_app_data_static(
         token_1,
@@ -290,7 +289,8 @@ pub fn create_intent_note<R: RngCore>(
         receiver_app_data_dynamic,
     );
     let rseed = RandomSeed::random(&mut rng);
-    Note::new(
+    let rho = Nullifier::random(&mut rng);
+    Note::new_input_note(
         *COMPRESSED_OR_RELATION_INTENT_VK,
         app_data_static,
         pallas::Base::zero(),
@@ -305,28 +305,21 @@ pub fn create_intent_note<R: RngCore>(
 #[test]
 fn test_halo2_or_relation_intent_vp_circuit() {
     use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
-    use crate::{
-        circuit::vp_examples::token::COMPRESSED_TOKEN_VK, note::tests::random_output_note,
-        nullifier::tests::random_nullifier,
-    };
+    use crate::{circuit::vp_examples::token::COMPRESSED_TOKEN_VK, note::tests::random_note};
     use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     let circuit = {
-        let mut output_notes = [(); NUM_NOTE].map(|_| {
-            let padding_rho = random_nullifier(&mut rng);
-            random_output_note(&mut rng, padding_rho)
-        });
+        let mut output_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
         let token_1 = Token::new("token1".to_string(), 1u64);
         let token_2 = Token::new("token2".to_string(), 2u64);
         output_notes[0].note_type.app_vk = *COMPRESSED_TOKEN_VK;
         output_notes[0].note_type.app_data_static = token_1.encode_name();
         output_notes[0].value = token_1.value();
 
-        let rho = Nullifier::from(pallas::Base::random(&mut rng));
-        let nk = NullifierKeyContainer::random_key(&mut rng);
+        let nk = pallas::Base::random(&mut rng);
         let nk_com = output_notes[0].get_nk_commitment();
         let intent_note = create_intent_note(
             &mut rng,
@@ -334,10 +327,9 @@ fn test_halo2_or_relation_intent_vp_circuit() {
             &token_2,
             nk_com,
             output_notes[0].app_data_dynamic,
-            rho,
             nk,
         );
-        let padding_input_note = Note::random_padding_input_note(&mut rng);
+        let padding_input_note = Note::random_padding_note(&mut rng);
         let input_notes = [intent_note, padding_input_note];
         OrRelationIntentValidityPredicateCircuit {
             owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),

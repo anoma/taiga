@@ -9,6 +9,7 @@ use crate::{
     },
     merkle_tree::{Anchor, MerklePath, Node},
     nullifier::{Nullifier, NullifierKeyContainer},
+    shielded_ptx::NoteVPVerifyingInfoSet,
     utils::{poseidon_hash_n, poseidon_to_curve},
 };
 use blake2b_simd::Params as Blake2bParams;
@@ -122,30 +123,21 @@ pub struct NoteType {
 #[derive(Copy, Clone, Debug, Default)]
 pub struct RandomSeed([u8; 32]);
 
+/// NoteValidityPredicates includes one application(static) VP and a few dynamic VPs.
 #[derive(Clone)]
-pub struct InputNoteProvingInfo {
-    pub note: Note,
-    pub merkle_path: MerklePath,
-    pub anchor: Anchor,
-    application_vp: Box<ValidityPredicate>,
-    dynamic_vps: Vec<Box<ValidityPredicate>>,
-}
-
-#[derive(Clone)]
-pub struct OutputNoteProvingInfo {
-    pub note: Note,
+pub struct NoteValidityPredicates {
     application_vp: Box<ValidityPredicate>,
     dynamic_vps: Vec<Box<ValidityPredicate>>,
 }
 
 impl Note {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub fn new_input_note(
         app_vk: pallas::Base,
         app_data_static: pallas::Base,
         app_data_dynamic: pallas::Base,
         value: u64,
-        nk_container: NullifierKeyContainer,
+        nk: pallas::Base,
         rho: Nullifier,
         is_merkle_checked: bool,
         rseed: RandomSeed,
@@ -155,11 +147,34 @@ impl Note {
             note_type,
             app_data_dynamic,
             value,
-            nk_container,
+            nk_container: NullifierKeyContainer::Key(nk),
             is_merkle_checked,
             psi: rseed.get_psi(&rho),
             rcm: rseed.get_rcm(&rho),
             rho,
+        }
+    }
+
+    // The rho, psi, and rcm are not specified until the action is constructed.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_output_note(
+        app_vk: pallas::Base,
+        app_data_static: pallas::Base,
+        app_data_dynamic: pallas::Base,
+        value: u64,
+        nk_com: pallas::Base,
+        is_merkle_checked: bool,
+    ) -> Self {
+        let note_type = NoteType::new(app_vk, app_data_static);
+        Self {
+            note_type,
+            app_data_dynamic,
+            value,
+            nk_container: NullifierKeyContainer::Commitment(nk_com),
+            is_merkle_checked,
+            psi: pallas::Base::default(),
+            rcm: pallas::Base::default(),
+            rho: Nullifier::default(),
         }
     }
 
@@ -188,7 +203,7 @@ impl Note {
         }
     }
 
-    pub fn random_padding_input_note<R: RngCore>(mut rng: R) -> Self {
+    pub fn random_padding_note<R: RngCore>(mut rng: R) -> Self {
         let app_vk = *COMPRESSED_TRIVIAL_VP_VK;
         let app_data_static = pallas::Base::random(&mut rng);
         let note_type = NoteType::new(app_vk, app_data_static);
@@ -201,25 +216,6 @@ impl Note {
             app_data_dynamic,
             value: 0,
             nk_container: nk,
-            rho,
-            psi: rseed.get_psi(&rho),
-            rcm: rseed.get_rcm(&rho),
-            is_merkle_checked: false,
-        }
-    }
-
-    pub fn random_padding_output_note<R: RngCore>(mut rng: R, rho: Nullifier) -> Self {
-        let app_vk = *COMPRESSED_TRIVIAL_VP_VK;
-        let app_data_static = pallas::Base::random(&mut rng);
-        let note_type = NoteType::new(app_vk, app_data_static);
-        let app_data_dynamic = pallas::Base::random(&mut rng);
-        let nk_com = NullifierKeyContainer::from_commitment(pallas::Base::random(&mut rng));
-        let rseed = RandomSeed::random(&mut rng);
-        Note {
-            note_type,
-            app_data_dynamic,
-            value: 0,
-            nk_container: nk_com,
             rho,
             psi: rseed.get_psi(&rho),
             rcm: rseed.get_rcm(&rho),
@@ -287,6 +283,14 @@ impl Note {
     pub fn calculate_root(&self, path: &MerklePath) -> Anchor {
         let cm_node = Node::from(self);
         path.root(cm_node)
+    }
+
+    pub fn set_rho<R: RngCore>(&mut self, input_note: &Note, mut rng: R) {
+        let rseed = RandomSeed::random(&mut rng);
+
+        self.rho = input_note.get_nf().unwrap();
+        self.psi = rseed.get_psi(&self.rho);
+        self.rcm = rseed.get_rcm(&self.rho);
     }
 }
 
@@ -494,96 +498,71 @@ impl RandomSeed {
     }
 }
 
-impl InputNoteProvingInfo {
+impl NoteValidityPredicates {
     pub fn new(
-        note: Note,
-        merkle_path: MerklePath,
-        // If no custom anchor is provided then the standard one is calculated from the note and path.
-        custom_anchor: Option<Anchor>,
         application_vp: Box<ValidityPredicate>,
         dynamic_vps: Vec<Box<ValidityPredicate>>,
     ) -> Self {
-        let anchor = match custom_anchor {
-            Some(anchor) => anchor,
-            None => note.calculate_root(&merkle_path),
-        };
         Self {
-            note,
-            merkle_path,
-            anchor,
             application_vp,
             dynamic_vps,
         }
     }
 
-    pub fn get_application_vp(&self) -> Box<ValidityPredicate> {
-        self.application_vp.clone()
+    // Generate vp proofs
+    pub fn build(&self) -> NoteVPVerifyingInfoSet {
+        let app_vp_verifying_info = self.application_vp.get_verifying_info();
+
+        let app_dynamic_vp_verifying_info = self
+            .dynamic_vps
+            .iter()
+            .map(|verifying_info| verifying_info.get_verifying_info())
+            .collect();
+
+        NoteVPVerifyingInfoSet::new(app_vp_verifying_info, app_dynamic_vp_verifying_info)
     }
 
-    pub fn get_dynamic_vps(&self) -> Vec<Box<ValidityPredicate>> {
-        self.dynamic_vps.clone()
-    }
-
-    pub fn create_padding_note_proving_info(
-        padding_note: Note,
-        merkle_path: MerklePath,
-        anchor: Anchor,
+    // Create an input padding note vps
+    pub fn create_input_padding_note_vps(
+        note: &Note,
         input_notes: [Note; NUM_NOTE],
         output_notes: [Note; NUM_NOTE],
     ) -> Self {
-        let trivail_vp = Box::new(TrivialValidityPredicateCircuit {
-            owned_note_pub_id: padding_note.get_nf().unwrap().inner(),
+        let note_id = note.get_nf().unwrap().inner();
+        let application_vp = Box::new(TrivialValidityPredicateCircuit::new(
+            note_id,
             input_notes,
             output_notes,
-        });
-        InputNoteProvingInfo::new(padding_note, merkle_path, Some(anchor), trivail_vp, vec![])
-    }
-}
-
-impl OutputNoteProvingInfo {
-    pub fn new(
-        note: Note,
-        application_vp: Box<ValidityPredicate>,
-        dynamic_vps: Vec<Box<ValidityPredicate>>,
-    ) -> Self {
+        ));
         Self {
-            note,
             application_vp,
-            dynamic_vps,
+            dynamic_vps: vec![],
         }
     }
 
-    pub fn get_application_vp(&self) -> Box<ValidityPredicate> {
-        self.application_vp.clone()
-    }
-
-    pub fn get_dynamic_vps(&self) -> Vec<Box<ValidityPredicate>> {
-        self.dynamic_vps.clone()
-    }
-
-    pub fn create_padding_note_proving_info(
-        padding_note: Note,
+    // Create an output padding note vps
+    pub fn create_output_padding_note_vps(
+        note: &Note,
         input_notes: [Note; NUM_NOTE],
         output_notes: [Note; NUM_NOTE],
     ) -> Self {
-        let trivail_vp = Box::new(TrivialValidityPredicateCircuit {
-            owned_note_pub_id: padding_note.commitment().inner(),
+        let note_id = note.commitment().inner();
+        let application_vp = Box::new(TrivialValidityPredicateCircuit::new(
+            note_id,
             input_notes,
             output_notes,
-        });
-        OutputNoteProvingInfo::new(padding_note, trivail_vp, vec![])
+        ));
+        Self {
+            application_vp,
+            dynamic_vps: vec![],
+        }
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use super::{InputNoteProvingInfo, Note, NoteType, OutputNoteProvingInfo, RandomSeed};
-    use crate::{
-        circuit::vp_examples::tests::random_trivial_vp_circuit,
-        constant::TAIGA_COMMITMENT_TREE_DEPTH,
-        merkle_tree::MerklePath,
-        nullifier::{tests::*, Nullifier, NullifierKeyContainer},
-    };
+    use super::{Note, NoteType, RandomSeed};
+    use crate::nullifier::tests::*;
     use halo2_proofs::arithmetic::Field;
     use pasta_curves::pallas;
     use rand::{Rng, RngCore};
@@ -594,57 +573,18 @@ pub mod tests {
         NoteType::new(app_vk, app_data_static)
     }
 
-    pub fn random_input_note<R: RngCore>(mut rng: R) -> Note {
+    pub fn random_note<R: RngCore>(mut rng: R) -> Note {
         let rho = random_nullifier(&mut rng);
-        let nk = random_nullifier_key(&mut rng);
-        random_note_from_parts(&mut rng, rho, nk)
-    }
-
-    pub fn random_output_note<R: RngCore>(mut rng: R, rho: Nullifier) -> Note {
-        let nk_com = random_nullifier_key_commitment(&mut rng);
-        random_note_from_parts(&mut rng, rho, nk_com)
-    }
-
-    fn random_note_from_parts<R: RngCore>(
-        mut rng: R,
-        rho: Nullifier,
-        nk_container: NullifierKeyContainer,
-    ) -> Note {
-        let note_type = random_note_type(&mut rng);
-        let app_data_dynamic = pallas::Base::random(&mut rng);
-        let value: u64 = rng.gen();
         let rseed = RandomSeed::random(&mut rng);
         Note {
-            note_type,
-            app_data_dynamic,
-            value,
-            nk_container,
+            note_type: random_note_type(&mut rng),
+            app_data_dynamic: pallas::Base::random(&mut rng),
+            value: rng.gen(),
+            nk_container: random_nullifier_key(&mut rng),
             is_merkle_checked: true,
             psi: rseed.get_psi(&rho),
             rcm: rseed.get_rcm(&rho),
             rho,
-        }
-    }
-
-    pub fn random_input_proving_info<R: RngCore>(mut rng: R) -> InputNoteProvingInfo {
-        let note = random_input_note(&mut rng);
-        let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let application_vp = Box::new(random_trivial_vp_circuit(&mut rng));
-        let dynamic_vps = vec![];
-        InputNoteProvingInfo::new(note, merkle_path, None, application_vp, dynamic_vps)
-    }
-
-    pub fn random_output_proving_info<R: RngCore>(
-        mut rng: R,
-        rho: Nullifier,
-    ) -> OutputNoteProvingInfo {
-        let note = random_output_note(&mut rng, rho);
-        let application_vp = Box::new(random_trivial_vp_circuit(&mut rng));
-        let dynamic_vps = vec![];
-        OutputNoteProvingInfo {
-            note,
-            application_vp,
-            dynamic_vps,
         }
     }
 
@@ -657,7 +597,7 @@ pub mod tests {
         use crate::note::NoteCommitment;
         let mut rng = OsRng;
 
-        let input_note = random_input_note(&mut rng);
+        let input_note = random_note(&mut rng);
         {
             // BorshSerialize
             let borsh = borsh::to_vec(&input_note).unwrap();
@@ -666,8 +606,9 @@ pub mod tests {
             assert_eq!(input_note, de_note);
         }
 
-        let output_note = random_output_note(&mut rng, input_note.rho);
+        let mut output_note = input_note;
         {
+            output_note.nk_container = random_nullifier_key_commitment(&mut rng);
             // BorshSerialize
             let borsh = borsh::to_vec(&output_note).unwrap();
             // BorshDeserialize

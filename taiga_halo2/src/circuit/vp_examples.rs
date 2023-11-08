@@ -240,25 +240,15 @@ impl ValidityPredicateVerifyingInfo for TrivialValidityPredicateCircuit {
 #[cfg(test)]
 pub mod tests {
     use super::TrivialValidityPredicateCircuit;
-    use crate::{
-        constant::NUM_NOTE,
-        note::tests::{random_input_note, random_output_note},
-    };
+    use crate::{constant::NUM_NOTE, note::tests::random_note};
     use ff::Field;
     use pasta_curves::pallas;
     use rand::RngCore;
     pub fn random_trivial_vp_circuit<R: RngCore>(mut rng: R) -> TrivialValidityPredicateCircuit {
         let owned_note_pub_id = pallas::Base::random(&mut rng);
-        let input_notes = [(); NUM_NOTE].map(|_| random_input_note(&mut rng));
-        let output_notes = input_notes
-            .iter()
-            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
-            .collect::<Vec<_>>();
-        TrivialValidityPredicateCircuit::new(
-            owned_note_pub_id,
-            input_notes,
-            output_notes.try_into().unwrap(),
-        )
+        let input_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
+        let output_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
+        TrivialValidityPredicateCircuit::new(owned_note_pub_id, input_notes, output_notes)
     }
 
     #[test]

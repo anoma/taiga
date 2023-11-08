@@ -7,7 +7,7 @@ use crate::constant::{
 use crate::error::TransactionError;
 use crate::executable::Executable;
 use crate::merkle_tree::Anchor;
-use crate::note::{InputNoteProvingInfo, NoteCommitment, OutputNoteProvingInfo};
+use crate::note::{NoteCommitment, NoteValidityPredicates};
 use crate::nullifier::Nullifier;
 use crate::proof::Proof;
 use crate::value_commitment::ValueCommitment;
@@ -91,7 +91,7 @@ impl ShieldedPartialTransaction {
             .collect();
         let mut rcv_sum = pallas::Scalar::zero();
         let actions: Vec<ActionVerifyingInfo> = actions
-            .into_iter()
+            .iter()
             .map(|action_info| {
                 rcv_sum += action_info.get_rcv();
                 ActionVerifyingInfo::create(action_info, &mut rng).unwrap()
@@ -108,47 +108,41 @@ impl ShieldedPartialTransaction {
     }
 
     pub fn build<R: RngCore>(
-        input_info: [InputNoteProvingInfo; NUM_NOTE],
-        output_info: [OutputNoteProvingInfo; NUM_NOTE],
+        action_pairs: Vec<ActionInfo>,
+        input_note_vps: Vec<NoteValidityPredicates>,
+        output_note_vps: Vec<NoteValidityPredicates>,
         hints: Vec<u8>,
         mut rng: R,
-    ) -> Self {
-        let inputs: Vec<NoteVPVerifyingInfoSet> = input_info
-            .iter()
-            .map(|input_note| {
-                NoteVPVerifyingInfoSet::build(
-                    input_note.get_application_vp(),
-                    input_note.get_dynamic_vps(),
-                )
-            })
-            .collect();
-        let outputs: Vec<NoteVPVerifyingInfoSet> = output_info
-            .iter()
-            .map(|output_note| {
-                NoteVPVerifyingInfoSet::build(
-                    output_note.get_application_vp(),
-                    output_note.get_dynamic_vps(),
-                )
-            })
-            .collect();
+    ) -> Result<Self, Error> {
+        // Generate action proofs
         let mut rcv_sum = pallas::Scalar::zero();
-        let actions: Vec<ActionVerifyingInfo> = input_info
-            .into_iter()
-            .zip(output_info)
-            .map(|(input, output)| {
-                let action_info = ActionInfo::from_proving_info(input, output, &mut rng);
+        let actions: Vec<ActionVerifyingInfo> = action_pairs
+            .iter()
+            .map(|action_info| {
                 rcv_sum += action_info.get_rcv();
                 ActionVerifyingInfo::create(action_info, &mut rng).unwrap()
             })
             .collect();
 
-        Self {
+        // Generate input vp proofs
+        let inputs: Vec<NoteVPVerifyingInfoSet> = input_note_vps
+            .iter()
+            .map(|input_note_vp| input_note_vp.build())
+            .collect();
+
+        // Generate output vp proofs
+        let outputs: Vec<NoteVPVerifyingInfoSet> = output_note_vps
+            .iter()
+            .map(|output_note_vp| output_note_vp.build())
+            .collect();
+
+        Ok(Self {
             actions: actions.try_into().unwrap(),
             inputs: inputs.try_into().unwrap(),
             outputs: outputs.try_into().unwrap(),
             binding_sig_r: Some(rcv_sum),
             hints,
-        }
+        })
     }
 
     // verify zk proof
@@ -400,7 +394,7 @@ impl<'a> Decoder<'a> for ShieldedPartialTransaction {
 }
 
 impl ActionVerifyingInfo {
-    pub fn create<R: RngCore>(action_info: ActionInfo, mut rng: R) -> Result<Self, Error> {
+    pub fn create<R: RngCore>(action_info: &ActionInfo, mut rng: R) -> Result<Self, Error> {
         let (action_instance, circuit) = action_info.build();
         let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
         let action_proof = Proof::create(
@@ -409,8 +403,7 @@ impl ActionVerifyingInfo {
             circuit,
             &[&action_instance.to_instance()],
             &mut rng,
-        )
-        .unwrap();
+        )?;
         Ok(Self {
             action_proof,
             action_instance,
@@ -440,6 +433,7 @@ impl NoteVPVerifyingInfoSet {
         }
     }
 
+    // TODO: remove it.
     pub fn build(
         application_vp: Box<ValidityPredicate>,
         dynamic_vps: Vec<Box<ValidityPredicate>>,
@@ -493,12 +487,13 @@ impl NoteVPVerifyingInfoSet {
 #[cfg(test)]
 pub mod testing {
     use crate::{
+        action::ActionInfo,
         circuit::vp_circuit::{ValidityPredicate, ValidityPredicateVerifyingInfo},
         circuit::vp_examples::TrivialValidityPredicateCircuit,
         constant::TAIGA_COMMITMENT_TREE_DEPTH,
         merkle_tree::MerklePath,
-        note::{InputNoteProvingInfo, Note, OutputNoteProvingInfo, RandomSeed},
-        nullifier::{Nullifier, NullifierKeyContainer},
+        note::{Note, NoteValidityPredicates, RandomSeed},
+        nullifier::Nullifier,
         shielded_ptx::ShieldedPartialTransaction,
         utils::poseidon_hash,
     };
@@ -525,10 +520,10 @@ pub mod testing {
             let app_data_dynamic = poseidon_hash(app_dynamic_vp_vk[0], app_dynamic_vp_vk[1]);
             let rho = Nullifier::from(pallas::Base::random(&mut rng));
             let value = 5000u64;
-            let nk = NullifierKeyContainer::random_key(&mut rng);
+            let nk = pallas::Base::random(&mut rng);
             let rseed = RandomSeed::random(&mut rng);
             let is_merkle_checked = true;
-            Note::new(
+            Note::new_input_note(
                 compressed_trivial_vp_vk,
                 app_data_static,
                 app_data_dynamic,
@@ -539,37 +534,44 @@ pub mod testing {
                 rseed,
             )
         };
-        let output_note_1 = {
+        let mut output_note_1 = {
             let app_data_static = pallas::Base::zero();
             // TODO: add real application dynamic VPs and encode them to app_data_dynamic later.
             // If the dynamic VP is not used, set app_data_dynamic pallas::Base::zero() by default.
             let app_data_dynamic = pallas::Base::zero();
-            let rho = input_note_1.get_nf().unwrap();
             let value = 5000u64;
-            let nk_com = NullifierKeyContainer::random_commitment(&mut rng);
-            let rseed = RandomSeed::random(&mut rng);
+            let nk_com = pallas::Base::random(&mut rng);
             let is_merkle_checked = true;
-            Note::new(
+            Note::new_output_note(
                 compressed_trivial_vp_vk,
                 app_data_static,
                 app_data_dynamic,
                 value,
                 nk_com,
-                rho,
                 is_merkle_checked,
-                rseed,
             )
         };
 
+        // Construct action pair
+        let merkle_path_1 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+        let action_1 = ActionInfo::new(
+            input_note_1,
+            merkle_path_1,
+            None,
+            &mut output_note_1,
+            &mut rng,
+        );
+
+        // Generate notes
         let input_note_2 = {
             let app_data_static = pallas::Base::one();
             let app_data_dynamic = pallas::Base::zero();
             let rho = Nullifier::from(pallas::Base::random(&mut rng));
             let value = 10u64;
-            let nk = NullifierKeyContainer::random_key(&mut rng);
+            let nk = pallas::Base::random(&mut rng);
             let rseed = RandomSeed::random(&mut rng);
             let is_merkle_checked = true;
-            Note::new(
+            Note::new_input_note(
                 compressed_trivial_vp_vk,
                 app_data_static,
                 app_data_dynamic,
@@ -580,28 +582,32 @@ pub mod testing {
                 rseed,
             )
         };
-        let output_note_2 = {
+        let mut output_note_2 = {
             let app_data_static = pallas::Base::one();
             let app_data_dynamic = pallas::Base::zero();
-            let rho = input_note_2.get_nf().unwrap();
             let value = 10u64;
-            let nk_com = NullifierKeyContainer::random_commitment(&mut rng);
-            let rseed = RandomSeed::random(&mut rng);
+            let nk_com = pallas::Base::random(&mut rng);
             let is_merkle_checked = true;
-            Note::new(
+            Note::new_output_note(
                 compressed_trivial_vp_vk,
                 app_data_static,
                 app_data_dynamic,
                 value,
                 nk_com,
-                rho,
                 is_merkle_checked,
-                rseed,
             )
         };
 
-        // Generate note info
-        let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+        // Construct action pair
+        let merkle_path_2 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+        let action_2 = ActionInfo::new(
+            input_note_2,
+            merkle_path_2,
+            None,
+            &mut output_note_2,
+            &mut rng,
+        );
+
         // Create vp circuit and fill the note info
         let mut trivial_vp_circuit = TrivialValidityPredicateCircuit {
             owned_note_pub_id: input_note_1.get_nf().unwrap().inner(),
@@ -612,41 +618,30 @@ pub mod testing {
         let trivial_app_logic_1: Box<ValidityPredicate> = Box::new(trivial_vp_circuit.clone());
         let trivial_app_logic_2 = Box::new(trivial_vp_circuit.clone());
         let trivial_dynamic_vps = vec![trivial_app_logic_1, trivial_app_logic_2];
-        let input_note_proving_info_1 = InputNoteProvingInfo::new(
-            input_note_1,
-            merkle_path.clone(),
-            None,
-            input_application_vp_1,
-            trivial_dynamic_vps.clone(),
-        );
+        let input_note_1_vps =
+            NoteValidityPredicates::new(input_application_vp_1, trivial_dynamic_vps);
+
         // The following notes use empty logic vps and use app_data_dynamic with pallas::Base::zero() by default.
         trivial_vp_circuit.owned_note_pub_id = input_note_2.get_nf().unwrap().inner();
         let input_application_vp_2 = Box::new(trivial_vp_circuit.clone());
-        let dynamic_vps = vec![];
-        let input_note_proving_info_2 = InputNoteProvingInfo::new(
-            input_note_2,
-            merkle_path,
-            None,
-            input_application_vp_2,
-            dynamic_vps.clone(),
-        );
+        let input_note_2_vps = NoteValidityPredicates::new(input_application_vp_2, vec![]);
 
         trivial_vp_circuit.owned_note_pub_id = output_note_1.commitment().inner();
         let output_application_vp_1 = Box::new(trivial_vp_circuit.clone());
-        let output_note_proving_info_1 =
-            OutputNoteProvingInfo::new(output_note_1, output_application_vp_1, dynamic_vps.clone());
+        let output_note_1_vps = NoteValidityPredicates::new(output_application_vp_1, vec![]);
 
         trivial_vp_circuit.owned_note_pub_id = output_note_2.commitment().inner();
         let output_application_vp_2 = Box::new(trivial_vp_circuit);
-        let output_note_proving_info_2 =
-            OutputNoteProvingInfo::new(output_note_2, output_application_vp_2, dynamic_vps);
+        let output_note_2_vps = NoteValidityPredicates::new(output_application_vp_2, vec![]);
 
         // Create shielded partial tx
         ShieldedPartialTransaction::build(
-            [input_note_proving_info_1, input_note_proving_info_2],
-            [output_note_proving_info_1, output_note_proving_info_2],
+            vec![action_1, action_2],
+            vec![input_note_1_vps, input_note_2_vps],
+            vec![output_note_1_vps, output_note_2_vps],
             vec![],
             &mut rng,
         )
+        .unwrap()
     }
 }
