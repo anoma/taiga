@@ -1,14 +1,19 @@
-use crate::circuit::{
-    vp_circuit::{VPVerifyingInfo, ValidityPredicateVerifyingInfo, VampIRValidityPredicateCircuit},
-    vp_examples::TrivialValidityPredicateCircuit,
+use crate::circuit::vp_circuit::{
+    VPVerifyingInfo, ValidityPredicateVerifyingInfo, VampIRValidityPredicateCircuit,
 };
+#[cfg(feature = "borsh")]
+use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
+use crate::error::TransactionError;
 use crate::shielded_ptx::NoteVPVerifyingInfoSet;
+
+#[cfg(feature = "borsh")]
 use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg(feature = "serde")]
 use serde;
 use std::path::PathBuf;
 
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ValidityPredicateRepresentation {
     // vampir has a unified circuit representation.
@@ -19,14 +24,16 @@ pub enum ValidityPredicateRepresentation {
     // TODO: add other vp types here if needed
 }
 
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ValidityPredicateByteCode {
     circuit: ValidityPredicateRepresentation,
     inputs: Vec<u8>,
 }
 
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ApplicationByteCode {
     app_vp_bytecode: ValidityPredicateByteCode,
@@ -38,7 +45,7 @@ impl ValidityPredicateByteCode {
         Self { circuit, inputs }
     }
 
-    pub fn generate_proof(self) -> VPVerifyingInfo {
+    pub fn generate_proof(self) -> Result<VPVerifyingInfo, TransactionError> {
         match self.circuit {
             ValidityPredicateRepresentation::VampIR(circuit) => {
                 // TDDO: use the file_name api atm,
@@ -50,12 +57,15 @@ impl ValidityPredicateByteCode {
                     &vamp_ir_circuit_file,
                     &inputs_file,
                 );
-                vp_circuit.get_verifying_info()
+                Ok(vp_circuit.get_verifying_info())
             }
+            #[cfg(feature = "serde")]
             ValidityPredicateRepresentation::Trivial => {
                 let vp = TrivialValidityPredicateCircuit::from_bytes(self.inputs);
-                vp.get_verifying_info()
+                Ok(vp.get_verifying_info())
             }
+            #[allow(unreachable_patterns)]
+            _ => Err(TransactionError::InvalidValidityPredicateRepresentation),
         }
     }
 }
@@ -71,14 +81,17 @@ impl ApplicationByteCode {
         }
     }
 
-    pub fn generate_proofs(self) -> NoteVPVerifyingInfoSet {
-        let app_vp_verifying_info = self.app_vp_bytecode.generate_proof();
+    pub fn generate_proofs(self) -> Result<NoteVPVerifyingInfoSet, TransactionError> {
+        let app_vp_verifying_info = self.app_vp_bytecode.generate_proof()?;
 
-        let app_dynamic_vp_verifying_info = self
+        let app_dynamic_vp_verifying_info: Result<Vec<_>, _> = self
             .dynamic_vp_bytecode
             .into_iter()
             .map(|bytecode| bytecode.generate_proof())
             .collect();
-        NoteVPVerifyingInfoSet::new(app_vp_verifying_info, app_dynamic_vp_verifying_info)
+        Ok(NoteVPVerifyingInfoSet::new(
+            app_vp_verifying_info,
+            app_dynamic_vp_verifying_info?,
+        ))
     }
 }
