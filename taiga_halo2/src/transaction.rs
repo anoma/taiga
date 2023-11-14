@@ -325,6 +325,7 @@ impl TransparentPartialTxBundle {
 pub mod testing {
     use crate::shielded_ptx::testing::create_shielded_ptx;
     use crate::transaction::{ShieldedPartialTxBundle, TransparentPartialTxBundle};
+    #[cfg(feature = "borsh")]
     use crate::transparent_ptx::testing::create_transparent_ptx;
 
     pub fn create_shielded_ptx_bundle(num: usize) -> ShieldedPartialTxBundle {
@@ -336,6 +337,7 @@ pub mod testing {
         ShieldedPartialTxBundle::new(bundle)
     }
 
+    #[cfg(feature = "borsh")]
     pub fn create_transparent_ptx_bundle(num: usize) -> TransparentPartialTxBundle {
         let mut bundle = vec![];
         for _ in 0..num {
@@ -353,7 +355,12 @@ pub mod testing {
         let rng = OsRng;
 
         let shielded_ptx_bundle = create_shielded_ptx_bundle(1);
+
+        #[cfg(feature = "borsh")]
         let transparent_ptx_bundle = create_transparent_ptx_bundle(1);
+        #[cfg(not(feature = "borsh"))]
+        let transparent_ptx_bundle = TransparentPartialTxBundle::default();
+        
         let tx = Transaction::build(rng, shielded_ptx_bundle, transparent_ptx_bundle).unwrap();
         let _ret = tx.execute().unwrap();
 

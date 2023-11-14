@@ -1,10 +1,14 @@
-use crate::circuit::vp_circuit::{
-    VPVerifyingInfo, ValidityPredicateVerifyingInfo, VampIRValidityPredicateCircuit,
-};
 #[cfg(feature = "borsh")]
 use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
 use crate::error::TransactionError;
 use crate::shielded_ptx::NoteVPVerifyingInfoSet;
+use crate::{
+    circuit::vp_circuit::{
+        VPVerifyingInfo, ValidityPredicateVerifyingInfo, VampIRValidityPredicateCircuit,
+    },
+    note::NoteCommitment,
+    nullifier::Nullifier,
+};
 
 #[cfg(feature = "borsh")]
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -59,14 +63,48 @@ impl ValidityPredicateByteCode {
                 );
                 Ok(vp_circuit.get_verifying_info())
             }
-            #[cfg(feature = "serde")]
+            #[cfg(feature = "borsh")]
             ValidityPredicateRepresentation::Trivial => {
-                let vp = TrivialValidityPredicateCircuit::from_bytes(self.inputs);
+                let vp = TrivialValidityPredicateCircuit::from_bytes(&self.inputs);
                 Ok(vp.get_verifying_info())
             }
             #[allow(unreachable_patterns)]
             _ => Err(TransactionError::InvalidValidityPredicateRepresentation),
         }
+    }
+
+    // Verify vp circuit transparently
+    pub fn verify_transparently(
+        &self,
+        _nfs: &[Nullifier],
+        _cms: &[NoteCommitment],
+    ) -> Result<(), TransactionError> {
+        // check VP and return public_inputs
+        let _public_inputs = match &self.circuit {
+            ValidityPredicateRepresentation::VampIR(circuit) => {
+                // TDDO: use the file_name api atm,
+                // request vamp_ir to provide a api to generate circuit from bytes.
+                let vamp_ir_circuit_file =
+                    PathBuf::from(String::from_utf8_lossy(circuit).to_string());
+                let inputs_file = PathBuf::from(String::from_utf8_lossy(&self.inputs).to_string());
+                let vp_circuit = VampIRValidityPredicateCircuit::from_vamp_ir_file(
+                    &vamp_ir_circuit_file,
+                    &inputs_file,
+                );
+                vp_circuit.verify_transparently()?
+            }
+            #[cfg(feature = "borsh")]
+            ValidityPredicateRepresentation::Trivial => {
+                let vp = TrivialValidityPredicateCircuit::from_bytes(&self.inputs);
+                vp.verify_transparently()?
+            }
+            #[allow(unreachable_patterns)]
+            _ => return Err(TransactionError::InvalidValidityPredicateRepresentation),
+        };
+
+        // TODO: check nullifiers and note_commitments
+
+        Ok(())
     }
 }
 
@@ -93,5 +131,18 @@ impl ApplicationByteCode {
             app_vp_verifying_info,
             app_dynamic_vp_verifying_info?,
         ))
+    }
+
+    // Verify vp circuits transparently
+    pub fn verify_transparently(
+        &self,
+        nfs: &[Nullifier],
+        cms: &[NoteCommitment],
+    ) -> Result<(), TransactionError> {
+        self.app_vp_bytecode.verify_transparently(nfs, cms)?;
+        for dynamic_vp in self.dynamic_vp_bytecode.iter() {
+            dynamic_vp.verify_transparently(nfs, cms)?;
+        }
+        Ok(())
     }
 }

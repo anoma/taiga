@@ -17,6 +17,7 @@ use crate::{
         vp_examples::token::{Token, TOKEN_VK},
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP},
+    error::TransactionError,
     note::{Note, RandomSeed},
     nullifier::Nullifier,
     proof::Proof,

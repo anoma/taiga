@@ -13,6 +13,7 @@ use crate::{
         vp_examples::signature_verification::COMPRESSED_TOKEN_AUTH_VK,
     },
     constant::{GENERATOR, NUM_NOTE, SETUP_PARAMS_MAP},
+    error::TransactionError,
     note::{Note, RandomSeed},
     note_encryption::{NoteCiphertext, NotePlaintext, SecretKey},
     proof::Proof,

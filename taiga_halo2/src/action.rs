@@ -40,7 +40,9 @@ pub struct ActionPublicInputs {
 }
 
 /// The information to build ActionPublicInputs and ActionCircuit.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 pub struct ActionInfo {
     input_note: Note,
     input_merkle_path: MerklePath,
@@ -157,17 +159,35 @@ impl ActionInfo {
         self.rseed.get_vp_cm_r(PRF_EXPAND_OUTPUT_VP_CM_R)
     }
 
+    // Only used in transparent scenario: the achor is untrusted, recalcute root when executing it transaprently.
+    pub fn calcute_root(&self) -> Anchor {
+        self.input_note.calculate_root(&self.input_merkle_path)
+    }
+
+    // Get value commitment
+    pub fn get_value_commitment(&self, blind_r: &pallas::Scalar) -> ValueCommitment {
+        ValueCommitment::commit(&self.input_note, &self.output_note, blind_r)
+    }
+
+    pub fn get_input_note_nullifer(&self) -> Nullifier {
+        self.input_note.get_nf().unwrap()
+    }
+
+    pub fn get_output_note_cm(&self) -> NoteCommitment {
+        self.output_note.commitment()
+    }
+
     pub fn build(&self) -> (ActionPublicInputs, ActionCircuit) {
-        let nf = self.input_note.get_nf().unwrap();
+        let nf = self.get_input_note_nullifer();
         assert_eq!(
             nf, self.output_note.rho,
             "The nf of input note should be equal to the rho of output note"
         );
 
-        let cm = self.output_note.commitment();
+        let cm = self.get_output_note_cm();
 
         let rcv = self.get_rcv();
-        let cv_net = ValueCommitment::new(&self.input_note, &self.output_note, &rcv);
+        let cv_net = self.get_value_commitment(&rcv);
 
         let input_vp_cm_r = self.get_input_vp_com_r();
         let input_vp_commitment =
