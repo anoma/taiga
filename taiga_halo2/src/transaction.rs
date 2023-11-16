@@ -360,7 +360,7 @@ pub mod testing {
         let transparent_ptx_bundle = create_transparent_ptx_bundle(1);
         #[cfg(not(feature = "borsh"))]
         let transparent_ptx_bundle = TransparentPartialTxBundle::default();
-        
+
         let tx = Transaction::build(rng, shielded_ptx_bundle, transparent_ptx_bundle).unwrap();
         let _ret = tx.execute().unwrap();
 

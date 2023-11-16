@@ -44,19 +44,28 @@ impl TransparentPartialTransaction {
 impl Executable for TransparentPartialTransaction {
     fn execute(&self) -> Result<(), TransactionError> {
         // check VPs, nullifiers, and note commitments
-        let nfs = self.get_nullifiers();
-        let output_cms = self.get_output_cms();
-        for vp in self
-            .input_note_app
-            .iter()
-            .chain(self.output_note_app.iter())
-        {
-            vp.verify_transparently(&nfs, &output_cms)?;
+        let action_nfs = self.get_nullifiers();
+        let action_cms = self.get_output_cms();
+        for (vp, nf) in self.input_note_app.iter().zip(action_nfs.iter()) {
+            let owned_note_id = vp.verify_transparently(&action_nfs, &action_cms)?;
+            // Check all notes are checked
+            if owned_note_id != nf.inner() {
+                return Err(TransactionError::InconsistentOwnedNotePubID);
+            }
+        }
+
+        for (vp, cm) in self.output_note_app.iter().zip(action_cms.iter()) {
+            let owned_note_id = vp.verify_transparently(&action_nfs, &action_cms)?;
+            // Check all notes are checked
+            if owned_note_id != cm.inner() {
+                return Err(TransactionError::InconsistentOwnedNotePubID);
+            }
         }
 
         Ok(())
     }
 
+    // get nullifiers from actions
     fn get_nullifiers(&self) -> Vec<Nullifier> {
         self.actions
             .iter()
@@ -64,6 +73,7 @@ impl Executable for TransparentPartialTransaction {
             .collect()
     }
 
+    // get output cms from actions
     fn get_output_cms(&self) -> Vec<NoteCommitment> {
         self.actions
             .iter()
@@ -80,7 +90,7 @@ impl Executable for TransparentPartialTransaction {
 
     fn get_anchors(&self) -> Vec<Anchor> {
         // TODO: We have easier way to check the anchor in transparent scenario, but keep consistent with sheilded right now.
-        // TODO: skip when the is_merkle_checked flag is false
+        // TODO: we can skip the root if the is_merkle_checked flag is false?
         self.actions
             .iter()
             .map(|action| action.calcute_root())
