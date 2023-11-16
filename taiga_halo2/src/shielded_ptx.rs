@@ -168,7 +168,7 @@ impl ShieldedPartialTransaction {
     fn check_nullifiers(&self) -> Result<(), TransactionError> {
         assert_eq!(NUM_NOTE, 2);
         let action_nfs = self.get_nullifiers();
-        for vp_info in self.inputs.iter() {
+        for vp_info in self.inputs.iter().chain(self.outputs.iter()) {
             for nfs in vp_info.get_nullifiers().iter() {
                 // Check the vp actually uses the input notes from action circuits.
                 if !((action_nfs[0].inner() == nfs[0] && action_nfs[1].inner() == nfs[1])
@@ -200,7 +200,7 @@ impl ShieldedPartialTransaction {
     fn check_note_commitments(&self) -> Result<(), TransactionError> {
         assert_eq!(NUM_NOTE, 2);
         let action_cms = self.get_output_cms();
-        for vp_info in self.outputs.iter() {
+        for vp_info in self.inputs.iter().chain(self.outputs.iter()) {
             for cms in vp_info.get_note_commitments().iter() {
                 // Check the vp actually uses the output notes from action circuits.
                 if !((action_cms[0] == cms[0] && action_cms[1] == cms[1])
