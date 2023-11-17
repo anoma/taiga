@@ -6,6 +6,7 @@ use crate::{
         ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_PARAMS_SIZE},
+    error::TransactionError,
     note::{Note, RandomSeed},
     proof::Proof,
     vp_commitment::ValidityPredicateCommitment,
@@ -100,7 +101,7 @@ impl TrivialValidityPredicateCircuit {
 
     // Only for test
     #[cfg(feature = "borsh")]
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
+    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
         BorshDeserialize::deserialize(&mut bytes.as_ref()).unwrap()
     }
 
@@ -230,6 +231,16 @@ impl ValidityPredicateVerifyingInfo for TrivialValidityPredicateCircuit {
             proof,
             public_inputs,
         }
+    }
+
+    fn verify_transparently(&self) -> Result<ValidityPredicatePublicInputs, TransactionError> {
+        use halo2_proofs::dev::MockProver;
+        let mut rng = OsRng;
+        let public_inputs = self.get_public_inputs(&mut rng);
+        let prover =
+            MockProver::<pallas::Base>::run(15, self, vec![public_inputs.to_vec()]).unwrap();
+        prover.verify().unwrap();
+        Ok(public_inputs)
     }
 
     fn get_vp_vk(&self) -> ValidityPredicateVerifyingKey {

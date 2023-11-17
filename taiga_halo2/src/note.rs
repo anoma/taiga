@@ -121,6 +121,8 @@ pub struct NoteType {
 }
 
 #[derive(Copy, Clone, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 pub struct RandomSeed([u8; 32]);
 
 /// NoteValidityPredicates includes one application(static) VP and a few dynamic VPs.

@@ -25,6 +25,7 @@ use crate::{
         VP_CIRCUIT_OWNED_NOTE_PUB_ID_PUBLIC_INPUT_IDX, VP_CIRCUIT_PARAMS_SIZE,
         VP_CIRCUIT_PUBLIC_INPUT_NUM,
     },
+    error::TransactionError,
     note::{Note, NoteCommitment, RandomSeed},
     note_encryption::{NoteCiphertext, SecretKey},
     proof::Proof,
@@ -425,6 +426,7 @@ impl ValidityPredicateConfig {
 
 pub trait ValidityPredicateVerifyingInfo: DynClone {
     fn get_verifying_info(&self) -> VPVerifyingInfo;
+    fn verify_transparently(&self) -> Result<ValidityPredicatePublicInputs, TransactionError>;
     fn get_vp_vk(&self) -> ValidityPredicateVerifyingKey;
 }
 
@@ -776,6 +778,19 @@ macro_rules! vp_verifying_info_impl {
                 }
             }
 
+            fn verify_transparently(
+                &self,
+            ) -> Result<ValidityPredicatePublicInputs, TransactionError> {
+                use halo2_proofs::dev::MockProver;
+                let mut rng = OsRng;
+                let public_inputs = self.get_public_inputs(&mut rng);
+                let prover =
+                    MockProver::<pallas::Base>::run(15, self, vec![public_inputs.to_vec()])
+                        .unwrap();
+                prover.verify().unwrap();
+                Ok(public_inputs)
+            }
+
             fn get_vp_vk(&self) -> ValidityPredicateVerifyingKey {
                 let params = SETUP_PARAMS_MAP.get(&15).unwrap();
                 let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
@@ -910,6 +925,22 @@ impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
             proof,
             public_inputs: public_inputs.into(),
         }
+    }
+
+    fn verify_transparently(&self) -> Result<ValidityPredicatePublicInputs, TransactionError> {
+        use halo2_proofs::dev::MockProver;
+        let mut rng = OsRng;
+        let mut public_inputs = self.public_inputs.clone();
+        let rseed = RandomSeed::random(&mut rng);
+        public_inputs.extend(ValidityPredicatePublicInputs::get_public_input_padding(
+            self.public_inputs.len(),
+            &rseed,
+        ));
+        let prover =
+            MockProver::<pallas::Base>::run(15, &self.circuit, vec![public_inputs.to_vec()])
+                .unwrap();
+        prover.verify().unwrap();
+        Ok(ValidityPredicatePublicInputs::from(public_inputs))
     }
 
     fn get_vp_vk(&self) -> ValidityPredicateVerifyingKey {

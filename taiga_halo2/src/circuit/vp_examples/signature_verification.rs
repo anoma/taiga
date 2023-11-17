@@ -11,6 +11,7 @@ use crate::{
         },
     },
     constant::{TaigaFixedBasesFull, NUM_NOTE, SETUP_PARAMS_MAP},
+    error::TransactionError,
     note::{Note, RandomSeed},
     proof::Proof,
     utils::{mod_r_p, poseidon_hash_n},

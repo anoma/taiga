@@ -20,6 +20,7 @@ use crate::{
         VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_2, VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_1,
         VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_2,
     },
+    error::TransactionError,
     note::{Note, NoteValidityPredicates, RandomSeed},
     nullifier::Nullifier,
     proof::Proof,

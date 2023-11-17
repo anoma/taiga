@@ -1,42 +1,41 @@
 use crate::{
-    error::TransactionError,
-    executable::Executable,
-    merkle_tree::{Anchor, MerklePath},
-    note::{Note, NoteCommitment},
-    nullifier::{Nullifier, NullifierKeyContainer},
-    value_commitment::ValueCommitment,
+    action::ActionInfo, circuit::vp_bytecode::ApplicationByteCode, constant::NUM_NOTE,
+    error::TransactionError, executable::Executable, merkle_tree::Anchor, note::NoteCommitment,
+    nullifier::Nullifier, value_commitment::ValueCommitment,
 };
 
+use pasta_curves::pallas;
 #[cfg(feature = "serde")]
 use serde;
 
 #[cfg(feature = "borsh")]
 use borsh::{BorshDeserialize, BorshSerialize};
-use rand::RngCore;
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TransparentPartialTransaction {
-    inputs: Vec<InputResource>,
-    outputs: Vec<OutputResource>,
+    actions: Vec<ActionInfo>,
+    input_note_app: Vec<ApplicationByteCode>,
+    output_note_app: Vec<ApplicationByteCode>,
     hints: Vec<u8>,
 }
 
 impl TransparentPartialTransaction {
-    pub fn new<R: RngCore>(
-        inputs: Vec<InputResource>,
-        mut outputs: Vec<OutputResource>,
+    pub fn new(
+        actions: Vec<ActionInfo>,
+        input_note_app: Vec<ApplicationByteCode>,
+        output_note_app: Vec<ApplicationByteCode>,
         hints: Vec<u8>,
-        mut rng: R,
     ) -> Self {
-        outputs
-            .iter_mut()
-            .zip(inputs.iter())
-            .for_each(|(output, input)| output.note.set_rho(&input.note, &mut rng));
+        assert_eq!(actions.len(), NUM_NOTE);
+        assert_eq!(input_note_app.len(), NUM_NOTE);
+        assert_eq!(output_note_app.len(), NUM_NOTE);
+
         Self {
-            inputs,
-            outputs,
+            actions,
+            input_note_app,
+            output_note_app,
             hints,
         }
     }
@@ -44,129 +43,152 @@ impl TransparentPartialTransaction {
 
 impl Executable for TransparentPartialTransaction {
     fn execute(&self) -> Result<(), TransactionError> {
-        assert_eq!(self.inputs.len(), self.outputs.len());
-        for input in self.inputs.iter() {
-            // check nullifer_key is provided
-            if let NullifierKeyContainer::Commitment(_) = input.note.nk_container {
-                return Err(TransactionError::MissingTransparentResourceNullifierKey);
-            }
-
-            // check merkle_path is provided
-            if input.merkle_path.is_none() && input.note.is_merkle_checked {
-                return Err(TransactionError::MissingTransparentResourceMerklePath);
+        // check VPs, nullifiers, and note commitments
+        let action_nfs = self.get_nullifiers();
+        let action_cms = self.get_output_cms();
+        for (vp, nf) in self.input_note_app.iter().zip(action_nfs.iter()) {
+            let owned_note_id = vp.verify_transparently(&action_nfs, &action_cms)?;
+            // Check all notes are checked
+            if owned_note_id != nf.inner() {
+                return Err(TransactionError::InconsistentOwnedNotePubID);
             }
         }
 
-        // TODO: figure out how transparent ptx executes
-        // VP should be checked here
+        for (vp, cm) in self.output_note_app.iter().zip(action_cms.iter()) {
+            let owned_note_id = vp.verify_transparently(&action_nfs, &action_cms)?;
+            // Check all notes are checked
+            if owned_note_id != cm.inner() {
+                return Err(TransactionError::InconsistentOwnedNotePubID);
+            }
+        }
 
         Ok(())
     }
 
+    // get nullifiers from actions
     fn get_nullifiers(&self) -> Vec<Nullifier> {
-        self.inputs
+        self.actions
             .iter()
-            .map(|resource| resource.note.get_nf().unwrap())
+            .map(|action| action.get_input_note_nullifer())
             .collect()
     }
 
+    // get output cms from actions
     fn get_output_cms(&self) -> Vec<NoteCommitment> {
-        self.outputs
+        self.actions
             .iter()
-            .map(|resource| resource.note.commitment())
+            .map(|action| action.get_output_note_cm())
             .collect()
     }
 
     fn get_value_commitments(&self) -> Vec<ValueCommitment> {
-        vec![ValueCommitment::from_tranparent_resources(
-            &self.inputs,
-            &self.outputs,
-        )]
+        self.actions
+            .iter()
+            .map(|action| action.get_value_commitment(&pallas::Scalar::zero()))
+            .collect()
     }
 
     fn get_anchors(&self) -> Vec<Anchor> {
-        let mut anchors = Vec::new();
-        for input in self.inputs.iter() {
-            if input.note.is_merkle_checked {
-                if let Some(path) = &input.merkle_path {
-                    anchors.push(input.note.calculate_root(path));
-                }
-            }
-        }
-        anchors
+        // TODO: We have easier way to check the anchor in transparent scenario, but keep consistent with sheilded right now.
+        // TODO: we can skip the root if the is_merkle_checked flag is false?
+        self.actions
+            .iter()
+            .map(|action| action.calculate_root())
+            .collect()
     }
 }
 
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct InputResource {
-    pub note: Note,
-    // Only normal notes need the path, while dummy(intent and padding) notes don't need the path to calculate the anchor.
-    pub merkle_path: Option<MerklePath>,
-    // TODO: figure out transparent vp reprentation and how to execute it.
-    //     pub static_vp:
-    //     pub dynamic_vps:
-}
-
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct OutputResource {
-    pub note: Note,
-    // TODO: figure out transparent vp reprentation and how to execute it.
-    //     pub static_vp:
-    //     pub dynamic_vps:
-}
-
 #[cfg(test)]
+#[cfg(feature = "borsh")]
 pub mod testing {
     use crate::{
+        circuit::vp_examples::TrivialValidityPredicateCircuit,
         constant::TAIGA_COMMITMENT_TREE_DEPTH, merkle_tree::MerklePath, note::tests::random_note,
         transparent_ptx::*,
     };
     use rand::rngs::OsRng;
 
-    // No transparent vp included
     pub fn create_transparent_ptx() -> TransparentPartialTransaction {
         let mut rng = OsRng;
-        let input_resource_1 = {
-            let note = random_note(&mut rng);
-            let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-            InputResource {
-                note,
-                merkle_path: Some(merkle_path),
-            }
-        };
-        let output_resource_1 = {
+        // construct notes
+        let input_note_1 = random_note(&mut rng);
+        let mut output_note_1 = {
             let mut note = random_note(&mut rng);
-            // Adjust the random note to keep the balance
-            note.note_type = input_resource_1.note.note_type;
-            note.value = input_resource_1.note.value;
-            OutputResource { note }
+            note.note_type = input_note_1.note_type;
+            note.value = input_note_1.value;
+            note
+        };
+        let merkle_path_1 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+        let action_1 = ActionInfo::new(
+            input_note_1,
+            merkle_path_1,
+            None,
+            &mut output_note_1,
+            &mut rng,
+        );
+
+        let input_note_2 = random_note(&mut rng);
+        let mut output_note_2 = {
+            let mut note = random_note(&mut rng);
+            note.note_type = input_note_2.note_type;
+            note.value = input_note_2.value;
+            note
+        };
+        let merkle_path_2 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+        let action_2 = ActionInfo::new(
+            input_note_2,
+            merkle_path_2,
+            None,
+            &mut output_note_2,
+            &mut rng,
+        );
+
+        // construct applications
+        let input_note_1_app = {
+            let app_vp = TrivialValidityPredicateCircuit::new(
+                input_note_1.get_nf().unwrap().inner(),
+                [input_note_1, input_note_2],
+                [output_note_1, output_note_2],
+            );
+
+            ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
         };
 
-        let input_resource_2 = {
-            let mut note = random_note(&mut rng);
-            note.is_merkle_checked = false;
-            InputResource {
-                note,
-                merkle_path: None,
-            }
+        let input_note_2_app = {
+            let app_vp = TrivialValidityPredicateCircuit::new(
+                input_note_2.get_nf().unwrap().inner(),
+                [input_note_1, input_note_2],
+                [output_note_1, output_note_2],
+            );
+
+            ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
         };
-        let output_resource_2 = {
-            let mut note = random_note(&mut rng);
-            // Adjust the random note to keep the balance
-            note.note_type = input_resource_2.note.note_type;
-            note.value = input_resource_2.note.value;
-            OutputResource { note }
+
+        let output_note_1_app = {
+            let app_vp = TrivialValidityPredicateCircuit::new(
+                output_note_1.commitment().inner(),
+                [input_note_1, input_note_2],
+                [output_note_1, output_note_2],
+            );
+
+            ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
+        };
+
+        let output_note_2_app = {
+            let app_vp = TrivialValidityPredicateCircuit::new(
+                output_note_2.commitment().inner(),
+                [input_note_1, input_note_2],
+                [output_note_1, output_note_2],
+            );
+
+            ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
         };
 
         TransparentPartialTransaction::new(
-            vec![input_resource_1, input_resource_2],
-            vec![output_resource_1, output_resource_2],
+            vec![action_1, action_2],
+            vec![input_note_1_app, input_note_2_app],
+            vec![output_note_1_app, output_note_2_app],
             vec![],
-            &mut rng,
         )
     }
 }

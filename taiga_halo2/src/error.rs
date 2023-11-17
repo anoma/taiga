@@ -24,6 +24,8 @@ pub enum TransactionError {
     MissingTransparentResourceMerklePath,
     /// Shielded partial Tx binding signature r is missing
     MissingPartialTxBindingSignatureR,
+    /// ValidityPredicateRepresentation is not valid
+    InvalidValidityPredicateRepresentation,
 }
 
 impl Display for TransactionError {
@@ -51,6 +53,9 @@ impl Display for TransactionError {
             }
             MissingPartialTxBindingSignatureR => {
                 f.write_str("Shielded partial Tx binding signature r is missing")
+            }
+            InvalidValidityPredicateRepresentation => {
+                f.write_str("ValidityPredicateRepresentation is not valid, add borsh feature if using native vp examples ")
             }
         }
     }

@@ -11,6 +11,7 @@ use crate::{
         },
     },
     constant::{NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_CUSTOM_PUBLIC_INPUT_BEGIN_IDX},
+    error::TransactionError,
     note::{Note, RandomSeed},
     proof::Proof,
     vp_commitment::ValidityPredicateCommitment,

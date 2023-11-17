@@ -172,7 +172,7 @@ pub fn create_shielded_partial_transaction(
     input_note_app: Vec<ApplicationByteCode>,
     output_note_app: Vec<ApplicationByteCode>,
     hints: Vec<u8>,
-) -> ShieldedPartialTransaction {
+) -> Result<ShieldedPartialTransaction, TransactionError> {
     let rng = OsRng;
     ShieldedPartialTransaction::from_bytecode(actions, input_note_app, output_note_app, hints, rng)
 }
@@ -333,7 +333,8 @@ pub mod tests {
             vec![input_note_1_app, input_note_2_app],
             vec![output_note_1_app, output_note_2_app],
             vec![],
-        );
+        )
+        .unwrap();
 
         let ptx_bytes = partial_transaction_serialize(&ptx).unwrap();
         verify_shielded_partial_transaction(ptx_bytes).unwrap();

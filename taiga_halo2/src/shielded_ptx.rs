@@ -21,7 +21,6 @@ use rustler::{Decoder, Encoder, Env, NifResult, NifStruct, Term};
 #[cfg(feature = "serde")]
 use serde;
 
-#[cfg(feature = "borsh")]
 use crate::circuit::vp_bytecode::ApplicationByteCode;
 #[cfg(feature = "borsh")]
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -73,19 +72,18 @@ struct ShieldedPartialTransactionProxy {
 }
 
 impl ShieldedPartialTransaction {
-    #[cfg(feature = "borsh")]
     pub fn from_bytecode<R: RngCore>(
         actions: Vec<ActionInfo>,
         input_note_app: Vec<ApplicationByteCode>,
         output_note_app: Vec<ApplicationByteCode>,
         hints: Vec<u8>,
         mut rng: R,
-    ) -> Self {
-        let inputs: Vec<NoteVPVerifyingInfoSet> = input_note_app
+    ) -> Result<Self, TransactionError> {
+        let inputs: Result<Vec<_>, _> = input_note_app
             .into_iter()
             .map(|bytecode| bytecode.generate_proofs())
             .collect();
-        let outputs: Vec<NoteVPVerifyingInfoSet> = output_note_app
+        let outputs: Result<Vec<_>, _> = output_note_app
             .into_iter()
             .map(|bytecode| bytecode.generate_proofs())
             .collect();
@@ -98,13 +96,13 @@ impl ShieldedPartialTransaction {
             })
             .collect();
 
-        Self {
+        Ok(Self {
             actions: actions.try_into().unwrap(),
-            inputs: inputs.try_into().unwrap(),
-            outputs: outputs.try_into().unwrap(),
+            inputs: inputs?.try_into().unwrap(),
+            outputs: outputs?.try_into().unwrap(),
             binding_sig_r: Some(rcv_sum),
             hints,
-        }
+        })
     }
 
     pub fn build<R: RngCore>(

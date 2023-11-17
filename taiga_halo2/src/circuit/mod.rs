@@ -11,6 +11,5 @@ pub mod hash_to_curve;
 pub mod note_commitment;
 pub mod note_encryption_circuit;
 mod vamp_ir_utils;
-#[cfg(feature = "borsh")]
 pub mod vp_bytecode;
 pub mod vp_examples;
