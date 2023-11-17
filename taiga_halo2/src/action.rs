@@ -159,8 +159,8 @@ impl ActionInfo {
         self.rseed.get_vp_cm_r(PRF_EXPAND_OUTPUT_VP_CM_R)
     }
 
-    // Only used in transparent scenario: the achor is untrusted, recalcute root when executing it transaprently.
-    pub fn calcute_root(&self) -> Anchor {
+    // Only used in transparent scenario: the achor is untrusted, recalculate root when executing it transparently.
+    pub fn calculate_root(&self) -> Anchor {
         self.input_note.calculate_root(&self.input_merkle_path)
     }
 

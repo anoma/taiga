@@ -93,7 +93,7 @@ impl Executable for TransparentPartialTransaction {
         // TODO: we can skip the root if the is_merkle_checked flag is false?
         self.actions
             .iter()
-            .map(|action| action.calcute_root())
+            .map(|action| action.calculate_root())
             .collect()
     }
 }
