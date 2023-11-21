@@ -1,7 +1,7 @@
 use crate::{
-    action::ActionInfo, circuit::vp_bytecode::ApplicationByteCode, constant::NUM_NOTE,
-    error::TransactionError, executable::Executable, merkle_tree::Anchor, note::NoteCommitment,
-    nullifier::Nullifier, value_commitment::ValueCommitment,
+    action::ActionInfo, circuit::vp_bytecode::ApplicationByteCode, constant::NUM_RESOURCE,
+    error::TransactionError, executable::Executable, merkle_tree::Anchor, nullifier::Nullifier,
+    resource::NoteCommitment, value_commitment::ValueCommitment,
 };
 
 use pasta_curves::pallas;
@@ -16,26 +16,26 @@ use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TransparentPartialTransaction {
     actions: Vec<ActionInfo>,
-    input_note_app: Vec<ApplicationByteCode>,
-    output_note_app: Vec<ApplicationByteCode>,
+    input_resource_app: Vec<ApplicationByteCode>,
+    output_resource_app: Vec<ApplicationByteCode>,
     hints: Vec<u8>,
 }
 
 impl TransparentPartialTransaction {
     pub fn new(
         actions: Vec<ActionInfo>,
-        input_note_app: Vec<ApplicationByteCode>,
-        output_note_app: Vec<ApplicationByteCode>,
+        input_resource_app: Vec<ApplicationByteCode>,
+        output_resource_app: Vec<ApplicationByteCode>,
         hints: Vec<u8>,
     ) -> Self {
-        assert_eq!(actions.len(), NUM_NOTE);
-        assert_eq!(input_note_app.len(), NUM_NOTE);
-        assert_eq!(output_note_app.len(), NUM_NOTE);
+        assert_eq!(actions.len(), NUM_RESOURCE);
+        assert_eq!(input_resource_app.len(), NUM_RESOURCE);
+        assert_eq!(output_resource_app.len(), NUM_RESOURCE);
 
         Self {
             actions,
-            input_note_app,
-            output_note_app,
+            input_resource_app,
+            output_resource_app,
             hints,
         }
     }
@@ -43,22 +43,22 @@ impl TransparentPartialTransaction {
 
 impl Executable for TransparentPartialTransaction {
     fn execute(&self) -> Result<(), TransactionError> {
-        // check VPs, nullifiers, and note commitments
+        // check VPs, nullifiers, and resource commitments
         let action_nfs = self.get_nullifiers();
         let action_cms = self.get_output_cms();
-        for (vp, nf) in self.input_note_app.iter().zip(action_nfs.iter()) {
-            let owned_note_id = vp.verify_transparently(&action_nfs, &action_cms)?;
-            // Check all notes are checked
-            if owned_note_id != nf.inner() {
-                return Err(TransactionError::InconsistentOwnedNotePubID);
+        for (vp, nf) in self.input_resource_app.iter().zip(action_nfs.iter()) {
+            let owned_resource_id = vp.verify_transparently(&action_nfs, &action_cms)?;
+            // Check all resources are checked
+            if owned_resource_id != nf.inner() {
+                return Err(TransactionError::InconsistentOwneResourceID);
             }
         }
 
-        for (vp, cm) in self.output_note_app.iter().zip(action_cms.iter()) {
-            let owned_note_id = vp.verify_transparently(&action_nfs, &action_cms)?;
-            // Check all notes are checked
-            if owned_note_id != cm.inner() {
-                return Err(TransactionError::InconsistentOwnedNotePubID);
+        for (vp, cm) in self.output_resource_app.iter().zip(action_cms.iter()) {
+            let owned_resource_id = vp.verify_transparently(&action_nfs, &action_cms)?;
+            // Check all resources are checked
+            if owned_resource_id != cm.inner() {
+                return Err(TransactionError::InconsistentOwneResourceID);
             }
         }
 
@@ -69,7 +69,7 @@ impl Executable for TransparentPartialTransaction {
     fn get_nullifiers(&self) -> Vec<Nullifier> {
         self.actions
             .iter()
-            .map(|action| action.get_input_note_nullifer())
+            .map(|action| action.get_input_resource_nullifer())
             .collect()
     }
 
@@ -77,7 +77,7 @@ impl Executable for TransparentPartialTransaction {
     fn get_output_cms(&self) -> Vec<NoteCommitment> {
         self.actions
             .iter()
-            .map(|action| action.get_output_note_cm())
+            .map(|action| action.get_output_resource_cm())
             .collect()
     }
 
@@ -103,82 +103,82 @@ impl Executable for TransparentPartialTransaction {
 pub mod testing {
     use crate::{
         circuit::vp_examples::TrivialValidityPredicateCircuit,
-        constant::TAIGA_COMMITMENT_TREE_DEPTH, merkle_tree::MerklePath, note::tests::random_note,
-        transparent_ptx::*,
+        constant::TAIGA_COMMITMENT_TREE_DEPTH, merkle_tree::MerklePath,
+        resource::tests::random_resource, transparent_ptx::*,
     };
     use rand::rngs::OsRng;
 
     pub fn create_transparent_ptx() -> TransparentPartialTransaction {
         let mut rng = OsRng;
-        // construct notes
-        let input_note_1 = random_note(&mut rng);
-        let mut output_note_1 = {
-            let mut note = random_note(&mut rng);
-            note.note_type = input_note_1.note_type;
-            note.value = input_note_1.value;
-            note
+        // construct resources
+        let input_resource_1 = random_resource(&mut rng);
+        let mut output_resource_1 = {
+            let mut resource = random_resource(&mut rng);
+            resource.note_type = input_resource_1.note_type;
+            resource.value = input_resource_1.value;
+            resource
         };
         let merkle_path_1 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         let action_1 = ActionInfo::new(
-            input_note_1,
+            input_resource_1,
             merkle_path_1,
             None,
-            &mut output_note_1,
+            &mut output_resource_1,
             &mut rng,
         );
 
-        let input_note_2 = random_note(&mut rng);
-        let mut output_note_2 = {
-            let mut note = random_note(&mut rng);
-            note.note_type = input_note_2.note_type;
-            note.value = input_note_2.value;
-            note
+        let input_resource_2 = random_resource(&mut rng);
+        let mut output_resource_2 = {
+            let mut resource = random_resource(&mut rng);
+            resource.note_type = input_resource_2.note_type;
+            resource.value = input_resource_2.value;
+            resource
         };
         let merkle_path_2 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         let action_2 = ActionInfo::new(
-            input_note_2,
+            input_resource_2,
             merkle_path_2,
             None,
-            &mut output_note_2,
+            &mut output_resource_2,
             &mut rng,
         );
 
         // construct applications
-        let input_note_1_app = {
+        let input_resource_1_app = {
             let app_vp = TrivialValidityPredicateCircuit::new(
-                input_note_1.get_nf().unwrap().inner(),
-                [input_note_1, input_note_2],
-                [output_note_1, output_note_2],
+                input_resource_1.get_nf().unwrap().inner(),
+                [input_resource_1, input_resource_2],
+                [output_resource_1, output_resource_2],
             );
 
             ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
         };
 
-        let input_note_2_app = {
+        let input_resource_2_app = {
             let app_vp = TrivialValidityPredicateCircuit::new(
-                input_note_2.get_nf().unwrap().inner(),
-                [input_note_1, input_note_2],
-                [output_note_1, output_note_2],
+                input_resource_2.get_nf().unwrap().inner(),
+                [input_resource_1, input_resource_2],
+                [output_resource_1, output_resource_2],
             );
 
             ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
         };
 
-        let output_note_1_app = {
+        let output_resource_1_app = {
             let app_vp = TrivialValidityPredicateCircuit::new(
-                output_note_1.commitment().inner(),
-                [input_note_1, input_note_2],
-                [output_note_1, output_note_2],
+                output_resource_1.commitment().inner(),
+                [input_resource_1, input_resource_2],
+                [output_resource_1, output_resource_2],
             );
 
             ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
         };
 
-        let output_note_2_app = {
+        let output_resource_2_app = {
             let app_vp = TrivialValidityPredicateCircuit::new(
-                output_note_2.commitment().inner(),
-                [input_note_1, input_note_2],
-                [output_note_1, output_note_2],
+                output_resource_2.commitment().inner(),
+                [input_resource_1, input_resource_2],
+                [output_resource_1, output_resource_2],
             );
 
             ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
@@ -186,8 +186,8 @@ pub mod testing {
 
         TransparentPartialTransaction::new(
             vec![action_1, action_2],
-            vec![input_note_1_app, input_note_2_app],
-            vec![output_note_1_app, output_note_2_app],
+            vec![input_resource_1_app, input_resource_2_app],
+            vec![output_resource_1_app, output_resource_2_app],
             vec![],
         )
     }

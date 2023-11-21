@@ -4,42 +4,42 @@ use crate::{
 };
 use crate::{
     error::TransactionError,
-    note::{Note, RandomSeed},
     nullifier::Nullifier,
+    resource::{RandomSeed, Resource},
     shielded_ptx::ShieldedPartialTransaction,
     transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
 };
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
 
-pub const NOTE_SIZE: usize = 234;
+pub const RESOURCE_SIZE: usize = 234;
 
 #[cfg(feature = "borsh")]
 use borsh::{BorshDeserialize, BorshSerialize};
 
-/// Create a note
+/// Create a resource
 /// app_vk is the compressed verifying key of application(static) VP
 /// app_data_static is the encoded data that is defined in application vp
 /// app_data_dynamic is the data defined in application vp and will NOT be used to derive type
-/// value is the quantity of notes
+/// value is the quantity of resources
 /// nk is the nullifier key
 /// rho is the old nullifier
-/// is_merkle_checked is true for normal notes, false for intent(ephemeral) notes
+/// is_merkle_checked is true for normal resources, false for intent(ephemeral) resources
 ///
-/// In practice, input notes are fetched and decrypted from blockchain storage.
-/// The create_input_note API is only for test.
-pub fn create_input_note(
+/// In practice, input resources are fetched and decrypted from blockchain storage.
+/// The create_input_resource API is only for test.
+pub fn create_input_resource(
     app_vk: pallas::Base,
     app_data_static: pallas::Base,
     app_data_dynamic: pallas::Base,
     value: u64,
     nk: pallas::Base,
     is_merkle_checked: bool,
-) -> Note {
+) -> Resource {
     let rng = OsRng;
     let rho = Nullifier::random(rng);
     let rseed = RandomSeed::random(rng);
-    Note::new_input_note(
+    Resource::new_input_resource(
         app_vk,
         app_data_static,
         app_data_dynamic,
@@ -52,16 +52,16 @@ pub fn create_input_note(
 }
 
 ///
-pub fn create_output_note(
+pub fn create_output_resource(
     app_vk: pallas::Base,
     app_data_static: pallas::Base,
     app_data_dynamic: pallas::Base,
     value: u64,
-    // The owner of output note has the nullifer key and exposes the nullifier_key commitment to output creator.
+    // The owner of output resource has the nullifer key and exposes the nullifier_key commitment to output creator.
     nk_com: pallas::Base,
     is_merkle_checked: bool,
-) -> Note {
-    Note::new_output_note(
+) -> Resource {
+    Resource::new_output_resource(
         app_vk,
         app_data_static,
         app_data_dynamic,
@@ -71,11 +71,11 @@ pub fn create_output_note(
     )
 }
 
-/// Note borsh serialization
+/// Resource borsh serialization
 ///
-/// Note size: 234 bytes
+/// Resource size: 234 bytes
 ///
-/// Note layout:
+/// Resource layout:
 /// |   Parameters          | type          |size(bytes)|
 /// |   -                   |   -           |   -       |
 /// |   app_vk              | pallas::Base  |   32      |
@@ -89,19 +89,19 @@ pub fn create_output_note(
 /// |   rcm                 | pallas::Base  |   32      |
 /// |   is_merkle_checked   | u8            |   1       |
 #[cfg(feature = "borsh")]
-pub fn note_serialize(note: &Note) -> std::io::Result<Vec<u8>> {
-    let mut result = Vec::with_capacity(NOTE_SIZE);
-    note.serialize(&mut result)?;
+pub fn resource_serialize(resource: &Resource) -> std::io::Result<Vec<u8>> {
+    let mut result = Vec::with_capacity(RESOURCE_SIZE);
+    resource.serialize(&mut result)?;
     Ok(result)
 }
 
-/// Note borsh deserialization
+/// Resource borsh deserialization
 #[cfg(feature = "borsh")]
-pub fn note_deserialize(bytes: Vec<u8>) -> std::io::Result<Note> {
-    if bytes.len() != NOTE_SIZE {
+pub fn resource_deserialize(bytes: Vec<u8>) -> std::io::Result<Resource> {
+    if bytes.len() != RESOURCE_SIZE {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
-            "incorrect note size",
+            "incorrect resource size",
         ));
     }
     BorshDeserialize::deserialize(&mut bytes.as_ref())
@@ -128,7 +128,7 @@ pub fn note_deserialize(bytes: Vec<u8>) -> std::io::Result<Note> {
 /// | binding_sig_r                     | Option<pallas::Scalar>| 1 or (1 + 32) |
 /// | hints                             | Vec<u8>               | -             |
 ///
-/// Note: Ultimately, vp proofs won't go to the ptx. It's verifier proofs instead.
+/// Resource: Ultimately, vp proofs won't go to the ptx. It's verifier proofs instead.
 /// The verifier proof may have a much smaller size since the verifier verifying-key
 /// is a constant and can be cached.
 #[cfg(feature = "borsh")]
@@ -169,12 +169,18 @@ pub fn transaction_deserialize(bytes: Vec<u8>) -> std::io::Result<Transaction> {
 #[cfg(feature = "borsh")]
 pub fn create_shielded_partial_transaction(
     actions: Vec<ActionInfo>,
-    input_note_app: Vec<ApplicationByteCode>,
-    output_note_app: Vec<ApplicationByteCode>,
+    input_resource_app: Vec<ApplicationByteCode>,
+    output_resource_app: Vec<ApplicationByteCode>,
     hints: Vec<u8>,
 ) -> Result<ShieldedPartialTransaction, TransactionError> {
     let rng = OsRng;
-    ShieldedPartialTransaction::from_bytecode(actions, input_note_app, output_note_app, hints, rng)
+    ShieldedPartialTransaction::from_bytecode(
+        actions,
+        input_resource_app,
+        output_resource_app,
+        hints,
+        rng,
+    )
 }
 
 /// Create a transaction from partial transactions
@@ -227,26 +233,27 @@ pub fn verify_shielded_partial_transaction(ptx_bytes: Vec<u8>) -> Result<(), Tra
 #[cfg(feature = "borsh")]
 pub mod tests {
     use crate::{
-        note::tests::random_note, nullifier::tests::random_nullifier_key_commitment, taiga_api::*,
+        nullifier::tests::random_nullifier_key_commitment, resource::tests::random_resource,
+        taiga_api::*,
     };
     use rand::rngs::OsRng;
 
     #[test]
-    fn note_borsh_serialization_api_test() {
+    fn resource_borsh_serialization_api_test() {
         let mut rng = OsRng;
-        let input_note = random_note(&mut rng);
+        let input_resource = random_resource(&mut rng);
         {
-            let bytes = note_serialize(&input_note).unwrap();
-            let de_input_note = note_deserialize(bytes).unwrap();
-            assert_eq!(input_note, de_input_note);
+            let bytes = resource_serialize(&input_resource).unwrap();
+            let de_input_resource = resource_deserialize(bytes).unwrap();
+            assert_eq!(input_resource, de_input_resource);
         }
 
         {
-            let mut output_note = input_note;
-            output_note.nk_container = random_nullifier_key_commitment(&mut rng);
-            let bytes = note_serialize(&output_note).unwrap();
-            let de_output_note = note_deserialize(bytes).unwrap();
-            assert_eq!(output_note, de_output_note);
+            let mut output_resource = input_resource;
+            output_resource.nk_container = random_nullifier_key_commitment(&mut rng);
+            let bytes = resource_serialize(&output_resource).unwrap();
+            let de_output_resource = resource_deserialize(bytes).unwrap();
+            assert_eq!(output_resource, de_output_resource);
         }
     }
 
@@ -257,71 +264,71 @@ pub mod tests {
         use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
         use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
         use crate::merkle_tree::MerklePath;
-        use crate::note::tests::random_note;
+        use crate::resource::tests::random_resource;
 
         let mut rng = OsRng;
 
-        // construct notes
-        let input_note_1 = random_note(&mut rng);
-        let input_note_1_nf = input_note_1.get_nf().unwrap();
-        let mut output_note_1 = random_note(&mut rng);
+        // construct resources
+        let input_resource_1 = random_resource(&mut rng);
+        let input_resource_1_nf = input_resource_1.get_nf().unwrap();
+        let mut output_resource_1 = random_resource(&mut rng);
         let merkle_path_1 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         let action_1 = ActionInfo::new(
-            input_note_1,
+            input_resource_1,
             merkle_path_1,
             None,
-            &mut output_note_1,
+            &mut output_resource_1,
             &mut rng,
         );
 
-        let input_note_2 = random_note(&mut rng);
-        let input_note_2_nf = input_note_2.get_nf().unwrap();
-        let mut output_note_2 = random_note(&mut rng);
+        let input_resource_2 = random_resource(&mut rng);
+        let input_resource_2_nf = input_resource_2.get_nf().unwrap();
+        let mut output_resource_2 = random_resource(&mut rng);
         let merkle_path_2 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         let action_2 = ActionInfo::new(
-            input_note_2,
+            input_resource_2,
             merkle_path_2,
             None,
-            &mut output_note_2,
+            &mut output_resource_2,
             &mut rng,
         );
 
         // construct applications
-        let input_note_1_app = {
+        let input_resource_1_app = {
             let app_vp = TrivialValidityPredicateCircuit::new(
-                input_note_1_nf.inner(),
-                [input_note_1, input_note_2],
-                [output_note_1, output_note_2],
+                input_resource_1_nf.inner(),
+                [input_resource_1, input_resource_2],
+                [output_resource_1, output_resource_2],
             );
 
             ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
         };
 
-        let input_note_2_app = {
+        let input_resource_2_app = {
             let app_vp = TrivialValidityPredicateCircuit::new(
-                input_note_2_nf.inner(),
-                [input_note_1, input_note_2],
-                [output_note_1, output_note_2],
+                input_resource_2_nf.inner(),
+                [input_resource_1, input_resource_2],
+                [output_resource_1, output_resource_2],
             );
 
             ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
         };
 
-        let output_note_1_app = {
+        let output_resource_1_app = {
             let app_vp = TrivialValidityPredicateCircuit::new(
-                output_note_1.commitment().inner(),
-                [input_note_1, input_note_2],
-                [output_note_1, output_note_2],
+                output_resource_1.commitment().inner(),
+                [input_resource_1, input_resource_2],
+                [output_resource_1, output_resource_2],
             );
 
             ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
         };
 
-        let output_note_2_app = {
+        let output_resource_2_app = {
             let app_vp = TrivialValidityPredicateCircuit::new(
-                output_note_2.commitment().inner(),
-                [input_note_1, input_note_2],
-                [output_note_1, output_note_2],
+                output_resource_2.commitment().inner(),
+                [input_resource_1, input_resource_2],
+                [output_resource_1, output_resource_2],
             );
 
             ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
@@ -330,8 +337,8 @@ pub mod tests {
         // construct ptx
         let ptx = create_shielded_partial_transaction(
             vec![action_1, action_2],
-            vec![input_note_1_app, input_note_2_app],
-            vec![output_note_1_app, output_note_2_app],
+            vec![input_resource_1_app, input_resource_2_app],
+            vec![output_resource_1_app, output_resource_2_app],
             vec![],
         )
         .unwrap();

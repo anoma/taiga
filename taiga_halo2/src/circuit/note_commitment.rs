@@ -159,7 +159,7 @@ pub fn note_commit(
             .compose_config
             .assign(&mut layouter, &is_merkle_checked, &value)?;
 
-    // note commitment
+    // resource commitment
     let poseidon_message = [
         app_vp,
         app_data_static,
@@ -172,7 +172,7 @@ pub fn note_commit(
     ];
     poseidon_hash_gadget(
         chip.config.poseidon_config,
-        layouter.namespace(|| "note commitment"),
+        layouter.namespace(|| "resource commitment"),
         poseidon_message,
     )
 }

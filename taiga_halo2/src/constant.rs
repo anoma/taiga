@@ -19,7 +19,7 @@ use lazy_static::lazy_static;
 use pasta_curves::{group::Curve, pallas, vesta};
 use std::collections::HashMap;
 
-/// SWU hash-to-curve personalization for the note commitment generator
+/// SWU hash-to-curve personalization for the resource commitment generator
 pub const NOTE_COMMITMENT_PERSONALIZATION: &str = "Taiga-NoteCommit";
 
 pub const TRANSACTION_BINDING_HASH_PERSONALIZATION: &[u8; 16] = b"TxBindingSigHash";
@@ -41,8 +41,8 @@ pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
 
 pub const BASE_BITS_NUM: usize = 255;
 
-/// The number of notes in a (partial)tx.
-pub const NUM_NOTE: usize = 2;
+/// The number of resources in a (partial)tx.
+pub const NUM_RESOURCE: usize = 2;
 
 pub const ACTION_NF_PUBLIC_INPUT_ROW_IDX: usize = 0;
 pub const ACTION_ANCHOR_PUBLIC_INPUT_ROW_IDX: usize = 1;
@@ -69,7 +69,7 @@ pub const VP_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX: usize = 0;
 pub const VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX: usize = 1;
 pub const VP_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX: usize = 2;
 pub const VP_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX: usize = 3;
-pub const VP_CIRCUIT_OWNED_NOTE_PUB_ID_PUBLIC_INPUT_IDX: usize = 4;
+pub const VP_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX: usize = 4;
 pub const VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_1: usize = 5;
 pub const VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_2: usize = 6;
 pub const VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_1: usize = 7;
@@ -82,7 +82,7 @@ pub const VP_CIRCUIT_NOTE_ENCRYPTION_MAC_IDX: usize = 22;
 pub const VP_CIRCUIT_NOTE_ENCRYPTION_PK_X_IDX: usize = 23;
 pub const VP_CIRCUIT_NOTE_ENCRYPTION_PK_Y_IDX: usize = 24;
 
-// Note encryption
+// Resource encryption
 pub const NOTE_ENCRYPTION_PLAINTEXT_NUM: usize = 10;
 pub const NOTE_ENCRYPTION_CIPHERTEXT_NUM: usize = NOTE_ENCRYPTION_PLAINTEXT_NUM + 2; // msg(10) + MAC(1) + NOUNCE(1)
 

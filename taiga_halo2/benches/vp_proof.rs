@@ -7,17 +7,17 @@ use rand::rngs::OsRng;
 use rand::Rng;
 use taiga_halo2::{
     circuit::{vp_circuit::ValidityPredicateCircuit, vp_examples::TrivialValidityPredicateCircuit},
-    constant::{NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_PARAMS_SIZE},
-    note::{Note, NoteType, RandomSeed},
+    constant::{NUM_RESOURCE, SETUP_PARAMS_MAP, VP_CIRCUIT_PARAMS_SIZE},
     nullifier::{Nullifier, NullifierKeyContainer},
     proof::Proof,
+    resource::{NoteType, RandomSeed, Resource},
 };
 
 fn bench_vp_proof(name: &str, c: &mut Criterion) {
     let mut rng = OsRng;
 
     let vp_circuit = {
-        let input_notes = [(); NUM_NOTE].map(|_| {
+        let input_resources = [(); NUM_RESOURCE].map(|_| {
             let rho = Nullifier::from(pallas::Base::random(&mut rng));
             let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
             let note_type = {
@@ -28,7 +28,7 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
             let app_data_dynamic = pallas::Base::random(&mut rng);
             let value: u64 = rng.gen();
             let rseed = RandomSeed::random(&mut rng);
-            Note {
+            Resource {
                 note_type,
                 app_data_dynamic,
                 value,
@@ -39,7 +39,7 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
                 rho,
             }
         });
-        let output_notes = input_notes
+        let output_resources = input_resources
             .iter()
             .map(|input| {
                 let rho = input.get_nf().unwrap();
@@ -52,7 +52,7 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
                 let app_data_dynamic = pallas::Base::random(&mut rng);
                 let value: u64 = rng.gen();
                 let rseed = RandomSeed::random(&mut rng);
-                Note {
+                Resource {
                     note_type,
                     app_data_dynamic,
                     value,
@@ -64,11 +64,11 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
                 }
             })
             .collect::<Vec<_>>();
-        let owned_note_pub_id = input_notes[0].get_nf().unwrap().inner();
+        let owned_resource_id = input_resources[0].get_nf().unwrap().inner();
         TrivialValidityPredicateCircuit::new(
-            owned_note_pub_id,
-            input_notes,
-            output_notes.try_into().unwrap(),
+            owned_resource_id,
+            input_resources,
+            output_resources.try_into().unwrap(),
         )
     };
     let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();

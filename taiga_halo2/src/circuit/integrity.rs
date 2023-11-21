@@ -2,10 +2,10 @@ use crate::circuit::{
     gadgets::{assign_free_advice, assign_free_constant, poseidon_hash::poseidon_hash_gadget},
     hash_to_curve::{hash_to_curve_circuit, HashToCurveConfig},
     note_commitment::{note_commit, NoteCommitChip},
-    vp_circuit::{InputNoteVariables, NoteVariables, OutputNoteVariables},
+    vp_circuit::{InputResourceVariables, OutputResourceVariables, ResourceVariables},
 };
 use crate::constant::{TaigaFixedBases, TaigaFixedBasesFull, POSEIDON_TO_CURVE_INPUT_LEN};
-use crate::note::Note;
+use crate::resource::Resource;
 use crate::utils::poseidon_to_curve;
 use halo2_gadgets::{
     ecc::{chip::EccChip, FixedPoint, NonIdentityPoint, Point, ScalarFixed, ScalarVar},
@@ -38,18 +38,18 @@ pub fn nullifier_circuit(
     )
 }
 
-// Check input note integrity and return the input note variables and the nullifier
+// Check input resource integrity and return the input resource variables and the nullifier
 #[allow(clippy::too_many_arguments)]
-pub fn check_input_note(
+pub fn check_input_resource(
     mut layouter: impl Layouter<pallas::Base>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
     note_commit_chip: NoteCommitChip,
-    input_note: Note,
+    input_resource: Resource,
     nf_row_idx: usize,
-) -> Result<InputNoteVariables, Error> {
+) -> Result<InputResourceVariables, Error> {
     // Witness nk
-    let nk = input_note.get_nk().unwrap();
+    let nk = input_resource.get_nk().unwrap();
     let nk_var = assign_free_advice(
         layouter.namespace(|| "witness nk"),
         advices[0],
@@ -73,49 +73,49 @@ pub fn check_input_note(
     let app_data_dynamic = assign_free_advice(
         layouter.namespace(|| "witness app_data_dynamic"),
         advices[0],
-        Value::known(input_note.app_data_dynamic),
+        Value::known(input_resource.app_data_dynamic),
     )?;
 
     // Witness app_vk
     let app_vk = assign_free_advice(
         layouter.namespace(|| "witness app_vk"),
         advices[0],
-        Value::known(input_note.get_app_vk()),
+        Value::known(input_resource.get_app_vk()),
     )?;
 
     // Witness app_data_static
     let app_data_static = assign_free_advice(
         layouter.namespace(|| "witness app_data_static"),
         advices[0],
-        Value::known(input_note.get_app_data_static()),
+        Value::known(input_resource.get_app_data_static()),
     )?;
 
     // Witness and range check the value(u64)
     let value = value_range_check(
         layouter.namespace(|| "value range check"),
         note_commit_chip.get_lookup_config(),
-        input_note.value,
+        input_resource.value,
     )?;
 
     // Witness rho
     let rho = assign_free_advice(
         layouter.namespace(|| "witness rho"),
         advices[0],
-        Value::known(input_note.rho.inner()),
+        Value::known(input_resource.rho.inner()),
     )?;
 
     // Witness psi
     let psi = assign_free_advice(
         layouter.namespace(|| "witness psi_input"),
         advices[0],
-        Value::known(input_note.get_psi()),
+        Value::known(input_resource.get_psi()),
     )?;
 
     // Witness rcm
     let rcm = assign_free_advice(
         layouter.namespace(|| "witness rcm"),
         advices[0],
-        Value::known(input_note.get_rcm()),
+        Value::known(input_resource.get_rcm()),
     )?;
 
     // Witness is_merkle_checked
@@ -123,12 +123,12 @@ pub fn check_input_note(
     let is_merkle_checked = assign_free_advice(
         layouter.namespace(|| "witness is_merkle_checked"),
         advices[0],
-        Value::known(pallas::Base::from(input_note.is_merkle_checked)),
+        Value::known(pallas::Base::from(input_resource.is_merkle_checked)),
     )?;
 
-    // Check note commitment
+    // Check resource commitment
     let cm = note_commit(
-        layouter.namespace(|| "note commitment"),
+        layouter.namespace(|| "resource commitment"),
         note_commit_chip.clone(),
         app_vk.clone(),
         app_data_static.clone(),
@@ -154,7 +154,7 @@ pub fn check_input_note(
     // Public nullifier
     layouter.constrain_instance(nf.cell(), instances, nf_row_idx)?;
 
-    let note_variables = NoteVariables {
+    let resource_variables = ResourceVariables {
         app_vk,
         value,
         app_data_static,
@@ -166,70 +166,70 @@ pub fn check_input_note(
         rcm,
     };
 
-    Ok(InputNoteVariables {
-        note_variables,
+    Ok(InputResourceVariables {
+        resource_variables,
         nf,
         cm,
     })
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn check_output_note(
+pub fn check_output_resource(
     mut layouter: impl Layouter<pallas::Base>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
     note_commit_chip: NoteCommitChip,
-    output_note: Note,
+    output_resource: Resource,
     old_nf: AssignedCell<pallas::Base, pallas::Base>,
     cm_row_idx: usize,
-) -> Result<OutputNoteVariables, Error> {
+) -> Result<OutputResourceVariables, Error> {
     // Witness nk_com
     let nk_com = assign_free_advice(
         layouter.namespace(|| "witness nk_com"),
         advices[0],
-        Value::known(output_note.get_nk_commitment()),
+        Value::known(output_resource.get_nk_commitment()),
     )?;
 
     // Witness app_data_dynamic
     let app_data_dynamic = assign_free_advice(
         layouter.namespace(|| "witness app_data_dynamic"),
         advices[0],
-        Value::known(output_note.app_data_dynamic),
+        Value::known(output_resource.app_data_dynamic),
     )?;
 
     // Witness app_vk
     let app_vk = assign_free_advice(
         layouter.namespace(|| "witness app_vk"),
         advices[0],
-        Value::known(output_note.get_app_vk()),
+        Value::known(output_resource.get_app_vk()),
     )?;
 
     // Witness app_data_static
     let app_data_static = assign_free_advice(
         layouter.namespace(|| "witness app_data_static"),
         advices[0],
-        Value::known(output_note.get_app_data_static()),
+        Value::known(output_resource.get_app_data_static()),
     )?;
 
     // Witness and range check the value(u64)
     let value = value_range_check(
         layouter.namespace(|| "value range check"),
         note_commit_chip.get_lookup_config(),
-        output_note.value,
+        output_resource.value,
     )?;
 
     // Witness rcm
     let rcm = assign_free_advice(
         layouter.namespace(|| "witness rcm"),
         advices[0],
-        Value::known(output_note.get_rcm()),
+        Value::known(output_resource.get_rcm()),
     )?;
 
     // Witness psi
     let psi = assign_free_advice(
         layouter.namespace(|| "witness psi_output"),
         advices[0],
-        Value::known(output_note.get_psi()),
+        Value::known(output_resource.get_psi()),
     )?;
 
     // Witness is_merkle_checked
@@ -237,12 +237,12 @@ pub fn check_output_note(
     let is_merkle_checked = assign_free_advice(
         layouter.namespace(|| "witness is_merkle_checked"),
         advices[0],
-        Value::known(pallas::Base::from(output_note.is_merkle_checked)),
+        Value::known(pallas::Base::from(output_resource.is_merkle_checked)),
     )?;
 
-    // Check note commitment
+    // Check resource commitment
     let cm = note_commit(
-        layouter.namespace(|| "note commitment"),
+        layouter.namespace(|| "resource commitment"),
         note_commit_chip,
         app_vk.clone(),
         app_data_static.clone(),
@@ -258,7 +258,7 @@ pub fn check_output_note(
     // Public cm
     layouter.constrain_instance(cm.cell(), instances, cm_row_idx)?;
 
-    let note_variables = NoteVariables {
+    let resource_variables = ResourceVariables {
         app_vk,
         app_data_static,
         value,
@@ -270,7 +270,10 @@ pub fn check_output_note(
         rcm,
     };
 
-    Ok(OutputNoteVariables { note_variables, cm })
+    Ok(OutputResourceVariables {
+        resource_variables,
+        cm,
+    })
 }
 
 pub fn derive_note_type(
@@ -288,7 +291,7 @@ pub fn derive_note_type(
     )?;
 
     // Assign a new `NonIdentityPoint` and constran equal to hash_to_curve point since `Point` doesn't have mul operation
-    // IndentityPoint is an invalid note type and it returns an error.
+    // IndentityPoint is an invalid resource type and it returns an error.
     let non_identity_point = app_vk
         .value()
         .zip(app_data_static.value())
@@ -297,11 +300,11 @@ pub fn derive_note_type(
         });
     let non_identity_point_var = NonIdentityPoint::new(
         ecc_chip,
-        layouter.namespace(|| "non-identity note type"),
+        layouter.namespace(|| "non-identity resource type"),
         non_identity_point,
     )?;
     point.constrain_equal(
-        layouter.namespace(|| "non-identity note type"),
+        layouter.namespace(|| "non-identity resource type"),
         &non_identity_point_var,
     )?;
     Ok(non_identity_point_var)
@@ -322,7 +325,7 @@ pub fn compute_value_commitment(
 ) -> Result<Point<pallas::Affine, EccChip<TaigaFixedBases>>, Error> {
     // input value point
     let note_type_input = derive_note_type(
-        layouter.namespace(|| "derive input note type"),
+        layouter.namespace(|| "derive input resource type"),
         hash_to_curve_config.clone(),
         ecc_chip.clone(),
         app_address_input,
@@ -338,7 +341,7 @@ pub fn compute_value_commitment(
 
     // output value point
     let note_type_output = derive_note_type(
-        layouter.namespace(|| "derive output note type"),
+        layouter.namespace(|| "derive output resource type"),
         hash_to_curve_config,
         ecc_chip.clone(),
         app_address_output,
@@ -418,8 +421,8 @@ fn value_range_check<const K: usize>(
 #[test]
 fn test_halo2_nullifier_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
-    use crate::note::NoteCommitment;
     use crate::nullifier::{Nullifier, NullifierKeyContainer};
+    use crate::resource::NoteCommitment;
     use halo2_gadgets::poseidon::{
         primitives as poseidon, Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
     };

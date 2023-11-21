@@ -15,20 +15,20 @@ use taiga_halo2::{
         gadgets::{
             assign_free_advice,
             poseidon_hash::poseidon_hash_gadget,
-            target_note_variable::{
-                get_is_input_note_flag, get_owned_note_variable, GetIsInputNoteFlagConfig,
-                GetOwnedNoteVariableConfig,
+            target_resource_variable::{
+                get_is_input_resource_flag, get_owned_resource_variable, GetIsInputResourceFlagConfig,
+                GetOwnedResourceVariableConfig,
             },
         },
-        note_circuit::NoteConfig,
+        resource_circuit::ResourceConfig,
         vp_circuit::{
-            BasicValidityPredicateVariables, OutputNoteVariables, VPVerifyingInfo,
+            BasicValidityPredicateVariables, OutputResourceVariables, VPVerifyingInfo,
             ValidityPredicateCircuit, ValidityPredicateConfig, ValidityPredicateInfo,
             ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
         },
     },
-    constant::{NUM_NOTE, SETUP_PARAMS_MAP},
-    note::{Note, RandomSeed},
+    constant::{NUM_RESOURCE, SETUP_PARAMS_MAP},
+    resource::{Resource, RandomSeed},
     proof::Proof,
     utils::poseidon_hash,
     vp_circuit_impl,
@@ -37,34 +37,34 @@ use taiga_halo2::{
 
 #[derive(Clone, Debug, Default)]
 struct DealerIntentValidityPredicateCircuit {
-    owned_note_pub_id: pallas::Base,
-    input_notes: [Note; NUM_NOTE],
-    output_notes: [Note; NUM_NOTE],
+    owned_resource_id: pallas::Base,
+    input_resources: [Resource; NUM_RESOURCE],
+    output_resources: [Resource; NUM_RESOURCE],
     encoded_puzzle: pallas::Base,
     sudoku_app_vk: pallas::Base,
-    // When it's an output note, we don't need a valid solution.
+    // When it's an output resource, we don't need a valid solution.
     encoded_solution: pallas::Base,
 }
 
 #[derive(Clone, Debug)]
 struct IntentAppValidityPredicateConfig {
-    note_conifg: NoteConfig,
+    resource_config: ResourceConfig,
     advices: [Column<Advice>; 10],
-    get_owned_note_variable_config: GetOwnedNoteVariableConfig,
-    get_is_input_note_flag_config: GetIsInputNoteFlagConfig,
+    get_owned_resource_variable_config: GetOwnedResourceVariableConfig,
+    get_is_input_resource_flag_config: GetIsInputResourceFlagConfig,
     dealer_intent_check_config: DealerIntentCheckConfig,
 }
 
 impl ValidityPredicateConfig for IntentAppValidityPredicateConfig {
-    fn get_note_config(&self) -> NoteConfig {
-        self.note_conifg.clone()
+    fn get_resource_config(&self) -> ResourceConfig {
+        self.resource_config.clone()
     }
 
     fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
-        let note_conifg = Self::configure_note(meta);
+        let resource_config = Self::configure_resource(meta);
 
-        let advices = note_conifg.advices;
-        let get_owned_note_variable_config = GetOwnedNoteVariableConfig::configure(
+        let advices = resource_config.advices;
+        let get_owned_resource_variable_config = GetOwnedResourceVariableConfig::configure(
             meta,
             advices[0],
             [advices[1], advices[2], advices[3], advices[4]],
@@ -72,14 +72,14 @@ impl ValidityPredicateConfig for IntentAppValidityPredicateConfig {
         let dealer_intent_check_config = DealerIntentCheckConfig::configure(
             meta, advices[0], advices[1], advices[2], advices[3], advices[4], advices[5],
         );
-        let get_is_input_note_flag_config =
-            GetIsInputNoteFlagConfig::configure(meta, advices[0], advices[1], advices[2]);
+        let get_is_input_resource_flag_config =
+            GetIsInputResourceFlagConfig::configure(meta, advices[0], advices[1], advices[2]);
 
         Self {
-            note_conifg,
+            resource_config,
             advices,
-            get_owned_note_variable_config,
-            get_is_input_note_flag_config,
+            get_owned_resource_variable_config,
+            get_is_input_resource_flag_config,
             dealer_intent_check_config,
         }
     }
@@ -98,19 +98,19 @@ impl DealerIntentValidityPredicateCircuit {
         &self,
         config: &IntentAppValidityPredicateConfig,
         mut layouter: impl Layouter<pallas::Base>,
-        is_input_note: &AssignedCell<pallas::Base, pallas::Base>,
+        is_input_resource: &AssignedCell<pallas::Base, pallas::Base>,
         encoded_puzzle: &AssignedCell<pallas::Base, pallas::Base>,
-        sudoku_app_vk_in_dealer_intent_note: &AssignedCell<pallas::Base, pallas::Base>,
-        puzzle_note: &OutputNoteVariables,
+        sudoku_app_vk_in_dealer_intent_resource: &AssignedCell<pallas::Base, pallas::Base>,
+        puzzle_resource: &OutputResourceVariables,
     ) -> Result<(), Error> {
-        // puzzle_note_app_data_static = poseidon_hash(encoded_puzzle || encoded_solution)
+        // puzzle_resource_app_data_static = poseidon_hash(encoded_puzzle || encoded_solution)
         let encoded_solution = assign_free_advice(
             layouter.namespace(|| "witness encoded_solution"),
             config.advices[0],
             Value::known(self.encoded_solution),
         )?;
-        let encoded_puzzle_note_app_data_static = poseidon_hash_gadget(
-            config.get_note_config().poseidon_config,
+        let puzzle_resource_app_data_static = poseidon_hash_gadget(
+            config.get_resource_config().poseidon_config,
             layouter.namespace(|| "app_data_static encoding"),
             [encoded_puzzle.clone(), encoded_solution],
         )?;
@@ -119,12 +119,12 @@ impl DealerIntentValidityPredicateCircuit {
             || "dealer intent check",
             |mut region| {
                 config.dealer_intent_check_config.assign_region(
-                    is_input_note,
-                    &puzzle_note.note_variables.value,
-                    &puzzle_note.note_variables.app_vk,
-                    sudoku_app_vk_in_dealer_intent_note,
-                    &puzzle_note.note_variables.app_data_static,
-                    &encoded_puzzle_note_app_data_static,
+                    is_input_resource,
+                    &puzzle_resource.resource_variables.value,
+                    &puzzle_resource.resource_variables.app_vk,
+                    sudoku_app_vk_in_dealer_intent_resource,
+                    &puzzle_resource.resource_variables.app_data_static,
+                    &puzzle_resource_app_data_static,
                     0,
                     &mut region,
                 )
@@ -135,12 +135,12 @@ impl DealerIntentValidityPredicateCircuit {
 }
 
 impl ValidityPredicateInfo for DealerIntentValidityPredicateCircuit {
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.input_notes
+    fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE] {
+        &self.input_resources
     }
 
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.output_notes
+    fn get_output_resources(&self) -> &[Resource; NUM_RESOURCE] {
+        &self.output_resources
     }
 
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
@@ -153,8 +153,8 @@ impl ValidityPredicateInfo for DealerIntentValidityPredicateCircuit {
         public_inputs.into()
     }
 
-    fn get_owned_note_pub_id(&self) -> pallas::Base {
-        self.owned_note_pub_id
+    fn get_owned_resource_id(&self) -> pallas::Base {
+        self.owned_resource_id
     }
 }
 
@@ -167,20 +167,20 @@ impl ValidityPredicateCircuit for DealerIntentValidityPredicateCircuit {
         mut layouter: impl Layouter<pallas::Base>,
         basic_variables: BasicValidityPredicateVariables,
     ) -> Result<(), Error> {
-        let owned_note_pub_id = basic_variables.get_owned_note_pub_id();
-        let is_input_note = get_is_input_note_flag(
-            config.get_is_input_note_flag_config,
-            layouter.namespace(|| "get is_input_note_flag"),
-            &owned_note_pub_id,
-            &basic_variables.get_input_note_nfs(),
-            &basic_variables.get_output_note_cms(),
+        let owned_resource_id = basic_variables.get_owned_resource_id();
+        let is_input_resource = get_is_input_resource_flag(
+            config.get_is_input_resource_flag_config,
+            layouter.namespace(|| "get is_input_resource_flag"),
+            &owned_resource_id,
+            &basic_variables.get_input_resource_nfs(),
+            &basic_variables.get_output_resource_cms(),
         )?;
 
-        // search target note and output the app_static_data
-        let app_data_static = get_owned_note_variable(
-            config.get_owned_note_variable_config,
-            layouter.namespace(|| "get owned note app_static_data"),
-            &owned_note_pub_id,
+        // search target resource and output the app_static_data
+        let app_data_static = get_owned_resource_variable(
+            config.get_owned_resource_variable_config,
+            layouter.namespace(|| "get owned resource app_static_data"),
+            &owned_resource_id,
             &basic_variables.get_app_data_static_searchable_pairs(),
         )?;
 
@@ -196,7 +196,7 @@ impl ValidityPredicateCircuit for DealerIntentValidityPredicateCircuit {
             Value::known(self.sudoku_app_vk),
         )?;
         let app_data_static_encode = poseidon_hash_gadget(
-            config.get_note_config().poseidon_config,
+            config.get_resource_config().poseidon_config,
             layouter.namespace(|| "app_data_static encoding"),
             [encoded_puzzle.clone(), sudoku_app_vk.clone()],
         )?;
@@ -208,15 +208,15 @@ impl ValidityPredicateCircuit for DealerIntentValidityPredicateCircuit {
             },
         )?;
 
-        // if it is an output note, do nothing
-        // if it is an input note, 1. check the zero value of puzzle_note; 2. check the puzzle equality.
+        // if it is an output resource, do nothing
+        // if it is an input resource, 1. check the zero value of puzzle_resource; 2. check the puzzle equality.
         self.dealer_intent_check(
             &config,
             layouter.namespace(|| "dealer intent check"),
-            &is_input_note,
+            &is_input_resource,
             &encoded_puzzle,
             &sudoku_app_vk,
-            &basic_variables.output_note_variables[0],
+            &basic_variables.output_resource_variables[0],
         )
     }
 }
@@ -226,40 +226,40 @@ vp_circuit_impl!(DealerIntentValidityPredicateCircuit);
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DealerIntentCheckConfig {
     q_dealer_intent_check: Selector,
-    is_input_note: Column<Advice>,
-    puzzle_note_value: Column<Advice>,
+    is_input_resource: Column<Advice>,
+    puzzle_resource_value: Column<Advice>,
     sudoku_app_vk: Column<Advice>,
-    sudoku_app_vk_in_dealer_intent_note: Column<Advice>,
-    puzzle_note_app_data_static: Column<Advice>,
-    encoded_puzzle_note_app_data_static: Column<Advice>,
+    sudoku_app_vk_in_dealer_intent_resource: Column<Advice>,
+    puzzle_resource_app_data_static: Column<Advice>,
+    puzzle_resource_app_data_static: Column<Advice>,
 }
 
 impl DealerIntentCheckConfig {
     #[allow(clippy::too_many_arguments)]
     pub fn configure(
         meta: &mut ConstraintSystem<pallas::Base>,
-        is_input_note: Column<Advice>,
-        puzzle_note_value: Column<Advice>,
+        is_input_resource: Column<Advice>,
+        puzzle_resource_value: Column<Advice>,
         sudoku_app_vk: Column<Advice>,
-        sudoku_app_vk_in_dealer_intent_note: Column<Advice>,
-        puzzle_note_app_data_static: Column<Advice>,
-        encoded_puzzle_note_app_data_static: Column<Advice>,
+        sudoku_app_vk_in_dealer_intent_resource: Column<Advice>,
+        puzzle_resource_app_data_static: Column<Advice>,
+        puzzle_resource_app_data_static: Column<Advice>,
     ) -> Self {
-        meta.enable_equality(is_input_note);
-        meta.enable_equality(puzzle_note_value);
+        meta.enable_equality(is_input_resource);
+        meta.enable_equality(puzzle_resource_value);
         meta.enable_equality(sudoku_app_vk);
-        meta.enable_equality(sudoku_app_vk_in_dealer_intent_note);
-        meta.enable_equality(puzzle_note_app_data_static);
-        meta.enable_equality(encoded_puzzle_note_app_data_static);
+        meta.enable_equality(sudoku_app_vk_in_dealer_intent_resource);
+        meta.enable_equality(puzzle_resource_app_data_static);
+        meta.enable_equality(puzzle_resource_app_data_static);
 
         let config = Self {
             q_dealer_intent_check: meta.selector(),
-            is_input_note,
-            puzzle_note_value,
+            is_input_resource,
+            puzzle_resource_value,
             sudoku_app_vk,
-            sudoku_app_vk_in_dealer_intent_note,
-            puzzle_note_app_data_static,
-            encoded_puzzle_note_app_data_static,
+            sudoku_app_vk_in_dealer_intent_resource,
+            puzzle_resource_app_data_static,
+            puzzle_resource_app_data_static,
         };
 
         config.create_gate(meta);
@@ -270,35 +270,35 @@ impl DealerIntentCheckConfig {
     fn create_gate(&self, meta: &mut ConstraintSystem<pallas::Base>) {
         meta.create_gate("check dealer intent", |meta| {
             let q_dealer_intent_check = meta.query_selector(self.q_dealer_intent_check);
-            let is_input_note = meta.query_advice(self.is_input_note, Rotation::cur());
-            let puzzle_note_value = meta.query_advice(self.puzzle_note_value, Rotation::cur());
+            let is_input_resource = meta.query_advice(self.is_input_resource, Rotation::cur());
+            let puzzle_resource_value = meta.query_advice(self.puzzle_resource_value, Rotation::cur());
             let sudoku_app_vk = meta.query_advice(self.sudoku_app_vk, Rotation::cur());
-            let sudoku_app_vk_in_dealer_intent_note =
-                meta.query_advice(self.sudoku_app_vk_in_dealer_intent_note, Rotation::cur());
-            let puzzle_note_app_data_static =
-                meta.query_advice(self.puzzle_note_app_data_static, Rotation::cur());
-            let encoded_puzzle_note_app_data_static =
-                meta.query_advice(self.encoded_puzzle_note_app_data_static, Rotation::cur());
+            let sudoku_app_vk_in_dealer_intent_resource =
+                meta.query_advice(self.sudoku_app_vk_in_dealer_intent_resource, Rotation::cur());
+            let puzzle_resource_app_data_static =
+                meta.query_advice(self.puzzle_resource_app_data_static, Rotation::cur());
+            let puzzle_resource_app_data_static =
+                meta.query_advice(self.puzzle_resource_app_data_static, Rotation::cur());
 
-            let bool_check_is_input = bool_check(is_input_note.clone());
+            let bool_check_is_input = bool_check(is_input_resource.clone());
 
             Constraints::with_selector(
                 q_dealer_intent_check,
                 [
                     ("bool_check_is_input", bool_check_is_input),
                     (
-                        "check zero value of puzzle note",
-                        is_input_note.clone() * puzzle_note_value,
+                        "check zero value of puzzle resource",
+                        is_input_resource.clone() * puzzle_resource_value,
                     ),
                     (
                         "check sudoku_app_vk",
-                        is_input_note.clone()
-                            * (sudoku_app_vk - sudoku_app_vk_in_dealer_intent_note),
+                        is_input_resource.clone()
+                            * (sudoku_app_vk - sudoku_app_vk_in_dealer_intent_resource),
                     ),
                     (
-                        "check puzzle note app_data_static encoding",
-                        is_input_note
-                            * (puzzle_note_app_data_static - encoded_puzzle_note_app_data_static),
+                        "check puzzle resource app_data_static encoding",
+                        is_input_resource
+                            * (puzzle_resource_app_data_static - puzzle_resource_app_data_static),
                     ),
                 ],
             )
@@ -308,42 +308,42 @@ impl DealerIntentCheckConfig {
     #[allow(clippy::too_many_arguments)]
     pub fn assign_region(
         &self,
-        is_input_note: &AssignedCell<pallas::Base, pallas::Base>,
-        puzzle_note_value: &AssignedCell<pallas::Base, pallas::Base>,
+        is_input_resource: &AssignedCell<pallas::Base, pallas::Base>,
+        puzzle_resource_value: &AssignedCell<pallas::Base, pallas::Base>,
         sudoku_app_vk: &AssignedCell<pallas::Base, pallas::Base>,
-        sudoku_app_vk_in_dealer_intent_note: &AssignedCell<pallas::Base, pallas::Base>,
-        puzzle_note_app_data_static: &AssignedCell<pallas::Base, pallas::Base>,
-        encoded_puzzle_note_app_data_static: &AssignedCell<pallas::Base, pallas::Base>,
+        sudoku_app_vk_in_dealer_intent_resource: &AssignedCell<pallas::Base, pallas::Base>,
+        puzzle_resource_app_data_static: &AssignedCell<pallas::Base, pallas::Base>,
+        puzzle_resource_app_data_static: &AssignedCell<pallas::Base, pallas::Base>,
         offset: usize,
         region: &mut Region<'_, pallas::Base>,
     ) -> Result<(), Error> {
         // Enable `q_dealer_intent_check` selector
         self.q_dealer_intent_check.enable(region, offset)?;
 
-        is_input_note.copy_advice(|| "is_input_note", region, self.is_input_note, offset)?;
-        puzzle_note_value.copy_advice(
-            || "puzzle_note_value",
+        is_input_resource.copy_advice(|| "is_input_resource", region, self.is_input_resource, offset)?;
+        puzzle_resource_value.copy_advice(
+            || "puzzle_resource_value",
             region,
-            self.puzzle_note_value,
+            self.puzzle_resource_value,
             offset,
         )?;
         sudoku_app_vk.copy_advice(|| "sudoku_app_vk", region, self.sudoku_app_vk, offset)?;
-        sudoku_app_vk_in_dealer_intent_note.copy_advice(
-            || "sudoku_app_vk_in_dealer_intent_note",
+        sudoku_app_vk_in_dealer_intent_resource.copy_advice(
+            || "sudoku_app_vk_in_dealer_intent_resource",
             region,
-            self.sudoku_app_vk_in_dealer_intent_note,
+            self.sudoku_app_vk_in_dealer_intent_resource,
             offset,
         )?;
-        puzzle_note_app_data_static.copy_advice(
-            || "puzzle_note_app_data_static",
+        puzzle_resource_app_data_static.copy_advice(
+            || "puzzle_resource_app_data_static",
             region,
-            self.puzzle_note_app_data_static,
+            self.puzzle_resource_app_data_static,
             offset,
         )?;
-        encoded_puzzle_note_app_data_static.copy_advice(
-            || "encoded_puzzle_note_app_data_static",
+        puzzle_resource_app_data_static.copy_advice(
+            || "puzzle_resource_app_data_static",
             region,
-            self.encoded_puzzle_note_app_data_static,
+            self.puzzle_resource_app_data_static,
             offset,
         )?;
 
@@ -353,30 +353,30 @@ impl DealerIntentCheckConfig {
 
 #[test]
 fn test_halo2_dealer_intent_vp_circuit() {
-    use crate::app_vp::tests::{random_input_note, random_output_note};
+    use crate::app_vp::tests::{random_input_resource, random_output_resource};
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     let circuit = {
-        let input_notes = [(); NUM_NOTE].map(|_| random_input_note(&mut rng));
-        let mut output_notes = input_notes
+        let input_resources = [(); NUM_RESOURCE].map(|_| random_input_resource(&mut rng));
+        let mut output_resources = input_resources
             .iter()
-            .map(|input| random_output_note(&mut rng, input.get_nf().unwrap()))
+            .map(|input| random_output_resource(&mut rng, input.get_nf().unwrap()))
             .collect::<Vec<_>>();
         let encoded_puzzle = pallas::Base::random(&mut rng);
         let sudoku_app_vk = pallas::Base::random(&mut rng);
-        output_notes[0].note_type.app_data_static =
+        output_resources[0].note_type.app_data_static =
             DealerIntentValidityPredicateCircuit::compute_app_data_static(
                 encoded_puzzle,
                 sudoku_app_vk,
             );
         let encoded_solution = pallas::Base::random(&mut rng);
-        let owned_note_pub_id = output_notes[0].commitment().inner();
+        let owned_resource_id = output_resources[0].commitment().inner();
         DealerIntentValidityPredicateCircuit {
-            owned_note_pub_id,
-            input_notes,
-            output_notes: output_notes.try_into().unwrap(),
+            owned_resource_id,
+            input_resources,
+            output_resources: output_resources.try_into().unwrap(),
             encoded_puzzle,
             sudoku_app_vk,
             encoded_solution,

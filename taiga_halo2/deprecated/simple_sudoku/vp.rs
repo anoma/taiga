@@ -7,15 +7,15 @@ use pasta_curves::pallas;
 extern crate taiga_halo2;
 use taiga_halo2::{
     circuit::{
-        note_circuit::NoteConfig,
+        resource_circuit::ResourceConfig,
         vp_circuit::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicatePublicInputs,
             ValidityPredicateVerifyingInfo,
         },
     },
-    constant::{NUM_NOTE, SETUP_PARAMS_MAP},
-    note::{Note, RandomSeed},
+    constant::{NUM_RESOURCE, SETUP_PARAMS_MAP},
+    resource::{Resource, RandomSeed},
     proof::Proof,
     vp_circuit_impl,
     vp_vk::ValidityPredicateVerifyingKey,
@@ -26,15 +26,15 @@ use rand::{rngs::OsRng, RngCore};
 
 #[derive(Clone, Debug)]
 pub struct SudokuVPConfig {
-    note_config: NoteConfig,
+    resource_config: ResourceConfig,
     sudoku_config: SudokuConfig,
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct SudokuVP {
     pub sudoku: SudokuCircuit,
-    input_notes: [Note; NUM_NOTE],
-    output_notes: [Note; NUM_NOTE],
+    input_resources: [Resource; NUM_RESOURCE],
+    output_resources: [Resource; NUM_RESOURCE],
 }
 
 impl ValidityPredicateCircuit for SudokuVP {
@@ -49,12 +49,12 @@ impl ValidityPredicateCircuit for SudokuVP {
 }
 
 impl ValidityPredicateInfo for SudokuVP {
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.input_notes
+    fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE] {
+        &self.input_resources
     }
 
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.output_notes
+    fn get_output_resources(&self) -> &[Resource; NUM_RESOURCE] {
+        &self.output_resources
     }
 
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
@@ -67,7 +67,7 @@ impl ValidityPredicateInfo for SudokuVP {
         public_inputs.into()
     }
 
-    fn get_owned_note_pub_id(&self) -> pallas::Base {
+    fn get_owned_resource_id(&self) -> pallas::Base {
         pallas::Base::zero()
     }
 }
@@ -75,13 +75,13 @@ impl ValidityPredicateInfo for SudokuVP {
 impl SudokuVP {
     pub fn new(
         sudoku: SudokuCircuit,
-        input_notes: [Note; NUM_NOTE],
-        output_notes: [Note; NUM_NOTE],
+        input_resources: [Resource; NUM_RESOURCE],
+        output_resources: [Resource; NUM_RESOURCE],
     ) -> Self {
         Self {
             sudoku,
-            input_notes,
-            output_notes,
+            input_resources,
+            output_resources,
         }
     }
 }
@@ -91,8 +91,8 @@ vp_circuit_impl!(SudokuVP);
 #[cfg(test)]
 mod tests {
     use taiga_halo2::{
-        constant::NUM_NOTE,
-        note::{Note, RandomSeed},
+        constant::NUM_RESOURCE,
+        resource::{Resource, RandomSeed},
         nullifier::{Nullifier, NullifierKeyContainer},
         vp_vk::ValidityPredicateVerifyingKey,
     };
@@ -108,8 +108,8 @@ mod tests {
     #[test]
     fn test_vp() {
         let mut rng = OsRng;
-        let input_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
-        let output_notes = [(); NUM_NOTE].map(|_| Note::dummy(&mut rng));
+        let input_resources = [(); NUM_RESOURCE].map(|_| Resource::dummy(&mut rng));
+        let output_resources = [(); NUM_RESOURCE].map(|_| Resource::dummy(&mut rng));
 
         const K: u32 = 13;
         let sudoku = SudokuCircuit {
@@ -129,7 +129,7 @@ mod tests {
 
         let vk = plonk::keygen_vk(&params, &sudoku).unwrap();
 
-        let mut _vp = SudokuVP::new(sudoku, input_notes, output_notes);
+        let mut _vp = SudokuVP::new(sudoku, input_resources, output_resources);
 
         let vp_vk = ValidityPredicateVerifyingKey::from_vk(vk);
 
@@ -140,7 +140,7 @@ mod tests {
         let nk = NullifierKeyContainer::random_key(&mut rng);
         let rseed = RandomSeed::random(&mut rng);
         let rho = Nullifier::from(pallas::Base::random(&mut rng));
-        Note::new(
+        Resource::new(
             vp_vk,
             app_data_static,
             app_data_dynamic,

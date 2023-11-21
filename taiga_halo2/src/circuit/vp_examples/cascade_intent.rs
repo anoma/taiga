@@ -1,26 +1,26 @@
 /// The intent is to show how to cascade partial transactions so they can be executed atomically.
-/// In this example, Alice wants to spend three(more than the fixed NUM_NOTE) different kinds of tokens/notes simultaneously.
-/// She needs to distribute the notes to two partial transactions. She can use the intent to cascade the partial transactions.
-/// In the first partial transaction, she spends two notes and creates a cascade intent note to encode and check the third note info.
-/// In the sencond partial transaction, she spends the cascade note and the third note.
+/// In this example, Alice wants to spend three(more than the fixed NUM_RESOURCE) different kinds of tokens/resources simultaneously.
+/// She needs to distribute the resources to two partial transactions. She can use the intent to cascade the partial transactions.
+/// In the first partial transaction, she spends two resources and creates a cascade intent resource to encode and check the third resource info.
+/// In the sencond partial transaction, she spends the cascade resource and the third resource.
 ///
 use crate::{
     circuit::{
         blake2s::publicize_default_dynamic_vp_commitments,
         gadgets::{
             assign_free_advice,
-            target_note_variable::{get_is_input_note_flag, get_owned_note_variable},
+            target_resource_variable::{get_is_input_resource_flag, get_owned_resource_variable},
         },
         vp_circuit::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
         },
     },
-    constant::{NUM_NOTE, SETUP_PARAMS_MAP},
+    constant::{NUM_RESOURCE, SETUP_PARAMS_MAP},
     error::TransactionError,
-    note::{Note, RandomSeed},
     nullifier::Nullifier,
     proof::Proof,
+    resource::{RandomSeed, Resource},
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
@@ -42,15 +42,15 @@ lazy_static! {
 // CascadeIntentValidityPredicateCircuit
 #[derive(Clone, Debug, Default)]
 pub struct CascadeIntentValidityPredicateCircuit {
-    pub owned_note_pub_id: pallas::Base,
-    pub input_notes: [Note; NUM_NOTE],
-    pub output_notes: [Note; NUM_NOTE],
-    // use the note commitment to identify the note.
+    pub owned_resource_id: pallas::Base,
+    pub input_resources: [Resource; NUM_RESOURCE],
+    pub output_resources: [Resource; NUM_RESOURCE],
+    // use the resource commitment to identify the resource.
     pub cascade_note_cm: pallas::Base,
 }
 
 impl CascadeIntentValidityPredicateCircuit {
-    // We can encode at most three notes to app_data_static if needed.
+    // We can encode at most three resources to app_data_static if needed.
     pub fn encode_app_data_static(cascade_note_cm: pallas::Base) -> pallas::Base {
         cascade_note_cm
     }
@@ -64,44 +64,44 @@ impl ValidityPredicateCircuit for CascadeIntentValidityPredicateCircuit {
         mut layouter: impl Layouter<pallas::Base>,
         basic_variables: BasicValidityPredicateVariables,
     ) -> Result<(), Error> {
-        let owned_note_pub_id = basic_variables.get_owned_note_pub_id();
-        let is_input_note = get_is_input_note_flag(
-            config.get_is_input_note_flag_config,
-            layouter.namespace(|| "get is_input_note_flag"),
-            &owned_note_pub_id,
-            &basic_variables.get_input_note_nfs(),
-            &basic_variables.get_output_note_cms(),
+        let owned_resource_id = basic_variables.get_owned_resource_id();
+        let is_input_resource = get_is_input_resource_flag(
+            config.get_is_input_resource_flag_config,
+            layouter.namespace(|| "get is_input_resource_flag"),
+            &owned_resource_id,
+            &basic_variables.get_input_resource_nfs(),
+            &basic_variables.get_output_resource_cms(),
         )?;
 
-        // If the number of cascade notes is more than one, encode them.
+        // If the number of cascade resources is more than one, encode them.
         let cascade_note_cm = assign_free_advice(
             layouter.namespace(|| "witness cascade_note_cm"),
             config.advices[0],
             Value::known(self.cascade_note_cm),
         )?;
 
-        // search target note and get the intent app_static_data
-        let app_data_static = get_owned_note_variable(
-            config.get_owned_note_variable_config,
-            layouter.namespace(|| "get owned note app_data_static"),
-            &owned_note_pub_id,
+        // search target resource and get the intent app_static_data
+        let app_data_static = get_owned_resource_variable(
+            config.get_owned_resource_variable_config,
+            layouter.namespace(|| "get owned resource app_data_static"),
+            &owned_resource_id,
             &basic_variables.get_app_data_static_searchable_pairs(),
         )?;
 
-        // check the app_data_static of intent note
+        // check the app_data_static of intent resource
         layouter.assign_region(
             || "check app_data_static",
             |mut region| region.constrain_equal(cascade_note_cm.cell(), app_data_static.cell()),
         )?;
 
-        // check the cascade note
+        // check the cascade resource
         layouter.assign_region(
-            || "conditional equal: check the cascade note",
+            || "conditional equal: check the cascade resource",
             |mut region| {
                 config.conditional_equal_config.assign_region(
-                    &is_input_note,
+                    &is_input_resource,
                     &app_data_static,
-                    &basic_variables.input_note_variables[1].cm,
+                    &basic_variables.input_resource_variables[1].cm,
                     0,
                     &mut region,
                 )
@@ -118,12 +118,12 @@ impl ValidityPredicateCircuit for CascadeIntentValidityPredicateCircuit {
         Ok(())
     }
 
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.input_notes
+    fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE] {
+        &self.input_resources
     }
 
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.output_notes
+    fn get_output_resources(&self) -> &[Resource; NUM_RESOURCE] {
+        &self.output_resources
     }
 
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
@@ -140,24 +140,24 @@ impl ValidityPredicateCircuit for CascadeIntentValidityPredicateCircuit {
         public_inputs.into()
     }
 
-    fn get_owned_note_pub_id(&self) -> pallas::Base {
-        self.owned_note_pub_id
+    fn get_owned_resource_id(&self) -> pallas::Base {
+        self.owned_resource_id
     }
 }
 
 vp_circuit_impl!(CascadeIntentValidityPredicateCircuit);
 vp_verifying_info_impl!(CascadeIntentValidityPredicateCircuit);
 
-pub fn create_intent_note<R: RngCore>(
+pub fn create_intent_resource<R: RngCore>(
     mut rng: R,
     cascade_note_cm: pallas::Base,
     nk: pallas::Base,
-) -> Note {
+) -> Resource {
     let app_data_static =
         CascadeIntentValidityPredicateCircuit::encode_app_data_static(cascade_note_cm);
     let rseed = RandomSeed::random(&mut rng);
     let rho = Nullifier::random(&mut rng);
-    Note::new_input_note(
+    Resource::new_input_resource(
         *COMPRESSED_CASCADE_INTENT_VK,
         app_data_static,
         pallas::Base::zero(),
@@ -172,24 +172,24 @@ pub fn create_intent_note<R: RngCore>(
 #[test]
 fn test_halo2_cascade_intent_vp_circuit() {
     use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
-    use crate::note::tests::random_note;
+    use crate::resource::tests::random_resource;
     use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     let circuit = {
-        let cascade_input_note = random_note(&mut rng);
-        let cascade_note_cm = cascade_input_note.commitment().inner();
+        let cascade_input_resource = random_resource(&mut rng);
+        let cascade_note_cm = cascade_input_resource.commitment().inner();
         let nk = pallas::Base::random(&mut rng);
-        let intent_note = create_intent_note(&mut rng, cascade_note_cm, nk);
-        let input_notes = [intent_note, cascade_input_note];
-        let output_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
+        let intent_resource = create_intent_resource(&mut rng, cascade_note_cm, nk);
+        let input_resources = [intent_resource, cascade_input_resource];
+        let output_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
 
         CascadeIntentValidityPredicateCircuit {
-            owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
-            input_notes,
-            output_notes,
+            owned_resource_id: input_resources[0].get_nf().unwrap().inner(),
+            input_resources,
+            output_resources,
             cascade_note_cm,
         }
     };

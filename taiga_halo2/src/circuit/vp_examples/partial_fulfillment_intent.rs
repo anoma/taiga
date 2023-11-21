@@ -9,17 +9,17 @@ use crate::{
             assign_free_constant,
             mul::MulChip,
             sub::{SubChip, SubInstructions},
-            target_note_variable::{get_is_input_note_flag, get_owned_note_variable},
+            target_resource_variable::{get_is_input_resource_flag, get_owned_resource_variable},
         },
         vp_circuit::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
         },
     },
-    constant::{NUM_NOTE, SETUP_PARAMS_MAP},
+    constant::{NUM_RESOURCE, SETUP_PARAMS_MAP},
     error::TransactionError,
-    note::{Note, RandomSeed},
     proof::Proof,
+    resource::{RandomSeed, Resource},
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
@@ -48,9 +48,9 @@ lazy_static! {
 // PartialFulfillmentIntentValidityPredicateCircuit
 #[derive(Clone, Debug, Default)]
 pub struct PartialFulfillmentIntentValidityPredicateCircuit {
-    pub owned_note_pub_id: pallas::Base,
-    pub input_notes: [Note; NUM_NOTE],
-    pub output_notes: [Note; NUM_NOTE],
+    pub owned_resource_id: pallas::Base,
+    pub input_resources: [Resource; NUM_RESOURCE],
+    pub output_resources: [Resource; NUM_RESOURCE],
     pub swap: Swap,
 }
 
@@ -65,7 +65,7 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
         let sub_chip = SubChip::construct(config.sub_config.clone(), ());
         let mul_chip = MulChip::construct(config.mul_config.clone());
 
-        let owned_note_pub_id = basic_variables.get_owned_note_pub_id();
+        let owned_resource_id = basic_variables.get_owned_resource_id();
 
         let app_data_static = self.swap.assign_app_data_static(
             config.advices[0],
@@ -76,43 +76,43 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
             layouter.namespace(|| "encode app_data_static"),
         )?;
 
-        // search target note and get the intent app_static_data
-        let owned_note_app_data_static = get_owned_note_variable(
-            config.get_owned_note_variable_config,
-            layouter.namespace(|| "get owned note app_data_static"),
-            &owned_note_pub_id,
+        // search target resource and get the intent app_static_data
+        let owned_resource_app_data_static = get_owned_resource_variable(
+            config.get_owned_resource_variable_config,
+            layouter.namespace(|| "get owned resource app_data_static"),
+            &owned_resource_id,
             &basic_variables.get_app_data_static_searchable_pairs(),
         )?;
 
         // Enforce consistency of app_data_static:
         //  - as witnessed in the swap, and
-        //  - as encoded in the intent note
+        //  - as encoded in the intent resource
         layouter.assign_region(
             || "check app_data_static",
             |mut region| {
                 region.constrain_equal(
                     encoded_app_data_static.cell(),
-                    owned_note_app_data_static.cell(),
+                    owned_resource_app_data_static.cell(),
                 )
             },
         )?;
 
-        let is_input_note = get_is_input_note_flag(
-            config.get_is_input_note_flag_config,
-            layouter.namespace(|| "get is_input_note_flag"),
-            &owned_note_pub_id,
-            &basic_variables.get_input_note_nfs(),
-            &basic_variables.get_output_note_cms(),
+        let is_input_resource = get_is_input_resource_flag(
+            config.get_is_input_resource_flag_config,
+            layouter.namespace(|| "get is_input_resource_flag"),
+            &owned_resource_id,
+            &basic_variables.get_input_resource_nfs(),
+            &basic_variables.get_output_resource_cms(),
         )?;
-        // Conditional checks if is_input_note == 1
-        app_data_static.is_input_note_checks(
-            &is_input_note,
+        // Conditional checks if is_input_resource == 1
+        app_data_static.is_input_resource_checks(
+            &is_input_resource,
             &basic_variables,
             &config.conditional_equal_config,
-            layouter.namespace(|| "is_input_note checks"),
+            layouter.namespace(|| "is_input_resource checks"),
         )?;
 
-        let is_output_note = {
+        let is_output_resource = {
             let constant_one = assign_free_constant(
                 layouter.namespace(|| "one"),
                 config.advices[0],
@@ -122,21 +122,21 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
             SubInstructions::sub(
                 &sub_chip,
                 layouter.namespace(|| "expected_sold_value - returned_value"),
-                &is_input_note,
+                &is_input_resource,
                 &constant_one,
             )?
         };
-        // Conditional checks if is_output_note == 1
-        app_data_static.is_output_note_checks(
-            &is_output_note,
+        // Conditional checks if is_output_resource == 1
+        app_data_static.is_output_resource_checks(
+            &is_output_resource,
             &basic_variables,
             &config.conditional_equal_config,
-            layouter.namespace(|| "is_output_note checks"),
+            layouter.namespace(|| "is_output_resource checks"),
         )?;
 
         // Conditional checks if is_partial_fulfillment == 1
         app_data_static.is_partial_fulfillment_checks(
-            &is_input_note,
+            &is_input_resource,
             &basic_variables,
             &config.conditional_equal_config,
             &sub_chip,
@@ -154,12 +154,12 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
         Ok(())
     }
 
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.input_notes
+    fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE] {
+        &self.input_resources
     }
 
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.output_notes
+    fn get_output_resources(&self) -> &[Resource; NUM_RESOURCE] {
+        &self.output_resources
     }
 
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
@@ -176,8 +176,8 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
         public_inputs.into()
     }
 
-    fn get_owned_note_pub_id(&self) -> pallas::Base {
-        self.owned_note_pub_id
+    fn get_owned_resource_id(&self) -> pallas::Base {
+        self.owned_resource_id
     }
 }
 
@@ -197,7 +197,7 @@ mod tests {
     use rand::rngs::OsRng;
     use rand::RngCore;
 
-    // Generate a swap, along with its corresponding intent note and authorisation
+    // Generate a swap, along with its corresponding intent resource and authorisation
     fn swap(mut rng: impl RngCore, sell: Token, buy: Token) -> Swap {
         let sk = pallas::Scalar::random(&mut rng);
         let auth = TokenAuthorization::from_sk_vk(&sk, &COMPRESSED_TOKEN_AUTH_VK);
@@ -212,18 +212,18 @@ mod tests {
         let buy = Token::new("token2".to_string(), 4u64);
 
         let swap = swap(&mut rng, sell, buy);
-        let intent_note = swap.create_intent_note(&mut rng);
+        let intent_resource = swap.create_intent_resource(&mut rng);
 
-        let input_padding_note = Note::random_padding_note(&mut rng);
-        let output_padding_note = Note::random_padding_note(&mut rng);
+        let input_padding_resource = Resource::random_padding_resource(&mut rng);
+        let output_padding_resource = Resource::random_padding_resource(&mut rng);
 
-        let input_notes = [*swap.sell.note(), input_padding_note];
-        let output_notes = [intent_note, output_padding_note];
+        let input_resources = [*swap.sell.resource(), input_padding_resource];
+        let output_resources = [intent_resource, output_padding_resource];
 
         let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
-            owned_note_pub_id: intent_note.commitment().inner(),
-            input_notes,
-            output_notes,
+            owned_resource_id: intent_resource.commitment().inner(),
+            input_resources,
+            output_resources,
             swap,
         };
         let public_inputs = circuit.get_public_inputs(&mut rng);
@@ -244,15 +244,15 @@ mod tests {
         let buy = Token::new("token2".to_string(), 4u64);
 
         let swap = swap(&mut rng, sell, buy);
-        let intent_note = swap.create_intent_note(&mut rng);
+        let intent_resource = swap.create_intent_resource(&mut rng);
 
         let bob_sell = swap.buy.clone();
-        let (input_notes, output_notes) = swap.fill(&mut rng, intent_note, bob_sell);
+        let (input_resources, output_resources) = swap.fill(&mut rng, intent_resource, bob_sell);
 
         let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
-            owned_note_pub_id: intent_note.get_nf().unwrap().inner(),
-            input_notes,
-            output_notes,
+            owned_resource_id: intent_resource.get_nf().unwrap().inner(),
+            input_resources,
+            output_resources,
             swap,
         };
         let public_inputs = circuit.get_public_inputs(&mut rng);
@@ -273,15 +273,15 @@ mod tests {
         let buy = Token::new("token2".to_string(), 4u64);
 
         let swap = swap(&mut rng, sell, buy);
-        let intent_note = swap.create_intent_note(&mut rng);
+        let intent_resource = swap.create_intent_resource(&mut rng);
 
         let bob_sell = Token::new(swap.buy.name().inner().to_string(), 2u64);
-        let (input_notes, output_notes) = swap.fill(&mut rng, intent_note, bob_sell);
+        let (input_resources, output_resources) = swap.fill(&mut rng, intent_resource, bob_sell);
 
         let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
-            owned_note_pub_id: intent_note.get_nf().unwrap().inner(),
-            input_notes,
-            output_notes,
+            owned_resource_id: intent_resource.get_nf().unwrap().inner(),
+            input_resources,
+            output_resources,
             swap,
         };
         let public_inputs = circuit.get_public_inputs(&mut rng);

@@ -13,12 +13,12 @@ use taiga_halo2::{
     circuit::vp_examples::{
         partial_fulfillment_intent::{PartialFulfillmentIntentValidityPredicateCircuit, Swap},
         signature_verification::COMPRESSED_TOKEN_AUTH_VK,
-        token::{Token, TokenAuthorization, TokenNote},
+        token::{Token, TokenAuthorization, TokenResource},
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
-    note::{Note, NoteValidityPredicates},
     nullifier::NullifierKeyContainer,
+    resource::{Resource, ResourceValidityPredicates},
     shielded_ptx::ShieldedPartialTransaction,
     transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
 };
@@ -28,33 +28,33 @@ pub fn create_token_intent_ptx<R: RngCore>(
     sell: Token,
     buy: Token,
     input_auth_sk: pallas::Scalar,
-) -> (ShieldedPartialTransaction, Swap, Note) {
+) -> (ShieldedPartialTransaction, Swap, Resource) {
     let input_auth = TokenAuthorization::from_sk_vk(&input_auth_sk, &COMPRESSED_TOKEN_AUTH_VK);
     let swap = Swap::random(&mut rng, sell, buy, input_auth);
-    let mut intent_note = swap.create_intent_note(&mut rng);
+    let mut intent_resource = swap.create_intent_resource(&mut rng);
 
-    // padding the zero notes
-    let padding_input_note = Note::random_padding_note(&mut rng);
-    let mut padding_output_note = Note::random_padding_note(&mut rng);
+    // padding the zero resources
+    let padding_input_resource = Resource::random_padding_resource(&mut rng);
+    let mut padding_output_resource = Resource::random_padding_resource(&mut rng);
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
     // Create action pairs
     let actions = {
         let action_1 = ActionInfo::new(
-            *swap.sell.note(),
+            *swap.sell.resource(),
             merkle_path.clone(),
             None,
-            &mut intent_note,
+            &mut intent_resource,
             &mut rng,
         );
 
-        // Fetch a valid anchor for dummy notes
+        // Fetch a valid anchor for dummy resources
         let anchor = Anchor::from(pallas::Base::random(&mut rng));
         let action_2 = ActionInfo::new(
-            padding_input_note,
+            padding_input_resource,
             merkle_path,
             Some(anchor),
-            &mut padding_output_note,
+            &mut padding_output_resource,
             &mut rng,
         );
         vec![action_1, action_2]
@@ -62,41 +62,41 @@ pub fn create_token_intent_ptx<R: RngCore>(
 
     // Create VPs
     let (input_vps, output_vps) = {
-        let input_notes = [*swap.sell.note(), padding_input_note];
-        let output_notes = [intent_note, padding_output_note];
+        let input_resources = [*swap.sell.resource(), padding_input_resource];
+        let output_resources = [intent_resource, padding_output_resource];
         // Create the input token vps
         let input_token_vps = swap.sell.generate_input_token_vps(
             &mut rng,
             input_auth,
             input_auth_sk,
-            input_notes,
-            output_notes,
+            input_resources,
+            output_resources,
         );
 
         // Create the intent vps
         let intent_vps = {
             let intent_vp = PartialFulfillmentIntentValidityPredicateCircuit {
-                owned_note_pub_id: intent_note.commitment().inner(),
-                input_notes,
-                output_notes,
+                owned_resource_id: intent_resource.commitment().inner(),
+                input_resources,
+                output_resources,
                 swap: swap.clone(),
             };
 
-            NoteValidityPredicates::new(Box::new(intent_vp), vec![])
+            ResourceValidityPredicates::new(Box::new(intent_vp), vec![])
         };
 
         // Create the padding input vps
-        let padding_input_vps = NoteValidityPredicates::create_input_padding_note_vps(
-            &padding_input_note,
-            input_notes,
-            output_notes,
+        let padding_input_vps = ResourceValidityPredicates::create_input_padding_resource_vps(
+            &padding_input_resource,
+            input_resources,
+            output_resources,
         );
 
         // Create the padding output vps
-        let padding_output_vps = NoteValidityPredicates::create_output_padding_note_vps(
-            &padding_output_note,
-            input_notes,
-            output_notes,
+        let padding_output_vps = ResourceValidityPredicates::create_output_padding_resource_vps(
+            &padding_output_resource,
+            input_resources,
+            output_resources,
         );
 
         (
@@ -109,43 +109,43 @@ pub fn create_token_intent_ptx<R: RngCore>(
     let ptx = ShieldedPartialTransaction::build(actions, input_vps, output_vps, vec![], &mut rng)
         .unwrap();
 
-    (ptx, swap, intent_note)
+    (ptx, swap, intent_resource)
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn consume_token_intent_ptx<R: RngCore>(
     mut rng: R,
     swap: Swap,
-    intent_note: Note,
+    intent_resource: Resource,
     offer: Token,
     output_auth_pk: pallas::Point,
 ) -> ShieldedPartialTransaction {
-    let (input_notes, [mut bought_note, mut returned_note]) =
-        swap.fill(&mut rng, intent_note, offer);
-    let [intent_note, padding_input_note] = input_notes;
+    let (input_resources, [mut bought_resource, mut returned_resource]) =
+        swap.fill(&mut rng, intent_resource, offer);
+    let [intent_resource, padding_input_resource] = input_resources;
 
-    // output notes
+    // output resources
     let output_auth = TokenAuthorization::new(output_auth_pk, *COMPRESSED_TOKEN_AUTH_VK);
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
-    // Fetch a valid anchor for dummy notes
+    // Fetch a valid anchor for dummy resources
     let anchor = Anchor::from(pallas::Base::random(&mut rng));
 
     // Create action pairs
     let actions = {
         let action_1 = ActionInfo::new(
-            intent_note,
+            intent_resource,
             merkle_path.clone(),
             Some(anchor),
-            &mut bought_note,
+            &mut bought_resource,
             &mut rng,
         );
 
         let action_2 = ActionInfo::new(
-            padding_input_note,
+            padding_input_resource,
             merkle_path,
             Some(anchor),
-            &mut returned_note,
+            &mut returned_resource,
             &mut rng,
         );
         vec![action_1, action_2]
@@ -153,43 +153,53 @@ pub fn consume_token_intent_ptx<R: RngCore>(
 
     // Create VPs
     let (input_vps, output_vps) = {
-        let output_notes = [bought_note, returned_note];
+        let output_resources = [bought_resource, returned_resource];
         // Create intent vps
         let intent_vps = {
             let intent_vp = PartialFulfillmentIntentValidityPredicateCircuit {
-                owned_note_pub_id: intent_note.get_nf().unwrap().inner(),
-                input_notes,
-                output_notes,
+                owned_resource_id: intent_resource.get_nf().unwrap().inner(),
+                input_resources,
+                output_resources,
                 swap: swap.clone(),
             };
 
-            NoteValidityPredicates::new(Box::new(intent_vp), vec![])
+            ResourceValidityPredicates::new(Box::new(intent_vp), vec![])
         };
 
-        // Create bought_note_vps
-        let bought_note_vps = TokenNote {
+        // Create bought_resource_vps
+        let bought_resource_vps = TokenResource {
             token_name: swap.buy.name().clone(),
-            note: bought_note,
+            resource: bought_resource,
         }
-        .generate_output_token_vps(&mut rng, output_auth, input_notes, output_notes);
-
-        // Create the padding input vps
-        let padding_input_vps = NoteValidityPredicates::create_input_padding_note_vps(
-            &padding_input_note,
-            input_notes,
-            output_notes,
+        .generate_output_token_vps(
+            &mut rng,
+            output_auth,
+            input_resources,
+            output_resources,
         );
 
-        // Create returned_note_vps
-        let returned_note_vps = TokenNote {
+        // Create the padding input vps
+        let padding_input_vps = ResourceValidityPredicates::create_input_padding_resource_vps(
+            &padding_input_resource,
+            input_resources,
+            output_resources,
+        );
+
+        // Create returned_resource_vps
+        let returned_resource_vps = TokenResource {
             token_name: swap.sell.token_name().clone(),
-            note: returned_note,
+            resource: returned_resource,
         }
-        .generate_output_token_vps(&mut rng, output_auth, input_notes, output_notes);
+        .generate_output_token_vps(
+            &mut rng,
+            output_auth,
+            input_resources,
+            output_resources,
+        );
 
         (
             vec![intent_vps, padding_input_vps],
-            vec![bought_note_vps, returned_note_vps],
+            vec![bought_resource_vps, returned_resource_vps],
         )
     };
 
@@ -207,7 +217,7 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
     let alice_auth_pk = generator * alice_auth_sk;
     let sell = Token::new("btc".to_string(), 2u64);
     let buy = Token::new("eth".to_string(), 10u64);
-    let (alice_ptx, swap, intent_note) =
+    let (alice_ptx, swap, intent_resource) =
         create_token_intent_ptx(&mut rng, sell.clone(), buy.clone(), alice_auth_sk);
 
     // Bob creates the partial transaction with 1 DOLPHIN input and 5 BTC output
@@ -227,9 +237,10 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
         bob_nk.get_commitment(),
     );
 
-    // Solver/Bob creates the partial transaction to consume the intent note
+    // Solver/Bob creates the partial transaction to consume the intent resource
     // The bob_ptx and solver_ptx can be merged to one ptx.
-    let solver_ptx = consume_token_intent_ptx(&mut rng, swap, intent_note, offer, alice_auth_pk);
+    let solver_ptx =
+        consume_token_intent_ptx(&mut rng, swap, intent_resource, offer, alice_auth_pk);
 
     // Solver creates the final transaction
     let shielded_tx_bundle = ShieldedPartialTxBundle::new(vec![alice_ptx, bob_ptx, solver_ptx]);

@@ -3,17 +3,17 @@ use crate::{
         blake2s::publicize_default_dynamic_vp_commitments,
         gadgets::{
             assign_free_advice, poseidon_hash::poseidon_hash_gadget,
-            target_note_variable::get_owned_note_variable,
+            target_resource_variable::get_owned_resource_variable,
         },
         vp_circuit::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
         },
     },
-    constant::{TaigaFixedBasesFull, NUM_NOTE, SETUP_PARAMS_MAP},
+    constant::{TaigaFixedBasesFull, NUM_RESOURCE, SETUP_PARAMS_MAP},
     error::TransactionError,
-    note::{Note, RandomSeed},
     proof::Proof,
+    resource::{RandomSeed, Resource},
     utils::{mod_r_p, poseidon_hash_n},
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
@@ -33,8 +33,8 @@ use pasta_curves::{
 use rand::rngs::OsRng;
 use rand::RngCore;
 
-// The message contains the input note nullifiers and output note commitments
-const MESSAGE_LEN: usize = NUM_NOTE * 2;
+// The message contains the input resource nullifiers and output resource commitments
+const MESSAGE_LEN: usize = NUM_RESOURCE * 2;
 const POSEIDON_HASH_LEN: usize = MESSAGE_LEN + 4;
 lazy_static! {
     pub static ref TOKEN_AUTH_VK: ValidityPredicateVerifyingKey =
@@ -92,9 +92,9 @@ impl SchnorrSignature {
 // SignatureVerificationValidityPredicateCircuit uses the schnorr signature.
 #[derive(Clone, Debug, Default)]
 pub struct SignatureVerificationValidityPredicateCircuit {
-    pub owned_note_pub_id: pallas::Base,
-    pub input_notes: [Note; NUM_NOTE],
-    pub output_notes: [Note; NUM_NOTE],
+    pub owned_resource_id: pallas::Base,
+    pub input_resources: [Resource; NUM_RESOURCE],
+    pub output_resources: [Resource; NUM_RESOURCE],
     pub vp_vk: pallas::Base,
     pub signature: SchnorrSignature,
     pub receiver_vp_vk: pallas::Base,
@@ -102,17 +102,17 @@ pub struct SignatureVerificationValidityPredicateCircuit {
 
 impl SignatureVerificationValidityPredicateCircuit {
     pub fn new(
-        owned_note_pub_id: pallas::Base,
-        input_notes: [Note; NUM_NOTE],
-        output_notes: [Note; NUM_NOTE],
+        owned_resource_id: pallas::Base,
+        input_resources: [Resource; NUM_RESOURCE],
+        output_resources: [Resource; NUM_RESOURCE],
         vp_vk: pallas::Base,
         signature: SchnorrSignature,
         receiver_vp_vk: pallas::Base,
     ) -> Self {
         Self {
-            owned_note_pub_id,
-            input_notes,
-            output_notes,
+            owned_resource_id,
+            input_resources,
+            output_resources,
             vp_vk,
             signature,
             receiver_vp_vk,
@@ -121,29 +121,29 @@ impl SignatureVerificationValidityPredicateCircuit {
 
     pub fn from_sk_and_sign<R: RngCore>(
         mut rng: R,
-        owned_note_pub_id: pallas::Base,
-        input_notes: [Note; NUM_NOTE],
-        output_notes: [Note; NUM_NOTE],
+        owned_resource_id: pallas::Base,
+        input_resources: [Resource; NUM_RESOURCE],
+        output_resources: [Resource; NUM_RESOURCE],
         vp_vk: pallas::Base,
         sk: pallas::Scalar,
         receiver_vp_vk: pallas::Base,
     ) -> Self {
-        assert_eq!(NUM_NOTE, 2);
+        assert_eq!(NUM_RESOURCE, 2);
         let mut message = vec![];
-        input_notes
+        input_resources
             .iter()
-            .zip(output_notes.iter())
-            .for_each(|(input_note, output_note)| {
-                let nf = input_note.get_nf().unwrap().inner();
+            .zip(output_resources.iter())
+            .for_each(|(input_resource, output_resource)| {
+                let nf = input_resource.get_nf().unwrap().inner();
                 message.push(nf);
-                let cm = output_note.commitment();
+                let cm = output_resource.commitment();
                 message.push(cm.inner());
             });
         let signature = SchnorrSignature::sign(&mut rng, sk, message);
         Self {
-            owned_note_pub_id,
-            input_notes,
-            output_notes,
+            owned_resource_id,
+            input_resources,
+            output_resources,
             vp_vk,
             signature,
             receiver_vp_vk,
@@ -168,12 +168,12 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
             Value::known(self.signature.pk.to_affine()),
         )?;
 
-        // search target note and get the app_data_dynamic
-        let owned_note_pub_id = basic_variables.get_owned_note_pub_id();
-        let app_data_dynamic = get_owned_note_variable(
-            config.get_owned_note_variable_config,
-            layouter.namespace(|| "get owned note app_data_dynamic"),
-            &owned_note_pub_id,
+        // search target resource and get the app_data_dynamic
+        let owned_resource_id = basic_variables.get_owned_resource_id();
+        let app_data_dynamic = get_owned_resource_variable(
+            config.get_owned_resource_variable_config,
+            layouter.namespace(|| "get owned resource app_data_dynamic"),
+            &owned_resource_id,
             &basic_variables.get_app_data_dynamic_searchable_pairs(),
         )?;
 
@@ -221,9 +221,9 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
 
         // Hash(r||P||m)
         let h_scalar = {
-            let nfs = basic_variables.get_input_note_nfs();
-            let cms = basic_variables.get_output_note_cms();
-            assert_eq!(NUM_NOTE, 2);
+            let nfs = basic_variables.get_input_resource_nfs();
+            let cms = basic_variables.get_output_resource_cms();
+            assert_eq!(NUM_RESOURCE, 2);
             let h = poseidon_hash_gadget(
                 config.poseidon_config,
                 layouter.namespace(|| "Poseidon_hash(r, P, m)"),
@@ -260,12 +260,12 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
         Ok(())
     }
 
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.input_notes
+    fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE] {
+        &self.input_resources
     }
 
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.output_notes
+    fn get_output_resources(&self) -> &[Resource; NUM_RESOURCE] {
+        &self.output_resources
     }
 
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
@@ -282,8 +282,8 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
         public_inputs.into()
     }
 
-    fn get_owned_note_pub_id(&self) -> pallas::Base {
-        self.owned_note_pub_id
+    fn get_owned_resource_id(&self) -> pallas::Base {
+        self.owned_resource_id
     }
 }
 
@@ -296,24 +296,24 @@ fn test_halo2_sig_verification_vp_circuit() {
         receiver_vp::COMPRESSED_RECEIVER_VK, token::TokenAuthorization,
     };
     use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
-    use crate::note::tests::random_note;
+    use crate::resource::tests::random_resource;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     let circuit = {
-        let mut input_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
-        let output_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
+        let mut input_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
+        let output_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
         let sk = pallas::Scalar::random(&mut rng);
         let auth_vk = pallas::Base::random(&mut rng);
         let auth = TokenAuthorization::from_sk_vk(&sk, &auth_vk);
-        input_notes[0].app_data_dynamic = auth.to_app_data_dynamic();
-        let owned_note_pub_id = input_notes[0].get_nf().unwrap().inner();
+        input_resources[0].app_data_dynamic = auth.to_app_data_dynamic();
+        let owned_resource_id = input_resources[0].get_nf().unwrap().inner();
         SignatureVerificationValidityPredicateCircuit::from_sk_and_sign(
             &mut rng,
-            owned_note_pub_id,
-            input_notes,
-            output_notes,
+            owned_resource_id,
+            input_resources,
+            output_resources,
             auth_vk,
             sk,
             *COMPRESSED_RECEIVER_VK,

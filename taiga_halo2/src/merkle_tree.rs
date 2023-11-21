@@ -1,9 +1,9 @@
 use std::hash::{Hash, Hasher};
 
 use crate::merkle_tree::LR::{L, R};
-use crate::note::NoteCommitment;
+use crate::resource::NoteCommitment;
 use crate::utils::poseidon_hash;
-use crate::{constant::TAIGA_COMMITMENT_TREE_DEPTH, note::Note};
+use crate::{constant::TAIGA_COMMITMENT_TREE_DEPTH, resource::Resource};
 use ff::PrimeField;
 use halo2_proofs::arithmetic::Field;
 use pasta_curves::pallas;
@@ -19,7 +19,7 @@ use serde;
 #[cfg(feature = "borsh")]
 use borsh::{BorshDeserialize, BorshSerialize};
 
-/// The root of the note commitment Merkletree.
+/// The root of the resource commitment Merkletree.
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 #[cfg_attr(feature = "nif", derive(NifTuple))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -185,9 +185,9 @@ impl From<pallas::Base> for Node {
     }
 }
 
-impl From<&Note> for Node {
-    fn from(note: &Note) -> Node {
-        Node(note.commitment().inner())
+impl From<&Resource> for Node {
+    fn from(resource: &Resource) -> Node {
+        Node(resource.commitment().inner())
     }
 }
 

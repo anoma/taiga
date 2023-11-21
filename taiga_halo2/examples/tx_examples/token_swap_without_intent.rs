@@ -1,4 +1,4 @@
-/// Multi-party token swap without intent notes
+/// Multi-party token swap without intent resources
 /// Alice has 5 "BTC" and wants 10 "ETH"
 /// Bob has 10 "ETH" and wants 15 "XAN"
 /// Carol has 15 "XAN" and wants 5 BTC""

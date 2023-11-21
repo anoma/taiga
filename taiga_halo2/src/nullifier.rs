@@ -1,7 +1,7 @@
 use std::hash::Hash;
 
 use crate::{
-    note::NoteCommitment,
+    resource::NoteCommitment,
     utils::{poseidon_hash_n, prf_nf},
 };
 use halo2_proofs::arithmetic::Field;

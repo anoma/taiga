@@ -14,14 +14,14 @@ use taiga_halo2::{
         TAIGA_COMMITMENT_TREE_DEPTH,
     },
     merkle_tree::MerklePath,
-    note::{Note, NoteType, RandomSeed},
     nullifier::{Nullifier, NullifierKeyContainer},
+    resource::{NoteType, RandomSeed, Resource},
 };
 
 fn bench_action_proof(name: &str, c: &mut Criterion) {
     let mut rng = OsRng;
     let action_info = {
-        let input_note = {
+        let input_resource = {
             let rho = Nullifier::from(pallas::Base::random(&mut rng));
             let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
             let note_type = {
@@ -32,7 +32,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
             let app_data_dynamic = pallas::Base::random(&mut rng);
             let value: u64 = rng.gen();
             let rseed = RandomSeed::random(&mut rng);
-            Note {
+            Resource {
                 note_type,
                 app_data_dynamic,
                 value,
@@ -43,8 +43,8 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
                 rho,
             }
         };
-        let mut output_note = {
-            let rho = input_note.get_nf().unwrap();
+        let mut output_resource = {
+            let rho = input_resource.get_nf().unwrap();
             let nk_com = NullifierKeyContainer::from_commitment(pallas::Base::random(&mut rng));
             let note_type = {
                 let app_vk = pallas::Base::random(&mut rng);
@@ -54,7 +54,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
             let app_data_dynamic = pallas::Base::random(&mut rng);
             let value: u64 = rng.gen();
             let rseed = RandomSeed::random(&mut rng);
-            Note {
+            Resource {
                 note_type,
                 app_data_dynamic,
                 value,
@@ -67,10 +67,10 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
         };
         let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         ActionInfo::new(
-            input_note,
+            input_resource,
             input_merkle_path,
             None,
-            &mut output_note,
+            &mut output_resource,
             &mut rng,
         )
     };

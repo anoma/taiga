@@ -5,10 +5,10 @@ use crate::{
         VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
         ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
     },
-    constant::{NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_PARAMS_SIZE},
+    constant::{NUM_RESOURCE, SETUP_PARAMS_MAP, VP_CIRCUIT_PARAMS_SIZE},
     error::TransactionError,
-    note::{Note, RandomSeed},
     proof::Proof,
+    resource::{RandomSeed, Resource},
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
@@ -59,9 +59,9 @@ lazy_static! {
 // TrivialValidityPredicateCircuit with empty custom constraints.
 #[derive(Clone, Debug, Default)]
 pub struct TrivialValidityPredicateCircuit {
-    pub owned_note_pub_id: pallas::Base,
-    pub input_notes: [Note; NUM_NOTE],
-    pub output_notes: [Note; NUM_NOTE],
+    pub owned_resource_id: pallas::Base,
+    pub input_resources: [Resource; NUM_RESOURCE],
+    pub output_resources: [Resource; NUM_RESOURCE],
 }
 
 // I only exist to allow trivial derivation of the nifstruct
@@ -69,21 +69,21 @@ pub struct TrivialValidityPredicateCircuit {
 #[cfg_attr(feature = "nif", derive(NifStruct))]
 #[cfg_attr(feature = "nif", module = "Taiga.VP.Trivial")]
 struct TrivialValidtyPredicateCircuitProxy {
-    owned_note_pub_id: pallas::Base,
-    input_notes: Vec<Note>,
-    output_notes: Vec<Note>,
+    owned_resource_id: pallas::Base,
+    input_resources: Vec<Resource>,
+    output_resources: Vec<Resource>,
 }
 
 impl TrivialValidityPredicateCircuit {
     pub fn new(
-        owned_note_pub_id: pallas::Base,
-        input_notes: [Note; NUM_NOTE],
-        output_notes: [Note; NUM_NOTE],
+        owned_resource_id: pallas::Base,
+        input_resources: [Resource; NUM_RESOURCE],
+        output_resources: [Resource; NUM_RESOURCE],
     ) -> Self {
         Self {
-            owned_note_pub_id,
-            input_notes,
-            output_notes,
+            owned_resource_id,
+            input_resources,
+            output_resources,
         }
     }
 
@@ -107,9 +107,9 @@ impl TrivialValidityPredicateCircuit {
 
     fn to_proxy(&self) -> TrivialValidtyPredicateCircuitProxy {
         TrivialValidtyPredicateCircuitProxy {
-            owned_note_pub_id: self.owned_note_pub_id,
-            input_notes: self.input_notes.to_vec(),
-            output_notes: self.output_notes.to_vec(),
+            owned_resource_id: self.owned_resource_id,
+            input_resources: self.input_resources.to_vec(),
+            output_resources: self.output_resources.to_vec(),
         }
     }
 }
@@ -118,12 +118,12 @@ impl TrivialValidityPredicateCircuit {
 impl BorshSerialize for TrivialValidityPredicateCircuit {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         use ff::PrimeField;
-        writer.write_all(&self.owned_note_pub_id.to_repr())?;
-        for input in self.input_notes.iter() {
+        writer.write_all(&self.owned_resource_id.to_repr())?;
+        for input in self.input_resources.iter() {
             input.serialize(writer)?;
         }
 
-        for output in self.output_notes.iter() {
+        for output in self.output_resources.iter() {
             output.serialize(writer)?;
         }
         Ok(())
@@ -134,37 +134,37 @@ impl BorshSerialize for TrivialValidityPredicateCircuit {
 impl BorshDeserialize for TrivialValidityPredicateCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         use ff::PrimeField;
-        let owned_note_pub_id_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let owned_note_pub_id = Option::from(pallas::Base::from_repr(owned_note_pub_id_bytes))
+        let owned_resource_id_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let owned_resource_id = Option::from(pallas::Base::from_repr(owned_resource_id_bytes))
             .ok_or_else(|| {
                 std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
-                    "owned_note_pub_id not in field",
+                    "owned_resource_id not in field",
                 )
             })?;
-        let input_notes: Vec<_> = (0..NUM_NOTE)
-            .map(|_| Note::deserialize_reader(reader))
+        let input_resources: Vec<_> = (0..NUM_RESOURCE)
+            .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
-        let output_notes: Vec<_> = (0..NUM_NOTE)
-            .map(|_| Note::deserialize_reader(reader))
+        let output_resources: Vec<_> = (0..NUM_RESOURCE)
+            .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
         Ok(Self {
-            owned_note_pub_id,
-            input_notes: input_notes.try_into().unwrap(),
-            output_notes: output_notes.try_into().unwrap(),
+            owned_resource_id,
+            input_resources: input_resources.try_into().unwrap(),
+            output_resources: output_resources.try_into().unwrap(),
         })
     }
 }
 
 impl TrivialValidtyPredicateCircuitProxy {
     fn to_concrete(&self) -> Option<TrivialValidityPredicateCircuit> {
-        let input_notes = self.input_notes.clone().try_into().ok()?;
-        let output_notes = self.output_notes.clone().try_into().ok()?;
-        let owned_note_pub_id = self.owned_note_pub_id;
+        let input_resources = self.input_resources.clone().try_into().ok()?;
+        let output_resources = self.output_resources.clone().try_into().ok()?;
+        let owned_resource_id = self.owned_resource_id;
         Some(TrivialValidityPredicateCircuit {
-            owned_note_pub_id,
-            input_notes,
-            output_notes,
+            owned_resource_id,
+            input_resources,
+            output_resources,
         })
     }
 }
@@ -184,12 +184,12 @@ impl<'a> Decoder<'a> for TrivialValidityPredicateCircuit {
 }
 
 impl ValidityPredicateCircuit for TrivialValidityPredicateCircuit {
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.input_notes
+    fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE] {
+        &self.input_resources
     }
 
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.output_notes
+    fn get_output_resources(&self) -> &[Resource; NUM_RESOURCE] {
+        &self.output_resources
     }
 
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
@@ -206,8 +206,8 @@ impl ValidityPredicateCircuit for TrivialValidityPredicateCircuit {
         public_inputs.into()
     }
 
-    fn get_owned_note_pub_id(&self) -> pallas::Base {
-        self.owned_note_pub_id
+    fn get_owned_resource_id(&self) -> pallas::Base {
+        self.owned_resource_id
     }
 }
 
@@ -251,15 +251,15 @@ impl ValidityPredicateVerifyingInfo for TrivialValidityPredicateCircuit {
 #[cfg(test)]
 pub mod tests {
     use super::TrivialValidityPredicateCircuit;
-    use crate::{constant::NUM_NOTE, note::tests::random_note};
+    use crate::{constant::NUM_RESOURCE, resource::tests::random_resource};
     use ff::Field;
     use pasta_curves::pallas;
     use rand::RngCore;
     pub fn random_trivial_vp_circuit<R: RngCore>(mut rng: R) -> TrivialValidityPredicateCircuit {
-        let owned_note_pub_id = pallas::Base::random(&mut rng);
-        let input_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
-        let output_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
-        TrivialValidityPredicateCircuit::new(owned_note_pub_id, input_notes, output_notes)
+        let owned_resource_id = pallas::Base::random(&mut rng);
+        let input_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
+        let output_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
+        TrivialValidityPredicateCircuit::new(owned_resource_id, input_resources, output_resources)
     }
 
     #[test]

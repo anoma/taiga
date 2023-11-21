@@ -11,7 +11,7 @@ use pasta_curves::pallas;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ValueCheckConfig {
     q_value_check: Selector,
-    is_input_note: Column<Advice>,
+    is_input_resource: Column<Advice>,
     state_product: Column<Advice>,
     value: Column<Advice>,
 }
@@ -20,13 +20,13 @@ impl ValueCheckConfig {
     #[allow(clippy::too_many_arguments)]
     pub fn configure(
         meta: &mut ConstraintSystem<pallas::Base>,
-        is_input_note: Column<Advice>,
+        is_input_resource: Column<Advice>,
         state_product: Column<Advice>,
         value: Column<Advice>,
     ) -> Self {
         let config = Self {
             q_value_check: meta.selector(),
-            is_input_note,
+            is_input_resource,
             state_product,
             value,
         };
@@ -39,7 +39,7 @@ impl ValueCheckConfig {
     fn create_gate(&self, meta: &mut ConstraintSystem<pallas::Base>) {
         meta.create_gate("check state update", |meta| {
             let q_value_check = meta.query_selector(self.q_value_check);
-            let is_input_note = meta.query_advice(self.is_input_note, Rotation::cur());
+            let is_input_resource = meta.query_advice(self.is_input_resource, Rotation::cur());
             let state_product = meta.query_advice(self.state_product, Rotation::cur());
             let input_value = meta.query_advice(self.value, Rotation::cur());
             let output_value = meta.query_advice(self.value, Rotation::next());
@@ -57,7 +57,7 @@ impl ValueCheckConfig {
                     ("bool_check_value", bool_check_value),
                     ("is_zero check", poly),
                     ("output value check", (state_product_is_zero - output_value)),
-                    ("input value check", is_input_note * (input_value - one)),
+                    ("input value check", is_input_resource * (input_value - one)),
                 ],
             )
         });
@@ -65,7 +65,7 @@ impl ValueCheckConfig {
 
     pub fn assign_region(
         &self,
-        is_input_note: &AssignedCell<pallas::Base, pallas::Base>,
+        is_input_resource: &AssignedCell<pallas::Base, pallas::Base>,
         state_product: &AssignedCell<pallas::Base, pallas::Base>,
         input_value: &AssignedCell<pallas::Base, pallas::Base>,
         output_value: &AssignedCell<pallas::Base, pallas::Base>,
@@ -74,7 +74,7 @@ impl ValueCheckConfig {
     ) -> Result<(), Error> {
         // Enable `q_value_check` selector
         self.q_value_check.enable(region, offset)?;
-        is_input_note.copy_advice(|| "is_input_note", region, self.is_input_note, offset)?;
+        is_input_resource.copy_advice(|| "is_input_resource", region, self.is_input_resource, offset)?;
         state_product.copy_advice(|| "state_product", region, self.state_product, offset)?;
         input_value.copy_advice(|| "input value", region, self.value, offset)?;
         output_value.copy_advice(|| "output value", region, self.value, offset + 1)?;

@@ -1,5 +1,5 @@
 use crate::{
-    error::TransactionError, merkle_tree::Anchor, note::NoteCommitment, nullifier::Nullifier,
+    error::TransactionError, merkle_tree::Anchor, nullifier::Nullifier, resource::NoteCommitment,
     value_commitment::ValueCommitment,
 };
 
