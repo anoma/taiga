@@ -597,23 +597,23 @@ pub mod tests {
     use pasta_curves::pallas;
     use rand::{Rng, RngCore};
     use taiga_halo2::{
-        resource::{Resource, NoteType, RandomSeed},
+        resource::{Resource, ResourceKind, RandomSeed},
         nullifier::{Nullifier, NullifierKeyContainer},
     };
 
     pub fn random_input_resource<R: RngCore>(mut rng: R) -> Resource {
         let rho = Nullifier::from(pallas::Base::random(&mut rng));
         let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
-        let note_type = {
+        let kind = {
             let app_vk = pallas::Base::random(&mut rng);
             let app_data_static = pallas::Base::random(&mut rng);
-            NoteType::new(app_vk, app_data_static)
+            ResourceKind::new(app_vk, app_data_static)
         };
         let app_data_dynamic = pallas::Base::random(&mut rng);
         let value: u64 = rng.gen();
         let rseed = RandomSeed::random(&mut rng);
         Resource {
-            note_type,
+            kind,
             app_data_dynamic,
             value,
             nk_container: nk,
@@ -626,16 +626,16 @@ pub mod tests {
 
     pub fn random_output_resource<R: RngCore>(mut rng: R, rho: Nullifier) -> Resource {
         let nk_com = NullifierKeyContainer::from_commitment(pallas::Base::random(&mut rng));
-        let note_type = {
+        let kind = {
             let app_vk = pallas::Base::random(&mut rng);
             let app_data_static = pallas::Base::random(&mut rng);
-            NoteType::new(app_vk, app_data_static)
+            ResourceKind::new(app_vk, app_data_static)
         };
         let app_data_dynamic = pallas::Base::random(&mut rng);
         let value: u64 = rng.gen();
         let rseed = RandomSeed::random(&mut rng);
         Resource {
-            note_type,
+            kind,
             app_data_dynamic,
             value,
             nk_container: nk_com,
@@ -663,7 +663,7 @@ fn test_halo2_sudoku_app_vp_circuit_init() {
         let encoded_init_state = SudokuState::default().encode();
         let previous_state = SudokuState::default();
         let current_state = SudokuState::default();
-        output_resources[0].note_type.app_data_static =
+        output_resources[0].kind.app_data_static =
             poseidon_hash(encoded_init_state, current_state.encode());
         output_resources[0].value = 1u64;
         let owned_resource_id = output_resources[0].commitment().inner();
@@ -737,13 +737,13 @@ fn test_halo2_sudoku_app_vp_circuit_update() {
                 [6, 0, 7, 4, 3, 5, 1, 9, 8],
             ],
         };
-        input_resources[0].note_type.app_data_static =
+        input_resources[0].kind.app_data_static =
             poseidon_hash(encoded_init_state, previous_state.encode());
         input_resources[0].value = 1u64;
-        output_resources[0].note_type.app_data_static =
+        output_resources[0].kind.app_data_static =
             poseidon_hash(encoded_init_state, current_state.encode());
         output_resources[0].value = 1u64;
-        output_resources[0].note_type.app_vk = input_resources[0].note_type.app_vk;
+        output_resources[0].kind.app_vk = input_resources[0].kind.app_vk;
         SudokuAppValidityPredicateCircuit {
             owned_resource_id: input_resources[0].get_nf().unwrap().inner(),
             input_resources,
@@ -813,13 +813,13 @@ fn halo2_sudoku_app_vp_circuit_final() {
                 [6, 2, 7, 4, 3, 5, 1, 9, 8],
             ],
         };
-        input_resources[0].note_type.app_data_static =
+        input_resources[0].kind.app_data_static =
             poseidon_hash(encoded_init_state, previous_state.encode());
         input_resources[0].value = 1u64;
-        output_resources[0].note_type.app_data_static =
+        output_resources[0].kind.app_data_static =
             poseidon_hash(encoded_init_state, current_state.encode());
         output_resources[0].value = 0u64;
-        output_resources[0].note_type.app_vk = input_resources[0].note_type.app_vk;
+        output_resources[0].kind.app_vk = input_resources[0].kind.app_vk;
         SudokuAppValidityPredicateCircuit {
             owned_resource_id: input_resources[0].get_nf().unwrap().inner(),
             input_resources,

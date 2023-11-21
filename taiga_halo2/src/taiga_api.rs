@@ -20,7 +20,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// Create a resource
 /// app_vk is the compressed verifying key of application(static) VP
 /// app_data_static is the encoded data that is defined in application vp
-/// app_data_dynamic is the data defined in application vp and will NOT be used to derive type
+/// app_data_dynamic is the data defined in application vp and will NOT be used to derive kind
 /// value is the quantity of resources
 /// nk is the nullifier key
 /// rho is the old nullifier

@@ -20,7 +20,7 @@ use pasta_curves::{group::Curve, pallas, vesta};
 use std::collections::HashMap;
 
 /// SWU hash-to-curve personalization for the resource commitment generator
-pub const RESOURCE_COMMITMENT_PERSONALIZATION: &str = "Taiga-ResourceCommit";
+pub const RESOURCE_COMMITMENT_PERSONALIZATION: &str = "Taiga-NoteCommit";
 
 pub const TRANSACTION_BINDING_HASH_PERSONALIZATION: &[u8; 16] = b"TxBindingSigHash";
 

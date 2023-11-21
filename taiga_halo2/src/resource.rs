@@ -90,8 +90,8 @@ impl Hash for ResourceCommitment {
 #[cfg_attr(feature = "nif", module = "Taiga.Resource")]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Resource {
-    pub note_type: NoteType,
-    /// app_data_dynamic is the data defined in application vp and will NOT be used to derive type
+    pub kind: ResourceKind,
+    /// app_data_dynamic is the data defined in application vp and will NOT be used to derive kind
     /// sub-vps and any other data can be encoded to the app_data_dynamic
     pub app_data_dynamic: pallas::Base,
     /// value denotes the amount of the resource.
@@ -108,12 +108,12 @@ pub struct Resource {
     pub is_merkle_checked: bool,
 }
 
-/// The parameters in the NoteType are used to derive resource type.
+/// The parameters in the ResourceKind are used to derive resource kind.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "nif", derive(NifStruct))]
-#[cfg_attr(feature = "nif", module = "Taiga.NoteType")]
+#[cfg_attr(feature = "nif", module = "Taiga.ResourceKind")]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct NoteType {
+pub struct ResourceKind {
     /// app_vk is the compressed verifying key of VP
     pub app_vk: pallas::Base,
     /// app_data_static is the encoded data that is defined in application vp
@@ -144,9 +144,9 @@ impl Resource {
         is_merkle_checked: bool,
         rseed: RandomSeed,
     ) -> Self {
-        let note_type = NoteType::new(app_vk, app_data_static);
+        let kind = ResourceKind::new(app_vk, app_data_static);
         Self {
-            note_type,
+            kind,
             app_data_dynamic,
             value,
             nk_container: NullifierKeyContainer::Key(nk),
@@ -167,9 +167,9 @@ impl Resource {
         nk_com: pallas::Base,
         is_merkle_checked: bool,
     ) -> Self {
-        let note_type = NoteType::new(app_vk, app_data_static);
+        let kind = ResourceKind::new(app_vk, app_data_static);
         Self {
-            note_type,
+            kind,
             app_data_dynamic,
             value,
             nk_container: NullifierKeyContainer::Commitment(nk_com),
@@ -192,9 +192,9 @@ impl Resource {
         psi: pallas::Base,
         rcm: pallas::Base,
     ) -> Self {
-        let note_type = NoteType::new(app_vk, app_data_static);
+        let kind = ResourceKind::new(app_vk, app_data_static);
         Self {
-            note_type,
+            kind,
             app_data_dynamic,
             value,
             nk_container,
@@ -208,13 +208,13 @@ impl Resource {
     pub fn random_padding_resource<R: RngCore>(mut rng: R) -> Self {
         let app_vk = *COMPRESSED_TRIVIAL_VP_VK;
         let app_data_static = pallas::Base::random(&mut rng);
-        let note_type = NoteType::new(app_vk, app_data_static);
+        let kind = ResourceKind::new(app_vk, app_data_static);
         let app_data_dynamic = pallas::Base::random(&mut rng);
         let rho = Nullifier::from(pallas::Base::random(&mut rng));
         let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
         let rseed = RandomSeed::random(&mut rng);
         Resource {
-            note_type,
+            kind,
             app_data_dynamic,
             value: 0,
             nk_container: nk,
@@ -262,16 +262,16 @@ impl Resource {
         self.nk_container.get_commitment()
     }
 
-    pub fn get_note_type(&self) -> pallas::Point {
-        self.note_type.derive_note_type()
+    pub fn get_kind(&self) -> pallas::Point {
+        self.kind.derive_kind()
     }
 
     pub fn get_app_vk(&self) -> pallas::Base {
-        self.note_type.app_vk
+        self.kind.app_vk
     }
 
     pub fn get_app_data_static(&self) -> pallas::Base {
-        self.note_type.app_data_static
+        self.kind.app_data_static
     }
 
     pub fn get_psi(&self) -> pallas::Base {
@@ -301,9 +301,9 @@ impl BorshSerialize for Resource {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         use byteorder::{LittleEndian, WriteBytesExt};
         // Write app_vk
-        writer.write_all(&self.note_type.app_vk.to_repr())?;
+        writer.write_all(&self.kind.app_vk.to_repr())?;
         // Write app_data_static
-        writer.write_all(&self.note_type.app_data_static.to_repr())?;
+        writer.write_all(&self.kind.app_data_static.to_repr())?;
         // Write app_data_dynamic
         writer.write_all(&self.app_data_dynamic.to_repr())?;
         // Write resource value
@@ -406,7 +406,7 @@ impl BorshDeserialize for Resource {
     }
 }
 
-impl NoteType {
+impl ResourceKind {
     pub fn new(vk: pallas::Base, data: pallas::Base) -> Self {
         Self {
             app_vk: vk,
@@ -414,13 +414,13 @@ impl NoteType {
         }
     }
 
-    pub fn derive_note_type(&self) -> pallas::Point {
+    pub fn derive_kind(&self) -> pallas::Point {
         let inputs = [self.app_vk, self.app_data_static];
         poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&inputs)
     }
 }
 
-impl Hash for NoteType {
+impl Hash for ResourceKind {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.app_vk.to_repr().as_ref().hash(state);
         self.app_data_static.to_repr().as_ref().hash(state);
@@ -563,23 +563,23 @@ impl ResourceValidityPredicates {
 
 #[cfg(test)]
 pub mod tests {
-    use super::{NoteType, RandomSeed, Resource};
+    use super::{RandomSeed, Resource, ResourceKind};
     use crate::nullifier::tests::*;
     use halo2_proofs::arithmetic::Field;
     use pasta_curves::pallas;
     use rand::{Rng, RngCore};
 
-    pub fn random_note_type<R: RngCore>(mut rng: R) -> NoteType {
+    pub fn random_kind<R: RngCore>(mut rng: R) -> ResourceKind {
         let app_vk = pallas::Base::random(&mut rng);
         let app_data_static = pallas::Base::random(&mut rng);
-        NoteType::new(app_vk, app_data_static)
+        ResourceKind::new(app_vk, app_data_static)
     }
 
     pub fn random_resource<R: RngCore>(mut rng: R) -> Resource {
         let rho = random_nullifier(&mut rng);
         let rseed = RandomSeed::random(&mut rng);
         Resource {
-            note_type: random_note_type(&mut rng),
+            kind: random_kind(&mut rng),
             app_data_dynamic: pallas::Base::random(&mut rng),
             value: rng.gen(),
             nk_container: random_nullifier_key(&mut rng),
@@ -592,7 +592,7 @@ pub mod tests {
 
     #[cfg(feature = "borsh")]
     #[test]
-    fn note_borsh_serialization_test() {
+    fn resource_borsh_serialization_test() {
         use borsh::BorshDeserialize;
         use rand::rngs::OsRng;
 
@@ -604,8 +604,8 @@ pub mod tests {
             // BorshSerialize
             let borsh = borsh::to_vec(&input_resource).unwrap();
             // BorshDeserialize
-            let de_note: Resource = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
-            assert_eq!(input_resource, de_note);
+            let de_resource: Resource = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
+            assert_eq!(input_resource, de_resource);
         }
 
         let mut output_resource = input_resource;
@@ -614,8 +614,8 @@ pub mod tests {
             // BorshSerialize
             let borsh = borsh::to_vec(&output_resource).unwrap();
             // BorshDeserialize
-            let de_note: Resource = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
-            assert_eq!(output_resource, de_note);
+            let de_resource: Resource = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
+            assert_eq!(output_resource, de_resource);
         }
 
         let icm = input_resource.commitment();

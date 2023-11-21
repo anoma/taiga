@@ -550,7 +550,7 @@ fn test_halo2_token_vp_circuit() {
         let output_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
         let token_name = TokenName("Token_name".to_string());
         let auth = TokenAuthorization::random(&mut rng);
-        input_resources[0].note_type.app_data_static = token_name.encode();
+        input_resources[0].kind.app_data_static = token_name.encode();
         input_resources[0].app_data_dynamic = auth.to_app_data_dynamic();
         TokenValidityPredicateCircuit {
             owned_resource_id: input_resources[0].get_nf().unwrap().inner(),

@@ -114,7 +114,7 @@ pub mod testing {
         let input_resource_1 = random_resource(&mut rng);
         let mut output_resource_1 = {
             let mut resource = random_resource(&mut rng);
-            resource.note_type = input_resource_1.note_type;
+            resource.kind = input_resource_1.kind;
             resource.value = input_resource_1.value;
             resource
         };
@@ -130,7 +130,7 @@ pub mod testing {
         let input_resource_2 = random_resource(&mut rng);
         let mut output_resource_2 = {
             let mut resource = random_resource(&mut rng);
-            resource.note_type = input_resource_2.note_type;
+            resource.kind = input_resource_2.kind;
             resource.value = input_resource_2.value;
             resource
         };

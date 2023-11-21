@@ -15,7 +15,7 @@ use taiga_halo2::{
     },
     merkle_tree::MerklePath,
     nullifier::{Nullifier, NullifierKeyContainer},
-    resource::{NoteType, RandomSeed, Resource},
+    resource::{RandomSeed, Resource, ResourceKind},
 };
 
 fn bench_action_proof(name: &str, c: &mut Criterion) {
@@ -24,16 +24,16 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
         let input_resource = {
             let rho = Nullifier::from(pallas::Base::random(&mut rng));
             let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
-            let note_type = {
+            let kind = {
                 let app_vk = pallas::Base::random(&mut rng);
                 let app_data_static = pallas::Base::random(&mut rng);
-                NoteType::new(app_vk, app_data_static)
+                ResourceKind::new(app_vk, app_data_static)
             };
             let app_data_dynamic = pallas::Base::random(&mut rng);
             let value: u64 = rng.gen();
             let rseed = RandomSeed::random(&mut rng);
             Resource {
-                note_type,
+                kind,
                 app_data_dynamic,
                 value,
                 nk_container: nk,
@@ -46,16 +46,16 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
         let mut output_resource = {
             let rho = input_resource.get_nf().unwrap();
             let nk_com = NullifierKeyContainer::from_commitment(pallas::Base::random(&mut rng));
-            let note_type = {
+            let kind = {
                 let app_vk = pallas::Base::random(&mut rng);
                 let app_data_static = pallas::Base::random(&mut rng);
-                NoteType::new(app_vk, app_data_static)
+                ResourceKind::new(app_vk, app_data_static)
             };
             let app_data_dynamic = pallas::Base::random(&mut rng);
             let value: u64 = rng.gen();
             let rseed = RandomSeed::random(&mut rng);
             Resource {
-                note_type,
+                kind,
                 app_data_dynamic,
                 value,
                 nk_container: nk_com,

@@ -254,8 +254,8 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             self.get_output_resources()[1]
         };
         let message = vec![
-            target_resource.note_type.app_vk,
-            target_resource.note_type.app_data_static,
+            target_resource.kind.app_vk,
+            target_resource.kind.app_data_static,
             target_resource.app_data_dynamic,
             pallas::Base::from(target_resource.value),
             target_resource.rho.inner(),

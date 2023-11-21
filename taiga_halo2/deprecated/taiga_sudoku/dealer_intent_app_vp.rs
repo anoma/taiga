@@ -366,7 +366,7 @@ fn test_halo2_dealer_intent_vp_circuit() {
             .collect::<Vec<_>>();
         let encoded_puzzle = pallas::Base::random(&mut rng);
         let sudoku_app_vk = pallas::Base::random(&mut rng);
-        output_resources[0].note_type.app_data_static =
+        output_resources[0].kind.app_data_static =
             DealerIntentValidityPredicateCircuit::compute_app_data_static(
                 encoded_puzzle,
                 sudoku_app_vk,

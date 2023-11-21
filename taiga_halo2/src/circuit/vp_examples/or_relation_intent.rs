@@ -318,8 +318,8 @@ fn test_halo2_or_relation_intent_vp_circuit() {
         let mut output_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
         let token_1 = Token::new("token1".to_string(), 1u64);
         let token_2 = Token::new("token2".to_string(), 2u64);
-        output_resources[0].note_type.app_vk = *COMPRESSED_TOKEN_VK;
-        output_resources[0].note_type.app_data_static = token_1.encode_name();
+        output_resources[0].kind.app_vk = *COMPRESSED_TOKEN_VK;
+        output_resources[0].kind.app_data_static = token_1.encode_name();
         output_resources[0].value = token_1.value();
 
         let nk = pallas::Base::random(&mut rng);

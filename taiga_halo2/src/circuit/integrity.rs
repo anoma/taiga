@@ -276,7 +276,7 @@ pub fn check_output_resource(
     })
 }
 
-pub fn derive_note_type(
+pub fn derive_kind(
     mut layouter: impl Layouter<pallas::Base>,
     hash_to_curve_config: HashToCurveConfig,
     ecc_chip: EccChip<TaigaFixedBases>,
@@ -291,7 +291,7 @@ pub fn derive_note_type(
     )?;
 
     // Assign a new `NonIdentityPoint` and constran equal to hash_to_curve point since `Point` doesn't have mul operation
-    // IndentityPoint is an invalid resource type and it returns an error.
+    // IndentityPoint is an invalid resource kind and it returns an error.
     let non_identity_point = app_vk
         .value()
         .zip(app_data_static.value())
@@ -300,11 +300,11 @@ pub fn derive_note_type(
         });
     let non_identity_point_var = NonIdentityPoint::new(
         ecc_chip,
-        layouter.namespace(|| "non-identity resource type"),
+        layouter.namespace(|| "non-identity resource kind"),
         non_identity_point,
     )?;
     point.constrain_equal(
-        layouter.namespace(|| "non-identity resource type"),
+        layouter.namespace(|| "non-identity resource kind"),
         &non_identity_point_var,
     )?;
     Ok(non_identity_point_var)
@@ -323,9 +323,9 @@ pub fn compute_value_commitment(
     v_output: AssignedCell<pallas::Base, pallas::Base>,
     rcv: pallas::Scalar,
 ) -> Result<Point<pallas::Affine, EccChip<TaigaFixedBases>>, Error> {
-    // input value point
-    let note_type_input = derive_note_type(
-        layouter.namespace(|| "derive input resource type"),
+    // input value base point
+    let input_kind = derive_kind(
+        layouter.namespace(|| "derive input resource kind"),
         hash_to_curve_config.clone(),
         ecc_chip.clone(),
         app_address_input,
@@ -337,11 +337,11 @@ pub fn compute_value_commitment(
         &v_input,
     )?;
     let (value_point_input, _) =
-        note_type_input.mul(layouter.namespace(|| "input value point"), v_input_scalar)?;
+        input_kind.mul(layouter.namespace(|| "input value point"), v_input_scalar)?;
 
-    // output value point
-    let note_type_output = derive_note_type(
-        layouter.namespace(|| "derive output resource type"),
+    // output value base point
+    let output_kind = derive_kind(
+        layouter.namespace(|| "derive output resource kind"),
         hash_to_curve_config,
         ecc_chip.clone(),
         app_address_output,
@@ -353,7 +353,7 @@ pub fn compute_value_commitment(
         &v_output,
     )?;
     let (value_point_output, _) =
-        note_type_output.mul(layouter.namespace(|| "output value point"), v_output_scalar)?;
+        output_kind.mul(layouter.namespace(|| "output value point"), v_output_scalar)?;
 
     // Get and constrain the negative output value point
     let neg_v_point_output = Point::new(
