@@ -15,7 +15,7 @@ use crate::{
             },
         },
         integrity::{check_input_resource, check_output_resource},
-        note_commitment::{NoteCommitChip, NoteCommitConfig},
+        resource_commitment::{ResourceCommitChip, ResourceCommitConfig},
         vamp_ir_utils::{get_circuit_assignments, parse, VariableAssignmentError},
     },
     constant::{
@@ -30,7 +30,7 @@ use crate::{
     error::TransactionError,
     note_encryption::{NoteCiphertext, SecretKey},
     proof::Proof,
-    resource::{NoteCommitment, RandomSeed, Resource},
+    resource::{RandomSeed, Resource, ResourceCommitment},
     utils::mod_r_p,
     vp_vk::ValidityPredicateVerifyingKey,
 };
@@ -168,7 +168,7 @@ impl VPVerifyingInfo {
         ]
     }
 
-    pub fn get_note_commitments(&self) -> [NoteCommitment; NUM_RESOURCE] {
+    pub fn get_resource_commitments(&self) -> [ResourceCommitment; NUM_RESOURCE] {
         [
             self.public_inputs
                 .get_from_index(VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX)
@@ -327,7 +327,7 @@ pub struct ValidityPredicateConfig {
     pub sub_config: SubConfig,
     pub mul_config: MulConfig,
     pub blake2s_config: Blake2sConfig<pallas::Base>,
-    pub note_commit_config: NoteCommitConfig,
+    pub note_commit_config: ResourceCommitConfig,
 }
 
 impl ValidityPredicateConfig {
@@ -400,7 +400,7 @@ impl ValidityPredicateConfig {
         let extended_or_relation_config =
             ExtendedOrRelationConfig::configure(meta, [advices[0], advices[1], advices[2]]);
         let blake2s_config = Blake2sConfig::configure(meta, advices);
-        let note_commit_config = NoteCommitChip::configure(
+        let note_commit_config = ResourceCommitChip::configure(
             meta,
             advices[0..3].try_into().unwrap(),
             poseidon_config.clone(),
@@ -458,7 +458,7 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVer
         )?;
 
         // Construct a note_commit chip
-        let note_commit_chip = NoteCommitChip::construct(config.note_commit_config.clone());
+        let note_commit_chip = ResourceCommitChip::construct(config.note_commit_config.clone());
 
         let input_resources = self.get_input_resources();
         let output_resources = self.get_output_resources();

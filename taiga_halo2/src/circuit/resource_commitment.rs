@@ -92,24 +92,24 @@ impl ComposeMerkleCheckValue {
 }
 
 #[derive(Clone, Debug)]
-pub struct NoteCommitConfig {
+pub struct ResourceCommitConfig {
     compose_config: ComposeMerkleCheckValue,
     poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
     lookup_config: LookupRangeCheckConfig<pallas::Base, 10>,
 }
 
 #[derive(Clone, Debug)]
-pub struct NoteCommitChip {
-    config: NoteCommitConfig,
+pub struct ResourceCommitChip {
+    config: ResourceCommitConfig,
 }
 
-impl NoteCommitChip {
+impl ResourceCommitChip {
     pub fn configure(
         meta: &mut ConstraintSystem<pallas::Base>,
         advices: [Column<Advice>; 3],
         poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
         lookup_config: LookupRangeCheckConfig<pallas::Base, 10>,
-    ) -> NoteCommitConfig {
+    ) -> ResourceCommitConfig {
         let two_pow_128 = pallas::Base::from_u128(1 << 64).square();
         let compose_config = ComposeMerkleCheckValue::configure(
             meta,
@@ -119,15 +119,15 @@ impl NoteCommitChip {
             two_pow_128,
         );
 
-        NoteCommitConfig {
+        ResourceCommitConfig {
             compose_config,
             poseidon_config,
             lookup_config,
         }
     }
 
-    pub fn construct(config: NoteCommitConfig) -> Self {
-        NoteCommitChip { config }
+    pub fn construct(config: ResourceCommitConfig) -> Self {
+        ResourceCommitChip { config }
     }
 
     pub fn get_poseidon_config(&self) -> PoseidonConfig<pallas::Base, 3, 2> {
@@ -140,9 +140,9 @@ impl NoteCommitChip {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn note_commit(
+pub fn resource_commit(
     mut layouter: impl Layouter<pallas::Base>,
-    chip: NoteCommitChip,
+    chip: ResourceCommitChip,
     app_vp: AssignedCell<pallas::Base, pallas::Base>,
     app_data_static: AssignedCell<pallas::Base, pallas::Base>,
     app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,

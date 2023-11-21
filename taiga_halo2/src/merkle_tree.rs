@@ -1,7 +1,7 @@
 use std::hash::{Hash, Hasher};
 
 use crate::merkle_tree::LR::{L, R};
-use crate::resource::NoteCommitment;
+use crate::resource::ResourceCommitment;
 use crate::utils::poseidon_hash;
 use crate::{constant::TAIGA_COMMITMENT_TREE_DEPTH, resource::Resource};
 use ff::PrimeField;
@@ -191,8 +191,8 @@ impl From<&Resource> for Node {
     }
 }
 
-impl From<NoteCommitment> for Node {
-    fn from(cm: NoteCommitment) -> Node {
+impl From<ResourceCommitment> for Node {
+    fn from(cm: ResourceCommitment) -> Node {
         Node(cm.inner())
     }
 }

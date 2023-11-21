@@ -32,7 +32,7 @@ use halo2_proofs::{
 };
 use pasta_curves::pallas;
 
-use crate::circuit::note_commitment::{NoteCommitChip, NoteCommitConfig};
+use crate::circuit::resource_commitment::{ResourceCommitChip, ResourceCommitConfig};
 
 #[derive(Clone, Debug)]
 pub struct ActionConfig {
@@ -45,7 +45,7 @@ pub struct ActionConfig {
     merkle_path_selector: Selector,
     hash_to_curve_config: HashToCurveConfig,
     blake2s_config: Blake2sConfig<pallas::Base>,
-    note_commit_config: NoteCommitConfig,
+    resource_commit_config: ResourceCommitConfig,
 }
 
 /// The Action circuit.
@@ -148,7 +148,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
 
         let blake2s_config = Blake2sConfig::configure(meta, advices);
 
-        let note_commit_config = NoteCommitChip::configure(
+        let resource_commit_config = ResourceCommitChip::configure(
             meta,
             advices[0..3].try_into().unwrap(),
             poseidon_config.clone(),
@@ -165,7 +165,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             merkle_path_selector,
             hash_to_curve_config,
             blake2s_config,
-            note_commit_config,
+            resource_commit_config,
         }
     }
 
@@ -198,8 +198,8 @@ impl Circuit<pallas::Base> for ActionCircuit {
         // Construct a blake2s chip
         let blake2s_chip = Blake2sChip::construct(config.blake2s_config);
 
-        // Construct a note_commit chip
-        let note_commit_chip = NoteCommitChip::construct(config.note_commit_config);
+        // Construct a resource_commit chip
+        let resource_commit_chip = ResourceCommitChip::construct(config.resource_commit_config);
 
         // Input resource
         // Check the input resource commitment
@@ -207,7 +207,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             layouter.namespace(|| "check input resource"),
             config.advices,
             config.instances,
-            note_commit_chip.clone(),
+            resource_commit_chip.clone(),
             self.input_resource,
             ACTION_NF_PUBLIC_INPUT_ROW_IDX,
         )?;
@@ -225,7 +225,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             layouter.namespace(|| "check output resource"),
             config.advices,
             config.instances,
-            note_commit_chip,
+            resource_commit_chip,
             self.output_resource,
             input_resource_variables.nf,
             ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX,

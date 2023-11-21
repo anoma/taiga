@@ -13,7 +13,7 @@ pub enum TransactionError {
     /// Nullifier is not consistent between the action and the vp.
     InconsistentNullifier,
     /// Output resource commitment is not consistent between the action and the vp.
-    InconsistentOutputNoteCommitment,
+    InconsistentOutputResourceCommitment,
     /// Owned resource id is not consistent between the action and the vp.
     InconsistentOwneResourceID,
     /// IO error
@@ -38,7 +38,7 @@ impl Display for TransactionError {
             InconsistentNullifier => {
                 f.write_str("Nullifier is not consistent between the action and the vp")
             }
-            InconsistentOutputNoteCommitment => f.write_str(
+            InconsistentOutputResourceCommitment => f.write_str(
                 "Output resource commitment is not consistent between the action and the vp",
             ),
             InconsistentOwneResourceID => {

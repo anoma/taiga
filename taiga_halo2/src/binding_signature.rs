@@ -1,4 +1,4 @@
-use crate::constant::NOTE_COMMITMENT_R_GENERATOR;
+use crate::constant::RESOURCE_COMMITMENT_R_GENERATOR;
 use pasta_curves::group::cofactor::CofactorCurveAffine;
 use pasta_curves::group::{ff::PrimeField, GroupEncoding};
 use pasta_curves::pallas;
@@ -26,7 +26,7 @@ impl private::Sealed<TaigaBinding> for TaigaBinding {
     type Scalar = pallas::Scalar;
 
     fn basepoint() -> pallas::Point {
-        NOTE_COMMITMENT_R_GENERATOR.to_curve()
+        RESOURCE_COMMITMENT_R_GENERATOR.to_curve()
     }
 }
 

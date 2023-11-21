@@ -3,7 +3,7 @@ use crate::{
     constant::{PRF_EXPAND_INPUT_VP_CM_R, PRF_EXPAND_OUTPUT_VP_CM_R},
     merkle_tree::{Anchor, MerklePath},
     nullifier::Nullifier,
-    resource::{NoteCommitment, RandomSeed, Resource},
+    resource::{RandomSeed, Resource, ResourceCommitment},
     value_commitment::ValueCommitment,
     vp_commitment::ValidityPredicateCommitment,
 };
@@ -30,7 +30,7 @@ pub struct ActionPublicInputs {
     /// The nullifier of input resource.
     pub nf: Nullifier,
     /// The commitment to the output resource.
-    pub cm: NoteCommitment,
+    pub cm: ResourceCommitment,
     /// net value commitment
     pub cv_net: ValueCommitment,
     /// The commitment to input resource application(static) vp
@@ -94,7 +94,7 @@ impl BorshDeserialize for ActionPublicInputs {
         let nf = Option::from(Nullifier::from_bytes(nf_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "nf not in field"))?;
         let cm_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let cm = Option::from(NoteCommitment::from_bytes(cm_bytes))
+        let cm = Option::from(ResourceCommitment::from_bytes(cm_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "cm not in field"))?;
         let cv_net_bytes = <[u8; 32]>::deserialize_reader(reader)?;
         let cv_net = Option::from(ValueCommitment::from_bytes(cv_net_bytes))
@@ -173,7 +173,7 @@ impl ActionInfo {
         self.input_resource.get_nf().unwrap()
     }
 
-    pub fn get_output_resource_cm(&self) -> NoteCommitment {
+    pub fn get_output_resource_cm(&self) -> ResourceCommitment {
         self.output_resource.commitment()
     }
 

@@ -1,7 +1,7 @@
 use std::hash::Hash;
 
 use crate::{
-    resource::NoteCommitment,
+    resource::ResourceCommitment,
     utils::{poseidon_hash_n, prf_nf},
 };
 use halo2_proofs::arithmetic::Field;
@@ -35,12 +35,12 @@ pub enum NullifierKeyContainer {
 }
 
 impl Nullifier {
-    // nf = poseidon_hash(nk || \rho || \psi || note_cm), in which note_cm is a field element
+    // nf = poseidon_hash(nk || \rho || \psi || resource_cm), in which resource_cm is a field element
     pub fn derive(
         nk: &NullifierKeyContainer,
         rho: &pallas::Base,
         psi: &pallas::Base,
-        cm: &NoteCommitment,
+        cm: &ResourceCommitment,
     ) -> Option<Self> {
         match nk {
             NullifierKeyContainer::Commitment(_) => None,

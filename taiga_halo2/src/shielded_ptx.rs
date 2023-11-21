@@ -9,7 +9,7 @@ use crate::executable::Executable;
 use crate::merkle_tree::Anchor;
 use crate::nullifier::Nullifier;
 use crate::proof::Proof;
-use crate::resource::{NoteCommitment, ResourceValidityPredicates};
+use crate::resource::{ResourceCommitment, ResourceValidityPredicates};
 use crate::value_commitment::ValueCommitment;
 use halo2_proofs::plonk::Error;
 use pasta_curves::pallas;
@@ -195,16 +195,16 @@ impl ShieldedPartialTransaction {
     }
 
     // check the output cms are from action proofs
-    fn check_note_commitments(&self) -> Result<(), TransactionError> {
+    fn check_resource_commitments(&self) -> Result<(), TransactionError> {
         assert_eq!(NUM_RESOURCE, 2);
         let action_cms = self.get_output_cms();
         for vp_info in self.inputs.iter().chain(self.outputs.iter()) {
-            for cms in vp_info.get_note_commitments().iter() {
+            for cms in vp_info.get_resource_commitments().iter() {
                 // Check the vp actually uses the output resources from action circuits.
                 if !((action_cms[0] == cms[0] && action_cms[1] == cms[1])
                     || (action_cms[0] == cms[1] && action_cms[1] == cms[0]))
                 {
-                    return Err(TransactionError::InconsistentOutputNoteCommitment);
+                    return Err(TransactionError::InconsistentOutputResourceCommitment);
                 }
             }
         }
@@ -270,7 +270,7 @@ impl Executable for ShieldedPartialTransaction {
     fn execute(&self) -> Result<(), TransactionError> {
         self.verify_proof()?;
         self.check_nullifiers()?;
-        self.check_note_commitments()?;
+        self.check_resource_commitments()?;
         Ok(())
     }
 
@@ -281,7 +281,7 @@ impl Executable for ShieldedPartialTransaction {
             .collect()
     }
 
-    fn get_output_cms(&self) -> Vec<NoteCommitment> {
+    fn get_output_cms(&self) -> Vec<ResourceCommitment> {
         self.actions
             .iter()
             .map(|action| action.action_instance.cm)
@@ -473,11 +473,11 @@ impl ResourceVPVerifyingInfoSet {
         nfs
     }
 
-    pub fn get_note_commitments(&self) -> Vec<[NoteCommitment; NUM_RESOURCE]> {
-        let mut cms = vec![self.app_vp_verifying_info.get_note_commitments()];
+    pub fn get_resource_commitments(&self) -> Vec<[ResourceCommitment; NUM_RESOURCE]> {
+        let mut cms = vec![self.app_vp_verifying_info.get_resource_commitments()];
         self.app_dynamic_vp_verifying_info
             .iter()
-            .for_each(|vp_info| cms.push(vp_info.get_note_commitments()));
+            .for_each(|vp_info| cms.push(vp_info.get_resource_commitments()));
         cms
     }
 }

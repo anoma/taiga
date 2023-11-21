@@ -1,7 +1,7 @@
 use crate::{
     action::ActionInfo, circuit::vp_bytecode::ApplicationByteCode, constant::NUM_RESOURCE,
     error::TransactionError, executable::Executable, merkle_tree::Anchor, nullifier::Nullifier,
-    resource::NoteCommitment, value_commitment::ValueCommitment,
+    resource::ResourceCommitment, value_commitment::ValueCommitment,
 };
 
 use pasta_curves::pallas;
@@ -74,7 +74,7 @@ impl Executable for TransparentPartialTransaction {
     }
 
     // get output cms from actions
-    fn get_output_cms(&self) -> Vec<NoteCommitment> {
+    fn get_output_cms(&self) -> Vec<ResourceCommitment> {
         self.actions
             .iter()
             .map(|action| action.get_output_resource_cm())

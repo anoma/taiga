@@ -33,9 +33,9 @@ use borsh::{BorshDeserialize, BorshSerialize};
 #[derive(Copy, Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "nif", derive(NifTuple))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct NoteCommitment(pallas::Base);
+pub struct ResourceCommitment(pallas::Base);
 
-impl NoteCommitment {
+impl ResourceCommitment {
     pub fn inner(&self) -> pallas::Base {
         self.0
     }
@@ -45,18 +45,18 @@ impl NoteCommitment {
     }
 
     pub fn from_bytes(bytes: [u8; 32]) -> CtOption<Self> {
-        pallas::Base::from_repr(bytes).map(NoteCommitment)
+        pallas::Base::from_repr(bytes).map(ResourceCommitment)
     }
 }
 
-impl From<pallas::Base> for NoteCommitment {
+impl From<pallas::Base> for ResourceCommitment {
     fn from(cm: pallas::Base) -> Self {
-        NoteCommitment(cm)
+        ResourceCommitment(cm)
     }
 }
 
 #[cfg(feature = "borsh")]
-impl BorshSerialize for NoteCommitment {
+impl BorshSerialize for ResourceCommitment {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         writer.write_all(&self.to_bytes())?;
         Ok(())
@@ -64,21 +64,21 @@ impl BorshSerialize for NoteCommitment {
 }
 
 #[cfg(feature = "borsh")]
-impl BorshDeserialize for NoteCommitment {
+impl BorshDeserialize for ResourceCommitment {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let mut repr = [0u8; 32];
         reader.read_exact(&mut repr)?;
         let value = Option::from(pallas::Base::from_repr(repr)).ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                "NoteCommitment value not in field",
+                "ResourceCommitment value not in field",
             )
         })?;
         Ok(Self(value))
     }
 }
 
-impl Hash for NoteCommitment {
+impl Hash for ResourceCommitment {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.to_bytes().as_ref().hash(state);
     }
@@ -225,8 +225,8 @@ impl Resource {
         }
     }
 
-    // note_commitment = poseidon_hash(app_vk || app_data_static || app_data_dynamic || nk_commitment || rho || psi || is_merkle_checked || value || rcm)
-    pub fn commitment(&self) -> NoteCommitment {
+    // resource_commitment = poseidon_hash(app_vk || app_data_static || app_data_dynamic || nk_commitment || rho || psi || is_merkle_checked || value || rcm)
+    pub fn commitment(&self) -> ResourceCommitment {
         let compose_is_merkle_checked_value = if self.is_merkle_checked {
             pallas::Base::from_u128(1 << 64).square() + pallas::Base::from(self.value)
         } else {
@@ -242,7 +242,7 @@ impl Resource {
             compose_is_merkle_checked_value,
             self.rcm,
         ]);
-        NoteCommitment(ret)
+        ResourceCommitment(ret)
     }
 
     pub fn get_nf(&self) -> Option<Nullifier> {
@@ -596,7 +596,7 @@ pub mod tests {
         use borsh::BorshDeserialize;
         use rand::rngs::OsRng;
 
-        use crate::resource::NoteCommitment;
+        use crate::resource::ResourceCommitment;
         let mut rng = OsRng;
 
         let input_resource = random_resource(&mut rng);
@@ -623,7 +623,7 @@ pub mod tests {
             // BorshSerialize
             let borsh = borsh::to_vec(&icm).unwrap();
             // BorshDeserialize
-            let de_icm: NoteCommitment =
+            let de_icm: ResourceCommitment =
                 BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
             assert_eq!(icm, de_icm);
         }
@@ -633,7 +633,7 @@ pub mod tests {
             // BorshSerialize
             let borsh = borsh::to_vec(&ocm).unwrap();
             // BorshDeserialize
-            let de_ocm: NoteCommitment =
+            let de_ocm: ResourceCommitment =
                 BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
             assert_eq!(ocm, de_ocm);
         }

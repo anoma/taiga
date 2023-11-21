@@ -1,7 +1,7 @@
 use crate::circuit::{
     gadgets::{assign_free_advice, assign_free_constant, poseidon_hash::poseidon_hash_gadget},
     hash_to_curve::{hash_to_curve_circuit, HashToCurveConfig},
-    note_commitment::{note_commit, NoteCommitChip},
+    resource_commitment::{resource_commit, ResourceCommitChip},
     vp_circuit::{InputResourceVariables, OutputResourceVariables, ResourceVariables},
 };
 use crate::constant::{TaigaFixedBases, TaigaFixedBasesFull, POSEIDON_TO_CURVE_INPUT_LEN};
@@ -44,7 +44,7 @@ pub fn check_input_resource(
     mut layouter: impl Layouter<pallas::Base>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
-    note_commit_chip: NoteCommitChip,
+    resource_commit_chip: ResourceCommitChip,
     input_resource: Resource,
     nf_row_idx: usize,
 ) -> Result<InputResourceVariables, Error> {
@@ -64,7 +64,7 @@ pub fn check_input_resource(
 
     // nk_com = Com_r(nk, zero)
     let nk_com = poseidon_hash_gadget(
-        note_commit_chip.get_poseidon_config(),
+        resource_commit_chip.get_poseidon_config(),
         layouter.namespace(|| "nk_com encoding"),
         [nk_var.clone(), zero_constant],
     )?;
@@ -93,7 +93,7 @@ pub fn check_input_resource(
     // Witness and range check the value(u64)
     let value = value_range_check(
         layouter.namespace(|| "value range check"),
-        note_commit_chip.get_lookup_config(),
+        resource_commit_chip.get_lookup_config(),
         input_resource.value,
     )?;
 
@@ -119,7 +119,7 @@ pub fn check_input_resource(
     )?;
 
     // Witness is_merkle_checked
-    // is_merkle_checked will be boolean-constrained in the note_commit.
+    // is_merkle_checked will be boolean-constrained in the resource_commit.
     let is_merkle_checked = assign_free_advice(
         layouter.namespace(|| "witness is_merkle_checked"),
         advices[0],
@@ -127,9 +127,9 @@ pub fn check_input_resource(
     )?;
 
     // Check resource commitment
-    let cm = note_commit(
+    let cm = resource_commit(
         layouter.namespace(|| "resource commitment"),
-        note_commit_chip.clone(),
+        resource_commit_chip.clone(),
         app_vk.clone(),
         app_data_static.clone(),
         app_data_dynamic.clone(),
@@ -144,7 +144,7 @@ pub fn check_input_resource(
     // Generate nullifier
     let nf = nullifier_circuit(
         layouter.namespace(|| "Generate nullifier"),
-        note_commit_chip.get_poseidon_config(),
+        resource_commit_chip.get_poseidon_config(),
         nk_var,
         rho.clone(),
         psi.clone(),
@@ -178,7 +178,7 @@ pub fn check_output_resource(
     mut layouter: impl Layouter<pallas::Base>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
-    note_commit_chip: NoteCommitChip,
+    resource_commit_chip: ResourceCommitChip,
     output_resource: Resource,
     old_nf: AssignedCell<pallas::Base, pallas::Base>,
     cm_row_idx: usize,
@@ -214,7 +214,7 @@ pub fn check_output_resource(
     // Witness and range check the value(u64)
     let value = value_range_check(
         layouter.namespace(|| "value range check"),
-        note_commit_chip.get_lookup_config(),
+        resource_commit_chip.get_lookup_config(),
         output_resource.value,
     )?;
 
@@ -233,7 +233,7 @@ pub fn check_output_resource(
     )?;
 
     // Witness is_merkle_checked
-    // is_merkle_checked will be boolean-constrained in the note_commit.
+    // is_merkle_checked will be boolean-constrained in the resource_commit.
     let is_merkle_checked = assign_free_advice(
         layouter.namespace(|| "witness is_merkle_checked"),
         advices[0],
@@ -241,9 +241,9 @@ pub fn check_output_resource(
     )?;
 
     // Check resource commitment
-    let cm = note_commit(
+    let cm = resource_commit(
         layouter.namespace(|| "resource commitment"),
-        note_commit_chip,
+        resource_commit_chip,
         app_vk.clone(),
         app_data_static.clone(),
         app_data_dynamic.clone(),
@@ -388,7 +388,7 @@ pub fn compute_value_commitment(
         Value::known(rcv),
     )?;
 
-    let blind_base = FixedPoint::from_inner(ecc_chip, TaigaFixedBasesFull::NoteCommitmentR);
+    let blind_base = FixedPoint::from_inner(ecc_chip, TaigaFixedBasesFull::ResourceCommitmentR);
     let (blind, _) = blind_base.mul(
         layouter.namespace(|| "blind_scalar * blind_base"),
         &blind_scalar,
@@ -422,7 +422,7 @@ fn value_range_check<const K: usize>(
 fn test_halo2_nullifier_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
     use crate::nullifier::{Nullifier, NullifierKeyContainer};
-    use crate::resource::NoteCommitment;
+    use crate::resource::ResourceCommitment;
     use halo2_gadgets::poseidon::{
         primitives as poseidon, Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
     };
@@ -439,7 +439,7 @@ fn test_halo2_nullifier_circuit() {
         nk: NullifierKeyContainer,
         rho: pallas::Base,
         psi: pallas::Base,
-        cm: NoteCommitment,
+        cm: ResourceCommitment,
     }
 
     impl Circuit<pallas::Base> for MyCircuit {
@@ -559,7 +559,7 @@ fn test_halo2_nullifier_circuit() {
         nk: NullifierKeyContainer::random_key(&mut rng),
         rho: pallas::Base::random(&mut rng),
         psi: pallas::Base::random(&mut rng),
-        cm: NoteCommitment::default(),
+        cm: ResourceCommitment::default(),
     };
 
     let prover = MockProver::run(11, &circuit, vec![]).unwrap();

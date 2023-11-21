@@ -46,13 +46,13 @@ pub struct CascadeIntentValidityPredicateCircuit {
     pub input_resources: [Resource; NUM_RESOURCE],
     pub output_resources: [Resource; NUM_RESOURCE],
     // use the resource commitment to identify the resource.
-    pub cascade_note_cm: pallas::Base,
+    pub cascade_resource_cm: pallas::Base,
 }
 
 impl CascadeIntentValidityPredicateCircuit {
     // We can encode at most three resources to app_data_static if needed.
-    pub fn encode_app_data_static(cascade_note_cm: pallas::Base) -> pallas::Base {
-        cascade_note_cm
+    pub fn encode_app_data_static(cascade_resource_cm: pallas::Base) -> pallas::Base {
+        cascade_resource_cm
     }
 }
 
@@ -74,10 +74,10 @@ impl ValidityPredicateCircuit for CascadeIntentValidityPredicateCircuit {
         )?;
 
         // If the number of cascade resources is more than one, encode them.
-        let cascade_note_cm = assign_free_advice(
-            layouter.namespace(|| "witness cascade_note_cm"),
+        let cascade_resource_cm = assign_free_advice(
+            layouter.namespace(|| "witness cascade_resource_cm"),
             config.advices[0],
-            Value::known(self.cascade_note_cm),
+            Value::known(self.cascade_resource_cm),
         )?;
 
         // search target resource and get the intent app_static_data
@@ -91,7 +91,7 @@ impl ValidityPredicateCircuit for CascadeIntentValidityPredicateCircuit {
         // check the app_data_static of intent resource
         layouter.assign_region(
             || "check app_data_static",
-            |mut region| region.constrain_equal(cascade_note_cm.cell(), app_data_static.cell()),
+            |mut region| region.constrain_equal(cascade_resource_cm.cell(), app_data_static.cell()),
         )?;
 
         // check the cascade resource
@@ -150,11 +150,11 @@ vp_verifying_info_impl!(CascadeIntentValidityPredicateCircuit);
 
 pub fn create_intent_resource<R: RngCore>(
     mut rng: R,
-    cascade_note_cm: pallas::Base,
+    cascade_resource_cm: pallas::Base,
     nk: pallas::Base,
 ) -> Resource {
     let app_data_static =
-        CascadeIntentValidityPredicateCircuit::encode_app_data_static(cascade_note_cm);
+        CascadeIntentValidityPredicateCircuit::encode_app_data_static(cascade_resource_cm);
     let rseed = RandomSeed::random(&mut rng);
     let rho = Nullifier::random(&mut rng);
     Resource::new_input_resource(
@@ -180,9 +180,9 @@ fn test_halo2_cascade_intent_vp_circuit() {
     let mut rng = OsRng;
     let circuit = {
         let cascade_input_resource = random_resource(&mut rng);
-        let cascade_note_cm = cascade_input_resource.commitment().inner();
+        let cascade_resource_cm = cascade_input_resource.commitment().inner();
         let nk = pallas::Base::random(&mut rng);
-        let intent_resource = create_intent_resource(&mut rng, cascade_note_cm, nk);
+        let intent_resource = create_intent_resource(&mut rng, cascade_resource_cm, nk);
         let input_resources = [intent_resource, cascade_input_resource];
         let output_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
 
@@ -190,7 +190,7 @@ fn test_halo2_cascade_intent_vp_circuit() {
             owned_resource_id: input_resources[0].get_nf().unwrap().inner(),
             input_resources,
             output_resources,
-            cascade_note_cm,
+            cascade_resource_cm,
         }
     };
     let public_inputs = circuit.get_public_inputs(&mut rng);

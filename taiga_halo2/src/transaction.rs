@@ -4,7 +4,7 @@ use crate::error::TransactionError;
 use crate::executable::Executable;
 use crate::merkle_tree::Anchor;
 use crate::nullifier::Nullifier;
-use crate::resource::NoteCommitment;
+use crate::resource::ResourceCommitment;
 use crate::shielded_ptx::ShieldedPartialTransaction;
 use crate::transparent_ptx::TransparentPartialTransaction;
 use crate::value_commitment::ValueCommitment;
@@ -40,7 +40,7 @@ pub struct Transaction {
 pub struct TransactionResult {
     pub anchors: Vec<Anchor>,
     pub nullifiers: Vec<Nullifier>,
-    pub output_cms: Vec<NoteCommitment>,
+    pub output_cms: Vec<ResourceCommitment>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -248,7 +248,7 @@ impl ShieldedPartialTxBundle {
             partial_tx.execute()?;
         }
 
-        // Return Nullifiers to check double-spent, NoteCommitments to store, anchors to check the root-existence
+        // Return Nullifiers to check double-spent, ResourceCommitments to store, anchors to check the root-existence
         Ok(TransactionResult {
             nullifiers: self.get_nullifiers(),
             output_cms: self.get_output_cms(),
@@ -267,7 +267,7 @@ impl ShieldedPartialTxBundle {
         self.0.iter().flat_map(|ptx| ptx.get_nullifiers()).collect()
     }
 
-    pub fn get_output_cms(&self) -> Vec<NoteCommitment> {
+    pub fn get_output_cms(&self) -> Vec<ResourceCommitment> {
         self.0.iter().flat_map(|ptx| ptx.get_output_cms()).collect()
     }
 
@@ -312,7 +312,7 @@ impl TransparentPartialTxBundle {
         self.0.iter().flat_map(|ptx| ptx.get_nullifiers()).collect()
     }
 
-    pub fn get_output_cms(&self) -> Vec<NoteCommitment> {
+    pub fn get_output_cms(&self) -> Vec<ResourceCommitment> {
         self.0.iter().flat_map(|ptx| ptx.get_output_cms()).collect()
     }
 

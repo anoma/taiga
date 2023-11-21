@@ -1,4 +1,4 @@
-use crate::constant::NOTE_COMMITMENT_R_GENERATOR;
+use crate::constant::RESOURCE_COMMITMENT_R_GENERATOR;
 use crate::resource::Resource;
 use halo2_proofs::arithmetic::CurveAffine;
 use pasta_curves::group::cofactor::CofactorCurveAffine;
@@ -27,7 +27,7 @@ impl ValueCommitment {
         ValueCommitment(
             base_input * pallas::Scalar::from(input_resource.value)
                 - base_output * pallas::Scalar::from(output_resource.value)
-                + NOTE_COMMITMENT_R_GENERATOR.to_curve() * blind_r,
+                + RESOURCE_COMMITMENT_R_GENERATOR.to_curve() * blind_r,
         )
     }
 

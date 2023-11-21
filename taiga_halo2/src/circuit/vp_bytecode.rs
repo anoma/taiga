@@ -12,7 +12,7 @@ use crate::{
         VP_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX,
     },
     nullifier::Nullifier,
-    resource::NoteCommitment,
+    resource::ResourceCommitment,
 };
 
 #[cfg(feature = "borsh")]
@@ -83,7 +83,7 @@ impl ValidityPredicateByteCode {
     pub fn verify_transparently(
         &self,
         action_nfs: &[Nullifier],
-        action_cms: &[NoteCommitment],
+        action_cms: &[ResourceCommitment],
     ) -> Result<pallas::Base, TransactionError> {
         // check VP transparently
         let public_inputs = match &self.circuit {
@@ -121,7 +121,7 @@ impl ValidityPredicateByteCode {
             return Err(TransactionError::InconsistentNullifier);
         }
 
-        // check note_commitments
+        // check resource_commitments
         // Check the vp actually uses the output resources from action circuits.
         let vp_cms = [
             public_inputs.get_from_index(VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX),
@@ -130,7 +130,7 @@ impl ValidityPredicateByteCode {
         if !((action_cms[0].inner() == vp_cms[0] && action_cms[1].inner() == vp_cms[1])
             || (action_cms[0].inner() == vp_cms[1] && action_cms[1].inner() == vp_cms[0]))
         {
-            return Err(TransactionError::InconsistentOutputNoteCommitment);
+            return Err(TransactionError::InconsistentOutputResourceCommitment);
         }
 
         Ok(public_inputs.get_from_index(VP_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX))
@@ -166,7 +166,7 @@ impl ApplicationByteCode {
     pub fn verify_transparently(
         &self,
         action_nfs: &[Nullifier],
-        action_cms: &[NoteCommitment],
+        action_cms: &[ResourceCommitment],
     ) -> Result<pallas::Base, TransactionError> {
         let owned_resource_id = self
             .app_vp_bytecode
