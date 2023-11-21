@@ -1,5 +1,6 @@
 use crate::constant::{
-    NOTE_ENCRYPTION_CIPHERTEXT_NUM, NOTE_ENCRYPTION_PLAINTEXT_NUM, POSEIDON_RATE, POSEIDON_WIDTH,
+    POSEIDON_RATE, POSEIDON_WIDTH, RESOURCE_ENCRYPTION_CIPHERTEXT_NUM,
+    RESOURCE_ENCRYPTION_PLAINTEXT_NUM,
 };
 use ff::PrimeField;
 use group::Curve;
@@ -8,20 +9,24 @@ use halo2_proofs::arithmetic::CurveAffine;
 use pasta_curves::pallas;
 
 #[derive(Debug, Clone)]
-pub struct NoteCiphertext([pallas::Base; NOTE_ENCRYPTION_CIPHERTEXT_NUM]);
+pub struct ResourceCiphertext([pallas::Base; RESOURCE_ENCRYPTION_CIPHERTEXT_NUM]);
 
 #[derive(Debug, Clone)]
-pub struct NotePlaintext([pallas::Base; NOTE_ENCRYPTION_PLAINTEXT_NUM]);
+pub struct ResourcePlaintext([pallas::Base; RESOURCE_ENCRYPTION_PLAINTEXT_NUM]);
 
 #[derive(Debug, Clone)]
 pub struct SecretKey(pallas::Point);
 
-impl NoteCiphertext {
-    pub fn inner(&self) -> &[pallas::Base; NOTE_ENCRYPTION_CIPHERTEXT_NUM] {
+impl ResourceCiphertext {
+    pub fn inner(&self) -> &[pallas::Base; RESOURCE_ENCRYPTION_CIPHERTEXT_NUM] {
         &self.0
     }
 
-    pub fn encrypt(message: &NotePlaintext, secret_key: &SecretKey, nonce: &pallas::Base) -> Self {
+    pub fn encrypt(
+        message: &ResourcePlaintext,
+        secret_key: &SecretKey,
+        nonce: &pallas::Base,
+    ) -> Self {
         // Init poseidon sponge state
         let mut poseidon_sponge =
             Self::poseidon_sponge_init(message.inner().len(), secret_key, nonce);
@@ -107,9 +112,9 @@ impl NoteCiphertext {
     }
 }
 
-impl From<Vec<pallas::Base>> for NoteCiphertext {
+impl From<Vec<pallas::Base>> for ResourceCiphertext {
     fn from(input_vec: Vec<pallas::Base>) -> Self {
-        NoteCiphertext(
+        ResourceCiphertext(
             input_vec
                 .try_into()
                 .expect("public input with incorrect length"),
@@ -117,8 +122,8 @@ impl From<Vec<pallas::Base>> for NoteCiphertext {
     }
 }
 
-impl NotePlaintext {
-    pub fn inner(&self) -> &[pallas::Base; NOTE_ENCRYPTION_PLAINTEXT_NUM] {
+impl ResourcePlaintext {
+    pub fn inner(&self) -> &[pallas::Base; RESOURCE_ENCRYPTION_PLAINTEXT_NUM] {
         &self.0
     }
 
@@ -128,16 +133,16 @@ impl NotePlaintext {
 
     pub fn padding(msg: &Vec<pallas::Base>) -> Self {
         let mut plaintext = msg.clone();
-        let padding =
-            std::iter::repeat(pallas::Base::zero()).take(NOTE_ENCRYPTION_PLAINTEXT_NUM - msg.len());
+        let padding = std::iter::repeat(pallas::Base::zero())
+            .take(RESOURCE_ENCRYPTION_PLAINTEXT_NUM - msg.len());
         plaintext.extend(padding);
         plaintext.into()
     }
 }
 
-impl From<Vec<pallas::Base>> for NotePlaintext {
+impl From<Vec<pallas::Base>> for ResourcePlaintext {
     fn from(input_vec: Vec<pallas::Base>) -> Self {
-        NotePlaintext(
+        ResourcePlaintext(
             input_vec
                 .try_into()
                 .expect("public input with incorrect length"),
@@ -161,7 +166,7 @@ impl SecretKey {
 }
 
 #[test]
-fn test_halo2_note_encryption() {
+fn test_halo2_resource_encryption() {
     use ff::Field;
     use group::Group;
     use rand::rngs::OsRng;
@@ -177,11 +182,11 @@ fn test_halo2_note_encryption() {
         pallas::Base::one(),
         pallas::Base::one(),
     ];
-    let plaintext = NotePlaintext::padding(&message.to_vec());
+    let plaintext = ResourcePlaintext::padding(&message.to_vec());
     let nonce = pallas::Base::from_u128(23333u128);
 
     // Encryption
-    let cipher = NoteCiphertext::encrypt(&plaintext, &key, &nonce);
+    let cipher = ResourceCiphertext::encrypt(&plaintext, &key, &nonce);
 
     // Decryption
     let decryption = cipher.decrypt(&key).unwrap();

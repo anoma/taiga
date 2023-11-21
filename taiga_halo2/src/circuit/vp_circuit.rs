@@ -19,18 +19,18 @@ use crate::{
         vamp_ir_utils::{get_circuit_assignments, parse, VariableAssignmentError},
     },
     constant::{
-        TaigaFixedBases, NOTE_ENCRYPTION_CIPHERTEXT_NUM, NUM_RESOURCE, SETUP_PARAMS_MAP,
-        VP_CIRCUIT_NOTE_ENCRYPTION_PK_X_IDX, VP_CIRCUIT_NOTE_ENCRYPTION_PK_Y_IDX,
-        VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
+        TaigaFixedBases, NUM_RESOURCE, RESOURCE_ENCRYPTION_CIPHERTEXT_NUM, SETUP_PARAMS_MAP,
         VP_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX, VP_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX,
         VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX, VP_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX,
         VP_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX, VP_CIRCUIT_PARAMS_SIZE,
-        VP_CIRCUIT_PUBLIC_INPUT_NUM,
+        VP_CIRCUIT_PUBLIC_INPUT_NUM, VP_CIRCUIT_RESOURCE_ENCRYPTION_PK_X_IDX,
+        VP_CIRCUIT_RESOURCE_ENCRYPTION_PK_Y_IDX,
+        VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
     },
     error::TransactionError,
-    note_encryption::{NoteCiphertext, SecretKey},
     proof::Proof,
     resource::{RandomSeed, Resource, ResourceCommitment},
+    resource_encryption::{ResourceCiphertext, SecretKey},
     utils::mod_r_p,
     vp_vk::ValidityPredicateVerifyingKey,
 };
@@ -277,8 +277,8 @@ impl ValidityPredicatePublicInputs {
         input_len: usize,
         rseed: &RandomSeed,
     ) -> Vec<pallas::Base> {
-        assert!(input_len < VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX);
-        rseed.get_random_padding(VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX - input_len)
+        assert!(input_len < VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX);
+        rseed.get_random_padding(VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX - input_len)
     }
 
     pub fn to_vec(&self) -> Vec<pallas::Base> {
@@ -286,13 +286,15 @@ impl ValidityPredicatePublicInputs {
     }
 
     pub fn decrypt(&self, sk: pallas::Base) -> Option<Vec<pallas::Base>> {
-        let cipher: NoteCiphertext = self.0[VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX
-            ..VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX + NOTE_ENCRYPTION_CIPHERTEXT_NUM]
+        let cipher: ResourceCiphertext = self.0
+            [VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX
+                ..VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX
+                    + RESOURCE_ENCRYPTION_CIPHERTEXT_NUM]
             .to_vec()
             .into();
         let sender_pk = pallas::Affine::from_xy(
-            self.get_from_index(VP_CIRCUIT_NOTE_ENCRYPTION_PK_X_IDX),
-            self.get_from_index(VP_CIRCUIT_NOTE_ENCRYPTION_PK_Y_IDX),
+            self.get_from_index(VP_CIRCUIT_RESOURCE_ENCRYPTION_PK_X_IDX),
+            self.get_from_index(VP_CIRCUIT_RESOURCE_ENCRYPTION_PK_Y_IDX),
         )
         .unwrap()
         .to_curve();
@@ -327,7 +329,7 @@ pub struct ValidityPredicateConfig {
     pub sub_config: SubConfig,
     pub mul_config: MulConfig,
     pub blake2s_config: Blake2sConfig<pallas::Base>,
-    pub note_commit_config: ResourceCommitConfig,
+    pub resource_commit_config: ResourceCommitConfig,
 }
 
 impl ValidityPredicateConfig {
@@ -400,7 +402,7 @@ impl ValidityPredicateConfig {
         let extended_or_relation_config =
             ExtendedOrRelationConfig::configure(meta, [advices[0], advices[1], advices[2]]);
         let blake2s_config = Blake2sConfig::configure(meta, advices);
-        let note_commit_config = ResourceCommitChip::configure(
+        let resource_commit_config = ResourceCommitChip::configure(
             meta,
             advices[0..3].try_into().unwrap(),
             poseidon_config.clone(),
@@ -421,7 +423,7 @@ impl ValidityPredicateConfig {
             sub_config,
             mul_config,
             blake2s_config,
-            note_commit_config,
+            resource_commit_config,
         }
     }
 }
@@ -457,8 +459,9 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVer
             },
         )?;
 
-        // Construct a note_commit chip
-        let note_commit_chip = ResourceCommitChip::construct(config.note_commit_config.clone());
+        // Construct a resource_commit chip
+        let resource_commit_chip =
+            ResourceCommitChip::construct(config.resource_commit_config.clone());
 
         let input_resources = self.get_input_resources();
         let output_resources = self.get_output_resources();
@@ -469,7 +472,7 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVer
                 layouter.namespace(|| "check input resource"),
                 config.advices,
                 config.instances,
-                note_commit_chip.clone(),
+                resource_commit_chip.clone(),
                 input_resources[i],
                 i * 2,
             )?);
@@ -484,7 +487,7 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVer
                 layouter.namespace(|| "check output resource"),
                 config.advices,
                 config.instances,
-                note_commit_chip.clone(),
+                resource_commit_chip.clone(),
                 output_resources[i],
                 old_nf,
                 i * 2 + 1,

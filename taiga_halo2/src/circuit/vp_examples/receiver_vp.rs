@@ -5,7 +5,7 @@ use crate::{
             add::AddChip, assign_free_advice, poseidon_hash::poseidon_hash_gadget,
             target_resource_variable::get_owned_resource_variable,
         },
-        note_encryption_circuit::note_encryption_gadget,
+        resource_encryption_circuit::resource_encryption_gadget,
         vp_circuit::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
@@ -14,9 +14,9 @@ use crate::{
     },
     constant::{GENERATOR, NUM_RESOURCE, SETUP_PARAMS_MAP},
     error::TransactionError,
-    note_encryption::{NoteCiphertext, NotePlaintext, SecretKey},
     proof::Proof,
     resource::{RandomSeed, Resource},
+    resource_encryption::{ResourceCiphertext, ResourcePlaintext, SecretKey},
     utils::mod_r_p,
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
@@ -202,7 +202,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
         let add_chip = AddChip::<pallas::Base>::construct(config.add_config.clone(), ());
 
         // Encryption
-        note_encryption_gadget(
+        resource_encryption_gadget(
             layouter.namespace(|| "resource encryption"),
             config.advices[0],
             config.instances,
@@ -263,9 +263,9 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             target_resource.psi,
             target_resource.rcm,
         ];
-        let plaintext = NotePlaintext::padding(&message);
+        let plaintext = ResourcePlaintext::padding(&message);
         let key = SecretKey::from_dh_exchange(&self.rcv_pk, &mod_r_p(self.sk));
-        let cipher = NoteCiphertext::encrypt(&plaintext, &key, &self.nonce);
+        let cipher = ResourceCiphertext::encrypt(&plaintext, &key, &self.nonce);
         cipher.inner().iter().for_each(|&c| public_inputs.push(c));
 
         let generator = GENERATOR.to_curve();

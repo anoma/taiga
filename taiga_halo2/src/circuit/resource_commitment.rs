@@ -68,7 +68,7 @@ impl ComposeMerkleCheckValue {
         value: &AssignedCell<pallas::Base, pallas::Base>,
     ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
         layouter.assign_region(
-            || "NoteCommit MessagePiece e",
+            || "Compose is_merkle_checked and Value",
             |mut region| {
                 self.q_compose.enable(&mut region, 0)?;
 

@@ -3,8 +3,8 @@ use crate::circuit::gadgets::{
     assign_free_advice, assign_free_constant,
 };
 use crate::constant::{
-    BaseFieldGenerators, TaigaFixedBases, NOTE_ENCRYPTION_PLAINTEXT_NUM, POSEIDON_RATE,
-    POSEIDON_WIDTH, VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
+    BaseFieldGenerators, TaigaFixedBases, POSEIDON_RATE, POSEIDON_WIDTH,
+    RESOURCE_ENCRYPTION_PLAINTEXT_NUM, VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
 };
 use ff::PrimeField;
 use halo2_gadgets::{
@@ -23,7 +23,7 @@ use halo2_proofs::{
 use pasta_curves::pallas;
 
 #[allow(clippy::too_many_arguments)]
-pub fn note_encryption_gadget(
+pub fn resource_encryption_gadget(
     mut layouter: impl Layouter<pallas::Base>,
     advice: Column<Advice>,
     instances: Column<Instance>,
@@ -42,7 +42,7 @@ pub fn note_encryption_gadget(
         Value::known(pallas::Base::zero()),
     )?;
     let paddings =
-        std::iter::repeat(padding_zero).take(NOTE_ENCRYPTION_PLAINTEXT_NUM - message.len());
+        std::iter::repeat(padding_zero).take(RESOURCE_ENCRYPTION_PLAINTEXT_NUM - message.len());
     message.extend(paddings);
 
     // Compute symmetric secret key
@@ -130,7 +130,7 @@ pub fn note_encryption_gadget(
         layouter.constrain_instance(
             ele.cell(),
             instances,
-            VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX + i,
+            VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX + i,
         )?;
     }
 
