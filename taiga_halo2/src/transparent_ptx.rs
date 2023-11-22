@@ -115,7 +115,7 @@ pub mod testing {
         let mut output_resource_1 = {
             let mut resource = random_resource(&mut rng);
             resource.kind = input_resource_1.kind;
-            resource.value = input_resource_1.value;
+            resource.quantity = input_resource_1.quantity;
             resource
         };
         let merkle_path_1 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
@@ -131,7 +131,7 @@ pub mod testing {
         let mut output_resource_2 = {
             let mut resource = random_resource(&mut rng);
             resource.kind = input_resource_2.kind;
-            resource.value = input_resource_2.value;
+            resource.quantity = input_resource_2.quantity;
             resource
         };
         let merkle_path_2 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);

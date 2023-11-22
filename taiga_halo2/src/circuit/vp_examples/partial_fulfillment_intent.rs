@@ -121,7 +121,7 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
             // TODO: use a nor gate to replace the sub gate.
             SubInstructions::sub(
                 &sub_chip,
-                layouter.namespace(|| "expected_sold_value - returned_value"),
+                layouter.namespace(|| "expected_sold_quantity - returned_quantity"),
                 &is_input_resource,
                 &constant_one,
             )?

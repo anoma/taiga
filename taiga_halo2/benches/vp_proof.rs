@@ -26,12 +26,12 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
                 ResourceKind::new(app_vk, app_data_static)
             };
             let app_data_dynamic = pallas::Base::random(&mut rng);
-            let value: u64 = rng.gen();
+            let quantity: u64 = rng.gen();
             let rseed = RandomSeed::random(&mut rng);
             Resource {
                 kind,
                 app_data_dynamic,
-                value,
+                quantity,
                 nk_container: nk,
                 is_merkle_checked: true,
                 psi: rseed.get_psi(&rho),
@@ -50,12 +50,12 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
                     ResourceKind::new(app_vk, app_data_static)
                 };
                 let app_data_dynamic = pallas::Base::random(&mut rng);
-                let value: u64 = rng.gen();
+                let quantity: u64 = rng.gen();
                 let rseed = RandomSeed::random(&mut rng);
                 Resource {
                     kind,
                     app_data_dynamic,
-                    value,
+                    quantity,
                     nk_container: nk_com,
                     is_merkle_checked: true,
                     psi: rseed.get_psi(&rho),

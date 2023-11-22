@@ -90,11 +90,11 @@ pub fn check_input_resource(
         Value::known(input_resource.get_app_data_static()),
     )?;
 
-    // Witness and range check the value(u64)
-    let value = value_range_check(
-        layouter.namespace(|| "value range check"),
+    // Witness and range check the quantity(u64)
+    let quantity = quantity_range_check(
+        layouter.namespace(|| "quantity range check"),
         resource_commit_chip.get_lookup_config(),
-        input_resource.value,
+        input_resource.quantity,
     )?;
 
     // Witness rho
@@ -136,7 +136,7 @@ pub fn check_input_resource(
         nk_com.clone(),
         rho.clone(),
         psi.clone(),
-        value.clone(),
+        quantity.clone(),
         is_merkle_checked.clone(),
         rcm.clone(),
     )?;
@@ -156,7 +156,7 @@ pub fn check_input_resource(
 
     let resource_variables = ResourceVariables {
         app_vk,
-        value,
+        quantity,
         app_data_static,
         is_merkle_checked,
         app_data_dynamic,
@@ -211,11 +211,11 @@ pub fn check_output_resource(
         Value::known(output_resource.get_app_data_static()),
     )?;
 
-    // Witness and range check the value(u64)
-    let value = value_range_check(
-        layouter.namespace(|| "value range check"),
+    // Witness and range check the quantity(u64)
+    let quantity = quantity_range_check(
+        layouter.namespace(|| "quantity range check"),
         resource_commit_chip.get_lookup_config(),
-        output_resource.value,
+        output_resource.quantity,
     )?;
 
     // Witness rcm
@@ -250,7 +250,7 @@ pub fn check_output_resource(
         nk_com.clone(),
         old_nf.clone(),
         psi.clone(),
-        value.clone(),
+        quantity.clone(),
         is_merkle_checked.clone(),
         rcm.clone(),
     )?;
@@ -261,7 +261,7 @@ pub fn check_output_resource(
     let resource_variables = ResourceVariables {
         app_vk,
         app_data_static,
-        value,
+        quantity,
         is_merkle_checked,
         app_data_dynamic,
         rho: old_nf,
@@ -397,14 +397,14 @@ pub fn compute_value_commitment(
     commitment_v.add(layouter.namespace(|| "net value commitment"), &blind)
 }
 
-fn value_range_check<const K: usize>(
+fn quantity_range_check<const K: usize>(
     mut layouter: impl Layouter<pallas::Base>,
     lookup_config: &LookupRangeCheckConfig<pallas::Base, K>,
-    value: u64,
+    quantity: u64,
 ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
     let zs = lookup_config.witness_check(
         layouter.namespace(|| "6 * K(10) bits range check"),
-        Value::known(pallas::Base::from(value)),
+        Value::known(pallas::Base::from(quantity)),
         6,
         false,
     )?;

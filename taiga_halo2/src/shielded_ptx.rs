@@ -517,7 +517,7 @@ pub mod testing {
             // Use poseidon hash to encode the two dynamic VPs here
             let app_data_dynamic = poseidon_hash(app_dynamic_vp_vk[0], app_dynamic_vp_vk[1]);
             let rho = Nullifier::from(pallas::Base::random(&mut rng));
-            let value = 5000u64;
+            let quantity = 5000u64;
             let nk = pallas::Base::random(&mut rng);
             let rseed = RandomSeed::random(&mut rng);
             let is_merkle_checked = true;
@@ -525,7 +525,7 @@ pub mod testing {
                 compressed_trivial_vp_vk,
                 app_data_static,
                 app_data_dynamic,
-                value,
+                quantity,
                 nk,
                 rho,
                 is_merkle_checked,
@@ -537,14 +537,14 @@ pub mod testing {
             // TODO: add real application dynamic VPs and encode them to app_data_dynamic later.
             // If the dynamic VP is not used, set app_data_dynamic pallas::Base::zero() by default.
             let app_data_dynamic = pallas::Base::zero();
-            let value = 5000u64;
+            let quantity = 5000u64;
             let nk_com = pallas::Base::random(&mut rng);
             let is_merkle_checked = true;
             Resource::new_output_resource(
                 compressed_trivial_vp_vk,
                 app_data_static,
                 app_data_dynamic,
-                value,
+                quantity,
                 nk_com,
                 is_merkle_checked,
             )
@@ -565,7 +565,7 @@ pub mod testing {
             let app_data_static = pallas::Base::one();
             let app_data_dynamic = pallas::Base::zero();
             let rho = Nullifier::from(pallas::Base::random(&mut rng));
-            let value = 10u64;
+            let quantity = 10u64;
             let nk = pallas::Base::random(&mut rng);
             let rseed = RandomSeed::random(&mut rng);
             let is_merkle_checked = true;
@@ -573,7 +573,7 @@ pub mod testing {
                 compressed_trivial_vp_vk,
                 app_data_static,
                 app_data_dynamic,
-                value,
+                quantity,
                 nk,
                 rho,
                 is_merkle_checked,
@@ -583,14 +583,14 @@ pub mod testing {
         let mut output_resource_2 = {
             let app_data_static = pallas::Base::one();
             let app_data_dynamic = pallas::Base::zero();
-            let value = 10u64;
+            let quantity = 10u64;
             let nk_com = pallas::Base::random(&mut rng);
             let is_merkle_checked = true;
             Resource::new_output_resource(
                 compressed_trivial_vp_vk,
                 app_data_static,
                 app_data_dynamic,
-                value,
+                quantity,
                 nk_com,
                 is_merkle_checked,
             )

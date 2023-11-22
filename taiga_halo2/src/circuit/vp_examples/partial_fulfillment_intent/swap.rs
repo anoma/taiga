@@ -30,7 +30,7 @@ impl Swap {
         buy: Token,
         auth: TokenAuthorization,
     ) -> Self {
-        assert_eq!(buy.value() % sell.value(), 0);
+        assert_eq!(buy.quantity() % sell.quantity(), 0);
 
         let sell = {
             let nk = pallas::Base::random(&mut rng);
@@ -52,8 +52,8 @@ impl Swap {
     ) -> ([Resource; NUM_RESOURCE], [Resource; NUM_RESOURCE]) {
         assert_eq!(offer.name(), self.buy.name());
 
-        let ratio = self.buy.value() / self.sell.value;
-        assert_eq!(offer.value() % ratio, 0);
+        let ratio = self.buy.quantity() / self.sell.quantity;
+        assert_eq!(offer.quantity() % ratio, 0);
 
         let offer_resource = offer.create_random_output_token_resource(
             self.sell.resource().nk_container.get_commitment(),
@@ -62,11 +62,13 @@ impl Swap {
 
         let input_padding_resource = Resource::random_padding_resource(&mut rng);
 
-        let returned_resource = if offer.value() < self.buy.value() {
-            let filled_value = offer.value() / ratio;
-            let returned_value = self.sell.value - filled_value;
-            let returned_token =
-                Token::new(self.sell.token_name().inner().to_string(), returned_value);
+        let returned_resource = if offer.quantity() < self.buy.quantity() {
+            let filled_quantity = offer.quantity() / ratio;
+            let returned_quantity = self.sell.quantity - filled_quantity;
+            let returned_token = Token::new(
+                self.sell.token_name().inner().to_string(),
+                returned_quantity,
+            );
             *returned_token
                 .create_random_output_token_resource(
                     self.sell.resource().nk_container.get_commitment(),
@@ -86,9 +88,9 @@ impl Swap {
     pub fn encode_app_data_static(&self) -> pallas::Base {
         poseidon_hash_n([
             self.sell.encode_name(),
-            self.sell.encode_value(),
+            self.sell.encode_quantity(),
             self.buy.encode_name(),
-            self.buy.encode_value(),
+            self.buy.encode_quantity(),
             // Assuming the sold_token and bought_token have the same TOKEN_VK
             TOKEN_VK.get_compressed(),
             self.sell.resource().get_nk_commitment(),
@@ -129,10 +131,10 @@ impl Swap {
             Value::known(self.sell.encode_name()),
         )?;
 
-        let sold_token_value = assign_free_advice(
-            layouter.namespace(|| "witness sold_token_value"),
+        let sold_token_quantity = assign_free_advice(
+            layouter.namespace(|| "witness sold_token_quantity"),
             column,
-            Value::known(self.sell.encode_value()),
+            Value::known(self.sell.encode_quantity()),
         )?;
 
         let bought_token = assign_free_advice(
@@ -141,10 +143,10 @@ impl Swap {
             Value::known(self.buy.encode_name()),
         )?;
 
-        let bought_token_value = assign_free_advice(
-            layouter.namespace(|| "witness bought_token_value"),
+        let bought_token_quantity = assign_free_advice(
+            layouter.namespace(|| "witness bought_token_quantity"),
             column,
-            Value::known(self.buy.encode_value()),
+            Value::known(self.buy.encode_quantity()),
         )?;
 
         let receiver_nk_com = assign_free_advice(
@@ -162,9 +164,9 @@ impl Swap {
         Ok(PartialFulfillmentIntentDataStatic {
             token_vp_vk,
             sold_token,
-            sold_token_value,
+            sold_token_quantity,
             bought_token,
-            bought_token_value,
+            bought_token_quantity,
             receiver_nk_com,
             receiver_app_data_dynamic,
         })

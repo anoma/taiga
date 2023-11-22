@@ -94,8 +94,8 @@ pub struct Resource {
     /// app_data_dynamic is the data defined in application vp and will NOT be used to derive kind
     /// sub-vps and any other data can be encoded to the app_data_dynamic
     pub app_data_dynamic: pallas::Base,
-    /// value denotes the amount of the resource.
-    pub value: u64,
+    /// the quantity of the resource.
+    pub quantity: u64,
     /// NullifierKeyContainer contains the nullifier_key or the nullifier_key commitment.
     pub nk_container: NullifierKeyContainer,
     /// old nullifier. Nonce which is a deterministically computed, unique nonce
@@ -138,7 +138,7 @@ impl Resource {
         app_vk: pallas::Base,
         app_data_static: pallas::Base,
         app_data_dynamic: pallas::Base,
-        value: u64,
+        quantity: u64,
         nk: pallas::Base,
         rho: Nullifier,
         is_merkle_checked: bool,
@@ -148,7 +148,7 @@ impl Resource {
         Self {
             kind,
             app_data_dynamic,
-            value,
+            quantity,
             nk_container: NullifierKeyContainer::Key(nk),
             is_merkle_checked,
             psi: rseed.get_psi(&rho),
@@ -163,7 +163,7 @@ impl Resource {
         app_vk: pallas::Base,
         app_data_static: pallas::Base,
         app_data_dynamic: pallas::Base,
-        value: u64,
+        quantity: u64,
         nk_com: pallas::Base,
         is_merkle_checked: bool,
     ) -> Self {
@@ -171,7 +171,7 @@ impl Resource {
         Self {
             kind,
             app_data_dynamic,
-            value,
+            quantity,
             nk_container: NullifierKeyContainer::Commitment(nk_com),
             is_merkle_checked,
             psi: pallas::Base::default(),
@@ -185,7 +185,7 @@ impl Resource {
         app_vk: pallas::Base,
         app_data_static: pallas::Base,
         app_data_dynamic: pallas::Base,
-        value: u64,
+        quantity: u64,
         nk_container: NullifierKeyContainer,
         rho: Nullifier,
         is_merkle_checked: bool,
@@ -196,7 +196,7 @@ impl Resource {
         Self {
             kind,
             app_data_dynamic,
-            value,
+            quantity,
             nk_container,
             is_merkle_checked,
             psi,
@@ -216,7 +216,7 @@ impl Resource {
         Resource {
             kind,
             app_data_dynamic,
-            value: 0,
+            quantity: 0,
             nk_container: nk,
             rho,
             psi: rseed.get_psi(&rho),
@@ -225,12 +225,12 @@ impl Resource {
         }
     }
 
-    // resource_commitment = poseidon_hash(app_vk || app_data_static || app_data_dynamic || nk_commitment || rho || psi || is_merkle_checked || value || rcm)
+    // resource_commitment = poseidon_hash(app_vk || app_data_static || app_data_dynamic || nk_commitment || rho || psi || is_merkle_checked || quantity || rcm)
     pub fn commitment(&self) -> ResourceCommitment {
-        let compose_is_merkle_checked_value = if self.is_merkle_checked {
-            pallas::Base::from_u128(1 << 64).square() + pallas::Base::from(self.value)
+        let compose_is_merkle_checked_quantity = if self.is_merkle_checked {
+            pallas::Base::from_u128(1 << 64).square() + pallas::Base::from(self.quantity)
         } else {
-            pallas::Base::from(self.value)
+            pallas::Base::from(self.quantity)
         };
         let ret = poseidon_hash_n([
             self.get_app_vk(),
@@ -239,7 +239,7 @@ impl Resource {
             self.get_nk_commitment(),
             self.rho.inner(),
             self.psi,
-            compose_is_merkle_checked_value,
+            compose_is_merkle_checked_quantity,
             self.rcm,
         ]);
         ResourceCommitment(ret)
@@ -306,8 +306,8 @@ impl BorshSerialize for Resource {
         writer.write_all(&self.kind.app_data_static.to_repr())?;
         // Write app_data_dynamic
         writer.write_all(&self.app_data_dynamic.to_repr())?;
-        // Write resource value
-        writer.write_u64::<LittleEndian>(self.value)?;
+        // Write resource quantity
+        writer.write_u64::<LittleEndian>(self.quantity)?;
         // Write nk_container
         match self.nk_container {
             NullifierKeyContainer::Commitment(nk) => {
@@ -356,8 +356,8 @@ impl BorshDeserialize for Resource {
             .ok_or_else(|| {
                 io::Error::new(io::ErrorKind::InvalidData, "app_data_dynamic not in field")
             })?;
-        // Read resource value
-        let value = reader.read_u64::<LittleEndian>()?;
+        // Read resource quantity
+        let quantity = reader.read_u64::<LittleEndian>()?;
         // Read nk_container
         let mut nk_container_type = [0u8; 1];
         reader.read_exact(&mut nk_container_type)?;
@@ -396,7 +396,7 @@ impl BorshDeserialize for Resource {
             app_vk,
             app_data_static,
             app_data_dynamic,
-            value,
+            quantity,
             nk_container,
             rho,
             is_merkle_checked,
@@ -581,7 +581,7 @@ pub mod tests {
         Resource {
             kind: random_kind(&mut rng),
             app_data_dynamic: pallas::Base::random(&mut rng),
-            value: rng.gen(),
+            quantity: rng.gen(),
             nk_container: random_nullifier_key(&mut rng),
             is_merkle_checked: true,
             psi: rseed.get_psi(&rho),

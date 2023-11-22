@@ -120,7 +120,7 @@ impl DealerIntentValidityPredicateCircuit {
             |mut region| {
                 config.dealer_intent_check_config.assign_region(
                     is_input_resource,
-                    &puzzle_resource.resource_variables.value,
+                    &puzzle_resource.resource_variables.quantity,
                     &puzzle_resource.resource_variables.app_vk,
                     sudoku_app_vk_in_dealer_intent_resource,
                     &puzzle_resource.resource_variables.app_data_static,
@@ -209,7 +209,7 @@ impl ValidityPredicateCircuit for DealerIntentValidityPredicateCircuit {
         )?;
 
         // if it is an output resource, do nothing
-        // if it is an input resource, 1. check the zero value of puzzle_resource; 2. check the puzzle equality.
+        // if it is an input resource, 1. check the zero quantity of puzzle_resource; 2. check the puzzle equality.
         self.dealer_intent_check(
             &config,
             layouter.namespace(|| "dealer intent check"),
@@ -287,7 +287,7 @@ impl DealerIntentCheckConfig {
                 [
                     ("bool_check_is_input", bool_check_is_input),
                     (
-                        "check zero value of puzzle resource",
+                        "check zero quantity of puzzle resource",
                         is_input_resource.clone() * puzzle_resource_value,
                     ),
                     (

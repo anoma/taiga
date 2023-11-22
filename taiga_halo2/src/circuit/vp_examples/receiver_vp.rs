@@ -152,12 +152,12 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             &basic_variables.get_app_vk_searchable_pairs(),
         )?;
 
-        // search target resource and get the value
-        let value = get_owned_resource_variable(
+        // search target resource and get the quantity
+        let quantity = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource value"),
+            layouter.namespace(|| "get owned resource quantity"),
             &owned_resource_id,
-            &basic_variables.get_value_searchable_pairs(),
+            &basic_variables.get_quantity_searchable_pairs(),
         )?;
 
         let rho = get_owned_resource_variable(
@@ -192,7 +192,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             app_vk,
             app_data_static,
             app_data_dynamic,
-            value,
+            quantity,
             rho,
             nk_com,
             psi,
@@ -257,7 +257,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             target_resource.kind.app_vk,
             target_resource.kind.app_data_static,
             target_resource.app_data_dynamic,
-            pallas::Base::from(target_resource.value),
+            pallas::Base::from(target_resource.quantity),
             target_resource.rho.inner(),
             target_resource.get_nk_commitment(),
             target_resource.psi,
@@ -342,7 +342,7 @@ fn test_halo2_receiver_vp_circuit() {
     assert_eq!(de_cipher[2], circuit.output_resources[0].app_data_dynamic);
     assert_eq!(
         de_cipher[3],
-        pallas::Base::from(circuit.output_resources[0].value)
+        pallas::Base::from(circuit.output_resources[0].quantity)
     );
     assert_eq!(de_cipher[4], circuit.output_resources[0].rho.inner());
     assert_eq!(

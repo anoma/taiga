@@ -350,7 +350,7 @@ impl SudokuAppValidityPredicateCircuit {
                     .unwrap();
             });
 
-        // if cur_state is the final solution, check the output.value is zero else check the output.value is one
+        // if cur_state is the final solution, check the output.quantity is zero else check the output.quantity is one
         // ret has 27 elements
         let ret: Vec<AssignedCell<pallas::Base, pallas::Base>> = cur_state
             .chunks(3)
@@ -417,13 +417,13 @@ impl SudokuAppValidityPredicateCircuit {
         )?;
 
         layouter.assign_region(
-            || "check value",
+            || "check quantity",
             |mut region| {
                 value_check_config.assign_region(
                     is_input_resource,
                     &product,
-                    &input_resource.resource_variables.value,
-                    &output_resource.resource_variables.value,
+                    &input_resource.resource_variables.quantity,
+                    &output_resource.resource_variables.quantity,
                     0,
                     &mut region,
                 )
@@ -572,7 +572,7 @@ impl ValidityPredicateCircuit for SudokuAppValidityPredicateCircuit {
         )?;
 
         // if it is an input resource, check that the cur_state is updated from pre_state
-        // if encoded_current_state is the final solution, check the output.value is zero else check the output.value is one
+        // if encoded_current_state is the final solution, check the output.quantity is zero else check the output.quantity is one
         Self::check_solution(
             layouter.namespace(|| "check solution"),
             &config.state_update_config,
@@ -610,12 +610,12 @@ pub mod tests {
             ResourceKind::new(app_vk, app_data_static)
         };
         let app_data_dynamic = pallas::Base::random(&mut rng);
-        let value: u64 = rng.gen();
+        let quantity: u64 = rng.gen();
         let rseed = RandomSeed::random(&mut rng);
         Resource {
             kind,
             app_data_dynamic,
-            value,
+            quantity,
             nk_container: nk,
             is_merkle_checked: true,
             psi: rseed.get_psi(&rho),
@@ -632,12 +632,12 @@ pub mod tests {
             ResourceKind::new(app_vk, app_data_static)
         };
         let app_data_dynamic = pallas::Base::random(&mut rng);
-        let value: u64 = rng.gen();
+        let quantity: u64 = rng.gen();
         let rseed = RandomSeed::random(&mut rng);
         Resource {
             kind,
             app_data_dynamic,
-            value,
+            quantity,
             nk_container: nk_com,
             is_merkle_checked: true,
             psi: rseed.get_psi(&rho),
@@ -665,7 +665,7 @@ fn test_halo2_sudoku_app_vp_circuit_init() {
         let current_state = SudokuState::default();
         output_resources[0].kind.app_data_static =
             poseidon_hash(encoded_init_state, current_state.encode());
-        output_resources[0].value = 1u64;
+        output_resources[0].quantity = 1u64;
         let owned_resource_id = output_resources[0].commitment().inner();
         SudokuAppValidityPredicateCircuit {
             owned_resource_id,
@@ -739,10 +739,10 @@ fn test_halo2_sudoku_app_vp_circuit_update() {
         };
         input_resources[0].kind.app_data_static =
             poseidon_hash(encoded_init_state, previous_state.encode());
-        input_resources[0].value = 1u64;
+        input_resources[0].quantity = 1u64;
         output_resources[0].kind.app_data_static =
             poseidon_hash(encoded_init_state, current_state.encode());
-        output_resources[0].value = 1u64;
+        output_resources[0].quantity = 1u64;
         output_resources[0].kind.app_vk = input_resources[0].kind.app_vk;
         SudokuAppValidityPredicateCircuit {
             owned_resource_id: input_resources[0].get_nf().unwrap().inner(),
@@ -815,10 +815,10 @@ fn halo2_sudoku_app_vp_circuit_final() {
         };
         input_resources[0].kind.app_data_static =
             poseidon_hash(encoded_init_state, previous_state.encode());
-        input_resources[0].value = 1u64;
+        input_resources[0].quantity = 1u64;
         output_resources[0].kind.app_data_static =
             poseidon_hash(encoded_init_state, current_state.encode());
-        output_resources[0].value = 0u64;
+        output_resources[0].quantity = 0u64;
         output_resources[0].kind.app_vk = input_resources[0].kind.app_vk;
         SudokuAppValidityPredicateCircuit {
             owned_resource_id: input_resources[0].get_nf().unwrap().inner(),

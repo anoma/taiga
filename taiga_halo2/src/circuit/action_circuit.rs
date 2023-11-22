@@ -241,13 +241,13 @@ impl Circuit<pallas::Base> for ActionCircuit {
                 .resource_variables
                 .app_data_static
                 .clone(),
-            input_resource_variables.resource_variables.value.clone(),
+            input_resource_variables.resource_variables.quantity.clone(),
             output_resource_vars.resource_variables.app_vk.clone(),
             output_resource_vars
                 .resource_variables
                 .app_data_static
                 .clone(),
-            output_resource_vars.resource_variables.value,
+            output_resource_vars.resource_variables.quantity,
             self.rcv,
         )?;
         layouter.constrain_instance(

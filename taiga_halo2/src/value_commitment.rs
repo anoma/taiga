@@ -25,8 +25,8 @@ impl ValueCommitment {
         let base_input = input_resource.get_kind();
         let base_output = output_resource.get_kind();
         ValueCommitment(
-            base_input * pallas::Scalar::from(input_resource.value)
-                - base_output * pallas::Scalar::from(output_resource.value)
+            base_input * pallas::Scalar::from(input_resource.quantity)
+                - base_output * pallas::Scalar::from(output_resource.quantity)
                 + RESOURCE_COMMITMENT_R_GENERATOR.to_curve() * blind_r,
         )
     }

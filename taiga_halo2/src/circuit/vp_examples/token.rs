@@ -65,14 +65,14 @@ impl TokenName {
 #[derive(Clone, Debug, Default)]
 pub struct Token {
     name: TokenName,
-    value: u64,
+    quantity: u64,
 }
 
 impl Token {
-    pub fn new(name: String, value: u64) -> Self {
+    pub fn new(name: String, quantity: u64) -> Self {
         Self {
             name: TokenName(name),
-            value,
+            quantity,
         }
     }
 
@@ -80,16 +80,16 @@ impl Token {
         &self.name
     }
 
-    pub fn value(&self) -> u64 {
-        self.value
+    pub fn quantity(&self) -> u64 {
+        self.quantity
     }
 
     pub fn encode_name(&self) -> pallas::Base {
         self.name.encode()
     }
 
-    pub fn encode_value(&self) -> pallas::Base {
-        pallas::Base::from(self.value)
+    pub fn encode_quantity(&self) -> pallas::Base {
+        pallas::Base::from(self.quantity)
     }
 
     pub fn create_random_input_token_resource<R: RngCore>(
@@ -106,7 +106,7 @@ impl Token {
             *COMPRESSED_TOKEN_VK,
             app_data_static,
             app_data_dynamic,
-            self.value(),
+            self.quantity(),
             nk,
             rho,
             true,
@@ -130,7 +130,7 @@ impl Token {
             *COMPRESSED_TOKEN_VK,
             app_data_static,
             app_data_dynamic,
-            self.value(),
+            self.quantity(),
             nk_com,
             true,
         );
@@ -165,8 +165,8 @@ impl TokenResource {
         self.token_name.encode()
     }
 
-    pub fn encode_value(&self) -> pallas::Base {
-        pallas::Base::from(self.resource().value)
+    pub fn encode_quantity(&self) -> pallas::Base {
+        pallas::Base::from(self.resource().quantity)
     }
 
     pub fn resource(&self) -> &Resource {

@@ -61,14 +61,14 @@ impl OrRelationIntentValidityPredicateCircuit {
         receiver_app_data_dynamic: pallas::Base,
     ) -> pallas::Base {
         let token_property_1 = token_1.encode_name();
-        let token_value_1 = token_1.encode_value();
+        let token_quantity_1 = token_1.encode_quantity();
         let token_property_2 = token_2.encode_name();
-        let token_value_2 = token_2.encode_value();
+        let token_quantity_2 = token_2.encode_quantity();
         poseidon_hash_n([
             token_property_1,
-            token_value_1,
+            token_quantity_1,
             token_property_2,
-            token_value_2,
+            token_quantity_2,
             TOKEN_VK.get_compressed(),
             receiver_nk_com,
             receiver_app_data_dynamic,
@@ -105,10 +105,10 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
             Value::known(self.token_1.encode_name()),
         )?;
 
-        let token_value_1 = assign_free_advice(
-            layouter.namespace(|| "witness token value in token_1"),
+        let token_quantity_1 = assign_free_advice(
+            layouter.namespace(|| "witness token quantity in token_1"),
             config.advices[0],
-            Value::known(self.token_1.encode_value()),
+            Value::known(self.token_1.encode_quantity()),
         )?;
 
         let token_property_2 = assign_free_advice(
@@ -117,10 +117,10 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
             Value::known(self.token_2.encode_name()),
         )?;
 
-        let token_value_2 = assign_free_advice(
-            layouter.namespace(|| "witness token value in token_2"),
+        let token_quantity_2 = assign_free_advice(
+            layouter.namespace(|| "witness token quantity in token_2"),
             config.advices[0],
-            Value::known(self.token_2.encode_value()),
+            Value::known(self.token_2.encode_quantity()),
         )?;
 
         let receiver_nk_com = assign_free_advice(
@@ -141,9 +141,9 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
             layouter.namespace(|| "encode app_data_static"),
             [
                 token_property_1.clone(),
-                token_value_1.clone(),
+                token_quantity_1.clone(),
                 token_property_2.clone(),
-                token_value_2.clone(),
+                token_quantity_2.clone(),
                 token_vp_vk.clone(),
                 receiver_nk_com.clone(),
                 receiver_app_data_dynamic.clone(),
@@ -214,21 +214,24 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
             },
         )?;
 
-        // check the token_property and token_value in conditions
+        // check the token_property and token_quantity in conditions
         let output_resource_token_property = &basic_variables.output_resource_variables[0]
             .resource_variables
             .app_data_static;
-        let output_resource_token_value = &basic_variables.output_resource_variables[0]
+        let output_resource_token_quantity = &basic_variables.output_resource_variables[0]
             .resource_variables
-            .value;
+            .quantity;
         layouter.assign_region(
             || "extended or relatioin",
             |mut region| {
                 config.extended_or_relation_config.assign_region(
                     &is_input_resource,
-                    (&token_property_1, &token_value_1),
-                    (&token_property_2, &token_value_2),
-                    (output_resource_token_property, output_resource_token_value),
+                    (&token_property_1, &token_quantity_1),
+                    (&token_property_2, &token_quantity_2),
+                    (
+                        output_resource_token_property,
+                        output_resource_token_quantity,
+                    ),
                     0,
                     &mut region,
                 )
@@ -320,7 +323,7 @@ fn test_halo2_or_relation_intent_vp_circuit() {
         let token_2 = Token::new("token2".to_string(), 2u64);
         output_resources[0].kind.app_vk = *COMPRESSED_TOKEN_VK;
         output_resources[0].kind.app_data_static = token_1.encode_name();
-        output_resources[0].value = token_1.value();
+        output_resources[0].quantity = token_1.quantity();
 
         let nk = pallas::Base::random(&mut rng);
         let nk_com = output_resources[0].get_nk_commitment();

@@ -21,7 +21,6 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// app_vk is the compressed verifying key of application(static) VP
 /// app_data_static is the encoded data that is defined in application vp
 /// app_data_dynamic is the data defined in application vp and will NOT be used to derive kind
-/// value is the quantity of resources
 /// nk is the nullifier key
 /// rho is the old nullifier
 /// is_merkle_checked is true for normal resources, false for intent(ephemeral) resources
@@ -32,7 +31,7 @@ pub fn create_input_resource(
     app_vk: pallas::Base,
     app_data_static: pallas::Base,
     app_data_dynamic: pallas::Base,
-    value: u64,
+    quantity: u64,
     nk: pallas::Base,
     is_merkle_checked: bool,
 ) -> Resource {
@@ -43,7 +42,7 @@ pub fn create_input_resource(
         app_vk,
         app_data_static,
         app_data_dynamic,
-        value,
+        quantity,
         nk,
         rho,
         is_merkle_checked,
@@ -56,7 +55,7 @@ pub fn create_output_resource(
     app_vk: pallas::Base,
     app_data_static: pallas::Base,
     app_data_dynamic: pallas::Base,
-    value: u64,
+    quantity: u64,
     // The owner of output resource has the nullifer key and exposes the nullifier_key commitment to output creator.
     nk_com: pallas::Base,
     is_merkle_checked: bool,
@@ -65,7 +64,7 @@ pub fn create_output_resource(
         app_vk,
         app_data_static,
         app_data_dynamic,
-        value,
+        quantity,
         nk_com,
         is_merkle_checked,
     )
@@ -81,7 +80,7 @@ pub fn create_output_resource(
 /// |   app_vk              | pallas::Base  |   32      |
 /// |   app_data_static     | pallas::Base  |   32      |
 /// |   app_data_dynamic    | pallas::Base  |   32      |
-/// |   value(quantity)     | u64           |   8       |
+/// |   quantity            | u64           |   8       |
 /// |   nk_container type   | u8            |   1       |
 /// |   nk_com/nk           | pallas::Base  |   32      |
 /// |   rho                 | pallas::Base  |   32      |

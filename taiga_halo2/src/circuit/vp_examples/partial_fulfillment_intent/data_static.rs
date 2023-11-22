@@ -18,9 +18,9 @@ use pasta_curves::pallas;
 pub struct PartialFulfillmentIntentDataStatic {
     pub token_vp_vk: AssignedCell<pallas::Base, pallas::Base>,
     pub sold_token: AssignedCell<pallas::Base, pallas::Base>,
-    pub sold_token_value: AssignedCell<pallas::Base, pallas::Base>,
+    pub sold_token_quantity: AssignedCell<pallas::Base, pallas::Base>,
     pub bought_token: AssignedCell<pallas::Base, pallas::Base>,
-    pub bought_token_value: AssignedCell<pallas::Base, pallas::Base>,
+    pub bought_token_quantity: AssignedCell<pallas::Base, pallas::Base>,
     pub receiver_nk_com: AssignedCell<pallas::Base, pallas::Base>,
     pub receiver_app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
 }
@@ -37,9 +37,9 @@ impl PartialFulfillmentIntentDataStatic {
             layouter.namespace(|| "app_data_static encoding"),
             [
                 self.sold_token.clone(),
-                self.sold_token_value.clone(),
+                self.sold_token_quantity.clone(),
                 self.bought_token.clone(),
-                self.bought_token_value.clone(),
+                self.bought_token_quantity.clone(),
                 self.token_vp_vk.clone(),
                 self.receiver_nk_com.clone(),
                 self.receiver_app_data_dynamic.clone(),
@@ -159,14 +159,14 @@ impl PartialFulfillmentIntentDataStatic {
         )?;
 
         layouter.assign_region(
-            || "conditional equal: check sold token value",
+            || "conditional equal: check sold token quantity",
             |mut region| {
                 config.assign_region(
                     is_output_resource,
-                    &self.sold_token_value,
+                    &self.sold_token_quantity,
                     &basic_variables.input_resource_variables[0]
                         .resource_variables
-                        .value,
+                        .quantity,
                     0,
                     &mut region,
                 )
@@ -189,11 +189,12 @@ impl PartialFulfillmentIntentDataStatic {
         let is_partial_fulfillment = {
             let is_partial_fulfillment = SubInstructions::sub(
                 sub_chip,
-                layouter.namespace(|| "expected_bought_token_value - actual_bought_token_value"),
-                &self.bought_token_value,
+                layouter
+                    .namespace(|| "expected_bought_token_quantity - actual_bought_token_quantity"),
+                &self.bought_token_quantity,
                 &basic_variables.output_resource_variables[0]
                     .resource_variables
-                    .value,
+                    .quantity,
             )?;
             MulInstructions::mul(
                 mul_chip,
@@ -265,41 +266,41 @@ impl PartialFulfillmentIntentDataStatic {
             },
         )?;
 
-        // value check
+        // quantity check
         {
-            let actual_sold_value = SubInstructions::sub(
+            let actual_sold_quantity = SubInstructions::sub(
                 sub_chip,
-                layouter.namespace(|| "expected_sold_value - returned_value"),
-                &self.sold_token_value,
+                layouter.namespace(|| "expected_sold_quantity - returned_quantity"),
+                &self.sold_token_quantity,
                 &basic_variables.output_resource_variables[1]
                     .resource_variables
-                    .value,
+                    .quantity,
             )?;
 
-            // check (expected_bought_value * actual_sold_value) == (expected_sold_value * actual_bought_value)
+            // check (expected_bought_quantity * actual_sold_quantity) == (expected_sold_quantity * actual_bought_quantity)
             // if it's partially fulfilled
-            let expected_bought_mul_actual_sold_value = MulInstructions::mul(
+            let expected_bought_mul_actual_sold_quantity = MulInstructions::mul(
                 mul_chip,
-                layouter.namespace(|| "expected_bought_value * actual_sold_value"),
-                &self.bought_token_value,
-                &actual_sold_value,
+                layouter.namespace(|| "expected_bought_quantity * actual_sold_quantity"),
+                &self.bought_token_quantity,
+                &actual_sold_quantity,
             )?;
-            let expected_sold_mul_actual_bought_value = MulInstructions::mul(
+            let expected_sold_mul_actual_bought_quantity = MulInstructions::mul(
                 mul_chip,
-                layouter.namespace(|| "expected_sold_value * actual_bought_value"),
-                &self.sold_token_value,
+                layouter.namespace(|| "expected_sold_quantity * actual_bought_quantity"),
+                &self.sold_token_quantity,
                 &basic_variables.output_resource_variables[0]
                     .resource_variables
-                    .value,
+                    .quantity,
             )?;
 
             layouter.assign_region(
-                    || "conditional equal: expected_bought_value * actual_sold_value == expected_sold_value * actual_bought_value",
+                    || "conditional equal: expected_bought_quantity * actual_sold_quantity == expected_sold_quantity * actual_bought_quantity",
                     |mut region| {
                         config.assign_region(
                             &is_partial_fulfillment,
-                            &expected_bought_mul_actual_sold_value,
-                            &expected_sold_mul_actual_bought_value,
+                            &expected_bought_mul_actual_sold_quantity,
+                            &expected_sold_mul_actual_bought_quantity,
                             0,
                             &mut region,
                         )
