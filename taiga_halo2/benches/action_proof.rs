@@ -45,7 +45,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
         };
         let mut output_resource = {
             let nonce = input_resource.get_nf().unwrap();
-            let nk_com = NullifierKeyContainer::from_commitment(pallas::Base::random(&mut rng));
+            let npk = NullifierKeyContainer::from_npk(pallas::Base::random(&mut rng));
             let kind = {
                 let logic = pallas::Base::random(&mut rng);
                 let label = pallas::Base::random(&mut rng);
@@ -58,7 +58,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
                 kind,
                 value,
                 quantity,
-                nk_container: nk_com,
+                nk_container: npk,
                 is_merkle_checked: true,
                 psi: rseed.get_psi(&nonce),
                 rcm: rseed.get_rcm(&nonce),

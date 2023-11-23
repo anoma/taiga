@@ -538,14 +538,14 @@ pub mod testing {
             // If the dynamic VP is not used, set value pallas::Base::zero() by default.
             let value = pallas::Base::zero();
             let quantity = 5000u64;
-            let nk_com = pallas::Base::random(&mut rng);
+            let npk = pallas::Base::random(&mut rng);
             let is_merkle_checked = true;
             Resource::new_output_resource(
                 compressed_trivial_vp_vk,
                 label,
                 value,
                 quantity,
-                nk_com,
+                npk,
                 is_merkle_checked,
             )
         };
@@ -584,14 +584,14 @@ pub mod testing {
             let label = pallas::Base::one();
             let value = pallas::Base::zero();
             let quantity = 10u64;
-            let nk_com = pallas::Base::random(&mut rng);
+            let npk = pallas::Base::random(&mut rng);
             let is_merkle_checked = true;
             Resource::new_output_resource(
                 compressed_trivial_vp_vk,
                 label,
                 value,
                 quantity,
-                nk_com,
+                npk,
                 is_merkle_checked,
             )
         };

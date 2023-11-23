@@ -121,7 +121,7 @@ impl Token {
 
     pub fn create_random_output_token_resource(
         &self,
-        nk_com: pallas::Base,
+        npk: pallas::Base,
         auth: &TokenAuthorization,
     ) -> TokenResource {
         let label = self.encode_name();
@@ -131,7 +131,7 @@ impl Token {
             label,
             value,
             self.quantity(),
-            nk_com,
+            npk,
             true,
         );
 

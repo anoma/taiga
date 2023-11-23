@@ -164,7 +164,7 @@ impl Resource {
         label: pallas::Base,
         value: pallas::Base,
         quantity: u64,
-        nk_com: pallas::Base,
+        npk: pallas::Base,
         is_merkle_checked: bool,
     ) -> Self {
         let kind = ResourceKind::new(logic, label);
@@ -172,7 +172,7 @@ impl Resource {
             kind,
             value,
             quantity,
-            nk_container: NullifierKeyContainer::Commitment(nk_com),
+            nk_container: NullifierKeyContainer::PublicKey(npk),
             is_merkle_checked,
             psi: pallas::Base::default(),
             rcm: pallas::Base::default(),
@@ -225,7 +225,7 @@ impl Resource {
         }
     }
 
-    // resource_commitment = poseidon_hash(logic || label || value || nk_commitment || nonce || psi || is_merkle_checked || quantity || rcm)
+    // resource_commitment = poseidon_hash(logic || label || value || npk || nonce || psi || is_merkle_checked || quantity || rcm)
     pub fn commitment(&self) -> ResourceCommitment {
         let compose_is_merkle_checked_quantity = if self.is_merkle_checked {
             pallas::Base::from_u128(1 << 64).square() + pallas::Base::from(self.quantity)
@@ -236,7 +236,7 @@ impl Resource {
             self.get_logic(),
             self.get_label(),
             self.value,
-            self.get_nk_commitment(),
+            self.get_npk(),
             self.nonce.inner(),
             self.psi,
             compose_is_merkle_checked_quantity,
@@ -258,8 +258,8 @@ impl Resource {
         self.nk_container.get_nk()
     }
 
-    pub fn get_nk_commitment(&self) -> pallas::Base {
-        self.nk_container.get_commitment()
+    pub fn get_npk(&self) -> pallas::Base {
+        self.nk_container.get_npk()
     }
 
     pub fn get_kind(&self) -> pallas::Point {
@@ -310,7 +310,7 @@ impl BorshSerialize for Resource {
         writer.write_u64::<LittleEndian>(self.quantity)?;
         // Write nk_container
         match self.nk_container {
-            NullifierKeyContainer::Commitment(nk) => {
+            NullifierKeyContainer::PublicKey(nk) => {
                 writer.write_u8(1)?;
                 writer.write_all(&nk.to_repr())
             }
@@ -363,7 +363,7 @@ impl BorshDeserialize for Resource {
         let nk = Option::from(pallas::Base::from_repr(nk_container_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "nk not in field"))?;
         let nk_container = if nk_container_type == 0x01 {
-            NullifierKeyContainer::from_commitment(nk)
+            NullifierKeyContainer::from_npk(nk)
         } else {
             NullifierKeyContainer::from_key(nk)
         };

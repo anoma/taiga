@@ -24,14 +24,14 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
     let alice_nk = pallas::Base::random(&mut rng);
 
     let bob_auth = TokenAuthorization::random(&mut rng);
-    let bob_nk_com = pallas::Base::random(&mut rng);
+    let bob_npk = pallas::Base::random(&mut rng);
 
     let input_token_1 = Token::new("btc".to_string(), 1u64);
     let input_resource_1 =
         input_token_1.create_random_input_token_resource(&mut rng, alice_nk, &alice_auth);
     let output_token_1 = Token::new("btc".to_string(), 1u64);
     let mut output_resource_1 =
-        output_token_1.create_random_output_token_resource(bob_nk_com, &bob_auth);
+        output_token_1.create_random_output_token_resource(bob_npk, &bob_auth);
     let input_token_2 = Token::new("eth".to_string(), 2u64);
     let input_resource_2 =
         input_token_2.create_random_input_token_resource(&mut rng, alice_nk, &alice_auth);
@@ -43,10 +43,10 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
         create_intent_resource(&mut rng, input_resource_3.commitment().inner(), alice_nk);
     let output_token_2 = Token::new("eth".to_string(), 2u64);
     let mut output_resource_2 =
-        output_token_2.create_random_output_token_resource(bob_nk_com, &bob_auth);
+        output_token_2.create_random_output_token_resource(bob_npk, &bob_auth);
     let output_token_3 = Token::new("xan".to_string(), 3u64);
     let mut output_resource_3 =
-        output_token_3.create_random_output_token_resource(bob_nk_com, &bob_auth);
+        output_token_3.create_random_output_token_resource(bob_npk, &bob_auth);
 
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 

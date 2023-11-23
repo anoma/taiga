@@ -29,8 +29,8 @@ pub struct Nullifier(pallas::Base);
 #[cfg_attr(feature = "nif", derive(NifTaggedEnum))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum NullifierKeyContainer {
-    // The NullifierKeyContainer::Commitment is the commitment of NullifierKeyContainer::Key `nk_com = Commitment(nk, 0)`
-    Commitment(pallas::Base),
+    // The NullifierKeyContainer::PublicKey is the commitment of NullifierKeyContainer::Key `npk = Commitment(nk, 0)`
+    PublicKey(pallas::Base),
     Key(pallas::Base),
 }
 
@@ -43,7 +43,7 @@ impl Nullifier {
         cm: &ResourceCommitment,
     ) -> Option<Self> {
         match nk {
-            NullifierKeyContainer::Commitment(_) => None,
+            NullifierKeyContainer::PublicKey(_) => None,
             NullifierKeyContainer::Key(key) => {
                 let nf = Nullifier(poseidon_hash_n([*key, *nonce, *psi, cm.inner()]));
                 Some(nf)
@@ -111,8 +111,8 @@ impl NullifierKeyContainer {
         NullifierKeyContainer::Key(pallas::Base::random(&mut rng))
     }
 
-    pub fn random_commitment<R: RngCore>(mut rng: R) -> Self {
-        NullifierKeyContainer::Commitment(pallas::Base::random(&mut rng))
+    pub fn random_npk<R: RngCore>(mut rng: R) -> Self {
+        NullifierKeyContainer::PublicKey(pallas::Base::random(&mut rng))
     }
 
     /// Creates an NullifierKeyContainer::Key.
@@ -120,9 +120,9 @@ impl NullifierKeyContainer {
         NullifierKeyContainer::Key(key)
     }
 
-    /// Creates a NullifierKeyContainer::Commitment.
-    pub fn from_commitment(cm: pallas::Base) -> Self {
-        NullifierKeyContainer::Commitment(cm)
+    /// Creates a NullifierKeyContainer::PublicKey.
+    pub fn from_npk(cm: pallas::Base) -> Self {
+        NullifierKeyContainer::PublicKey(cm)
     }
 
     pub fn get_nk(&self) -> Option<pallas::Base> {
@@ -132,9 +132,9 @@ impl NullifierKeyContainer {
         }
     }
 
-    pub fn get_commitment(&self) -> pallas::Base {
+    pub fn get_npk(&self) -> pallas::Base {
         match self {
-            NullifierKeyContainer::Commitment(v) => *v,
+            NullifierKeyContainer::PublicKey(v) => *v,
             NullifierKeyContainer::Key(key) => {
                 // Commitment(nk, zero), use poseidon hash as Commitment.
                 prf_nf(*key, pallas::Base::zero())
@@ -144,10 +144,8 @@ impl NullifierKeyContainer {
 
     pub fn to_commitment(&self) -> Self {
         match self {
-            NullifierKeyContainer::Commitment(_) => *self,
-            NullifierKeyContainer::Key(_) => {
-                NullifierKeyContainer::Commitment(self.get_commitment())
-            }
+            NullifierKeyContainer::PublicKey(_) => *self,
+            NullifierKeyContainer::Key(_) => NullifierKeyContainer::PublicKey(self.get_npk()),
         }
     }
 }
@@ -176,6 +174,6 @@ pub mod tests {
     }
 
     pub fn random_nullifier_key_commitment<R: RngCore>(mut rng: R) -> NullifierKeyContainer {
-        NullifierKeyContainer::from_commitment(pallas::Base::random(&mut rng))
+        NullifierKeyContainer::from_npk(pallas::Base::random(&mut rng))
     }
 }

@@ -21,7 +21,7 @@ pub struct PartialFulfillmentIntentLabel {
     pub sold_token_quantity: AssignedCell<pallas::Base, pallas::Base>,
     pub bought_token: AssignedCell<pallas::Base, pallas::Base>,
     pub bought_token_quantity: AssignedCell<pallas::Base, pallas::Base>,
-    pub receiver_nk_com: AssignedCell<pallas::Base, pallas::Base>,
+    pub receiver_npk: AssignedCell<pallas::Base, pallas::Base>,
     pub receiver_value: AssignedCell<pallas::Base, pallas::Base>,
 }
 
@@ -41,7 +41,7 @@ impl PartialFulfillmentIntentLabel {
                 self.bought_token.clone(),
                 self.bought_token_quantity.clone(),
                 self.token_vp_vk.clone(),
-                self.receiver_nk_com.clone(),
+                self.receiver_npk.clone(),
                 self.receiver_value.clone(),
             ],
         )
@@ -85,16 +85,16 @@ impl PartialFulfillmentIntentLabel {
             },
         )?;
 
-        // check nk_com
+        // check npk
         layouter.assign_region(
-            || "conditional equal: check bought token nk_com",
+            || "conditional equal: check bought token npk",
             |mut region| {
                 config.assign_region(
                     is_input_resource,
-                    &self.receiver_nk_com,
+                    &self.receiver_npk,
                     &basic_variables.output_resource_variables[0]
                         .resource_variables
-                        .nk_com,
+                        .npk,
                     0,
                     &mut region,
                 )
@@ -237,14 +237,14 @@ impl PartialFulfillmentIntentLabel {
         )?;
 
         layouter.assign_region(
-            || "conditional equal: check returned token nk_com",
+            || "conditional equal: check returned token npk",
             |mut region| {
                 config.assign_region(
                     &is_partial_fulfillment,
-                    &self.receiver_nk_com,
+                    &self.receiver_npk,
                     &basic_variables.output_resource_variables[1]
                         .resource_variables
-                        .nk_com,
+                        .npk,
                     0,
                     &mut region,
                 )

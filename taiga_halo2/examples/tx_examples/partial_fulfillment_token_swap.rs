@@ -234,7 +234,7 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
         bob_nk.get_nk().unwrap(),
         returned,
         bob_auth_pk,
-        bob_nk.get_commitment(),
+        bob_nk.get_npk(),
     );
 
     // Solver/Bob creates the partial transaction to consume the intent resource

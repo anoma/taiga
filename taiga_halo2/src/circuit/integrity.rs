@@ -62,10 +62,10 @@ pub fn check_input_resource(
         pallas::Base::zero(),
     )?;
 
-    // nk_com = Com_r(nk, zero)
-    let nk_com = poseidon_hash_gadget(
+    // npk = Com_r(nk, zero)
+    let npk = poseidon_hash_gadget(
         resource_commit_chip.get_poseidon_config(),
-        layouter.namespace(|| "nk_com encoding"),
+        layouter.namespace(|| "npk encoding"),
         [nk_var.clone(), zero_constant],
     )?;
 
@@ -133,7 +133,7 @@ pub fn check_input_resource(
         logic.clone(),
         label.clone(),
         value.clone(),
-        nk_com.clone(),
+        npk.clone(),
         nonce.clone(),
         psi.clone(),
         quantity.clone(),
@@ -161,7 +161,7 @@ pub fn check_input_resource(
         is_merkle_checked,
         value,
         nonce,
-        nk_com,
+        npk,
         psi,
         rcm,
     };
@@ -183,11 +183,11 @@ pub fn check_output_resource(
     old_nf: AssignedCell<pallas::Base, pallas::Base>,
     cm_row_idx: usize,
 ) -> Result<OutputResourceVariables, Error> {
-    // Witness nk_com
-    let nk_com = assign_free_advice(
-        layouter.namespace(|| "witness nk_com"),
+    // Witness npk
+    let npk = assign_free_advice(
+        layouter.namespace(|| "witness npk"),
         advices[0],
-        Value::known(output_resource.get_nk_commitment()),
+        Value::known(output_resource.get_npk()),
     )?;
 
     // Witness value
@@ -247,7 +247,7 @@ pub fn check_output_resource(
         logic.clone(),
         label.clone(),
         value.clone(),
-        nk_com.clone(),
+        npk.clone(),
         old_nf.clone(),
         psi.clone(),
         quantity.clone(),
@@ -265,7 +265,7 @@ pub fn check_output_resource(
         is_merkle_checked,
         value,
         nonce: old_nf,
-        nk_com,
+        npk,
         psi,
         rcm,
     };

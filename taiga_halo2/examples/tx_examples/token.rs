@@ -23,7 +23,7 @@ pub fn create_token_swap_ptx<R: RngCore>(
     input_nk: pallas::Base,
     output_token: Token,
     output_auth_pk: pallas::Point,
-    output_nk_com: pallas::Base,
+    output_npk: pallas::Base,
 ) -> ShieldedPartialTransaction {
     let input_auth = TokenAuthorization::from_sk_vk(&input_auth_sk, &COMPRESSED_TOKEN_AUTH_VK);
 
@@ -34,7 +34,7 @@ pub fn create_token_swap_ptx<R: RngCore>(
     // output resource
     let output_auth = TokenAuthorization::new(output_auth_pk, *COMPRESSED_TOKEN_AUTH_VK);
     let mut output_resource =
-        output_token.create_random_output_token_resource(output_nk_com, &output_auth);
+        output_token.create_random_output_token_resource(output_npk, &output_auth);
 
     // padding the zero resources
     let padding_input_resource = Resource::random_padding_resource(&mut rng);

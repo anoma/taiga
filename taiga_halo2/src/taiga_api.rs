@@ -57,10 +57,10 @@ pub fn create_output_resource(
     value: pallas::Base,
     quantity: u64,
     // The owner of output resource has the nullifer key and exposes the nullifier_key commitment to output creator.
-    nk_com: pallas::Base,
+    npk: pallas::Base,
     is_merkle_checked: bool,
 ) -> Resource {
-    Resource::new_output_resource(logic, label, value, quantity, nk_com, is_merkle_checked)
+    Resource::new_output_resource(logic, label, value, quantity, npk, is_merkle_checked)
 }
 
 /// Resource borsh serialization
@@ -75,7 +75,7 @@ pub fn create_output_resource(
 /// |   value               | pallas::Base  |   32      |
 /// |   quantity            | u64           |   8       |
 /// |   nk_container type   | u8            |   1       |
-/// |   nk_com/nk           | pallas::Base  |   32      |
+/// |   npk                 | pallas::Base  |   32      |
 /// |   nonce               | pallas::Base  |   32      |
 /// |   psi                 | pallas::Base  |   32      |
 /// |   rcm                 | pallas::Base  |   32      |

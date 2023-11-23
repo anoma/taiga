@@ -49,7 +49,7 @@ pub struct OrRelationIntentValidityPredicateCircuit {
     pub output_resources: [Resource; NUM_RESOURCE],
     pub token_1: Token,
     pub token_2: Token,
-    pub receiver_nk_com: pallas::Base,
+    pub receiver_npk: pallas::Base,
     pub receiver_value: pallas::Base,
 }
 
@@ -57,7 +57,7 @@ impl OrRelationIntentValidityPredicateCircuit {
     pub fn encode_label(
         token_1: &Token,
         token_2: &Token,
-        receiver_nk_com: pallas::Base,
+        receiver_npk: pallas::Base,
         receiver_value: pallas::Base,
     ) -> pallas::Base {
         let token_property_1 = token_1.encode_name();
@@ -70,7 +70,7 @@ impl OrRelationIntentValidityPredicateCircuit {
             token_property_2,
             token_quantity_2,
             TOKEN_VK.get_compressed(),
-            receiver_nk_com,
+            receiver_npk,
             receiver_value,
         ])
     }
@@ -123,10 +123,10 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
             Value::known(self.token_2.encode_quantity()),
         )?;
 
-        let receiver_nk_com = assign_free_advice(
-            layouter.namespace(|| "witness receiver nk_com"),
+        let receiver_npk = assign_free_advice(
+            layouter.namespace(|| "witness receiver npk"),
             config.advices[0],
-            Value::known(self.receiver_nk_com),
+            Value::known(self.receiver_npk),
         )?;
 
         let receiver_value = assign_free_advice(
@@ -145,7 +145,7 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
                 token_property_2.clone(),
                 token_quantity_2.clone(),
                 token_vp_vk.clone(),
-                receiver_nk_com.clone(),
+                receiver_npk.clone(),
                 receiver_value.clone(),
             ],
         )?;
@@ -180,16 +180,16 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
             },
         )?;
 
-        // check nk_com
+        // check npk
         layouter.assign_region(
-            || "conditional equal: check nk_com",
+            || "conditional equal: check npk",
             |mut region| {
                 config.conditional_equal_config.assign_region(
                     &is_input_resource,
-                    &receiver_nk_com,
+                    &receiver_npk,
                     &basic_variables.output_resource_variables[0]
                         .resource_variables
-                        .nk_com,
+                        .npk,
                     0,
                     &mut region,
                 )
@@ -280,14 +280,14 @@ pub fn create_intent_resource<R: RngCore>(
     mut rng: R,
     token_1: &Token,
     token_2: &Token,
-    receiver_nk_com: pallas::Base,
+    receiver_npk: pallas::Base,
     receiver_value: pallas::Base,
     nk: pallas::Base,
 ) -> Resource {
     let label = OrRelationIntentValidityPredicateCircuit::encode_label(
         token_1,
         token_2,
-        receiver_nk_com,
+        receiver_npk,
         receiver_value,
     );
     let rseed = RandomSeed::random(&mut rng);
@@ -324,12 +324,12 @@ fn test_halo2_or_relation_intent_vp_circuit() {
         output_resources[0].quantity = token_1.quantity();
 
         let nk = pallas::Base::random(&mut rng);
-        let nk_com = output_resources[0].get_nk_commitment();
+        let npk = output_resources[0].get_npk();
         let intent_resource = create_intent_resource(
             &mut rng,
             &token_1,
             &token_2,
-            nk_com,
+            npk,
             output_resources[0].value,
             nk,
         );
@@ -341,7 +341,7 @@ fn test_halo2_or_relation_intent_vp_circuit() {
             output_resources,
             token_1,
             token_2,
-            receiver_nk_com: nk_com,
+            receiver_npk: npk,
             receiver_value: output_resources[0].value,
         }
     };

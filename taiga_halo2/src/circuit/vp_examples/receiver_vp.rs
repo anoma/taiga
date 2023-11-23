@@ -165,11 +165,11 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             &basic_variables.get_nonce_searchable_pairs(),
         )?;
 
-        let nk_com = get_owned_resource_variable(
+        let npk = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource nk_com"),
+            layouter.namespace(|| "get owned resource npk"),
             &owned_resource_id,
-            &basic_variables.get_nk_com_searchable_pairs(),
+            &basic_variables.get_npk_searchable_pairs(),
         )?;
 
         let psi = get_owned_resource_variable(
@@ -186,7 +186,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             &basic_variables.get_rcm_searchable_pairs(),
         )?;
 
-        let mut message = vec![logic, label, value, quantity, nonce, nk_com, psi, rcm];
+        let mut message = vec![logic, label, value, quantity, nonce, npk, psi, rcm];
 
         let add_chip = AddChip::<pallas::Base>::construct(config.add_config.clone(), ());
 
@@ -248,7 +248,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             target_resource.value,
             pallas::Base::from(target_resource.quantity),
             target_resource.nonce.inner(),
-            target_resource.get_nk_commitment(),
+            target_resource.get_npk(),
             target_resource.psi,
             target_resource.rcm,
         ];
@@ -331,10 +331,7 @@ fn test_halo2_receiver_vp_circuit() {
         pallas::Base::from(circuit.output_resources[0].quantity)
     );
     assert_eq!(de_cipher[4], circuit.output_resources[0].nonce.inner());
-    assert_eq!(
-        de_cipher[5],
-        circuit.output_resources[0].get_nk_commitment()
-    );
+    assert_eq!(de_cipher[5], circuit.output_resources[0].get_npk());
     assert_eq!(de_cipher[6], circuit.output_resources[0].get_psi());
     assert_eq!(de_cipher[7], circuit.output_resources[0].get_rcm());
 }

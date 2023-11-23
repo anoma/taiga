@@ -574,7 +574,7 @@ pub struct ResourceVariables {
     pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub nonce: AssignedCell<pallas::Base, pallas::Base>,
-    pub nk_com: AssignedCell<pallas::Base, pallas::Base>,
+    pub npk: AssignedCell<pallas::Base, pallas::Base>,
     pub psi: AssignedCell<pallas::Base, pallas::Base>,
     pub rcm: AssignedCell<pallas::Base, pallas::Base>,
 }
@@ -701,12 +701,10 @@ impl BasicValidityPredicateVariables {
         )
     }
 
-    pub fn get_nk_com_searchable_pairs(
-        &self,
-    ) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
+    pub fn get_npk_searchable_pairs(&self) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
         self.get_variable_searchable_pairs(
-            |variables| variables.resource_variables.nk_com.clone(),
-            |variables| variables.resource_variables.nk_com.clone(),
+            |variables| variables.resource_variables.npk.clone(),
+            |variables| variables.resource_variables.npk.clone(),
         )
     }
 

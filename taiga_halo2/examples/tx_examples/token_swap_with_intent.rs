@@ -43,12 +43,12 @@ pub fn create_token_intent_ptx<R: RngCore>(
         input_token.create_random_input_token_resource(&mut rng, input_nk, &input_auth);
 
     // output intent resource
-    let input_resource_nk_com = input_resource.get_nk_commitment();
+    let input_resource_npk = input_resource.get_npk();
     let mut intent_resource = create_intent_resource(
         &mut rng,
         &token_1,
         &token_2,
-        input_resource_nk_com,
+        input_resource_npk,
         input_resource.value,
         input_nk,
     );
@@ -102,7 +102,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
                 output_resources,
                 token_1,
                 token_2,
-                receiver_nk_com: input_resource_nk_com,
+                receiver_npk: input_resource_npk,
                 receiver_value: input_resource.value,
             };
 
@@ -133,7 +133,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
     let ptx = ShieldedPartialTransaction::build(actions, input_vps, output_vps, vec![], &mut rng)
         .unwrap();
 
-    (ptx, input_nk, input_resource_nk_com, input_resource.value)
+    (ptx, input_nk, input_resource_npk, input_resource.value)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -142,7 +142,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     token_1: Token,
     token_2: Token,
     input_nk: pallas::Base,
-    receiver_nk_com: pallas::Base,
+    receiver_npk: pallas::Base,
     receiver_value: pallas::Base,
     output_token: Token,
     output_auth_pk: pallas::Point,
@@ -152,7 +152,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
         &mut rng,
         &token_1,
         &token_2,
-        receiver_nk_com,
+        receiver_npk,
         receiver_value,
         input_nk,
     );
@@ -160,9 +160,9 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     // output resource
     let input_resource_nf = intent_resource.get_nf().unwrap();
     let output_auth = TokenAuthorization::new(output_auth_pk, *COMPRESSED_TOKEN_AUTH_VK);
-    let output_nk_com = NullifierKeyContainer::from_key(input_nk).get_commitment();
+    let output_npk = NullifierKeyContainer::from_key(input_nk).get_npk();
     let mut output_resource =
-        output_token.create_random_output_token_resource(output_nk_com, &output_auth);
+        output_token.create_random_output_token_resource(output_npk, &output_auth);
 
     // padding the zero resources
     let padding_input_resource = Resource::random_padding_resource(&mut rng);
@@ -205,7 +205,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
                 output_resources,
                 token_1,
                 token_2,
-                receiver_nk_com,
+                receiver_npk,
                 receiver_value,
             };
 
@@ -254,7 +254,7 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
     let token_1 = Token::new("dolphin".to_string(), 1u64);
     let token_2 = Token::new("monkey".to_string(), 2u64);
     let btc_token = Token::new("btc".to_string(), 5u64);
-    let (alice_ptx, intent_nk, receiver_nk_com, receiver_value) = create_token_intent_ptx(
+    let (alice_ptx, intent_nk, receiver_npk, receiver_value) = create_token_intent_ptx(
         &mut rng,
         token_1.clone(),
         token_2.clone(),
@@ -275,7 +275,7 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
         bob_nk.get_nk().unwrap(),
         btc_token,
         bob_auth_pk,
-        bob_nk.get_commitment(),
+        bob_nk.get_npk(),
     );
 
     // Solver/Bob creates the partial transaction to consume the intent resource
@@ -285,7 +285,7 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
         token_1.clone(),
         token_2,
         intent_nk,
-        receiver_nk_com,
+        receiver_npk,
         receiver_value,
         token_1,
         alice_auth_pk,

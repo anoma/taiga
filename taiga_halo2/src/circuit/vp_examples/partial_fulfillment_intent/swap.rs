@@ -56,7 +56,7 @@ impl Swap {
         assert_eq!(offer.quantity() % ratio, 0);
 
         let offer_resource = offer.create_random_output_token_resource(
-            self.sell.resource().nk_container.get_commitment(),
+            self.sell.resource().nk_container.get_npk(),
             &self.auth,
         );
 
@@ -71,7 +71,7 @@ impl Swap {
             );
             *returned_token
                 .create_random_output_token_resource(
-                    self.sell.resource().nk_container.get_commitment(),
+                    self.sell.resource().nk_container.get_npk(),
                     &self.auth,
                 )
                 .resource()
@@ -93,7 +93,7 @@ impl Swap {
             self.buy.encode_quantity(),
             // Assuming the sold_token and bought_token have the same TOKEN_VK
             TOKEN_VK.get_compressed(),
-            self.sell.resource().get_nk_commitment(),
+            self.sell.resource().get_npk(),
             self.sell.resource().value,
         ])
     }
@@ -149,10 +149,10 @@ impl Swap {
             Value::known(self.buy.encode_quantity()),
         )?;
 
-        let receiver_nk_com = assign_free_advice(
-            layouter.namespace(|| "witness receiver nk_com"),
+        let receiver_npk = assign_free_advice(
+            layouter.namespace(|| "witness receiver npk"),
             column,
-            Value::known(self.sell.resource().get_nk_commitment()),
+            Value::known(self.sell.resource().get_npk()),
         )?;
 
         let receiver_value = assign_free_advice(
@@ -167,7 +167,7 @@ impl Swap {
             sold_token_quantity,
             bought_token,
             bought_token_quantity,
-            receiver_nk_com,
+            receiver_npk,
             receiver_value,
         })
     }

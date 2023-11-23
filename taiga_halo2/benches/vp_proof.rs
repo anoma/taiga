@@ -43,7 +43,7 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
             .iter()
             .map(|input| {
                 let nonce = input.get_nf().unwrap();
-                let nk_com = NullifierKeyContainer::from_commitment(pallas::Base::random(&mut rng));
+                let npk = NullifierKeyContainer::from_npk(pallas::Base::random(&mut rng));
                 let kind = {
                     let logic = pallas::Base::random(&mut rng);
                     let label = pallas::Base::random(&mut rng);
@@ -56,7 +56,7 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
                     kind,
                     value,
                     quantity,
-                    nk_container: nk_com,
+                    nk_container: npk,
                     is_merkle_checked: true,
                     psi: rseed.get_psi(&nonce),
                     rcm: rseed.get_rcm(&nonce),
