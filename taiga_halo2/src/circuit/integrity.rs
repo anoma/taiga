@@ -311,7 +311,7 @@ pub fn derive_kind(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn compute_value_commitment(
+pub fn compute_delta_commitment(
     mut layouter: impl Layouter<pallas::Base>,
     ecc_chip: EccChip<TaigaFixedBases>,
     hash_to_curve_config: HashToCurveConfig,
@@ -394,7 +394,7 @@ pub fn compute_value_commitment(
         &blind_scalar,
     )?;
 
-    commitment_v.add(layouter.namespace(|| "net value commitment"), &blind)
+    commitment_v.add(layouter.namespace(|| "delta commitment"), &blind)
 }
 
 fn quantity_range_check<const K: usize>(

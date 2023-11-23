@@ -2,15 +2,15 @@ use crate::circuit::blake2s::{vp_commitment_gadget, Blake2sChip, Blake2sConfig};
 use crate::circuit::gadgets::assign_free_advice;
 use crate::circuit::hash_to_curve::HashToCurveConfig;
 use crate::circuit::integrity::{
-    check_input_resource, check_output_resource, compute_value_commitment,
+    check_input_resource, check_output_resource, compute_delta_commitment,
 };
 use crate::circuit::merkle_circuit::{
     merkle_poseidon_gadget, MerklePoseidonChip, MerklePoseidonConfig,
 };
 use crate::constant::{
-    TaigaFixedBases, ACTION_ANCHOR_PUBLIC_INPUT_ROW_IDX, ACTION_INPUT_VP_CM_1_ROW_IDX,
-    ACTION_INPUT_VP_CM_2_ROW_IDX, ACTION_NET_VALUE_CM_X_PUBLIC_INPUT_ROW_IDX,
-    ACTION_NET_VALUE_CM_Y_PUBLIC_INPUT_ROW_IDX, ACTION_NF_PUBLIC_INPUT_ROW_IDX,
+    TaigaFixedBases, ACTION_ANCHOR_PUBLIC_INPUT_ROW_IDX, ACTION_DELTA_CM_X_PUBLIC_INPUT_ROW_IDX,
+    ACTION_DELTA_CM_Y_PUBLIC_INPUT_ROW_IDX, ACTION_INPUT_VP_CM_1_ROW_IDX,
+    ACTION_INPUT_VP_CM_2_ROW_IDX, ACTION_NF_PUBLIC_INPUT_ROW_IDX,
     ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX, ACTION_OUTPUT_VP_CM_1_ROW_IDX,
     ACTION_OUTPUT_VP_CM_2_ROW_IDX, TAIGA_COMMITMENT_TREE_DEPTH,
 };
@@ -57,7 +57,7 @@ pub struct ActionCircuit {
     pub merkle_path: [(pallas::Base, LR); TAIGA_COMMITMENT_TREE_DEPTH],
     /// Output resource
     pub output_resource: Resource,
-    /// random scalar for net value commitment
+    /// random scalar for delta commitment
     pub rcv: pallas::Scalar,
     /// The randomness for input resource application vp commitment
     pub input_vp_cm_r: pallas::Base,
@@ -231,9 +231,9 @@ impl Circuit<pallas::Base> for ActionCircuit {
             ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX,
         )?;
 
-        // compute and public net value commitment(input_value_commitment - output_value_commitment)
-        let cv_net = compute_value_commitment(
-            layouter.namespace(|| "net value commitment"),
+        // compute and public delta commitment(input_value_commitment - output_value_commitment)
+        let delta = compute_delta_commitment(
+            layouter.namespace(|| "delta commitment"),
             ecc_chip,
             config.hash_to_curve_config.clone(),
             input_resource_variables.resource_variables.app_vk.clone(),
@@ -251,14 +251,14 @@ impl Circuit<pallas::Base> for ActionCircuit {
             self.rcv,
         )?;
         layouter.constrain_instance(
-            cv_net.inner().x().cell(),
+            delta.inner().x().cell(),
             config.instances,
-            ACTION_NET_VALUE_CM_X_PUBLIC_INPUT_ROW_IDX,
+            ACTION_DELTA_CM_X_PUBLIC_INPUT_ROW_IDX,
         )?;
         layouter.constrain_instance(
-            cv_net.inner().y().cell(),
+            delta.inner().y().cell(),
             config.instances,
-            ACTION_NET_VALUE_CM_Y_PUBLIC_INPUT_ROW_IDX,
+            ACTION_DELTA_CM_Y_PUBLIC_INPUT_ROW_IDX,
         )?;
 
         // merkle path check

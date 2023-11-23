@@ -1,5 +1,6 @@
 use crate::binding_signature::{BindingSignature, BindingSigningKey, BindingVerificationKey};
 use crate::constant::TRANSACTION_BINDING_HASH_PERSONALIZATION;
+use crate::delta_commitment::DeltaCommitment;
 use crate::error::TransactionError;
 use crate::executable::Executable;
 use crate::merkle_tree::Anchor;
@@ -7,7 +8,6 @@ use crate::nullifier::Nullifier;
 use crate::resource::ResourceCommitment;
 use crate::shielded_ptx::ShieldedPartialTransaction;
 use crate::transparent_ptx::TransparentPartialTransaction;
-use crate::value_commitment::ValueCommitment;
 use blake2b_simd::Params as Blake2bParams;
 use pasta_curves::{group::Group, pallas};
 use rand::{CryptoRng, RngCore};
@@ -100,13 +100,13 @@ impl Transaction {
         let mut vk = pallas::Point::identity();
         vk = self
             .shielded_ptx_bundle
-            .get_value_commitments()
+            .get_delta_commitments()
             .iter()
             .fold(vk, |acc, cv| acc + cv.inner());
 
         vk = self
             .transparent_ptx_bundle
-            .get_value_commitments()
+            .get_delta_commitments()
             .iter()
             .fold(vk, |acc, cv| acc + cv.inner());
 
@@ -128,7 +128,7 @@ impl Transaction {
             h.update(&cm.to_bytes());
         });
         shielded_bundle
-            .get_value_commitments()
+            .get_delta_commitments()
             .iter()
             .for_each(|vc| {
                 h.update(&vc.to_bytes());
@@ -145,7 +145,7 @@ impl Transaction {
             h.update(&cm.to_bytes());
         });
         transparent_bundle
-            .get_value_commitments()
+            .get_delta_commitments()
             .iter()
             .for_each(|vc| {
                 h.update(&vc.to_bytes());
@@ -256,10 +256,10 @@ impl ShieldedPartialTxBundle {
         })
     }
 
-    pub fn get_value_commitments(&self) -> Vec<ValueCommitment> {
+    pub fn get_delta_commitments(&self) -> Vec<DeltaCommitment> {
         self.0
             .iter()
-            .flat_map(|ptx| ptx.get_value_commitments())
+            .flat_map(|ptx| ptx.get_delta_commitments())
             .collect()
     }
 
@@ -301,10 +301,10 @@ impl TransparentPartialTxBundle {
         })
     }
 
-    pub fn get_value_commitments(&self) -> Vec<ValueCommitment> {
+    pub fn get_delta_commitments(&self) -> Vec<DeltaCommitment> {
         self.0
             .iter()
-            .flat_map(|ptx| ptx.get_value_commitments())
+            .flat_map(|ptx| ptx.get_delta_commitments())
             .collect()
     }
 

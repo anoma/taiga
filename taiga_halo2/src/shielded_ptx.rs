@@ -4,13 +4,13 @@ use crate::constant::{
     ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, MAX_DYNAMIC_VP_NUM,
     NUM_RESOURCE, SETUP_PARAMS_MAP,
 };
+use crate::delta_commitment::DeltaCommitment;
 use crate::error::TransactionError;
 use crate::executable::Executable;
 use crate::merkle_tree::Anchor;
 use crate::nullifier::Nullifier;
 use crate::proof::Proof;
 use crate::resource::{ResourceCommitment, ResourceValidityPredicates};
-use crate::value_commitment::ValueCommitment;
 use halo2_proofs::plonk::Error;
 use pasta_curves::pallas;
 use rand::RngCore;
@@ -288,10 +288,10 @@ impl Executable for ShieldedPartialTransaction {
             .collect()
     }
 
-    fn get_value_commitments(&self) -> Vec<ValueCommitment> {
+    fn get_delta_commitments(&self) -> Vec<DeltaCommitment> {
         self.actions
             .iter()
-            .map(|action| action.action_instance.cv_net)
+            .map(|action| action.action_instance.delta)
             .collect()
     }
 

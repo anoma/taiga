@@ -1,7 +1,7 @@
 use crate::{
     action::ActionInfo, circuit::vp_bytecode::ApplicationByteCode, constant::NUM_RESOURCE,
-    error::TransactionError, executable::Executable, merkle_tree::Anchor, nullifier::Nullifier,
-    resource::ResourceCommitment, value_commitment::ValueCommitment,
+    delta_commitment::DeltaCommitment, error::TransactionError, executable::Executable,
+    merkle_tree::Anchor, nullifier::Nullifier, resource::ResourceCommitment,
 };
 
 use pasta_curves::pallas;
@@ -81,10 +81,10 @@ impl Executable for TransparentPartialTransaction {
             .collect()
     }
 
-    fn get_value_commitments(&self) -> Vec<ValueCommitment> {
+    fn get_delta_commitments(&self) -> Vec<DeltaCommitment> {
         self.actions
             .iter()
-            .map(|action| action.get_value_commitment(&pallas::Scalar::zero()))
+            .map(|action| action.get_delta_commitment(&pallas::Scalar::zero()))
             .collect()
     }
 

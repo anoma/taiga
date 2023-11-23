@@ -1,10 +1,10 @@
 use crate::{
     circuit::action_circuit::ActionCircuit,
     constant::{PRF_EXPAND_INPUT_VP_CM_R, PRF_EXPAND_OUTPUT_VP_CM_R},
+    delta_commitment::DeltaCommitment,
     merkle_tree::{Anchor, MerklePath},
     nullifier::Nullifier,
     resource::{RandomSeed, Resource, ResourceCommitment},
-    value_commitment::ValueCommitment,
     vp_commitment::ValidityPredicateCommitment,
 };
 use pasta_curves::pallas;
@@ -31,8 +31,8 @@ pub struct ActionPublicInputs {
     pub nf: Nullifier,
     /// The commitment to the output resource.
     pub cm: ResourceCommitment,
-    /// net value commitment
-    pub cv_net: ValueCommitment,
+    /// Resource delta is used to reason about total quantities of different kinds of resources.
+    pub delta: DeltaCommitment,
     /// The commitment to input resource application(static) vp
     pub input_vp_commitment: ValidityPredicateCommitment,
     /// The commitment to output resource application(static) vp
@@ -48,7 +48,7 @@ pub struct ActionInfo {
     input_merkle_path: MerklePath,
     input_anchor: Anchor,
     output_resource: Resource,
-    // rseed is to generate the randomness of the value commitment and vp commitments
+    // rseed is to generate the randomness of the delta commitment and vp commitments
     rseed: RandomSeed,
 }
 
@@ -60,8 +60,8 @@ impl ActionPublicInputs {
             self.nf.inner(),
             self.anchor.inner(),
             self.cm.inner(),
-            self.cv_net.get_x(),
-            self.cv_net.get_y(),
+            self.delta.get_x(),
+            self.delta.get_y(),
             input_vp_commitment[0],
             input_vp_commitment[1],
             output_vp_commitment[0],
@@ -76,7 +76,7 @@ impl BorshSerialize for ActionPublicInputs {
         writer.write_all(&self.anchor.to_bytes())?;
         writer.write_all(&self.nf.to_bytes())?;
         writer.write_all(&self.cm.to_bytes())?;
-        writer.write_all(&self.cv_net.to_bytes())?;
+        writer.write_all(&self.delta.to_bytes())?;
         writer.write_all(&self.input_vp_commitment.to_bytes())?;
         writer.write_all(&self.output_vp_commitment.to_bytes())?;
         Ok(())
@@ -96,9 +96,9 @@ impl BorshDeserialize for ActionPublicInputs {
         let cm_bytes = <[u8; 32]>::deserialize_reader(reader)?;
         let cm = Option::from(ResourceCommitment::from_bytes(cm_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "cm not in field"))?;
-        let cv_net_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let cv_net = Option::from(ValueCommitment::from_bytes(cv_net_bytes))
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "cv_net not in field"))?;
+        let detla_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let delta = Option::from(DeltaCommitment::from_bytes(detla_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "delta not in field"))?;
         let input_vp_commitment_bytes = <[u8; 32]>::deserialize_reader(reader)?;
         let input_vp_commitment =
             ValidityPredicateCommitment::from_bytes(input_vp_commitment_bytes);
@@ -110,7 +110,7 @@ impl BorshDeserialize for ActionPublicInputs {
             anchor,
             nf,
             cm,
-            cv_net,
+            delta,
             input_vp_commitment,
             output_vp_commitment,
         })
@@ -144,7 +144,7 @@ impl ActionInfo {
         }
     }
 
-    // Get the randomness of value commitment
+    // Get the randomness of delta commitment
     pub fn get_rcv(&self) -> pallas::Scalar {
         self.rseed.get_rcv()
     }
@@ -164,9 +164,9 @@ impl ActionInfo {
         self.input_resource.calculate_root(&self.input_merkle_path)
     }
 
-    // Get value commitment
-    pub fn get_value_commitment(&self, blind_r: &pallas::Scalar) -> ValueCommitment {
-        ValueCommitment::commit(&self.input_resource, &self.output_resource, blind_r)
+    // Get delta commitment
+    pub fn get_delta_commitment(&self, blind_r: &pallas::Scalar) -> DeltaCommitment {
+        DeltaCommitment::commit(&self.input_resource, &self.output_resource, blind_r)
     }
 
     pub fn get_input_resource_nullifer(&self) -> Nullifier {
@@ -187,7 +187,7 @@ impl ActionInfo {
         let cm = self.get_output_resource_cm();
 
         let rcv = self.get_rcv();
-        let cv_net = self.get_value_commitment(&rcv);
+        let delta = self.get_delta_commitment(&rcv);
 
         let input_vp_cm_r = self.get_input_vp_com_r();
         let input_vp_commitment =
@@ -203,7 +203,7 @@ impl ActionInfo {
             nf,
             cm,
             anchor: self.input_anchor,
-            cv_net,
+            delta,
             input_vp_commitment,
             output_vp_commitment,
         };

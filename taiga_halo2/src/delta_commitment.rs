@@ -14,9 +14,9 @@ use serde;
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "nif", derive(NifTuple))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ValueCommitment(pallas::Point);
+pub struct DeltaCommitment(pallas::Point);
 
-impl ValueCommitment {
+impl DeltaCommitment {
     pub fn commit(
         input_resource: &Resource,
         output_resource: &Resource,
@@ -24,7 +24,7 @@ impl ValueCommitment {
     ) -> Self {
         let base_input = input_resource.get_kind();
         let base_output = output_resource.get_kind();
-        ValueCommitment(
+        DeltaCommitment(
             base_input * pallas::Scalar::from(input_resource.quantity)
                 - base_output * pallas::Scalar::from(output_resource.quantity)
                 + RESOURCE_COMMITMENT_R_GENERATOR.to_curve() * blind_r,
@@ -55,7 +55,7 @@ impl ValueCommitment {
         self.0.to_bytes()
     }
 
-    pub fn from_bytes(bytes: [u8; 32]) -> CtOption<ValueCommitment> {
-        pallas::Point::from_bytes(&bytes).map(ValueCommitment)
+    pub fn from_bytes(bytes: [u8; 32]) -> CtOption<DeltaCommitment> {
+        pallas::Point::from_bytes(&bytes).map(DeltaCommitment)
     }
 }
