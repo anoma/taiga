@@ -98,13 +98,13 @@ impl Token {
         nk: pallas::Base,
         auth: &TokenAuthorization,
     ) -> TokenResource {
-        let app_data_static = self.encode_name();
+        let label = self.encode_name();
         let app_data_dynamic = auth.to_app_data_dynamic();
         let rseed = RandomSeed::random(&mut rng);
         let rho = Nullifier::random(&mut rng);
         let resource = Resource::new_input_resource(
             *COMPRESSED_TOKEN_VK,
-            app_data_static,
+            label,
             app_data_dynamic,
             self.quantity(),
             nk,
@@ -124,11 +124,11 @@ impl Token {
         nk_com: pallas::Base,
         auth: &TokenAuthorization,
     ) -> TokenResource {
-        let app_data_static = self.encode_name();
+        let label = self.encode_name();
         let app_data_dynamic = auth.to_app_data_dynamic();
         let resource = Resource::new_output_resource(
             *COMPRESSED_TOKEN_VK,
-            app_data_static,
+            label,
             app_data_dynamic,
             self.quantity(),
             nk_com,
@@ -257,7 +257,7 @@ pub struct TokenValidityPredicateCircuit {
     pub owned_resource_id: pallas::Base,
     pub input_resources: [Resource; NUM_RESOURCE],
     pub output_resources: [Resource; NUM_RESOURCE],
-    // The token_name goes to app_data_static. It can be extended to a list and embedded to app_data_static.
+    // The token_name goes to label. It can be extended to a list and embedded to label.
     pub token_name: TokenName,
     // The auth goes to app_data_dynamic and defines how to consume and create the resource.
     pub auth: TokenAuthorization,
@@ -313,18 +313,18 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
 
         // We can add more constraints on token_property or extend the token_properties.
 
-        // search target resource and get the app_static_data
-        let app_data_static = get_owned_resource_variable(
+        // search target resource and get the label
+        let label = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource app_data_static"),
+            layouter.namespace(|| "get owned resource label"),
             &owned_resource_id,
-            &basic_variables.get_app_data_static_searchable_pairs(),
+            &basic_variables.get_label_searchable_pairs(),
         )?;
 
-        // check app_data_static
+        // check label
         layouter.assign_region(
-            || "check app_data_static",
-            |mut region| region.constrain_equal(token_property.cell(), app_data_static.cell()),
+            || "check label",
+            |mut region| region.constrain_equal(token_property.cell(), label.cell()),
         )?;
 
         // Construct an ECC chip
@@ -550,7 +550,7 @@ fn test_halo2_token_vp_circuit() {
         let output_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
         let token_name = TokenName("Token_name".to_string());
         let auth = TokenAuthorization::random(&mut rng);
-        input_resources[0].kind.app_data_static = token_name.encode();
+        input_resources[0].kind.label = token_name.encode();
         input_resources[0].app_data_dynamic = auth.to_app_data_dynamic();
         TokenValidityPredicateCircuit {
             owned_resource_id: input_resources[0].get_nf().unwrap().inner(),

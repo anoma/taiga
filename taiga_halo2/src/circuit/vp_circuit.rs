@@ -569,7 +569,7 @@ pub struct BasicValidityPredicateVariables {
 #[derive(Debug, Clone)]
 pub struct ResourceVariables {
     pub logic: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_data_static: AssignedCell<pallas::Base, pallas::Base>,
+    pub label: AssignedCell<pallas::Base, pallas::Base>,
     pub quantity: AssignedCell<pallas::Base, pallas::Base>,
     pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
     pub app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
@@ -662,12 +662,10 @@ impl BasicValidityPredicateVariables {
         )
     }
 
-    pub fn get_app_data_static_searchable_pairs(
-        &self,
-    ) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
+    pub fn get_label_searchable_pairs(&self) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
         self.get_variable_searchable_pairs(
-            |variables| variables.resource_variables.app_data_static.clone(),
-            |variables| variables.resource_variables.app_data_static.clone(),
+            |variables| variables.resource_variables.label.clone(),
+            |variables| variables.resource_variables.label.clone(),
         )
     }
 

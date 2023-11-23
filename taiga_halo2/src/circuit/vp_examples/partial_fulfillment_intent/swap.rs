@@ -1,4 +1,4 @@
-use super::{PartialFulfillmentIntentDataStatic, COMPRESSED_PARTIAL_FULFILLMENT_INTENT_VK};
+use super::{PartialFulfillmentIntentLabel, COMPRESSED_PARTIAL_FULFILLMENT_INTENT_VK};
 use crate::{
     circuit::{
         gadgets::assign_free_advice,
@@ -85,7 +85,7 @@ impl Swap {
         (input_resources, output_resources)
     }
 
-    pub fn encode_app_data_static(&self) -> pallas::Base {
+    pub fn encode_label(&self) -> pallas::Base {
         poseidon_hash_n([
             self.sell.encode_name(),
             self.sell.encode_quantity(),
@@ -103,7 +103,7 @@ impl Swap {
 
         Resource::new_input_resource(
             *COMPRESSED_PARTIAL_FULFILLMENT_INTENT_VK,
-            self.encode_app_data_static(),
+            self.encode_label(),
             pallas::Base::zero(),
             1u64,
             self.sell.resource().nk_container.get_nk().unwrap(),
@@ -113,12 +113,12 @@ impl Swap {
         )
     }
 
-    /// Assign variables encoded in app_static_data
-    pub fn assign_app_data_static(
+    /// Assign variables encoded in label
+    pub fn assign_label(
         &self,
         column: Column<Advice>,
         mut layouter: impl Layouter<pallas::Base>,
-    ) -> Result<PartialFulfillmentIntentDataStatic, Error> {
+    ) -> Result<PartialFulfillmentIntentLabel, Error> {
         let token_vp_vk = assign_free_advice(
             layouter.namespace(|| "witness token vp vk"),
             column,
@@ -161,7 +161,7 @@ impl Swap {
             Value::known(self.sell.resource().app_data_dynamic),
         )?;
 
-        Ok(PartialFulfillmentIntentDataStatic {
+        Ok(PartialFulfillmentIntentLabel {
             token_vp_vk,
             sold_token,
             sold_token_quantity,

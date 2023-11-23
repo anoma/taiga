@@ -54,7 +54,7 @@ pub struct OrRelationIntentValidityPredicateCircuit {
 }
 
 impl OrRelationIntentValidityPredicateCircuit {
-    pub fn encode_app_data_static(
+    pub fn encode_label(
         token_1: &Token,
         token_2: &Token,
         receiver_nk_com: pallas::Base,
@@ -135,10 +135,10 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
             Value::known(self.receiver_app_data_dynamic),
         )?;
 
-        // Encode the app_data_static of intent resource
-        let encoded_app_data_static = poseidon_hash_gadget(
+        // Encode the label of intent resource
+        let encoded_label = poseidon_hash_gadget(
             config.poseidon_config,
-            layouter.namespace(|| "encode app_data_static"),
+            layouter.namespace(|| "encode label"),
             [
                 token_property_1.clone(),
                 token_quantity_1.clone(),
@@ -150,20 +150,18 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
             ],
         )?;
 
-        // search target resource and get the intent app_static_data
-        let app_data_static = get_owned_resource_variable(
+        // search target resource and get the intent label
+        let label = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource app_data_static"),
+            layouter.namespace(|| "get owned resource label"),
             &owned_resource_id,
-            &basic_variables.get_app_data_static_searchable_pairs(),
+            &basic_variables.get_label_searchable_pairs(),
         )?;
 
-        // check the app_data_static of intent resource
+        // check the label of intent resource
         layouter.assign_region(
-            || "check app_data_static",
-            |mut region| {
-                region.constrain_equal(encoded_app_data_static.cell(), app_data_static.cell())
-            },
+            || "check label",
+            |mut region| region.constrain_equal(encoded_label.cell(), label.cell()),
         )?;
 
         // check the vp vk of output resource
@@ -217,7 +215,7 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
         // check the token_property and token_quantity in conditions
         let output_resource_token_property = &basic_variables.output_resource_variables[0]
             .resource_variables
-            .app_data_static;
+            .label;
         let output_resource_token_quantity = &basic_variables.output_resource_variables[0]
             .resource_variables
             .quantity;
@@ -286,7 +284,7 @@ pub fn create_intent_resource<R: RngCore>(
     receiver_app_data_dynamic: pallas::Base,
     nk: pallas::Base,
 ) -> Resource {
-    let app_data_static = OrRelationIntentValidityPredicateCircuit::encode_app_data_static(
+    let label = OrRelationIntentValidityPredicateCircuit::encode_label(
         token_1,
         token_2,
         receiver_nk_com,
@@ -296,7 +294,7 @@ pub fn create_intent_resource<R: RngCore>(
     let rho = Nullifier::random(&mut rng);
     Resource::new_input_resource(
         *COMPRESSED_OR_RELATION_INTENT_VK,
-        app_data_static,
+        label,
         pallas::Base::zero(),
         1u64,
         nk,
@@ -322,7 +320,7 @@ fn test_halo2_or_relation_intent_vp_circuit() {
         let token_1 = Token::new("token1".to_string(), 1u64);
         let token_2 = Token::new("token2".to_string(), 2u64);
         output_resources[0].kind.logic = *COMPRESSED_TOKEN_VK;
-        output_resources[0].kind.app_data_static = token_1.encode_name();
+        output_resources[0].kind.label = token_1.encode_name();
         output_resources[0].quantity = token_1.quantity();
 
         let nk = pallas::Base::random(&mut rng);

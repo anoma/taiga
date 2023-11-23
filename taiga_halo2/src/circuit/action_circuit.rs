@@ -237,16 +237,10 @@ impl Circuit<pallas::Base> for ActionCircuit {
             ecc_chip,
             config.hash_to_curve_config.clone(),
             input_resource_variables.resource_variables.logic.clone(),
-            input_resource_variables
-                .resource_variables
-                .app_data_static
-                .clone(),
+            input_resource_variables.resource_variables.label.clone(),
             input_resource_variables.resource_variables.quantity.clone(),
             output_resource_vars.resource_variables.logic.clone(),
-            output_resource_vars
-                .resource_variables
-                .app_data_static
-                .clone(),
+            output_resource_vars.resource_variables.label.clone(),
             output_resource_vars.resource_variables.quantity,
             self.rcv,
         )?;

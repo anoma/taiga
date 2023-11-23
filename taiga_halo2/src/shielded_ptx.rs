@@ -509,7 +509,7 @@ pub mod testing {
 
         // Generate resources
         let input_resource_1 = {
-            let app_data_static = pallas::Base::zero();
+            let label = pallas::Base::zero();
             // TODO: add real application dynamic VPs and encode them to app_data_dynamic later.
             let app_dynamic_vp_vk = [compressed_trivial_vp_vk, compressed_trivial_vp_vk];
             // Encode the app_dynamic_vp_vk into app_data_dynamic
@@ -523,7 +523,7 @@ pub mod testing {
             let is_merkle_checked = true;
             Resource::new_input_resource(
                 compressed_trivial_vp_vk,
-                app_data_static,
+                label,
                 app_data_dynamic,
                 quantity,
                 nk,
@@ -533,7 +533,7 @@ pub mod testing {
             )
         };
         let mut output_resource_1 = {
-            let app_data_static = pallas::Base::zero();
+            let label = pallas::Base::zero();
             // TODO: add real application dynamic VPs and encode them to app_data_dynamic later.
             // If the dynamic VP is not used, set app_data_dynamic pallas::Base::zero() by default.
             let app_data_dynamic = pallas::Base::zero();
@@ -542,7 +542,7 @@ pub mod testing {
             let is_merkle_checked = true;
             Resource::new_output_resource(
                 compressed_trivial_vp_vk,
-                app_data_static,
+                label,
                 app_data_dynamic,
                 quantity,
                 nk_com,
@@ -562,7 +562,7 @@ pub mod testing {
 
         // Generate resources
         let input_resource_2 = {
-            let app_data_static = pallas::Base::one();
+            let label = pallas::Base::one();
             let app_data_dynamic = pallas::Base::zero();
             let rho = Nullifier::from(pallas::Base::random(&mut rng));
             let quantity = 10u64;
@@ -571,7 +571,7 @@ pub mod testing {
             let is_merkle_checked = true;
             Resource::new_input_resource(
                 compressed_trivial_vp_vk,
-                app_data_static,
+                label,
                 app_data_dynamic,
                 quantity,
                 nk,
@@ -581,14 +581,14 @@ pub mod testing {
             )
         };
         let mut output_resource_2 = {
-            let app_data_static = pallas::Base::one();
+            let label = pallas::Base::one();
             let app_data_dynamic = pallas::Base::zero();
             let quantity = 10u64;
             let nk_com = pallas::Base::random(&mut rng);
             let is_merkle_checked = true;
             Resource::new_output_resource(
                 compressed_trivial_vp_vk,
-                app_data_static,
+                label,
                 app_data_dynamic,
                 quantity,
                 nk_com,

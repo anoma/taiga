@@ -50,8 +50,8 @@ pub struct CascadeIntentValidityPredicateCircuit {
 }
 
 impl CascadeIntentValidityPredicateCircuit {
-    // We can encode at most three resources to app_data_static if needed.
-    pub fn encode_app_data_static(cascade_resource_cm: pallas::Base) -> pallas::Base {
+    // We can encode at most three resources to label if needed.
+    pub fn encode_label(cascade_resource_cm: pallas::Base) -> pallas::Base {
         cascade_resource_cm
     }
 }
@@ -80,18 +80,18 @@ impl ValidityPredicateCircuit for CascadeIntentValidityPredicateCircuit {
             Value::known(self.cascade_resource_cm),
         )?;
 
-        // search target resource and get the intent app_static_data
-        let app_data_static = get_owned_resource_variable(
+        // search target resource and get the intent label
+        let label = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource app_data_static"),
+            layouter.namespace(|| "get owned resource label"),
             &owned_resource_id,
-            &basic_variables.get_app_data_static_searchable_pairs(),
+            &basic_variables.get_label_searchable_pairs(),
         )?;
 
-        // check the app_data_static of intent resource
+        // check the label of intent resource
         layouter.assign_region(
-            || "check app_data_static",
-            |mut region| region.constrain_equal(cascade_resource_cm.cell(), app_data_static.cell()),
+            || "check label",
+            |mut region| region.constrain_equal(cascade_resource_cm.cell(), label.cell()),
         )?;
 
         // check the cascade resource
@@ -100,7 +100,7 @@ impl ValidityPredicateCircuit for CascadeIntentValidityPredicateCircuit {
             |mut region| {
                 config.conditional_equal_config.assign_region(
                     &is_input_resource,
-                    &app_data_static,
+                    &label,
                     &basic_variables.input_resource_variables[1].cm,
                     0,
                     &mut region,
@@ -153,13 +153,12 @@ pub fn create_intent_resource<R: RngCore>(
     cascade_resource_cm: pallas::Base,
     nk: pallas::Base,
 ) -> Resource {
-    let app_data_static =
-        CascadeIntentValidityPredicateCircuit::encode_app_data_static(cascade_resource_cm);
+    let label = CascadeIntentValidityPredicateCircuit::encode_label(cascade_resource_cm);
     let rseed = RandomSeed::random(&mut rng);
     let rho = Nullifier::random(&mut rng);
     Resource::new_input_resource(
         *COMPRESSED_CASCADE_INTENT_VK,
-        app_data_static,
+        label,
         pallas::Base::zero(),
         1u64,
         nk,

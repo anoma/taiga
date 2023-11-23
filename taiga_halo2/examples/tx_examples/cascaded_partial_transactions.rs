@@ -114,7 +114,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
                     owned_resource_id: cascade_intent_resource.commitment().inner(),
                     input_resources,
                     output_resources,
-                    cascade_resource_cm: cascade_intent_resource.get_app_data_static(),
+                    cascade_resource_cm: cascade_intent_resource.get_label(),
                 };
 
                 ResourceValidityPredicates::new(Box::new(intent_vp), vec![])
@@ -165,7 +165,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
                     owned_resource_id: cascade_intent_resource.get_nf().unwrap().inner(),
                     input_resources,
                     output_resources,
-                    cascade_resource_cm: cascade_intent_resource.get_app_data_static(),
+                    cascade_resource_cm: cascade_intent_resource.get_label(),
                 };
 
                 ResourceValidityPredicates::new(Box::new(intent_vp), vec![])

@@ -35,8 +35,8 @@ use rand::RngCore;
 pub mod swap;
 pub use swap::Swap;
 
-mod data_static;
-use data_static::PartialFulfillmentIntentDataStatic;
+mod label;
+use label::PartialFulfillmentIntentLabel;
 
 lazy_static! {
     pub static ref PARTIAL_FULFILLMENT_INTENT_VK: ValidityPredicateVerifyingKey =
@@ -67,34 +67,28 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
 
         let owned_resource_id = basic_variables.get_owned_resource_id();
 
-        let app_data_static = self.swap.assign_app_data_static(
-            config.advices[0],
-            layouter.namespace(|| "assign app_data_static"),
-        )?;
-        let encoded_app_data_static = app_data_static.encode(
+        let label = self
+            .swap
+            .assign_label(config.advices[0], layouter.namespace(|| "assign label"))?;
+        let encoded_label = label.encode(
             config.poseidon_config.clone(),
-            layouter.namespace(|| "encode app_data_static"),
+            layouter.namespace(|| "encode label"),
         )?;
 
-        // search target resource and get the intent app_static_data
-        let owned_resource_app_data_static = get_owned_resource_variable(
+        // search target resource and get the intent label
+        let owned_resource_label = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource app_data_static"),
+            layouter.namespace(|| "get owned resource label"),
             &owned_resource_id,
-            &basic_variables.get_app_data_static_searchable_pairs(),
+            &basic_variables.get_label_searchable_pairs(),
         )?;
 
-        // Enforce consistency of app_data_static:
+        // Enforce consistency of label:
         //  - as witnessed in the swap, and
         //  - as encoded in the intent resource
         layouter.assign_region(
-            || "check app_data_static",
-            |mut region| {
-                region.constrain_equal(
-                    encoded_app_data_static.cell(),
-                    owned_resource_app_data_static.cell(),
-                )
-            },
+            || "check label",
+            |mut region| region.constrain_equal(encoded_label.cell(), owned_resource_label.cell()),
         )?;
 
         let is_input_resource = get_is_input_resource_flag(
@@ -105,7 +99,7 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
             &basic_variables.get_output_resource_cms(),
         )?;
         // Conditional checks if is_input_resource == 1
-        app_data_static.is_input_resource_checks(
+        label.is_input_resource_checks(
             &is_input_resource,
             &basic_variables,
             &config.conditional_equal_config,
@@ -127,7 +121,7 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
             )?
         };
         // Conditional checks if is_output_resource == 1
-        app_data_static.is_output_resource_checks(
+        label.is_output_resource_checks(
             &is_output_resource,
             &basic_variables,
             &config.conditional_equal_config,
@@ -135,7 +129,7 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
         )?;
 
         // Conditional checks if is_partial_fulfillment == 1
-        app_data_static.is_partial_fulfillment_checks(
+        label.is_partial_fulfillment_checks(
             &is_input_resource,
             &basic_variables,
             &config.conditional_equal_config,

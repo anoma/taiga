@@ -144,7 +144,7 @@ pub fn resource_commit(
     mut layouter: impl Layouter<pallas::Base>,
     chip: ResourceCommitChip,
     app_vp: AssignedCell<pallas::Base, pallas::Base>,
-    app_data_static: AssignedCell<pallas::Base, pallas::Base>,
+    label: AssignedCell<pallas::Base, pallas::Base>,
     app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
     nk_com: AssignedCell<pallas::Base, pallas::Base>,
     rho: AssignedCell<pallas::Base, pallas::Base>,
@@ -162,7 +162,7 @@ pub fn resource_commit(
     // resource commitment
     let poseidon_message = [
         app_vp,
-        app_data_static,
+        label,
         app_data_dynamic,
         nk_com,
         rho,

@@ -19,7 +19,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Create a resource
 /// logic is a hash of a predicate associated with the resource
-/// app_data_static is the encoded data that is defined in application vp
+/// label specifies the fungibility domain for the resource
 /// app_data_dynamic is the data defined in application vp and will NOT be used to derive kind
 /// nk is the nullifier key
 /// rho is the old nullifier
@@ -29,7 +29,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// The create_input_resource API is only for test.
 pub fn create_input_resource(
     logic: pallas::Base,
-    app_data_static: pallas::Base,
+    label: pallas::Base,
     app_data_dynamic: pallas::Base,
     quantity: u64,
     nk: pallas::Base,
@@ -40,7 +40,7 @@ pub fn create_input_resource(
     let rseed = RandomSeed::random(rng);
     Resource::new_input_resource(
         logic,
-        app_data_static,
+        label,
         app_data_dynamic,
         quantity,
         nk,
@@ -53,7 +53,7 @@ pub fn create_input_resource(
 ///
 pub fn create_output_resource(
     logic: pallas::Base,
-    app_data_static: pallas::Base,
+    label: pallas::Base,
     app_data_dynamic: pallas::Base,
     quantity: u64,
     // The owner of output resource has the nullifer key and exposes the nullifier_key commitment to output creator.
@@ -62,7 +62,7 @@ pub fn create_output_resource(
 ) -> Resource {
     Resource::new_output_resource(
         logic,
-        app_data_static,
+        label,
         app_data_dynamic,
         quantity,
         nk_com,
@@ -78,7 +78,7 @@ pub fn create_output_resource(
 /// |   Parameters          | type          |size(bytes)|
 /// |   -                   |   -           |   -       |
 /// |   logic               | pallas::Base  |   32      |
-/// |   app_data_static     | pallas::Base  |   32      |
+/// |   label     | pallas::Base  |   32      |
 /// |   app_data_dynamic    | pallas::Base  |   32      |
 /// |   quantity            | u64           |   8       |
 /// |   nk_container type   | u8            |   1       |

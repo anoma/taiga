@@ -83,11 +83,11 @@ pub fn check_input_resource(
         Value::known(input_resource.get_logic()),
     )?;
 
-    // Witness app_data_static
-    let app_data_static = assign_free_advice(
-        layouter.namespace(|| "witness app_data_static"),
+    // Witness label
+    let label = assign_free_advice(
+        layouter.namespace(|| "witness label"),
         advices[0],
-        Value::known(input_resource.get_app_data_static()),
+        Value::known(input_resource.get_label()),
     )?;
 
     // Witness and range check the quantity(u64)
@@ -131,7 +131,7 @@ pub fn check_input_resource(
         layouter.namespace(|| "resource commitment"),
         resource_commit_chip.clone(),
         logic.clone(),
-        app_data_static.clone(),
+        label.clone(),
         app_data_dynamic.clone(),
         nk_com.clone(),
         rho.clone(),
@@ -157,7 +157,7 @@ pub fn check_input_resource(
     let resource_variables = ResourceVariables {
         logic,
         quantity,
-        app_data_static,
+        label,
         is_merkle_checked,
         app_data_dynamic,
         rho,
@@ -204,11 +204,11 @@ pub fn check_output_resource(
         Value::known(output_resource.get_logic()),
     )?;
 
-    // Witness app_data_static
-    let app_data_static = assign_free_advice(
-        layouter.namespace(|| "witness app_data_static"),
+    // Witness label
+    let label = assign_free_advice(
+        layouter.namespace(|| "witness label"),
         advices[0],
-        Value::known(output_resource.get_app_data_static()),
+        Value::known(output_resource.get_label()),
     )?;
 
     // Witness and range check the quantity(u64)
@@ -245,7 +245,7 @@ pub fn check_output_resource(
         layouter.namespace(|| "resource commitment"),
         resource_commit_chip,
         logic.clone(),
-        app_data_static.clone(),
+        label.clone(),
         app_data_dynamic.clone(),
         nk_com.clone(),
         old_nf.clone(),
@@ -260,7 +260,7 @@ pub fn check_output_resource(
 
     let resource_variables = ResourceVariables {
         logic,
-        app_data_static,
+        label,
         quantity,
         is_merkle_checked,
         app_data_dynamic,
@@ -281,23 +281,20 @@ pub fn derive_kind(
     hash_to_curve_config: HashToCurveConfig,
     ecc_chip: EccChip<TaigaFixedBases>,
     logic: AssignedCell<pallas::Base, pallas::Base>,
-    app_data_static: AssignedCell<pallas::Base, pallas::Base>,
+    label: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<NonIdentityPoint<pallas::Affine, EccChip<TaigaFixedBases>>, Error> {
     let point = hash_to_curve_circuit(
         layouter.namespace(|| "hash to curve"),
         hash_to_curve_config,
         ecc_chip.clone(),
-        &[logic.clone(), app_data_static.clone()],
+        &[logic.clone(), label.clone()],
     )?;
 
     // Assign a new `NonIdentityPoint` and constran equal to hash_to_curve point since `Point` doesn't have mul operation
     // IndentityPoint is an invalid resource kind and it returns an error.
-    let non_identity_point = logic
-        .value()
-        .zip(app_data_static.value())
-        .map(|(&vk, &data)| {
-            poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&[vk, data]).to_affine()
-        });
+    let non_identity_point = logic.value().zip(label.value()).map(|(&vk, &data)| {
+        poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&[vk, data]).to_affine()
+    });
     let non_identity_point_var = NonIdentityPoint::new(
         ecc_chip,
         layouter.namespace(|| "non-identity resource kind"),

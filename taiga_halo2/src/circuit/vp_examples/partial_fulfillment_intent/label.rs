@@ -15,7 +15,7 @@ use halo2_proofs::{
 use pasta_curves::pallas;
 
 #[derive(Clone, Debug)]
-pub struct PartialFulfillmentIntentDataStatic {
+pub struct PartialFulfillmentIntentLabel {
     pub token_vp_vk: AssignedCell<pallas::Base, pallas::Base>,
     pub sold_token: AssignedCell<pallas::Base, pallas::Base>,
     pub sold_token_quantity: AssignedCell<pallas::Base, pallas::Base>,
@@ -25,16 +25,16 @@ pub struct PartialFulfillmentIntentDataStatic {
     pub receiver_app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
 }
 
-impl PartialFulfillmentIntentDataStatic {
+impl PartialFulfillmentIntentLabel {
     pub fn encode(
         &self,
         config: PoseidonConfig<pallas::Base, 3, 2>,
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
-        // Encode the app_data_static of intent resource
+        // Encode the label of intent resource
         poseidon_hash_gadget(
             config.clone(),
-            layouter.namespace(|| "app_data_static encoding"),
+            layouter.namespace(|| "label encoding"),
             [
                 self.sold_token.clone(),
                 self.sold_token_quantity.clone(),
@@ -78,7 +78,7 @@ impl PartialFulfillmentIntentDataStatic {
                     &self.bought_token,
                     &basic_variables.output_resource_variables[0]
                         .resource_variables
-                        .app_data_static,
+                        .label,
                     0,
                     &mut region,
                 )
@@ -144,14 +144,14 @@ impl PartialFulfillmentIntentDataStatic {
         )?;
 
         layouter.assign_region(
-            || "conditional equal: check sold token app_data_static",
+            || "conditional equal: check sold token label",
             |mut region| {
                 config.assign_region(
                     is_output_resource,
                     &self.sold_token,
                     &basic_variables.input_resource_variables[0]
                         .resource_variables
-                        .app_data_static,
+                        .label,
                     0,
                     &mut region,
                 )
@@ -220,16 +220,16 @@ impl PartialFulfillmentIntentDataStatic {
             },
         )?;
 
-        // check return token app_data_static if it's partially fulfilled
+        // check return token label if it's partially fulfilled
         layouter.assign_region(
-            || "conditional equal: check returned token app_data_static",
+            || "conditional equal: check returned token label",
             |mut region| {
                 config.assign_region(
                     &is_partial_fulfillment,
                     &self.sold_token,
                     &basic_variables.output_resource_variables[1]
                         .resource_variables
-                        .app_data_static,
+                        .label,
                     0,
                     &mut region,
                 )
