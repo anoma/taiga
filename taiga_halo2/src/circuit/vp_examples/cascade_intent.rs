@@ -155,14 +155,14 @@ pub fn create_intent_resource<R: RngCore>(
 ) -> Resource {
     let label = CascadeIntentValidityPredicateCircuit::encode_label(cascade_resource_cm);
     let rseed = RandomSeed::random(&mut rng);
-    let rho = Nullifier::random(&mut rng);
+    let nonce = Nullifier::random(&mut rng);
     Resource::new_input_resource(
         *COMPRESSED_CASCADE_INTENT_VK,
         label,
         pallas::Base::zero(),
         1u64,
         nk,
-        rho,
+        nonce,
         false,
         rseed,
     )

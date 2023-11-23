@@ -26,11 +26,11 @@ pub fn nullifier_circuit(
     mut layouter: impl Layouter<pallas::Base>,
     poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
     nk: AssignedCell<pallas::Base, pallas::Base>,
-    rho: AssignedCell<pallas::Base, pallas::Base>,
+    nonce: AssignedCell<pallas::Base, pallas::Base>,
     psi: AssignedCell<pallas::Base, pallas::Base>,
     cm: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
-    let poseidon_message = [nk, rho, psi, cm];
+    let poseidon_message = [nk, nonce, psi, cm];
     poseidon_hash_gadget(
         poseidon_config,
         layouter.namespace(|| "derive nullifier"),
@@ -97,11 +97,11 @@ pub fn check_input_resource(
         input_resource.quantity,
     )?;
 
-    // Witness rho
-    let rho = assign_free_advice(
-        layouter.namespace(|| "witness rho"),
+    // Witness nonce
+    let nonce = assign_free_advice(
+        layouter.namespace(|| "witness nonce"),
         advices[0],
-        Value::known(input_resource.rho.inner()),
+        Value::known(input_resource.nonce.inner()),
     )?;
 
     // Witness psi
@@ -134,7 +134,7 @@ pub fn check_input_resource(
         label.clone(),
         value.clone(),
         nk_com.clone(),
-        rho.clone(),
+        nonce.clone(),
         psi.clone(),
         quantity.clone(),
         is_merkle_checked.clone(),
@@ -146,7 +146,7 @@ pub fn check_input_resource(
         layouter.namespace(|| "Generate nullifier"),
         resource_commit_chip.get_poseidon_config(),
         nk_var,
-        rho.clone(),
+        nonce.clone(),
         psi.clone(),
         cm.clone(),
     )?;
@@ -160,7 +160,7 @@ pub fn check_input_resource(
         label,
         is_merkle_checked,
         value,
-        rho,
+        nonce,
         nk_com,
         psi,
         rcm,
@@ -264,7 +264,7 @@ pub fn check_output_resource(
         quantity,
         is_merkle_checked,
         value,
-        rho: old_nf,
+        nonce: old_nf,
         nk_com,
         psi,
         rcm,
@@ -434,7 +434,7 @@ fn test_halo2_nullifier_circuit() {
     #[derive(Default)]
     struct MyCircuit {
         nk: NullifierKeyContainer,
-        rho: pallas::Base,
+        nonce: pallas::Base,
         psi: pallas::Base,
         cm: ResourceCommitment,
     }
@@ -503,11 +503,11 @@ fn test_halo2_nullifier_circuit() {
                 Value::known(self.nk.get_nk().unwrap()),
             )?;
 
-            // Witness rho
-            let rho = assign_free_advice(
-                layouter.namespace(|| "witness rho"),
+            // Witness nonce
+            let nonce = assign_free_advice(
+                layouter.namespace(|| "witness nonce"),
                 advices[0],
-                Value::known(self.rho),
+                Value::known(self.nonce),
             )?;
 
             // Witness psi
@@ -528,13 +528,13 @@ fn test_halo2_nullifier_circuit() {
                 layouter.namespace(|| "nullifier"),
                 poseidon_config,
                 nk,
-                rho,
+                nonce,
                 psi,
                 cm,
             )?;
 
             let expect_nf = {
-                let nf = Nullifier::derive(&self.nk, &self.rho, &self.psi, &self.cm)
+                let nf = Nullifier::derive(&self.nk, &self.nonce, &self.psi, &self.cm)
                     .unwrap()
                     .inner();
                 assign_free_advice(
@@ -554,7 +554,7 @@ fn test_halo2_nullifier_circuit() {
     let mut rng = OsRng;
     let circuit = MyCircuit {
         nk: NullifierKeyContainer::random_key(&mut rng),
-        rho: pallas::Base::random(&mut rng),
+        nonce: pallas::Base::random(&mut rng),
         psi: pallas::Base::random(&mut rng),
         cm: ResourceCommitment::default(),
     };

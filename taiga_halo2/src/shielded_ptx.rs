@@ -516,7 +516,7 @@ pub mod testing {
             // The encoding method is flexible and defined in the application vp.
             // Use poseidon hash to encode the two dynamic VPs here
             let value = poseidon_hash(app_dynamic_vp_vk[0], app_dynamic_vp_vk[1]);
-            let rho = Nullifier::from(pallas::Base::random(&mut rng));
+            let nonce = Nullifier::from(pallas::Base::random(&mut rng));
             let quantity = 5000u64;
             let nk = pallas::Base::random(&mut rng);
             let rseed = RandomSeed::random(&mut rng);
@@ -527,7 +527,7 @@ pub mod testing {
                 value,
                 quantity,
                 nk,
-                rho,
+                nonce,
                 is_merkle_checked,
                 rseed,
             )
@@ -564,7 +564,7 @@ pub mod testing {
         let input_resource_2 = {
             let label = pallas::Base::one();
             let value = pallas::Base::zero();
-            let rho = Nullifier::from(pallas::Base::random(&mut rng));
+            let nonce = Nullifier::from(pallas::Base::random(&mut rng));
             let quantity = 10u64;
             let nk = pallas::Base::random(&mut rng);
             let rseed = RandomSeed::random(&mut rng);
@@ -575,7 +575,7 @@ pub mod testing {
                 value,
                 quantity,
                 nk,
-                rho,
+                nonce,
                 is_merkle_checked,
                 rseed,
             )

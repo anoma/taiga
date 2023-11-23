@@ -18,7 +18,7 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
 
     let vp_circuit = {
         let input_resources = [(); NUM_RESOURCE].map(|_| {
-            let rho = Nullifier::from(pallas::Base::random(&mut rng));
+            let nonce = Nullifier::from(pallas::Base::random(&mut rng));
             let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
             let kind = {
                 let logic = pallas::Base::random(&mut rng);
@@ -34,15 +34,15 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
                 quantity,
                 nk_container: nk,
                 is_merkle_checked: true,
-                psi: rseed.get_psi(&rho),
-                rcm: rseed.get_rcm(&rho),
-                rho,
+                psi: rseed.get_psi(&nonce),
+                rcm: rseed.get_rcm(&nonce),
+                nonce,
             }
         });
         let output_resources = input_resources
             .iter()
             .map(|input| {
-                let rho = input.get_nf().unwrap();
+                let nonce = input.get_nf().unwrap();
                 let nk_com = NullifierKeyContainer::from_commitment(pallas::Base::random(&mut rng));
                 let kind = {
                     let logic = pallas::Base::random(&mut rng);
@@ -58,9 +58,9 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
                     quantity,
                     nk_container: nk_com,
                     is_merkle_checked: true,
-                    psi: rseed.get_psi(&rho),
-                    rcm: rseed.get_rcm(&rho),
-                    rho,
+                    psi: rseed.get_psi(&nonce),
+                    rcm: rseed.get_rcm(&nonce),
+                    nonce,
                 }
             })
             .collect::<Vec<_>>();

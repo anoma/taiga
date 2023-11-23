@@ -22,7 +22,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
     let mut rng = OsRng;
     let action_info = {
         let input_resource = {
-            let rho = Nullifier::from(pallas::Base::random(&mut rng));
+            let nonce = Nullifier::from(pallas::Base::random(&mut rng));
             let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
             let kind = {
                 let logic = pallas::Base::random(&mut rng);
@@ -38,13 +38,13 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
                 quantity,
                 nk_container: nk,
                 is_merkle_checked: true,
-                psi: rseed.get_psi(&rho),
-                rcm: rseed.get_rcm(&rho),
-                rho,
+                psi: rseed.get_psi(&nonce),
+                rcm: rseed.get_rcm(&nonce),
+                nonce,
             }
         };
         let mut output_resource = {
-            let rho = input_resource.get_nf().unwrap();
+            let nonce = input_resource.get_nf().unwrap();
             let nk_com = NullifierKeyContainer::from_commitment(pallas::Base::random(&mut rng));
             let kind = {
                 let logic = pallas::Base::random(&mut rng);
@@ -60,9 +60,9 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
                 quantity,
                 nk_container: nk_com,
                 is_merkle_checked: true,
-                psi: rseed.get_psi(&rho),
-                rcm: rseed.get_rcm(&rho),
-                rho,
+                psi: rseed.get_psi(&nonce),
+                rcm: rseed.get_rcm(&nonce),
+                nonce,
             }
         };
         let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);

@@ -22,7 +22,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// label specifies the fungibility domain for the resource
 /// value is the fungible data of the resource
 /// nk is the nullifier key
-/// rho is the old nullifier
+/// nonce guarantees the uniqueness of the resource computable fields
 /// is_merkle_checked is true for normal resources, false for intent(ephemeral) resources
 ///
 /// In practice, input resources are fetched and decrypted from blockchain storage.
@@ -36,7 +36,7 @@ pub fn create_input_resource(
     is_merkle_checked: bool,
 ) -> Resource {
     let rng = OsRng;
-    let rho = Nullifier::random(rng);
+    let nonce = Nullifier::random(rng);
     let rseed = RandomSeed::random(rng);
     Resource::new_input_resource(
         logic,
@@ -44,7 +44,7 @@ pub fn create_input_resource(
         value,
         quantity,
         nk,
-        rho,
+        nonce,
         is_merkle_checked,
         rseed,
     )
@@ -76,7 +76,7 @@ pub fn create_output_resource(
 /// |   quantity            | u64           |   8       |
 /// |   nk_container type   | u8            |   1       |
 /// |   nk_com/nk           | pallas::Base  |   32      |
-/// |   rho                 | pallas::Base  |   32      |
+/// |   nonce               | pallas::Base  |   32      |
 /// |   psi                 | pallas::Base  |   32      |
 /// |   rcm                 | pallas::Base  |   32      |
 /// |   is_merkle_checked   | u8            |   1       |

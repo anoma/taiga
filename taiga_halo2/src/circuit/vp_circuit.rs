@@ -481,7 +481,7 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVer
             let old_nf = assign_free_advice(
                 layouter.namespace(|| "old nf"),
                 config.advices[0],
-                Value::known(output_resources[i].rho.inner()),
+                Value::known(output_resources[i].nonce.inner()),
             )?;
             output_resource_variables.push(check_output_resource(
                 layouter.namespace(|| "check output resource"),
@@ -573,7 +573,7 @@ pub struct ResourceVariables {
     pub quantity: AssignedCell<pallas::Base, pallas::Base>,
     pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
     pub value: AssignedCell<pallas::Base, pallas::Base>,
-    pub rho: AssignedCell<pallas::Base, pallas::Base>,
+    pub nonce: AssignedCell<pallas::Base, pallas::Base>,
     pub nk_com: AssignedCell<pallas::Base, pallas::Base>,
     pub psi: AssignedCell<pallas::Base, pallas::Base>,
     pub rcm: AssignedCell<pallas::Base, pallas::Base>,
@@ -694,10 +694,10 @@ impl BasicValidityPredicateVariables {
         )
     }
 
-    pub fn get_rho_searchable_pairs(&self) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
+    pub fn get_nonce_searchable_pairs(&self) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
         self.get_variable_searchable_pairs(
-            |variables| variables.resource_variables.rho.clone(),
-            |variables| variables.resource_variables.rho.clone(),
+            |variables| variables.resource_variables.nonce.clone(),
+            |variables| variables.resource_variables.nonce.clone(),
         )
     }
 

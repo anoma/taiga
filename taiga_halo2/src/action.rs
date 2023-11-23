@@ -120,7 +120,7 @@ impl BorshDeserialize for ActionPublicInputs {
 impl ActionInfo {
     // The dummy input resource must provide a valid custom_anchor, but a random merkle path
     // The normal input resource only needs to provide a valid merkle path. The anchor will be calculated from the resource and path.
-    // The rho of output_resource will be reset to the nullifier of input_resource
+    // The nonce of output_resource will be set to the nullifier of input_resource
     pub fn new<R: RngCore>(
         input_resource: Resource,
         input_merkle_path: MerklePath,
@@ -133,7 +133,7 @@ impl ActionInfo {
             None => input_resource.calculate_root(&input_merkle_path),
         };
 
-        output_resource.set_rho(&input_resource, &mut rng);
+        output_resource.set_nonce(&input_resource, &mut rng);
 
         Self {
             input_resource,
@@ -180,8 +180,8 @@ impl ActionInfo {
     pub fn build(&self) -> (ActionPublicInputs, ActionCircuit) {
         let nf = self.get_input_resource_nullifer();
         assert_eq!(
-            nf, self.output_resource.rho,
-            "The nf of input resource should be equal to the rho of output resource"
+            nf, self.output_resource.nonce,
+            "The nf of input resource must be equal to the nonce of output resource"
         );
 
         let cm = self.get_output_resource_cm();

@@ -101,14 +101,14 @@ impl Token {
         let label = self.encode_name();
         let value = auth.to_value();
         let rseed = RandomSeed::random(&mut rng);
-        let rho = Nullifier::random(&mut rng);
+        let nonce = Nullifier::random(&mut rng);
         let resource = Resource::new_input_resource(
             *COMPRESSED_TOKEN_VK,
             label,
             value,
             self.quantity(),
             nk,
-            rho,
+            nonce,
             true,
             rseed,
         );

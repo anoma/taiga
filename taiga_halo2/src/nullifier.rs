@@ -35,17 +35,17 @@ pub enum NullifierKeyContainer {
 }
 
 impl Nullifier {
-    // nf = poseidon_hash(nk || \rho || \psi || resource_cm), in which resource_cm is a field element
+    // nf = poseidon_hash(nk || nonce || \psi || resource_cm), in which resource_cm is a field element
     pub fn derive(
         nk: &NullifierKeyContainer,
-        rho: &pallas::Base,
+        nonce: &pallas::Base,
         psi: &pallas::Base,
         cm: &ResourceCommitment,
     ) -> Option<Self> {
         match nk {
             NullifierKeyContainer::Commitment(_) => None,
             NullifierKeyContainer::Key(key) => {
-                let nf = Nullifier(poseidon_hash_n([*key, *rho, *psi, cm.inner()]));
+                let nf = Nullifier(poseidon_hash_n([*key, *nonce, *psi, cm.inner()]));
                 Some(nf)
             }
         }
