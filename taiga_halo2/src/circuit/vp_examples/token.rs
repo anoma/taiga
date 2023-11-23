@@ -241,7 +241,7 @@ impl TokenResource {
             input_resources,
             output_resources,
             vp_vk: *COMPRESSED_RECEIVER_VK,
-            nonce: pallas::Base::from_u128(rng.gen()),
+            encrypt_nonce: pallas::Base::from_u128(rng.gen()),
             sk: pallas::Base::random(&mut rng),
             rcv_pk: auth.pk,
             auth_vp_vk: *COMPRESSED_TOKEN_AUTH_VK,

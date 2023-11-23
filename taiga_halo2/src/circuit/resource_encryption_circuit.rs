@@ -30,7 +30,7 @@ pub fn resource_encryption_gadget(
     poseidon_config: PoseidonConfig<pallas::Base, POSEIDON_WIDTH, POSEIDON_RATE>,
     add_chip: AddChip<pallas::Base>,
     ecc_chip: EccChip<TaigaFixedBases>,
-    nonce: AssignedCell<pallas::Base, pallas::Base>,
+    encrypt_nonce: AssignedCell<pallas::Base, pallas::Base>,
     sender_sk: AssignedCell<pallas::Base, pallas::Base>,
     rcv_pk: NonIdentityPoint<pallas::Affine, EccChip<TaigaFixedBases>>,
     message: &mut Vec<AssignedCell<pallas::Base, pallas::Base>>,
@@ -55,16 +55,16 @@ pub fn resource_encryption_gadget(
     let sender_pk = generator.mul(layouter.namespace(|| "sender_sk * generator"), sender_sk)?;
     let (secret_key, _) = rcv_pk.mul(layouter.namespace(|| "sender_sk * rcv_pk"), sk)?;
 
-    // length_nonce = length * 2^128 + nonce
+    // length_nonce = length * 2^128 + encrypt_nonce
     let length_var = assign_free_constant(
         layouter.namespace(|| "constant zero"),
         advice,
         pallas::Base::from(message.len() as u64) * pallas::Base::from_u128(1 << 64).square(),
     )?;
     let length_nonce = add_chip.add(
-        layouter.namespace(|| "length_nonce = length || nonce"),
+        layouter.namespace(|| "length_nonce = length || encrypt_nonce"),
         &length_var,
-        &nonce,
+        &encrypt_nonce,
     )?;
 
     // Init poseidon sponge state
@@ -109,8 +109,8 @@ pub fn resource_encryption_gadget(
             .for_each(|s| cipher.push(s.clone().into()));
     }
 
-    // Add nonce
-    cipher.push(nonce);
+    // Add encrypt_nonce
+    cipher.push(encrypt_nonce);
 
     // Compute MAC
     state = <PoseidonChip<_, POSEIDON_WIDTH, POSEIDON_RATE> as PoseidonInstructions<

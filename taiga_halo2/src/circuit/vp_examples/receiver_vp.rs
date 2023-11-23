@@ -48,7 +48,7 @@ pub struct ReceiverValidityPredicateCircuit {
     pub input_resources: [Resource; NUM_RESOURCE],
     pub output_resources: [Resource; NUM_RESOURCE],
     pub vp_vk: pallas::Base,
-    pub nonce: pallas::Base,
+    pub encrypt_nonce: pallas::Base,
     pub sk: pallas::Base,
     pub rcv_pk: pallas::Point,
     pub auth_vp_vk: pallas::Base,
@@ -61,7 +61,7 @@ impl Default for ReceiverValidityPredicateCircuit {
             input_resources: [(); NUM_RESOURCE].map(|_| Resource::default()),
             output_resources: [(); NUM_RESOURCE].map(|_| Resource::default()),
             vp_vk: pallas::Base::zero(),
-            nonce: pallas::Base::zero(),
+            encrypt_nonce: pallas::Base::zero(),
             sk: pallas::Base::zero(),
             rcv_pk: pallas::Point::generator(),
             auth_vp_vk: pallas::Base::zero(),
@@ -77,10 +77,10 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
         mut layouter: impl Layouter<pallas::Base>,
         basic_variables: BasicValidityPredicateVariables,
     ) -> Result<(), Error> {
-        let nonce = assign_free_advice(
-            layouter.namespace(|| "witness nonce"),
+        let encrypt_nonce = assign_free_advice(
+            layouter.namespace(|| "witness encrypt_nonce"),
             config.advices[0],
-            Value::known(self.nonce),
+            Value::known(self.encrypt_nonce),
         )?;
 
         let sk = assign_free_advice(
@@ -198,7 +198,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             config.poseidon_config,
             add_chip,
             ecc_chip,
-            nonce,
+            encrypt_nonce,
             sk,
             rcv_pk,
             &mut message,
@@ -254,7 +254,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
         ];
         let plaintext = ResourcePlaintext::padding(&message);
         let key = SecretKey::from_dh_exchange(&self.rcv_pk, &mod_r_p(self.sk));
-        let cipher = ResourceCiphertext::encrypt(&plaintext, &key, &self.nonce);
+        let cipher = ResourceCiphertext::encrypt(&plaintext, &key, &self.encrypt_nonce);
         cipher.inner().iter().for_each(|&c| public_inputs.push(c));
 
         let generator = GENERATOR.to_curve();
@@ -285,7 +285,7 @@ fn test_halo2_receiver_vp_circuit() {
     let (circuit, rcv_sk) = {
         let input_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
         let mut output_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
-        let nonce = pallas::Base::from_u128(23333u128);
+        let encrypt_nonce = pallas::Base::from_u128(23333u128);
         let sk = pallas::Base::random(&mut rng);
         let rcv_sk = pallas::Base::random(&mut rng);
         let generator = GENERATOR.to_curve();
@@ -304,7 +304,7 @@ fn test_halo2_receiver_vp_circuit() {
                 input_resources,
                 output_resources,
                 vp_vk: *COMPRESSED_RECEIVER_VK,
-                nonce,
+                encrypt_nonce,
                 sk,
                 rcv_pk,
                 auth_vp_vk: *COMPRESSED_TOKEN_AUTH_VK,
