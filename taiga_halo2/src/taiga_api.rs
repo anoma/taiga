@@ -18,7 +18,7 @@ pub const RESOURCE_SIZE: usize = 234;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Create a resource
-/// app_vk is the compressed verifying key of application(static) VP
+/// logic is a hash of a predicate associated with the resource
 /// app_data_static is the encoded data that is defined in application vp
 /// app_data_dynamic is the data defined in application vp and will NOT be used to derive kind
 /// nk is the nullifier key
@@ -28,7 +28,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// In practice, input resources are fetched and decrypted from blockchain storage.
 /// The create_input_resource API is only for test.
 pub fn create_input_resource(
-    app_vk: pallas::Base,
+    logic: pallas::Base,
     app_data_static: pallas::Base,
     app_data_dynamic: pallas::Base,
     quantity: u64,
@@ -39,7 +39,7 @@ pub fn create_input_resource(
     let rho = Nullifier::random(rng);
     let rseed = RandomSeed::random(rng);
     Resource::new_input_resource(
-        app_vk,
+        logic,
         app_data_static,
         app_data_dynamic,
         quantity,
@@ -52,7 +52,7 @@ pub fn create_input_resource(
 
 ///
 pub fn create_output_resource(
-    app_vk: pallas::Base,
+    logic: pallas::Base,
     app_data_static: pallas::Base,
     app_data_dynamic: pallas::Base,
     quantity: u64,
@@ -61,7 +61,7 @@ pub fn create_output_resource(
     is_merkle_checked: bool,
 ) -> Resource {
     Resource::new_output_resource(
-        app_vk,
+        logic,
         app_data_static,
         app_data_dynamic,
         quantity,
@@ -77,7 +77,7 @@ pub fn create_output_resource(
 /// Resource layout:
 /// |   Parameters          | type          |size(bytes)|
 /// |   -                   |   -           |   -       |
-/// |   app_vk              | pallas::Base  |   32      |
+/// |   logic               | pallas::Base  |   32      |
 /// |   app_data_static     | pallas::Base  |   32      |
 /// |   app_data_dynamic    | pallas::Base  |   32      |
 /// |   quantity            | u64           |   8       |

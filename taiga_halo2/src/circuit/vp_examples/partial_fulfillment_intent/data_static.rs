@@ -63,7 +63,7 @@ impl PartialFulfillmentIntentDataStatic {
                     &self.token_vp_vk,
                     &basic_variables.output_resource_variables[0]
                         .resource_variables
-                        .app_vk,
+                        .logic,
                     0,
                     &mut region,
                 )
@@ -136,7 +136,7 @@ impl PartialFulfillmentIntentDataStatic {
                     &self.token_vp_vk,
                     &basic_variables.input_resource_variables[0]
                         .resource_variables
-                        .app_vk,
+                        .logic,
                     0,
                     &mut region,
                 )
@@ -213,7 +213,7 @@ impl PartialFulfillmentIntentDataStatic {
                     &self.token_vp_vk,
                     &basic_variables.output_resource_variables[1]
                         .resource_variables
-                        .app_vk,
+                        .logic,
                     0,
                     &mut region,
                 )

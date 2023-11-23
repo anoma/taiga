@@ -236,13 +236,13 @@ impl Circuit<pallas::Base> for ActionCircuit {
             layouter.namespace(|| "delta commitment"),
             ecc_chip,
             config.hash_to_curve_config.clone(),
-            input_resource_variables.resource_variables.app_vk.clone(),
+            input_resource_variables.resource_variables.logic.clone(),
             input_resource_variables
                 .resource_variables
                 .app_data_static
                 .clone(),
             input_resource_variables.resource_variables.quantity.clone(),
-            output_resource_vars.resource_variables.app_vk.clone(),
+            output_resource_vars.resource_variables.logic.clone(),
             output_resource_vars
                 .resource_variables
                 .app_data_static
@@ -295,7 +295,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
         let input_vp_commitment = vp_commitment_gadget(
             &mut layouter,
             &blake2s_chip,
-            input_resource_variables.resource_variables.app_vk.clone(),
+            input_resource_variables.resource_variables.logic.clone(),
             input_vp_cm_r,
         )?;
         layouter.constrain_instance(
@@ -318,7 +318,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
         let output_vp_commitment = vp_commitment_gadget(
             &mut layouter,
             &blake2s_chip,
-            output_resource_vars.resource_variables.app_vk.clone(),
+            output_resource_vars.resource_variables.logic.clone(),
             output_vp_cm_r,
         )?;
         layouter.constrain_instance(

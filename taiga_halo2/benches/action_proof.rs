@@ -25,9 +25,9 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
             let rho = Nullifier::from(pallas::Base::random(&mut rng));
             let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
             let kind = {
-                let app_vk = pallas::Base::random(&mut rng);
+                let logic = pallas::Base::random(&mut rng);
                 let app_data_static = pallas::Base::random(&mut rng);
-                ResourceKind::new(app_vk, app_data_static)
+                ResourceKind::new(logic, app_data_static)
             };
             let app_data_dynamic = pallas::Base::random(&mut rng);
             let quantity: u64 = rng.gen();
@@ -47,9 +47,9 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
             let rho = input_resource.get_nf().unwrap();
             let nk_com = NullifierKeyContainer::from_commitment(pallas::Base::random(&mut rng));
             let kind = {
-                let app_vk = pallas::Base::random(&mut rng);
+                let logic = pallas::Base::random(&mut rng);
                 let app_data_static = pallas::Base::random(&mut rng);
-                ResourceKind::new(app_vk, app_data_static)
+                ResourceKind::new(logic, app_data_static)
             };
             let app_data_dynamic = pallas::Base::random(&mut rng);
             let quantity: u64 = rng.gen();

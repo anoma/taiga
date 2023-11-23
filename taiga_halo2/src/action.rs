@@ -191,13 +191,11 @@ impl ActionInfo {
 
         let input_vp_cm_r = self.get_input_vp_com_r();
         let input_vp_commitment =
-            ValidityPredicateCommitment::commit(&self.input_resource.get_app_vk(), &input_vp_cm_r);
+            ValidityPredicateCommitment::commit(&self.input_resource.get_logic(), &input_vp_cm_r);
 
         let output_vp_cm_r = self.get_output_vp_com_r();
-        let output_vp_commitment = ValidityPredicateCommitment::commit(
-            &self.output_resource.get_app_vk(),
-            &output_vp_cm_r,
-        );
+        let output_vp_commitment =
+            ValidityPredicateCommitment::commit(&self.output_resource.get_logic(), &output_vp_cm_r);
 
         let action = ActionPublicInputs {
             nf,

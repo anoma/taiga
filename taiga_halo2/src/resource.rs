@@ -114,8 +114,8 @@ pub struct Resource {
 #[cfg_attr(feature = "nif", module = "Taiga.ResourceKind")]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ResourceKind {
-    /// app_vk is the compressed verifying key of VP
-    pub app_vk: pallas::Base,
+    /// logic is a hash of a predicate associated with the resource
+    pub logic: pallas::Base,
     /// app_data_static is the encoded data that is defined in application vp
     pub app_data_static: pallas::Base,
 }
@@ -135,7 +135,7 @@ pub struct ResourceValidityPredicates {
 impl Resource {
     #[allow(clippy::too_many_arguments)]
     pub fn new_input_resource(
-        app_vk: pallas::Base,
+        logic: pallas::Base,
         app_data_static: pallas::Base,
         app_data_dynamic: pallas::Base,
         quantity: u64,
@@ -144,7 +144,7 @@ impl Resource {
         is_merkle_checked: bool,
         rseed: RandomSeed,
     ) -> Self {
-        let kind = ResourceKind::new(app_vk, app_data_static);
+        let kind = ResourceKind::new(logic, app_data_static);
         Self {
             kind,
             app_data_dynamic,
@@ -160,14 +160,14 @@ impl Resource {
     // The rho, psi, and rcm are not specified until the action is constructed.
     #[allow(clippy::too_many_arguments)]
     pub fn new_output_resource(
-        app_vk: pallas::Base,
+        logic: pallas::Base,
         app_data_static: pallas::Base,
         app_data_dynamic: pallas::Base,
         quantity: u64,
         nk_com: pallas::Base,
         is_merkle_checked: bool,
     ) -> Self {
-        let kind = ResourceKind::new(app_vk, app_data_static);
+        let kind = ResourceKind::new(logic, app_data_static);
         Self {
             kind,
             app_data_dynamic,
@@ -182,7 +182,7 @@ impl Resource {
 
     #[allow(clippy::too_many_arguments)]
     pub fn from_full(
-        app_vk: pallas::Base,
+        logic: pallas::Base,
         app_data_static: pallas::Base,
         app_data_dynamic: pallas::Base,
         quantity: u64,
@@ -192,7 +192,7 @@ impl Resource {
         psi: pallas::Base,
         rcm: pallas::Base,
     ) -> Self {
-        let kind = ResourceKind::new(app_vk, app_data_static);
+        let kind = ResourceKind::new(logic, app_data_static);
         Self {
             kind,
             app_data_dynamic,
@@ -206,9 +206,9 @@ impl Resource {
     }
 
     pub fn random_padding_resource<R: RngCore>(mut rng: R) -> Self {
-        let app_vk = *COMPRESSED_TRIVIAL_VP_VK;
+        let logic = *COMPRESSED_TRIVIAL_VP_VK;
         let app_data_static = pallas::Base::random(&mut rng);
-        let kind = ResourceKind::new(app_vk, app_data_static);
+        let kind = ResourceKind::new(logic, app_data_static);
         let app_data_dynamic = pallas::Base::random(&mut rng);
         let rho = Nullifier::from(pallas::Base::random(&mut rng));
         let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
@@ -225,7 +225,7 @@ impl Resource {
         }
     }
 
-    // resource_commitment = poseidon_hash(app_vk || app_data_static || app_data_dynamic || nk_commitment || rho || psi || is_merkle_checked || quantity || rcm)
+    // resource_commitment = poseidon_hash(logic || app_data_static || app_data_dynamic || nk_commitment || rho || psi || is_merkle_checked || quantity || rcm)
     pub fn commitment(&self) -> ResourceCommitment {
         let compose_is_merkle_checked_quantity = if self.is_merkle_checked {
             pallas::Base::from_u128(1 << 64).square() + pallas::Base::from(self.quantity)
@@ -233,7 +233,7 @@ impl Resource {
             pallas::Base::from(self.quantity)
         };
         let ret = poseidon_hash_n([
-            self.get_app_vk(),
+            self.get_logic(),
             self.get_app_data_static(),
             self.app_data_dynamic,
             self.get_nk_commitment(),
@@ -266,8 +266,8 @@ impl Resource {
         self.kind.derive_kind()
     }
 
-    pub fn get_app_vk(&self) -> pallas::Base {
-        self.kind.app_vk
+    pub fn get_logic(&self) -> pallas::Base {
+        self.kind.logic
     }
 
     pub fn get_app_data_static(&self) -> pallas::Base {
@@ -300,8 +300,8 @@ impl Resource {
 impl BorshSerialize for Resource {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         use byteorder::{LittleEndian, WriteBytesExt};
-        // Write app_vk
-        writer.write_all(&self.kind.app_vk.to_repr())?;
+        // Write logic
+        writer.write_all(&self.kind.logic.to_repr())?;
         // Write app_data_static
         writer.write_all(&self.kind.app_data_static.to_repr())?;
         // Write app_data_dynamic
@@ -337,11 +337,11 @@ impl BorshDeserialize for Resource {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         use byteorder::{LittleEndian, ReadBytesExt};
         use std::io;
-        // Read app_vk
-        let mut app_vk_bytes = [0u8; 32];
-        reader.read_exact(&mut app_vk_bytes)?;
-        let app_vk = Option::from(pallas::Base::from_repr(app_vk_bytes))
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "app_vk not in field"))?;
+        // Read logic
+        let mut logic_bytes = [0u8; 32];
+        reader.read_exact(&mut logic_bytes)?;
+        let logic = Option::from(pallas::Base::from_repr(logic_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "logic not in field"))?;
         // Read app_data_static
         let mut app_data_static_bytes = [0u8; 32];
         reader.read_exact(&mut app_data_static_bytes)?;
@@ -393,7 +393,7 @@ impl BorshDeserialize for Resource {
         let is_merkle_checked = is_merkle_checked_byte == 0x01;
         // Construct resource
         Ok(Resource::from_full(
-            app_vk,
+            logic,
             app_data_static,
             app_data_dynamic,
             quantity,
@@ -409,20 +409,20 @@ impl BorshDeserialize for Resource {
 impl ResourceKind {
     pub fn new(vk: pallas::Base, data: pallas::Base) -> Self {
         Self {
-            app_vk: vk,
+            logic: vk,
             app_data_static: data,
         }
     }
 
     pub fn derive_kind(&self) -> pallas::Point {
-        let inputs = [self.app_vk, self.app_data_static];
+        let inputs = [self.logic, self.app_data_static];
         poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&inputs)
     }
 }
 
 impl Hash for ResourceKind {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.app_vk.to_repr().as_ref().hash(state);
+        self.logic.to_repr().as_ref().hash(state);
         self.app_data_static.to_repr().as_ref().hash(state);
     }
 }
@@ -570,9 +570,9 @@ pub mod tests {
     use rand::{Rng, RngCore};
 
     pub fn random_kind<R: RngCore>(mut rng: R) -> ResourceKind {
-        let app_vk = pallas::Base::random(&mut rng);
+        let logic = pallas::Base::random(&mut rng);
         let app_data_static = pallas::Base::random(&mut rng);
-        ResourceKind::new(app_vk, app_data_static)
+        ResourceKind::new(logic, app_data_static)
     }
 
     pub fn random_resource<R: RngCore>(mut rng: R) -> Resource {

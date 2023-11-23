@@ -144,12 +144,12 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             &basic_variables.get_app_data_static_searchable_pairs(),
         )?;
 
-        // search target resource and get the app_vk
-        let app_vk = get_owned_resource_variable(
+        // search target resource and get the logic
+        let logic = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource app_vk"),
+            layouter.namespace(|| "get owned resource logic"),
             &owned_resource_id,
-            &basic_variables.get_app_vk_searchable_pairs(),
+            &basic_variables.get_logic_searchable_pairs(),
         )?;
 
         // search target resource and get the quantity
@@ -189,7 +189,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
         )?;
 
         let mut message = vec![
-            app_vk,
+            logic,
             app_data_static,
             app_data_dynamic,
             quantity,
@@ -254,7 +254,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             self.get_output_resources()[1]
         };
         let message = vec![
-            target_resource.kind.app_vk,
+            target_resource.kind.logic,
             target_resource.kind.app_data_static,
             target_resource.app_data_dynamic,
             pallas::Base::from(target_resource.quantity),
@@ -334,7 +334,7 @@ fn test_halo2_receiver_vp_circuit() {
     assert_eq!(prover.verify(), Ok(()));
 
     let de_cipher = public_inputs.decrypt(rcv_sk).unwrap();
-    assert_eq!(de_cipher[0], circuit.output_resources[0].get_app_vk());
+    assert_eq!(de_cipher[0], circuit.output_resources[0].get_logic());
     assert_eq!(
         de_cipher[1],
         circuit.output_resources[0].get_app_data_static()
