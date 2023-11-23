@@ -22,7 +22,7 @@ pub struct PartialFulfillmentIntentLabel {
     pub bought_token: AssignedCell<pallas::Base, pallas::Base>,
     pub bought_token_quantity: AssignedCell<pallas::Base, pallas::Base>,
     pub receiver_nk_com: AssignedCell<pallas::Base, pallas::Base>,
-    pub receiver_app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
+    pub receiver_value: AssignedCell<pallas::Base, pallas::Base>,
 }
 
 impl PartialFulfillmentIntentLabel {
@@ -42,7 +42,7 @@ impl PartialFulfillmentIntentLabel {
                 self.bought_token_quantity.clone(),
                 self.token_vp_vk.clone(),
                 self.receiver_nk_com.clone(),
-                self.receiver_app_data_dynamic.clone(),
+                self.receiver_value.clone(),
             ],
         )
     }
@@ -101,16 +101,16 @@ impl PartialFulfillmentIntentLabel {
             },
         )?;
 
-        // check app_data_dynamic
+        // check value
         layouter.assign_region(
-            || "conditional equal: check bought token app_data_dynamic",
+            || "conditional equal: check bought token value",
             |mut region| {
                 config.assign_region(
                     is_input_resource,
-                    &self.receiver_app_data_dynamic,
+                    &self.receiver_value,
                     &basic_variables.output_resource_variables[0]
                         .resource_variables
-                        .app_data_dynamic,
+                        .value,
                     0,
                     &mut region,
                 )
@@ -252,14 +252,14 @@ impl PartialFulfillmentIntentLabel {
         )?;
 
         layouter.assign_region(
-            || "conditional equal: check returned token app_data_dynamic",
+            || "conditional equal: check returned token value",
             |mut region| {
                 config.assign_region(
                     &is_partial_fulfillment,
-                    &self.receiver_app_data_dynamic,
+                    &self.receiver_value,
                     &basic_variables.output_resource_variables[1]
                         .resource_variables
-                        .app_data_dynamic,
+                        .value,
                     0,
                     &mut region,
                 )

@@ -50,7 +50,7 @@ pub struct OrRelationIntentValidityPredicateCircuit {
     pub token_1: Token,
     pub token_2: Token,
     pub receiver_nk_com: pallas::Base,
-    pub receiver_app_data_dynamic: pallas::Base,
+    pub receiver_value: pallas::Base,
 }
 
 impl OrRelationIntentValidityPredicateCircuit {
@@ -58,7 +58,7 @@ impl OrRelationIntentValidityPredicateCircuit {
         token_1: &Token,
         token_2: &Token,
         receiver_nk_com: pallas::Base,
-        receiver_app_data_dynamic: pallas::Base,
+        receiver_value: pallas::Base,
     ) -> pallas::Base {
         let token_property_1 = token_1.encode_name();
         let token_quantity_1 = token_1.encode_quantity();
@@ -71,7 +71,7 @@ impl OrRelationIntentValidityPredicateCircuit {
             token_quantity_2,
             TOKEN_VK.get_compressed(),
             receiver_nk_com,
-            receiver_app_data_dynamic,
+            receiver_value,
         ])
     }
 }
@@ -129,10 +129,10 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
             Value::known(self.receiver_nk_com),
         )?;
 
-        let receiver_app_data_dynamic = assign_free_advice(
-            layouter.namespace(|| "witness receiver app_data_dynamic"),
+        let receiver_value = assign_free_advice(
+            layouter.namespace(|| "witness receiver value"),
             config.advices[0],
-            Value::known(self.receiver_app_data_dynamic),
+            Value::known(self.receiver_value),
         )?;
 
         // Encode the label of intent resource
@@ -146,7 +146,7 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
                 token_quantity_2.clone(),
                 token_vp_vk.clone(),
                 receiver_nk_com.clone(),
-                receiver_app_data_dynamic.clone(),
+                receiver_value.clone(),
             ],
         )?;
 
@@ -196,16 +196,16 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
             },
         )?;
 
-        // check app_data_dynamic
+        // check value
         layouter.assign_region(
-            || "conditional equal: check app_data_dynamic",
+            || "conditional equal: check value",
             |mut region| {
                 config.conditional_equal_config.assign_region(
                     &is_input_resource,
-                    &receiver_app_data_dynamic,
+                    &receiver_value,
                     &basic_variables.output_resource_variables[0]
                         .resource_variables
-                        .app_data_dynamic,
+                        .value,
                     0,
                     &mut region,
                 )
@@ -281,14 +281,14 @@ pub fn create_intent_resource<R: RngCore>(
     token_1: &Token,
     token_2: &Token,
     receiver_nk_com: pallas::Base,
-    receiver_app_data_dynamic: pallas::Base,
+    receiver_value: pallas::Base,
     nk: pallas::Base,
 ) -> Resource {
     let label = OrRelationIntentValidityPredicateCircuit::encode_label(
         token_1,
         token_2,
         receiver_nk_com,
-        receiver_app_data_dynamic,
+        receiver_value,
     );
     let rseed = RandomSeed::random(&mut rng);
     let rho = Nullifier::random(&mut rng);
@@ -330,7 +330,7 @@ fn test_halo2_or_relation_intent_vp_circuit() {
             &token_1,
             &token_2,
             nk_com,
-            output_resources[0].app_data_dynamic,
+            output_resources[0].value,
             nk,
         );
         let padding_input_resource = Resource::random_padding_resource(&mut rng);
@@ -342,7 +342,7 @@ fn test_halo2_or_relation_intent_vp_circuit() {
             token_1,
             token_2,
             receiver_nk_com: nk_com,
-            receiver_app_data_dynamic: output_resources[0].app_data_dynamic,
+            receiver_value: output_resources[0].value,
         }
     };
     let public_inputs = circuit.get_public_inputs(&mut rng);

@@ -510,12 +510,12 @@ pub mod testing {
         // Generate resources
         let input_resource_1 = {
             let label = pallas::Base::zero();
-            // TODO: add real application dynamic VPs and encode them to app_data_dynamic later.
+            // TODO: add real application dynamic VPs and encode them to value later.
             let app_dynamic_vp_vk = [compressed_trivial_vp_vk, compressed_trivial_vp_vk];
-            // Encode the app_dynamic_vp_vk into app_data_dynamic
+            // Encode the app_dynamic_vp_vk into value
             // The encoding method is flexible and defined in the application vp.
             // Use poseidon hash to encode the two dynamic VPs here
-            let app_data_dynamic = poseidon_hash(app_dynamic_vp_vk[0], app_dynamic_vp_vk[1]);
+            let value = poseidon_hash(app_dynamic_vp_vk[0], app_dynamic_vp_vk[1]);
             let rho = Nullifier::from(pallas::Base::random(&mut rng));
             let quantity = 5000u64;
             let nk = pallas::Base::random(&mut rng);
@@ -524,7 +524,7 @@ pub mod testing {
             Resource::new_input_resource(
                 compressed_trivial_vp_vk,
                 label,
-                app_data_dynamic,
+                value,
                 quantity,
                 nk,
                 rho,
@@ -534,16 +534,16 @@ pub mod testing {
         };
         let mut output_resource_1 = {
             let label = pallas::Base::zero();
-            // TODO: add real application dynamic VPs and encode them to app_data_dynamic later.
-            // If the dynamic VP is not used, set app_data_dynamic pallas::Base::zero() by default.
-            let app_data_dynamic = pallas::Base::zero();
+            // TODO: add real application dynamic VPs and encode them to value later.
+            // If the dynamic VP is not used, set value pallas::Base::zero() by default.
+            let value = pallas::Base::zero();
             let quantity = 5000u64;
             let nk_com = pallas::Base::random(&mut rng);
             let is_merkle_checked = true;
             Resource::new_output_resource(
                 compressed_trivial_vp_vk,
                 label,
-                app_data_dynamic,
+                value,
                 quantity,
                 nk_com,
                 is_merkle_checked,
@@ -563,7 +563,7 @@ pub mod testing {
         // Generate resources
         let input_resource_2 = {
             let label = pallas::Base::one();
-            let app_data_dynamic = pallas::Base::zero();
+            let value = pallas::Base::zero();
             let rho = Nullifier::from(pallas::Base::random(&mut rng));
             let quantity = 10u64;
             let nk = pallas::Base::random(&mut rng);
@@ -572,7 +572,7 @@ pub mod testing {
             Resource::new_input_resource(
                 compressed_trivial_vp_vk,
                 label,
-                app_data_dynamic,
+                value,
                 quantity,
                 nk,
                 rho,
@@ -582,14 +582,14 @@ pub mod testing {
         };
         let mut output_resource_2 = {
             let label = pallas::Base::one();
-            let app_data_dynamic = pallas::Base::zero();
+            let value = pallas::Base::zero();
             let quantity = 10u64;
             let nk_com = pallas::Base::random(&mut rng);
             let is_merkle_checked = true;
             Resource::new_output_resource(
                 compressed_trivial_vp_vk,
                 label,
-                app_data_dynamic,
+                value,
                 quantity,
                 nk_com,
                 is_merkle_checked,
@@ -619,7 +619,7 @@ pub mod testing {
         let input_resource_1_vps =
             ResourceValidityPredicates::new(input_application_vp_1, trivial_dynamic_vps);
 
-        // The following resources use empty logic vps and use app_data_dynamic with pallas::Base::zero() by default.
+        // The following resources use empty logic vps and use value with pallas::Base::zero() by default.
         trivial_vp_circuit.owned_resource_id = input_resource_2.get_nf().unwrap().inner();
         let input_application_vp_2 = Box::new(trivial_vp_circuit.clone());
         let input_resource_2_vps = ResourceValidityPredicates::new(input_application_vp_2, vec![]);

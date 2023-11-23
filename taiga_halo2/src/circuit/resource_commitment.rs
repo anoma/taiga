@@ -145,7 +145,7 @@ pub fn resource_commit(
     chip: ResourceCommitChip,
     app_vp: AssignedCell<pallas::Base, pallas::Base>,
     label: AssignedCell<pallas::Base, pallas::Base>,
-    app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
+    value: AssignedCell<pallas::Base, pallas::Base>,
     nk_com: AssignedCell<pallas::Base, pallas::Base>,
     rho: AssignedCell<pallas::Base, pallas::Base>,
     psi: AssignedCell<pallas::Base, pallas::Base>,
@@ -163,7 +163,7 @@ pub fn resource_commit(
     let poseidon_message = [
         app_vp,
         label,
-        app_data_dynamic,
+        value,
         nk_com,
         rho,
         psi,

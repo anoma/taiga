@@ -572,7 +572,7 @@ pub struct ResourceVariables {
     pub label: AssignedCell<pallas::Base, pallas::Base>,
     pub quantity: AssignedCell<pallas::Base, pallas::Base>,
     pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
+    pub value: AssignedCell<pallas::Base, pallas::Base>,
     pub rho: AssignedCell<pallas::Base, pallas::Base>,
     pub nk_com: AssignedCell<pallas::Base, pallas::Base>,
     pub psi: AssignedCell<pallas::Base, pallas::Base>,
@@ -687,12 +687,10 @@ impl BasicValidityPredicateVariables {
         )
     }
 
-    pub fn get_app_data_dynamic_searchable_pairs(
-        &self,
-    ) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
+    pub fn get_value_searchable_pairs(&self) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
         self.get_variable_searchable_pairs(
-            |variables| variables.resource_variables.app_data_dynamic.clone(),
-            |variables| variables.resource_variables.app_data_dynamic.clone(),
+            |variables| variables.resource_variables.value.clone(),
+            |variables| variables.resource_variables.value.clone(),
         )
     }
 

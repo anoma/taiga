@@ -168,13 +168,13 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
             Value::known(self.signature.pk.to_affine()),
         )?;
 
-        // search target resource and get the app_data_dynamic
+        // search target resource and get the value
         let owned_resource_id = basic_variables.get_owned_resource_id();
-        let app_data_dynamic = get_owned_resource_variable(
+        let value = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource app_data_dynamic"),
+            layouter.namespace(|| "get owned resource value"),
             &owned_resource_id,
-            &basic_variables.get_app_data_dynamic_searchable_pairs(),
+            &basic_variables.get_value_searchable_pairs(),
         )?;
 
         let auth_vp_vk = assign_free_advice(
@@ -188,18 +188,16 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
             Value::known(self.receiver_vp_vk),
         )?;
 
-        // Decode the app_data_dynamic, and check the app_data_dynamic encoding
-        let encoded_app_data_dynamic = poseidon_hash_gadget(
+        // Decode the value, and check the value encoding
+        let encoded_value = poseidon_hash_gadget(
             config.poseidon_config.clone(),
-            layouter.namespace(|| "app_data_dynamic encoding"),
+            layouter.namespace(|| "value encoding"),
             [pk.inner().x(), pk.inner().y(), auth_vp_vk, receiver_vp_vk],
         )?;
 
         layouter.assign_region(
-            || "check app_data_dynamic encoding",
-            |mut region| {
-                region.constrain_equal(encoded_app_data_dynamic.cell(), app_data_dynamic.cell())
-            },
+            || "check value encoding",
+            |mut region| region.constrain_equal(encoded_value.cell(), value.cell()),
         )?;
 
         let r = NonIdentityPoint::new(
@@ -307,7 +305,7 @@ fn test_halo2_sig_verification_vp_circuit() {
         let sk = pallas::Scalar::random(&mut rng);
         let auth_vk = pallas::Base::random(&mut rng);
         let auth = TokenAuthorization::from_sk_vk(&sk, &auth_vk);
-        input_resources[0].app_data_dynamic = auth.to_app_data_dynamic();
+        input_resources[0].value = auth.to_value();
         let owned_resource_id = input_resources[0].get_nf().unwrap().inner();
         SignatureVerificationValidityPredicateCircuit::from_sk_and_sign(
             &mut rng,

@@ -99,11 +99,11 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
         )?;
 
         let owned_resource_id = basic_variables.get_owned_resource_id();
-        let app_data_dynamic = get_owned_resource_variable(
+        let value = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource app_data_dynamic"),
+            layouter.namespace(|| "get owned resource value"),
             &owned_resource_id,
-            &basic_variables.get_app_data_dynamic_searchable_pairs(),
+            &basic_variables.get_value_searchable_pairs(),
         )?;
 
         let auth_vp_vk = assign_free_advice(
@@ -117,10 +117,10 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             Value::known(self.vp_vk),
         )?;
 
-        // Decode the app_data_dynamic, and check the app_data_dynamic encoding
-        let encoded_app_data_dynamic = poseidon_hash_gadget(
+        // Decode the value, and check the value encoding
+        let encoded_value = poseidon_hash_gadget(
             config.poseidon_config.clone(),
-            layouter.namespace(|| "app_data_dynamic encoding"),
+            layouter.namespace(|| "value encoding"),
             [
                 rcv_pk.inner().x(),
                 rcv_pk.inner().y(),
@@ -130,10 +130,8 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
         )?;
 
         layouter.assign_region(
-            || "check app_data_dynamic encoding",
-            |mut region| {
-                region.constrain_equal(encoded_app_data_dynamic.cell(), app_data_dynamic.cell())
-            },
+            || "check value encoding",
+            |mut region| region.constrain_equal(encoded_value.cell(), value.cell()),
         )?;
 
         // search target resource and get the label
@@ -188,16 +186,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             &basic_variables.get_rcm_searchable_pairs(),
         )?;
 
-        let mut message = vec![
-            logic,
-            label,
-            app_data_dynamic,
-            quantity,
-            rho,
-            nk_com,
-            psi,
-            rcm,
-        ];
+        let mut message = vec![logic, label, value, quantity, rho, nk_com, psi, rcm];
 
         let add_chip = AddChip::<pallas::Base>::construct(config.add_config.clone(), ());
 
@@ -256,7 +245,7 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
         let message = vec![
             target_resource.kind.logic,
             target_resource.kind.label,
-            target_resource.app_data_dynamic,
+            target_resource.value,
             pallas::Base::from(target_resource.quantity),
             target_resource.rho.inner(),
             target_resource.get_nk_commitment(),
@@ -302,7 +291,7 @@ fn test_halo2_receiver_vp_circuit() {
         let generator = GENERATOR.to_curve();
         let rcv_pk = generator * mod_r_p(rcv_sk);
         let rcv_pk_coord = rcv_pk.to_affine().coordinates().unwrap();
-        output_resources[0].app_data_dynamic = poseidon_hash_n([
+        output_resources[0].value = poseidon_hash_n([
             *rcv_pk_coord.x(),
             *rcv_pk_coord.y(),
             *COMPRESSED_TOKEN_AUTH_VK,
@@ -336,7 +325,7 @@ fn test_halo2_receiver_vp_circuit() {
     let de_cipher = public_inputs.decrypt(rcv_sk).unwrap();
     assert_eq!(de_cipher[0], circuit.output_resources[0].get_logic());
     assert_eq!(de_cipher[1], circuit.output_resources[0].get_label());
-    assert_eq!(de_cipher[2], circuit.output_resources[0].app_data_dynamic);
+    assert_eq!(de_cipher[2], circuit.output_resources[0].value);
     assert_eq!(
         de_cipher[3],
         pallas::Base::from(circuit.output_resources[0].quantity)

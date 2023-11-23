@@ -49,7 +49,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
         &token_1,
         &token_2,
         input_resource_nk_com,
-        input_resource.app_data_dynamic,
+        input_resource.value,
         input_nk,
     );
 
@@ -103,7 +103,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
                 token_1,
                 token_2,
                 receiver_nk_com: input_resource_nk_com,
-                receiver_app_data_dynamic: input_resource.app_data_dynamic,
+                receiver_value: input_resource.value,
             };
 
             ResourceValidityPredicates::new(Box::new(intent_vp), vec![])
@@ -133,12 +133,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
     let ptx = ShieldedPartialTransaction::build(actions, input_vps, output_vps, vec![], &mut rng)
         .unwrap();
 
-    (
-        ptx,
-        input_nk,
-        input_resource_nk_com,
-        input_resource.app_data_dynamic,
-    )
+    (ptx, input_nk, input_resource_nk_com, input_resource.value)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -148,7 +143,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     token_2: Token,
     input_nk: pallas::Base,
     receiver_nk_com: pallas::Base,
-    receiver_app_data_dynamic: pallas::Base,
+    receiver_value: pallas::Base,
     output_token: Token,
     output_auth_pk: pallas::Point,
 ) -> ShieldedPartialTransaction {
@@ -158,7 +153,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
         &token_1,
         &token_2,
         receiver_nk_com,
-        receiver_app_data_dynamic,
+        receiver_value,
         input_nk,
     );
 
@@ -211,7 +206,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
                 token_1,
                 token_2,
                 receiver_nk_com,
-                receiver_app_data_dynamic,
+                receiver_value,
             };
 
             ResourceValidityPredicates::new(Box::new(intent_vp), vec![])
@@ -259,15 +254,14 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
     let token_1 = Token::new("dolphin".to_string(), 1u64);
     let token_2 = Token::new("monkey".to_string(), 2u64);
     let btc_token = Token::new("btc".to_string(), 5u64);
-    let (alice_ptx, intent_nk, receiver_nk_com, receiver_app_data_dynamic) =
-        create_token_intent_ptx(
-            &mut rng,
-            token_1.clone(),
-            token_2.clone(),
-            btc_token.clone(),
-            alice_auth_sk,
-            alice_nk,
-        );
+    let (alice_ptx, intent_nk, receiver_nk_com, receiver_value) = create_token_intent_ptx(
+        &mut rng,
+        token_1.clone(),
+        token_2.clone(),
+        btc_token.clone(),
+        alice_auth_sk,
+        alice_nk,
+    );
 
     // Bob creates the partial transaction with 1 DOLPHIN input and 5 BTC output
     let bob_auth_sk = pallas::Scalar::random(&mut rng);
@@ -292,7 +286,7 @@ pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) 
         token_2,
         intent_nk,
         receiver_nk_com,
-        receiver_app_data_dynamic,
+        receiver_value,
         token_1,
         alice_auth_pk,
     );

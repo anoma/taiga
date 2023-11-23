@@ -69,11 +69,11 @@ pub fn check_input_resource(
         [nk_var.clone(), zero_constant],
     )?;
 
-    // Witness app_data_dynamic
-    let app_data_dynamic = assign_free_advice(
-        layouter.namespace(|| "witness app_data_dynamic"),
+    // Witness value
+    let value = assign_free_advice(
+        layouter.namespace(|| "witness value"),
         advices[0],
-        Value::known(input_resource.app_data_dynamic),
+        Value::known(input_resource.value),
     )?;
 
     // Witness logic
@@ -132,7 +132,7 @@ pub fn check_input_resource(
         resource_commit_chip.clone(),
         logic.clone(),
         label.clone(),
-        app_data_dynamic.clone(),
+        value.clone(),
         nk_com.clone(),
         rho.clone(),
         psi.clone(),
@@ -159,7 +159,7 @@ pub fn check_input_resource(
         quantity,
         label,
         is_merkle_checked,
-        app_data_dynamic,
+        value,
         rho,
         nk_com,
         psi,
@@ -190,11 +190,11 @@ pub fn check_output_resource(
         Value::known(output_resource.get_nk_commitment()),
     )?;
 
-    // Witness app_data_dynamic
-    let app_data_dynamic = assign_free_advice(
-        layouter.namespace(|| "witness app_data_dynamic"),
+    // Witness value
+    let value = assign_free_advice(
+        layouter.namespace(|| "witness value"),
         advices[0],
-        Value::known(output_resource.app_data_dynamic),
+        Value::known(output_resource.value),
     )?;
 
     // Witness logic
@@ -246,7 +246,7 @@ pub fn check_output_resource(
         resource_commit_chip,
         logic.clone(),
         label.clone(),
-        app_data_dynamic.clone(),
+        value.clone(),
         nk_com.clone(),
         old_nf.clone(),
         psi.clone(),
@@ -263,7 +263,7 @@ pub fn check_output_resource(
         label,
         quantity,
         is_merkle_checked,
-        app_data_dynamic,
+        value,
         rho: old_nf,
         nk_com,
         psi,
@@ -312,12 +312,12 @@ pub fn compute_delta_commitment(
     mut layouter: impl Layouter<pallas::Base>,
     ecc_chip: EccChip<TaigaFixedBases>,
     hash_to_curve_config: HashToCurveConfig,
-    app_address_input: AssignedCell<pallas::Base, pallas::Base>,
-    data_input: AssignedCell<pallas::Base, pallas::Base>,
-    v_input: AssignedCell<pallas::Base, pallas::Base>,
-    app_address_output: AssignedCell<pallas::Base, pallas::Base>,
-    data_output: AssignedCell<pallas::Base, pallas::Base>,
-    v_output: AssignedCell<pallas::Base, pallas::Base>,
+    input_logic: AssignedCell<pallas::Base, pallas::Base>,
+    input_label: AssignedCell<pallas::Base, pallas::Base>,
+    input_quantity: AssignedCell<pallas::Base, pallas::Base>,
+    output_logic: AssignedCell<pallas::Base, pallas::Base>,
+    output_label: AssignedCell<pallas::Base, pallas::Base>,
+    output_quantity: AssignedCell<pallas::Base, pallas::Base>,
     rcv: pallas::Scalar,
 ) -> Result<Point<pallas::Affine, EccChip<TaigaFixedBases>>, Error> {
     // input value base point
@@ -325,13 +325,13 @@ pub fn compute_delta_commitment(
         layouter.namespace(|| "derive input resource kind"),
         hash_to_curve_config.clone(),
         ecc_chip.clone(),
-        app_address_input,
-        data_input,
+        input_logic,
+        input_label,
     )?;
     let v_input_scalar = ScalarVar::from_base(
         ecc_chip.clone(),
         layouter.namespace(|| "ScalarVar from_base"),
-        &v_input,
+        &input_quantity,
     )?;
     let (value_point_input, _) =
         input_kind.mul(layouter.namespace(|| "input value point"), v_input_scalar)?;
@@ -341,13 +341,13 @@ pub fn compute_delta_commitment(
         layouter.namespace(|| "derive output resource kind"),
         hash_to_curve_config,
         ecc_chip.clone(),
-        app_address_output,
-        data_output,
+        output_logic,
+        output_label,
     )?;
     let v_output_scalar = ScalarVar::from_base(
         ecc_chip.clone(),
         layouter.namespace(|| "ScalarVar from_base"),
-        &v_output,
+        &output_quantity,
     )?;
     let (value_point_output, _) =
         output_kind.mul(layouter.namespace(|| "output value point"), v_output_scalar)?;

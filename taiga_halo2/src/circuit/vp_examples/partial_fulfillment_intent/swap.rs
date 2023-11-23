@@ -94,7 +94,7 @@ impl Swap {
             // Assuming the sold_token and bought_token have the same TOKEN_VK
             TOKEN_VK.get_compressed(),
             self.sell.resource().get_nk_commitment(),
-            self.sell.resource().app_data_dynamic,
+            self.sell.resource().value,
         ])
     }
 
@@ -155,10 +155,10 @@ impl Swap {
             Value::known(self.sell.resource().get_nk_commitment()),
         )?;
 
-        let receiver_app_data_dynamic = assign_free_advice(
-            layouter.namespace(|| "witness receiver app_data_dynamic"),
+        let receiver_value = assign_free_advice(
+            layouter.namespace(|| "witness receiver value"),
             column,
-            Value::known(self.sell.resource().app_data_dynamic),
+            Value::known(self.sell.resource().value),
         )?;
 
         Ok(PartialFulfillmentIntentLabel {
@@ -168,7 +168,7 @@ impl Swap {
             bought_token,
             bought_token_quantity,
             receiver_nk_com,
-            receiver_app_data_dynamic,
+            receiver_value,
         })
     }
 }

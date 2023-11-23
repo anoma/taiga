@@ -99,13 +99,13 @@ impl Token {
         auth: &TokenAuthorization,
     ) -> TokenResource {
         let label = self.encode_name();
-        let app_data_dynamic = auth.to_app_data_dynamic();
+        let value = auth.to_value();
         let rseed = RandomSeed::random(&mut rng);
         let rho = Nullifier::random(&mut rng);
         let resource = Resource::new_input_resource(
             *COMPRESSED_TOKEN_VK,
             label,
-            app_data_dynamic,
+            value,
             self.quantity(),
             nk,
             rho,
@@ -125,11 +125,11 @@ impl Token {
         auth: &TokenAuthorization,
     ) -> TokenResource {
         let label = self.encode_name();
-        let app_data_dynamic = auth.to_app_data_dynamic();
+        let value = auth.to_value();
         let resource = Resource::new_output_resource(
             *COMPRESSED_TOKEN_VK,
             label,
-            app_data_dynamic,
+            value,
             self.quantity(),
             nk_com,
             true,
@@ -259,7 +259,7 @@ pub struct TokenValidityPredicateCircuit {
     pub output_resources: [Resource; NUM_RESOURCE],
     // The token_name goes to label. It can be extended to a list and embedded to label.
     pub token_name: TokenName,
-    // The auth goes to app_data_dynamic and defines how to consume and create the resource.
+    // The auth goes to value and defines how to consume and create the resource.
     pub auth: TokenAuthorization,
     pub receiver_vp_vk: pallas::Base,
     // rseed is to generate the randomness for vp commitment
@@ -342,12 +342,12 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             Value::known(self.auth.vk),
         )?;
 
-        // search target resource and get the app_data_dynamic
-        let app_data_dynamic = get_owned_resource_variable(
+        // search target resource and get the value
+        let value = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource app_data_dynamic"),
+            layouter.namespace(|| "get owned resource value"),
             &owned_resource_id,
-            &basic_variables.get_app_data_dynamic_searchable_pairs(),
+            &basic_variables.get_value_searchable_pairs(),
         )?;
 
         let receiver_vp_vk = assign_free_advice(
@@ -356,10 +356,10 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             Value::known(self.receiver_vp_vk),
         )?;
 
-        // Decode the app_data_dynamic, and check the app_data_dynamic encoding
-        let encoded_app_data_dynamic = poseidon_hash_gadget(
+        // Decode the value, and check the value encoding
+        let encoded_value = poseidon_hash_gadget(
             config.poseidon_config,
-            layouter.namespace(|| "app_data_dynamic encoding"),
+            layouter.namespace(|| "value encoding"),
             [
                 pk.inner().x(),
                 pk.inner().y(),
@@ -369,10 +369,8 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
         )?;
 
         layouter.assign_region(
-            || "check app_data_dynamic encoding",
-            |mut region| {
-                region.constrain_equal(encoded_app_data_dynamic.cell(), app_data_dynamic.cell())
-            },
+            || "check value encoding",
+            |mut region| region.constrain_equal(encoded_value.cell(), value.cell()),
         )?;
 
         // check the is_merkle_checked flag
@@ -520,7 +518,7 @@ impl TokenAuthorization {
         }
     }
 
-    pub fn to_app_data_dynamic(&self) -> pallas::Base {
+    pub fn to_value(&self) -> pallas::Base {
         let pk_coord = self.pk.to_affine().coordinates().unwrap();
         poseidon_hash_n::<4>([
             *pk_coord.x(),
@@ -551,7 +549,7 @@ fn test_halo2_token_vp_circuit() {
         let token_name = TokenName("Token_name".to_string());
         let auth = TokenAuthorization::random(&mut rng);
         input_resources[0].kind.label = token_name.encode();
-        input_resources[0].app_data_dynamic = auth.to_app_data_dynamic();
+        input_resources[0].value = auth.to_value();
         TokenValidityPredicateCircuit {
             owned_resource_id: input_resources[0].get_nf().unwrap().inner(),
             input_resources,

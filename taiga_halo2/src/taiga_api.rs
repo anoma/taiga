@@ -20,7 +20,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// Create a resource
 /// logic is a hash of a predicate associated with the resource
 /// label specifies the fungibility domain for the resource
-/// app_data_dynamic is the data defined in application vp and will NOT be used to derive kind
+/// value is the fungible data of the resource
 /// nk is the nullifier key
 /// rho is the old nullifier
 /// is_merkle_checked is true for normal resources, false for intent(ephemeral) resources
@@ -30,7 +30,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 pub fn create_input_resource(
     logic: pallas::Base,
     label: pallas::Base,
-    app_data_dynamic: pallas::Base,
+    value: pallas::Base,
     quantity: u64,
     nk: pallas::Base,
     is_merkle_checked: bool,
@@ -41,7 +41,7 @@ pub fn create_input_resource(
     Resource::new_input_resource(
         logic,
         label,
-        app_data_dynamic,
+        value,
         quantity,
         nk,
         rho,
@@ -54,20 +54,13 @@ pub fn create_input_resource(
 pub fn create_output_resource(
     logic: pallas::Base,
     label: pallas::Base,
-    app_data_dynamic: pallas::Base,
+    value: pallas::Base,
     quantity: u64,
     // The owner of output resource has the nullifer key and exposes the nullifier_key commitment to output creator.
     nk_com: pallas::Base,
     is_merkle_checked: bool,
 ) -> Resource {
-    Resource::new_output_resource(
-        logic,
-        label,
-        app_data_dynamic,
-        quantity,
-        nk_com,
-        is_merkle_checked,
-    )
+    Resource::new_output_resource(logic, label, value, quantity, nk_com, is_merkle_checked)
 }
 
 /// Resource borsh serialization
@@ -78,8 +71,8 @@ pub fn create_output_resource(
 /// |   Parameters          | type          |size(bytes)|
 /// |   -                   |   -           |   -       |
 /// |   logic               | pallas::Base  |   32      |
-/// |   label     | pallas::Base  |   32      |
-/// |   app_data_dynamic    | pallas::Base  |   32      |
+/// |   label               | pallas::Base  |   32      |
+/// |   value               | pallas::Base  |   32      |
 /// |   quantity            | u64           |   8       |
 /// |   nk_container type   | u8            |   1       |
 /// |   nk_com/nk           | pallas::Base  |   32      |
