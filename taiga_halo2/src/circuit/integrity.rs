@@ -1,11 +1,11 @@
 use crate::circuit::{
     gadgets::{assign_free_advice, assign_free_constant, poseidon_hash::poseidon_hash_gadget},
     hash_to_curve::{hash_to_curve_circuit, HashToCurveConfig},
-    note_commitment::{note_commit, NoteCommitChip},
-    vp_circuit::{InputNoteVariables, NoteVariables, OutputNoteVariables},
+    resource_commitment::{resource_commit, ResourceCommitChip},
+    vp_circuit::{InputResourceVariables, OutputResourceVariables, ResourceVariables},
 };
 use crate::constant::{TaigaFixedBases, TaigaFixedBasesFull, POSEIDON_TO_CURVE_INPUT_LEN};
-use crate::note::Note;
+use crate::resource::Resource;
 use crate::utils::poseidon_to_curve;
 use halo2_gadgets::{
     ecc::{chip::EccChip, FixedPoint, NonIdentityPoint, Point, ScalarFixed, ScalarVar},
@@ -26,11 +26,11 @@ pub fn nullifier_circuit(
     mut layouter: impl Layouter<pallas::Base>,
     poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
     nk: AssignedCell<pallas::Base, pallas::Base>,
-    rho: AssignedCell<pallas::Base, pallas::Base>,
+    nonce: AssignedCell<pallas::Base, pallas::Base>,
     psi: AssignedCell<pallas::Base, pallas::Base>,
     cm: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
-    let poseidon_message = [nk, rho, psi, cm];
+    let poseidon_message = [nk, nonce, psi, cm];
     poseidon_hash_gadget(
         poseidon_config,
         layouter.namespace(|| "derive nullifier"),
@@ -38,18 +38,18 @@ pub fn nullifier_circuit(
     )
 }
 
-// Check input note integrity and return the input note variables and the nullifier
+// Check input resource integrity and return the input resource variables and the nullifier
 #[allow(clippy::too_many_arguments)]
-pub fn check_input_note(
+pub fn check_input_resource(
     mut layouter: impl Layouter<pallas::Base>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
-    note_commit_chip: NoteCommitChip,
-    input_note: Note,
+    resource_commit_chip: ResourceCommitChip,
+    input_resource: Resource,
     nf_row_idx: usize,
-) -> Result<InputNoteVariables, Error> {
+) -> Result<InputResourceVariables, Error> {
     // Witness nk
-    let nk = input_note.get_nk().unwrap();
+    let nk = input_resource.get_nk().unwrap();
     let nk_var = assign_free_advice(
         layouter.namespace(|| "witness nk"),
         advices[0],
@@ -62,81 +62,81 @@ pub fn check_input_note(
         pallas::Base::zero(),
     )?;
 
-    // nk_com = Com_r(nk, zero)
-    let nk_com = poseidon_hash_gadget(
-        note_commit_chip.get_poseidon_config(),
-        layouter.namespace(|| "nk_com encoding"),
+    // npk = Com_r(nk, zero)
+    let npk = poseidon_hash_gadget(
+        resource_commit_chip.get_poseidon_config(),
+        layouter.namespace(|| "npk encoding"),
         [nk_var.clone(), zero_constant],
     )?;
 
-    // Witness app_data_dynamic
-    let app_data_dynamic = assign_free_advice(
-        layouter.namespace(|| "witness app_data_dynamic"),
+    // Witness value
+    let value = assign_free_advice(
+        layouter.namespace(|| "witness value"),
         advices[0],
-        Value::known(input_note.app_data_dynamic),
+        Value::known(input_resource.value),
     )?;
 
-    // Witness app_vk
-    let app_vk = assign_free_advice(
-        layouter.namespace(|| "witness app_vk"),
+    // Witness logic
+    let logic = assign_free_advice(
+        layouter.namespace(|| "witness logic"),
         advices[0],
-        Value::known(input_note.get_app_vk()),
+        Value::known(input_resource.get_logic()),
     )?;
 
-    // Witness app_data_static
-    let app_data_static = assign_free_advice(
-        layouter.namespace(|| "witness app_data_static"),
+    // Witness label
+    let label = assign_free_advice(
+        layouter.namespace(|| "witness label"),
         advices[0],
-        Value::known(input_note.get_app_data_static()),
+        Value::known(input_resource.get_label()),
     )?;
 
-    // Witness and range check the value(u64)
-    let value = value_range_check(
-        layouter.namespace(|| "value range check"),
-        note_commit_chip.get_lookup_config(),
-        input_note.value,
+    // Witness and range check the quantity(u64)
+    let quantity = quantity_range_check(
+        layouter.namespace(|| "quantity range check"),
+        resource_commit_chip.get_lookup_config(),
+        input_resource.quantity,
     )?;
 
-    // Witness rho
-    let rho = assign_free_advice(
-        layouter.namespace(|| "witness rho"),
+    // Witness nonce
+    let nonce = assign_free_advice(
+        layouter.namespace(|| "witness nonce"),
         advices[0],
-        Value::known(input_note.rho.inner()),
+        Value::known(input_resource.nonce.inner()),
     )?;
 
     // Witness psi
     let psi = assign_free_advice(
         layouter.namespace(|| "witness psi_input"),
         advices[0],
-        Value::known(input_note.get_psi()),
+        Value::known(input_resource.get_psi()),
     )?;
 
     // Witness rcm
     let rcm = assign_free_advice(
         layouter.namespace(|| "witness rcm"),
         advices[0],
-        Value::known(input_note.get_rcm()),
+        Value::known(input_resource.get_rcm()),
     )?;
 
     // Witness is_merkle_checked
-    // is_merkle_checked will be boolean-constrained in the note_commit.
+    // is_merkle_checked will be boolean-constrained in the resource_commit.
     let is_merkle_checked = assign_free_advice(
         layouter.namespace(|| "witness is_merkle_checked"),
         advices[0],
-        Value::known(pallas::Base::from(input_note.is_merkle_checked)),
+        Value::known(pallas::Base::from(input_resource.is_merkle_checked)),
     )?;
 
-    // Check note commitment
-    let cm = note_commit(
-        layouter.namespace(|| "note commitment"),
-        note_commit_chip.clone(),
-        app_vk.clone(),
-        app_data_static.clone(),
-        app_data_dynamic.clone(),
-        nk_com.clone(),
-        rho.clone(),
-        psi.clone(),
+    // Check resource commitment
+    let cm = resource_commit(
+        layouter.namespace(|| "resource commitment"),
+        resource_commit_chip.clone(),
+        logic.clone(),
+        label.clone(),
         value.clone(),
+        npk.clone(),
+        nonce.clone(),
+        psi.clone(),
+        quantity.clone(),
         is_merkle_checked.clone(),
         rcm.clone(),
     )?;
@@ -144,9 +144,9 @@ pub fn check_input_note(
     // Generate nullifier
     let nf = nullifier_circuit(
         layouter.namespace(|| "Generate nullifier"),
-        note_commit_chip.get_poseidon_config(),
+        resource_commit_chip.get_poseidon_config(),
         nk_var,
-        rho.clone(),
+        nonce.clone(),
         psi.clone(),
         cm.clone(),
     )?;
@@ -154,103 +154,103 @@ pub fn check_input_note(
     // Public nullifier
     layouter.constrain_instance(nf.cell(), instances, nf_row_idx)?;
 
-    let note_variables = NoteVariables {
-        app_vk,
-        value,
-        app_data_static,
+    let resource_variables = ResourceVariables {
+        logic,
+        quantity,
+        label,
         is_merkle_checked,
-        app_data_dynamic,
-        rho,
-        nk_com,
+        value,
+        nonce,
+        npk,
         psi,
         rcm,
     };
 
-    Ok(InputNoteVariables {
-        note_variables,
+    Ok(InputResourceVariables {
+        resource_variables,
         nf,
         cm,
     })
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn check_output_note(
+pub fn check_output_resource(
     mut layouter: impl Layouter<pallas::Base>,
     advices: [Column<Advice>; 10],
     instances: Column<Instance>,
-    note_commit_chip: NoteCommitChip,
-    output_note: Note,
+    resource_commit_chip: ResourceCommitChip,
+    output_resource: Resource,
     old_nf: AssignedCell<pallas::Base, pallas::Base>,
     cm_row_idx: usize,
-) -> Result<OutputNoteVariables, Error> {
-    // Witness nk_com
-    let nk_com = assign_free_advice(
-        layouter.namespace(|| "witness nk_com"),
+) -> Result<OutputResourceVariables, Error> {
+    // Witness npk
+    let npk = assign_free_advice(
+        layouter.namespace(|| "witness npk"),
         advices[0],
-        Value::known(output_note.get_nk_commitment()),
+        Value::known(output_resource.get_npk()),
     )?;
 
-    // Witness app_data_dynamic
-    let app_data_dynamic = assign_free_advice(
-        layouter.namespace(|| "witness app_data_dynamic"),
+    // Witness value
+    let value = assign_free_advice(
+        layouter.namespace(|| "witness value"),
         advices[0],
-        Value::known(output_note.app_data_dynamic),
+        Value::known(output_resource.value),
     )?;
 
-    // Witness app_vk
-    let app_vk = assign_free_advice(
-        layouter.namespace(|| "witness app_vk"),
+    // Witness logic
+    let logic = assign_free_advice(
+        layouter.namespace(|| "witness logic"),
         advices[0],
-        Value::known(output_note.get_app_vk()),
+        Value::known(output_resource.get_logic()),
     )?;
 
-    // Witness app_data_static
-    let app_data_static = assign_free_advice(
-        layouter.namespace(|| "witness app_data_static"),
+    // Witness label
+    let label = assign_free_advice(
+        layouter.namespace(|| "witness label"),
         advices[0],
-        Value::known(output_note.get_app_data_static()),
+        Value::known(output_resource.get_label()),
     )?;
 
-    // Witness and range check the value(u64)
-    let value = value_range_check(
-        layouter.namespace(|| "value range check"),
-        note_commit_chip.get_lookup_config(),
-        output_note.value,
+    // Witness and range check the quantity(u64)
+    let quantity = quantity_range_check(
+        layouter.namespace(|| "quantity range check"),
+        resource_commit_chip.get_lookup_config(),
+        output_resource.quantity,
     )?;
 
     // Witness rcm
     let rcm = assign_free_advice(
         layouter.namespace(|| "witness rcm"),
         advices[0],
-        Value::known(output_note.get_rcm()),
+        Value::known(output_resource.get_rcm()),
     )?;
 
     // Witness psi
     let psi = assign_free_advice(
         layouter.namespace(|| "witness psi_output"),
         advices[0],
-        Value::known(output_note.get_psi()),
+        Value::known(output_resource.get_psi()),
     )?;
 
     // Witness is_merkle_checked
-    // is_merkle_checked will be boolean-constrained in the note_commit.
+    // is_merkle_checked will be boolean-constrained in the resource_commit.
     let is_merkle_checked = assign_free_advice(
         layouter.namespace(|| "witness is_merkle_checked"),
         advices[0],
-        Value::known(pallas::Base::from(output_note.is_merkle_checked)),
+        Value::known(pallas::Base::from(output_resource.is_merkle_checked)),
     )?;
 
-    // Check note commitment
-    let cm = note_commit(
-        layouter.namespace(|| "note commitment"),
-        note_commit_chip,
-        app_vk.clone(),
-        app_data_static.clone(),
-        app_data_dynamic.clone(),
-        nk_com.clone(),
+    // Check resource commitment
+    let cm = resource_commit(
+        layouter.namespace(|| "resource commitment"),
+        resource_commit_chip,
+        logic.clone(),
+        label.clone(),
+        value.clone(),
+        npk.clone(),
         old_nf.clone(),
         psi.clone(),
-        value.clone(),
+        quantity.clone(),
         is_merkle_checked.clone(),
         rcm.clone(),
     )?;
@@ -258,99 +258,99 @@ pub fn check_output_note(
     // Public cm
     layouter.constrain_instance(cm.cell(), instances, cm_row_idx)?;
 
-    let note_variables = NoteVariables {
-        app_vk,
-        app_data_static,
-        value,
+    let resource_variables = ResourceVariables {
+        logic,
+        label,
+        quantity,
         is_merkle_checked,
-        app_data_dynamic,
-        rho: old_nf,
-        nk_com,
+        value,
+        nonce: old_nf,
+        npk,
         psi,
         rcm,
     };
 
-    Ok(OutputNoteVariables { note_variables, cm })
+    Ok(OutputResourceVariables {
+        resource_variables,
+        cm,
+    })
 }
 
-pub fn derive_note_type(
+pub fn derive_kind(
     mut layouter: impl Layouter<pallas::Base>,
     hash_to_curve_config: HashToCurveConfig,
     ecc_chip: EccChip<TaigaFixedBases>,
-    app_vk: AssignedCell<pallas::Base, pallas::Base>,
-    app_data_static: AssignedCell<pallas::Base, pallas::Base>,
+    logic: AssignedCell<pallas::Base, pallas::Base>,
+    label: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<NonIdentityPoint<pallas::Affine, EccChip<TaigaFixedBases>>, Error> {
     let point = hash_to_curve_circuit(
         layouter.namespace(|| "hash to curve"),
         hash_to_curve_config,
         ecc_chip.clone(),
-        &[app_vk.clone(), app_data_static.clone()],
+        &[logic.clone(), label.clone()],
     )?;
 
     // Assign a new `NonIdentityPoint` and constran equal to hash_to_curve point since `Point` doesn't have mul operation
-    // IndentityPoint is an invalid note type and it returns an error.
-    let non_identity_point = app_vk
-        .value()
-        .zip(app_data_static.value())
-        .map(|(&vk, &data)| {
-            poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&[vk, data]).to_affine()
-        });
+    // IndentityPoint is an invalid resource kind and it returns an error.
+    let non_identity_point = logic.value().zip(label.value()).map(|(&vk, &data)| {
+        poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&[vk, data]).to_affine()
+    });
     let non_identity_point_var = NonIdentityPoint::new(
         ecc_chip,
-        layouter.namespace(|| "non-identity note type"),
+        layouter.namespace(|| "non-identity resource kind"),
         non_identity_point,
     )?;
     point.constrain_equal(
-        layouter.namespace(|| "non-identity note type"),
+        layouter.namespace(|| "non-identity resource kind"),
         &non_identity_point_var,
     )?;
     Ok(non_identity_point_var)
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn compute_value_commitment(
+pub fn compute_delta_commitment(
     mut layouter: impl Layouter<pallas::Base>,
     ecc_chip: EccChip<TaigaFixedBases>,
     hash_to_curve_config: HashToCurveConfig,
-    app_address_input: AssignedCell<pallas::Base, pallas::Base>,
-    data_input: AssignedCell<pallas::Base, pallas::Base>,
-    v_input: AssignedCell<pallas::Base, pallas::Base>,
-    app_address_output: AssignedCell<pallas::Base, pallas::Base>,
-    data_output: AssignedCell<pallas::Base, pallas::Base>,
-    v_output: AssignedCell<pallas::Base, pallas::Base>,
+    input_logic: AssignedCell<pallas::Base, pallas::Base>,
+    input_label: AssignedCell<pallas::Base, pallas::Base>,
+    input_quantity: AssignedCell<pallas::Base, pallas::Base>,
+    output_logic: AssignedCell<pallas::Base, pallas::Base>,
+    output_label: AssignedCell<pallas::Base, pallas::Base>,
+    output_quantity: AssignedCell<pallas::Base, pallas::Base>,
     rcv: pallas::Scalar,
 ) -> Result<Point<pallas::Affine, EccChip<TaigaFixedBases>>, Error> {
-    // input value point
-    let note_type_input = derive_note_type(
-        layouter.namespace(|| "derive input note type"),
+    // input value base point
+    let input_kind = derive_kind(
+        layouter.namespace(|| "derive input resource kind"),
         hash_to_curve_config.clone(),
         ecc_chip.clone(),
-        app_address_input,
-        data_input,
+        input_logic,
+        input_label,
     )?;
     let v_input_scalar = ScalarVar::from_base(
         ecc_chip.clone(),
         layouter.namespace(|| "ScalarVar from_base"),
-        &v_input,
+        &input_quantity,
     )?;
     let (value_point_input, _) =
-        note_type_input.mul(layouter.namespace(|| "input value point"), v_input_scalar)?;
+        input_kind.mul(layouter.namespace(|| "input value point"), v_input_scalar)?;
 
-    // output value point
-    let note_type_output = derive_note_type(
-        layouter.namespace(|| "derive output note type"),
+    // output value base point
+    let output_kind = derive_kind(
+        layouter.namespace(|| "derive output resource kind"),
         hash_to_curve_config,
         ecc_chip.clone(),
-        app_address_output,
-        data_output,
+        output_logic,
+        output_label,
     )?;
     let v_output_scalar = ScalarVar::from_base(
         ecc_chip.clone(),
         layouter.namespace(|| "ScalarVar from_base"),
-        &v_output,
+        &output_quantity,
     )?;
     let (value_point_output, _) =
-        note_type_output.mul(layouter.namespace(|| "output value point"), v_output_scalar)?;
+        output_kind.mul(layouter.namespace(|| "output value point"), v_output_scalar)?;
 
     // Get and constrain the negative output value point
     let neg_v_point_output = Point::new(
@@ -385,23 +385,23 @@ pub fn compute_value_commitment(
         Value::known(rcv),
     )?;
 
-    let blind_base = FixedPoint::from_inner(ecc_chip, TaigaFixedBasesFull::NoteCommitmentR);
+    let blind_base = FixedPoint::from_inner(ecc_chip, TaigaFixedBasesFull::ResourceCommitmentR);
     let (blind, _) = blind_base.mul(
         layouter.namespace(|| "blind_scalar * blind_base"),
         &blind_scalar,
     )?;
 
-    commitment_v.add(layouter.namespace(|| "net value commitment"), &blind)
+    commitment_v.add(layouter.namespace(|| "delta commitment"), &blind)
 }
 
-fn value_range_check<const K: usize>(
+fn quantity_range_check<const K: usize>(
     mut layouter: impl Layouter<pallas::Base>,
     lookup_config: &LookupRangeCheckConfig<pallas::Base, K>,
-    value: u64,
+    quantity: u64,
 ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
     let zs = lookup_config.witness_check(
         layouter.namespace(|| "6 * K(10) bits range check"),
-        Value::known(pallas::Base::from(value)),
+        Value::known(pallas::Base::from(quantity)),
         6,
         false,
     )?;
@@ -418,8 +418,8 @@ fn value_range_check<const K: usize>(
 #[test]
 fn test_halo2_nullifier_circuit() {
     use crate::circuit::gadgets::assign_free_advice;
-    use crate::note::NoteCommitment;
     use crate::nullifier::{Nullifier, NullifierKeyContainer};
+    use crate::resource::ResourceCommitment;
     use halo2_gadgets::poseidon::{
         primitives as poseidon, Pow5Chip as PoseidonChip, Pow5Config as PoseidonConfig,
     };
@@ -434,9 +434,9 @@ fn test_halo2_nullifier_circuit() {
     #[derive(Default)]
     struct MyCircuit {
         nk: NullifierKeyContainer,
-        rho: pallas::Base,
+        nonce: pallas::Base,
         psi: pallas::Base,
-        cm: NoteCommitment,
+        cm: ResourceCommitment,
     }
 
     impl Circuit<pallas::Base> for MyCircuit {
@@ -503,11 +503,11 @@ fn test_halo2_nullifier_circuit() {
                 Value::known(self.nk.get_nk().unwrap()),
             )?;
 
-            // Witness rho
-            let rho = assign_free_advice(
-                layouter.namespace(|| "witness rho"),
+            // Witness nonce
+            let nonce = assign_free_advice(
+                layouter.namespace(|| "witness nonce"),
                 advices[0],
-                Value::known(self.rho),
+                Value::known(self.nonce),
             )?;
 
             // Witness psi
@@ -528,13 +528,13 @@ fn test_halo2_nullifier_circuit() {
                 layouter.namespace(|| "nullifier"),
                 poseidon_config,
                 nk,
-                rho,
+                nonce,
                 psi,
                 cm,
             )?;
 
             let expect_nf = {
-                let nf = Nullifier::derive(&self.nk, &self.rho, &self.psi, &self.cm)
+                let nf = Nullifier::derive(&self.nk, &self.nonce, &self.psi, &self.cm)
                     .unwrap()
                     .inner();
                 assign_free_advice(
@@ -554,9 +554,9 @@ fn test_halo2_nullifier_circuit() {
     let mut rng = OsRng;
     let circuit = MyCircuit {
         nk: NullifierKeyContainer::random_key(&mut rng),
-        rho: pallas::Base::random(&mut rng),
+        nonce: pallas::Base::random(&mut rng),
         psi: pallas::Base::random(&mut rng),
-        cm: NoteCommitment::default(),
+        cm: ResourceCommitment::default(),
     };
 
     let prover = MockProver::run(11, &circuit, vec![]).unwrap();

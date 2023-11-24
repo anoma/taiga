@@ -12,10 +12,10 @@ pub enum TransactionError {
     MissingBindingSignatures,
     /// Nullifier is not consistent between the action and the vp.
     InconsistentNullifier,
-    /// Output note commitment is not consistent between the action and the vp.
-    InconsistentOutputNoteCommitment,
-    /// Owned note public id is not consistent between the action and the vp.
-    InconsistentOwnedNotePubID,
+    /// Output resource commitment is not consistent between the action and the vp.
+    InconsistentOutputResourceCommitment,
+    /// Owned resource id is not consistent between the action and the vp.
+    InconsistentOwneResourceID,
     /// IO error
     IoError(std::io::Error),
     /// Transparent resource nullifier key is missing
@@ -38,11 +38,11 @@ impl Display for TransactionError {
             InconsistentNullifier => {
                 f.write_str("Nullifier is not consistent between the action and the vp")
             }
-            InconsistentOutputNoteCommitment => f.write_str(
-                "Output note commitment is not consistent between the action and the vp",
+            InconsistentOutputResourceCommitment => f.write_str(
+                "Output resource commitment is not consistent between the action and the vp",
             ),
-            InconsistentOwnedNotePubID => {
-                f.write_str("Owned note public id is not consistent between the action and the vp")
+            InconsistentOwneResourceID => {
+                f.write_str("Owned resource id is not consistent between the action and the vp")
             }
             IoError(e) => f.write_str(&format!("IoError error: {e}")),
             MissingTransparentResourceNullifierKey => {

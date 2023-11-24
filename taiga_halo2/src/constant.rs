@@ -19,8 +19,8 @@ use lazy_static::lazy_static;
 use pasta_curves::{group::Curve, pallas, vesta};
 use std::collections::HashMap;
 
-/// SWU hash-to-curve personalization for the note commitment generator
-pub const NOTE_COMMITMENT_PERSONALIZATION: &str = "Taiga-NoteCommit";
+/// SWU hash-to-curve personalization for the resource commitment generator
+pub const RESOURCE_COMMITMENT_PERSONALIZATION: &str = "Taiga-NoteCommit";
 
 pub const TRANSACTION_BINDING_HASH_PERSONALIZATION: &[u8; 16] = b"TxBindingSigHash";
 
@@ -41,14 +41,14 @@ pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
 
 pub const BASE_BITS_NUM: usize = 255;
 
-/// The number of notes in a (partial)tx.
-pub const NUM_NOTE: usize = 2;
+/// The number of resources in a (partial)tx.
+pub const NUM_RESOURCE: usize = 2;
 
 pub const ACTION_NF_PUBLIC_INPUT_ROW_IDX: usize = 0;
 pub const ACTION_ANCHOR_PUBLIC_INPUT_ROW_IDX: usize = 1;
 pub const ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX: usize = 2;
-pub const ACTION_NET_VALUE_CM_X_PUBLIC_INPUT_ROW_IDX: usize = 3;
-pub const ACTION_NET_VALUE_CM_Y_PUBLIC_INPUT_ROW_IDX: usize = 4;
+pub const ACTION_DELTA_CM_X_PUBLIC_INPUT_ROW_IDX: usize = 3;
+pub const ACTION_DELTA_CM_Y_PUBLIC_INPUT_ROW_IDX: usize = 4;
 pub const ACTION_INPUT_VP_CM_1_ROW_IDX: usize = 5;
 pub const ACTION_INPUT_VP_CM_2_ROW_IDX: usize = 6;
 pub const ACTION_OUTPUT_VP_CM_1_ROW_IDX: usize = 7;
@@ -60,31 +60,32 @@ pub const VALUE_BASE_DOMAIN_POSTFIX: &str = "Taiga-NoteType";
 
 pub const VP_CIRCUIT_PUBLIC_INPUT_NUM: usize = VP_CIRCUIT_MANDATORY_PUBLIC_INPUT_NUM
     + VP_CIRCUIT_CUSTOM_PUBLIC_INPUT_NUM
-    + VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_NUM;
+    + VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_NUM;
 pub const VP_CIRCUIT_MANDATORY_PUBLIC_INPUT_NUM: usize = 9;
 pub const VP_CIRCUIT_CUSTOM_PUBLIC_INPUT_NUM: usize = 2;
-pub const VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_NUM: usize = NOTE_ENCRYPTION_CIPHERTEXT_NUM + 2; // ciphertext(12) + public_key(2)
+pub const VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_NUM: usize =
+    RESOURCE_ENCRYPTION_CIPHERTEXT_NUM + 2; // ciphertext(12) + public_key(2)
 
 pub const VP_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX: usize = 0;
 pub const VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX: usize = 1;
 pub const VP_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX: usize = 2;
 pub const VP_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX: usize = 3;
-pub const VP_CIRCUIT_OWNED_NOTE_PUB_ID_PUBLIC_INPUT_IDX: usize = 4;
+pub const VP_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX: usize = 4;
 pub const VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_1: usize = 5;
 pub const VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_2: usize = 6;
 pub const VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_1: usize = 7;
 pub const VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_2: usize = 8;
 pub const VP_CIRCUIT_CUSTOM_PUBLIC_INPUT_BEGIN_IDX: usize = VP_CIRCUIT_MANDATORY_PUBLIC_INPUT_NUM;
-pub const VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX: usize =
+pub const VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX: usize =
     VP_CIRCUIT_MANDATORY_PUBLIC_INPUT_NUM + VP_CIRCUIT_CUSTOM_PUBLIC_INPUT_NUM;
-pub const VP_CIRCUIT_NOTE_ENCRYPTION_NONCE_IDX: usize = 21;
-pub const VP_CIRCUIT_NOTE_ENCRYPTION_MAC_IDX: usize = 22;
-pub const VP_CIRCUIT_NOTE_ENCRYPTION_PK_X_IDX: usize = 23;
-pub const VP_CIRCUIT_NOTE_ENCRYPTION_PK_Y_IDX: usize = 24;
+pub const VP_CIRCUIT_RESOURCE_ENCRYPTION_NONCE_IDX: usize = 21;
+pub const VP_CIRCUIT_RESOURCE_ENCRYPTION_MAC_IDX: usize = 22;
+pub const VP_CIRCUIT_RESOURCE_ENCRYPTION_PK_X_IDX: usize = 23;
+pub const VP_CIRCUIT_RESOURCE_ENCRYPTION_PK_Y_IDX: usize = 24;
 
-// Note encryption
-pub const NOTE_ENCRYPTION_PLAINTEXT_NUM: usize = 10;
-pub const NOTE_ENCRYPTION_CIPHERTEXT_NUM: usize = NOTE_ENCRYPTION_PLAINTEXT_NUM + 2; // msg(10) + MAC(1) + NOUNCE(1)
+// Resource encryption
+pub const RESOURCE_ENCRYPTION_PLAINTEXT_NUM: usize = 10;
+pub const RESOURCE_ENCRYPTION_CIPHERTEXT_NUM: usize = RESOURCE_ENCRYPTION_PLAINTEXT_NUM + 2; // msg(10) + MAC(1) + NOUNCE(1)
 
 // Poseidon parameters
 pub const POSEIDON_RATE: usize = 2;
@@ -143,14 +144,14 @@ lazy_static! {
 
 // SinsemillaCommit parameters
 lazy_static! {
-    pub static ref NOTE_COMMIT_DOMAIN: CommitDomain =
-        CommitDomain::new(NOTE_COMMITMENT_PERSONALIZATION);
-    pub static ref NOTE_COMMITMENT_GENERATOR: pallas::Affine = NOTE_COMMIT_DOMAIN.Q().to_affine();
-    pub static ref NOTE_COMMITMENT_R_GENERATOR: pallas::Affine = NOTE_COMMIT_DOMAIN.R().to_affine();
+    pub static ref RESOURCE_COMMIT_DOMAIN: CommitDomain =
+        CommitDomain::new(RESOURCE_COMMITMENT_PERSONALIZATION);
+    pub static ref RESOURCE_COMMITMENT_GENERATOR: pallas::Affine = RESOURCE_COMMIT_DOMAIN.Q().to_affine();
+    pub static ref RESOURCE_COMMITMENT_R_GENERATOR: pallas::Affine = RESOURCE_COMMIT_DOMAIN.R().to_affine();
     // Generator used in NullifierK and VP
     pub static ref GENERATOR: pallas::Affine = pallas::Point::generator().to_affine();
     // pub static ref R_ZS_AND_US: Vec<(u64, [pallas::Base; H])> =
-    //     find_zs_and_us(*NOTE_COMMITMENT_R_GENERATOR, NUM_WINDOWS).unwrap();
+    //     find_zs_and_us(*RESOURCE_COMMITMENT_R_GENERATOR, NUM_WINDOWS).unwrap();
     // pub static ref R_U: Vec<[[u8; 32]; H]> = R_ZS_AND_US
     //     .iter()
     //     .map(|(_, us)| {
@@ -5976,24 +5977,24 @@ pub const GENERATOR_Z: [u64; NUM_WINDOWS] = [
 ];
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct NoteCommitmentHashDomain;
-impl HashDomains<pallas::Affine> for NoteCommitmentHashDomain {
+pub struct ResourceCommitmentHashDomain;
+impl HashDomains<pallas::Affine> for ResourceCommitmentHashDomain {
     fn Q(&self) -> pallas::Affine {
-        *NOTE_COMMITMENT_GENERATOR
+        *RESOURCE_COMMITMENT_GENERATOR
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct NoteCommitmentDomain;
-impl CommitDomains<pallas::Affine, TaigaFixedBases, NoteCommitmentHashDomain>
-    for NoteCommitmentDomain
+pub struct ResourceCommitmentDomain;
+impl CommitDomains<pallas::Affine, TaigaFixedBases, ResourceCommitmentHashDomain>
+    for ResourceCommitmentDomain
 {
     fn r(&self) -> TaigaFixedBasesFull {
-        TaigaFixedBasesFull::NoteCommitmentR
+        TaigaFixedBasesFull::ResourceCommitmentR
     }
 
-    fn hash_domain(&self) -> NoteCommitmentHashDomain {
-        NoteCommitmentHashDomain
+    fn hash_domain(&self) -> ResourceCommitmentHashDomain {
+        ResourceCommitmentHashDomain
     }
 }
 
@@ -6008,7 +6009,7 @@ impl FixedPoints<pallas::Affine> for TaigaFixedBases {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum TaigaFixedBasesFull {
-    NoteCommitmentR,
+    ResourceCommitmentR,
     BaseGenerator,
 }
 
@@ -6017,21 +6018,21 @@ impl FixedPoint<pallas::Affine> for TaigaFixedBasesFull {
 
     fn generator(&self) -> pallas::Affine {
         match self {
-            Self::NoteCommitmentR => *NOTE_COMMITMENT_R_GENERATOR,
+            Self::ResourceCommitmentR => *RESOURCE_COMMITMENT_R_GENERATOR,
             Self::BaseGenerator => *GENERATOR,
         }
     }
 
     fn u(&self) -> Vec<[[u8; 32]; H]> {
         match self {
-            Self::NoteCommitmentR => R_U.to_vec(),
+            Self::ResourceCommitmentR => R_U.to_vec(),
             Self::BaseGenerator => GENERATOR_U.to_vec(),
         }
     }
 
     fn z(&self) -> Vec<u64> {
         match self {
-            Self::NoteCommitmentR => R_Z.to_vec(),
+            Self::ResourceCommitmentR => R_Z.to_vec(),
             Self::BaseGenerator => GENERATOR_Z.to_vec(),
         }
     }
@@ -6039,7 +6040,7 @@ impl FixedPoint<pallas::Affine> for TaigaFixedBasesFull {
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum BaseFieldGenerators {
-    NoteCommitmentR,
+    ResourceCommitmentR,
     BaseGenerator,
 }
 
@@ -6048,28 +6049,28 @@ impl FixedPoint<pallas::Affine> for BaseFieldGenerators {
 
     fn generator(&self) -> pallas::Affine {
         match self {
-            Self::NoteCommitmentR => *NOTE_COMMITMENT_R_GENERATOR,
+            Self::ResourceCommitmentR => *RESOURCE_COMMITMENT_R_GENERATOR,
             Self::BaseGenerator => *GENERATOR,
         }
     }
 
     fn u(&self) -> Vec<[[u8; 32]; H]> {
         match self {
-            Self::NoteCommitmentR => R_U.to_vec(),
+            Self::ResourceCommitmentR => R_U.to_vec(),
             Self::BaseGenerator => GENERATOR_U.to_vec(),
         }
     }
 
     fn z(&self) -> Vec<u64> {
         match self {
-            Self::NoteCommitmentR => R_Z.to_vec(),
+            Self::ResourceCommitmentR => R_Z.to_vec(),
             Self::BaseGenerator => GENERATOR_Z.to_vec(),
         }
     }
 }
 
 // We don't need the short?
-// NOTE_COMMITMENT_R_GENERATOR abuse here, replace with a new parameter when needed.
+// RESOURCE_COMMITMENT_R_GENERATOR abuse here, replace with a new parameter when needed.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Short;
 
@@ -6077,7 +6078,7 @@ impl FixedPoint<pallas::Affine> for Short {
     type FixedScalarKind = ShortScalar;
 
     fn generator(&self) -> pallas::Affine {
-        *NOTE_COMMITMENT_R_GENERATOR
+        *RESOURCE_COMMITMENT_R_GENERATOR
     }
 
     fn u(&self) -> Vec<[[u8; 32]; H]> {

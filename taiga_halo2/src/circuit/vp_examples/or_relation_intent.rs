@@ -8,7 +8,7 @@ use crate::{
         gadgets::{
             assign_free_advice,
             poseidon_hash::poseidon_hash_gadget,
-            target_note_variable::{get_is_input_note_flag, get_owned_note_variable},
+            target_resource_variable::{get_is_input_resource_flag, get_owned_resource_variable},
         },
         vp_circuit::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
@@ -16,11 +16,11 @@ use crate::{
         },
         vp_examples::token::{Token, TOKEN_VK},
     },
-    constant::{NUM_NOTE, SETUP_PARAMS_MAP},
+    constant::{NUM_RESOURCE, SETUP_PARAMS_MAP},
     error::TransactionError,
-    note::{Note, RandomSeed},
     nullifier::Nullifier,
     proof::Proof,
+    resource::{RandomSeed, Resource},
     utils::poseidon_hash_n,
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
@@ -44,34 +44,34 @@ lazy_static! {
 // OrRelationIntentValidityPredicateCircuit
 #[derive(Clone, Debug, Default)]
 pub struct OrRelationIntentValidityPredicateCircuit {
-    pub owned_note_pub_id: pallas::Base,
-    pub input_notes: [Note; NUM_NOTE],
-    pub output_notes: [Note; NUM_NOTE],
+    pub owned_resource_id: pallas::Base,
+    pub input_resources: [Resource; NUM_RESOURCE],
+    pub output_resources: [Resource; NUM_RESOURCE],
     pub token_1: Token,
     pub token_2: Token,
-    pub receiver_nk_com: pallas::Base,
-    pub receiver_app_data_dynamic: pallas::Base,
+    pub receiver_npk: pallas::Base,
+    pub receiver_value: pallas::Base,
 }
 
 impl OrRelationIntentValidityPredicateCircuit {
-    pub fn encode_app_data_static(
+    pub fn encode_label(
         token_1: &Token,
         token_2: &Token,
-        receiver_nk_com: pallas::Base,
-        receiver_app_data_dynamic: pallas::Base,
+        receiver_npk: pallas::Base,
+        receiver_value: pallas::Base,
     ) -> pallas::Base {
         let token_property_1 = token_1.encode_name();
-        let token_value_1 = token_1.encode_value();
+        let token_quantity_1 = token_1.encode_quantity();
         let token_property_2 = token_2.encode_name();
-        let token_value_2 = token_2.encode_value();
+        let token_quantity_2 = token_2.encode_quantity();
         poseidon_hash_n([
             token_property_1,
-            token_value_1,
+            token_quantity_1,
             token_property_2,
-            token_value_2,
+            token_quantity_2,
             TOKEN_VK.get_compressed(),
-            receiver_nk_com,
-            receiver_app_data_dynamic,
+            receiver_npk,
+            receiver_value,
         ])
     }
 }
@@ -84,13 +84,13 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
         mut layouter: impl Layouter<pallas::Base>,
         basic_variables: BasicValidityPredicateVariables,
     ) -> Result<(), Error> {
-        let owned_note_pub_id = basic_variables.get_owned_note_pub_id();
-        let is_input_note = get_is_input_note_flag(
-            config.get_is_input_note_flag_config,
-            layouter.namespace(|| "get is_input_note_flag"),
-            &owned_note_pub_id,
-            &basic_variables.get_input_note_nfs(),
-            &basic_variables.get_output_note_cms(),
+        let owned_resource_id = basic_variables.get_owned_resource_id();
+        let is_input_resource = get_is_input_resource_flag(
+            config.get_is_input_resource_flag_config,
+            layouter.namespace(|| "get is_input_resource_flag"),
+            &owned_resource_id,
+            &basic_variables.get_input_resource_nfs(),
+            &basic_variables.get_output_resource_cms(),
         )?;
 
         let token_vp_vk = assign_free_advice(
@@ -105,10 +105,10 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
             Value::known(self.token_1.encode_name()),
         )?;
 
-        let token_value_1 = assign_free_advice(
-            layouter.namespace(|| "witness token value in token_1"),
+        let token_quantity_1 = assign_free_advice(
+            layouter.namespace(|| "witness token quantity in token_1"),
             config.advices[0],
-            Value::known(self.token_1.encode_value()),
+            Value::known(self.token_1.encode_quantity()),
         )?;
 
         let token_property_2 = assign_free_advice(
@@ -117,118 +117,119 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
             Value::known(self.token_2.encode_name()),
         )?;
 
-        let token_value_2 = assign_free_advice(
-            layouter.namespace(|| "witness token value in token_2"),
+        let token_quantity_2 = assign_free_advice(
+            layouter.namespace(|| "witness token quantity in token_2"),
             config.advices[0],
-            Value::known(self.token_2.encode_value()),
+            Value::known(self.token_2.encode_quantity()),
         )?;
 
-        let receiver_nk_com = assign_free_advice(
-            layouter.namespace(|| "witness receiver nk_com"),
+        let receiver_npk = assign_free_advice(
+            layouter.namespace(|| "witness receiver npk"),
             config.advices[0],
-            Value::known(self.receiver_nk_com),
+            Value::known(self.receiver_npk),
         )?;
 
-        let receiver_app_data_dynamic = assign_free_advice(
-            layouter.namespace(|| "witness receiver app_data_dynamic"),
+        let receiver_value = assign_free_advice(
+            layouter.namespace(|| "witness receiver value"),
             config.advices[0],
-            Value::known(self.receiver_app_data_dynamic),
+            Value::known(self.receiver_value),
         )?;
 
-        // Encode the app_data_static of intent note
-        let encoded_app_data_static = poseidon_hash_gadget(
+        // Encode the label of intent resource
+        let encoded_label = poseidon_hash_gadget(
             config.poseidon_config,
-            layouter.namespace(|| "encode app_data_static"),
+            layouter.namespace(|| "encode label"),
             [
                 token_property_1.clone(),
-                token_value_1.clone(),
+                token_quantity_1.clone(),
                 token_property_2.clone(),
-                token_value_2.clone(),
+                token_quantity_2.clone(),
                 token_vp_vk.clone(),
-                receiver_nk_com.clone(),
-                receiver_app_data_dynamic.clone(),
+                receiver_npk.clone(),
+                receiver_value.clone(),
             ],
         )?;
 
-        // search target note and get the intent app_static_data
-        let app_data_static = get_owned_note_variable(
-            config.get_owned_note_variable_config,
-            layouter.namespace(|| "get owned note app_data_static"),
-            &owned_note_pub_id,
-            &basic_variables.get_app_data_static_searchable_pairs(),
+        // search target resource and get the intent label
+        let label = get_owned_resource_variable(
+            config.get_owned_resource_variable_config,
+            layouter.namespace(|| "get owned resource label"),
+            &owned_resource_id,
+            &basic_variables.get_label_searchable_pairs(),
         )?;
 
-        // check the app_data_static of intent note
+        // check the label of intent resource
         layouter.assign_region(
-            || "check app_data_static",
-            |mut region| {
-                region.constrain_equal(encoded_app_data_static.cell(), app_data_static.cell())
-            },
+            || "check label",
+            |mut region| region.constrain_equal(encoded_label.cell(), label.cell()),
         )?;
 
-        // check the vp vk of output note
+        // check the vp vk of output resource
         layouter.assign_region(
             || "conditional equal: check vp vk",
             |mut region| {
                 config.conditional_equal_config.assign_region(
-                    &is_input_note,
+                    &is_input_resource,
                     &token_vp_vk,
-                    &basic_variables.output_note_variables[0]
-                        .note_variables
-                        .app_vk,
+                    &basic_variables.output_resource_variables[0]
+                        .resource_variables
+                        .logic,
                     0,
                     &mut region,
                 )
             },
         )?;
 
-        // check nk_com
+        // check npk
         layouter.assign_region(
-            || "conditional equal: check nk_com",
+            || "conditional equal: check npk",
             |mut region| {
                 config.conditional_equal_config.assign_region(
-                    &is_input_note,
-                    &receiver_nk_com,
-                    &basic_variables.output_note_variables[0]
-                        .note_variables
-                        .nk_com,
+                    &is_input_resource,
+                    &receiver_npk,
+                    &basic_variables.output_resource_variables[0]
+                        .resource_variables
+                        .npk,
                     0,
                     &mut region,
                 )
             },
         )?;
 
-        // check app_data_dynamic
+        // check value
         layouter.assign_region(
-            || "conditional equal: check app_data_dynamic",
+            || "conditional equal: check value",
             |mut region| {
                 config.conditional_equal_config.assign_region(
-                    &is_input_note,
-                    &receiver_app_data_dynamic,
-                    &basic_variables.output_note_variables[0]
-                        .note_variables
-                        .app_data_dynamic,
+                    &is_input_resource,
+                    &receiver_value,
+                    &basic_variables.output_resource_variables[0]
+                        .resource_variables
+                        .value,
                     0,
                     &mut region,
                 )
             },
         )?;
 
-        // check the token_property and token_value in conditions
-        let output_note_token_property = &basic_variables.output_note_variables[0]
-            .note_variables
-            .app_data_static;
-        let output_note_token_value = &basic_variables.output_note_variables[0]
-            .note_variables
-            .value;
+        // check the token_property and token_quantity in conditions
+        let output_resource_token_property = &basic_variables.output_resource_variables[0]
+            .resource_variables
+            .label;
+        let output_resource_token_quantity = &basic_variables.output_resource_variables[0]
+            .resource_variables
+            .quantity;
         layouter.assign_region(
             || "extended or relatioin",
             |mut region| {
                 config.extended_or_relation_config.assign_region(
-                    &is_input_note,
-                    (&token_property_1, &token_value_1),
-                    (&token_property_2, &token_value_2),
-                    (output_note_token_property, output_note_token_value),
+                    &is_input_resource,
+                    (&token_property_1, &token_quantity_1),
+                    (&token_property_2, &token_quantity_2),
+                    (
+                        output_resource_token_property,
+                        output_resource_token_quantity,
+                    ),
                     0,
                     &mut region,
                 )
@@ -245,12 +246,12 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
         Ok(())
     }
 
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.input_notes
+    fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE] {
+        &self.input_resources
     }
 
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.output_notes
+    fn get_output_resources(&self) -> &[Resource; NUM_RESOURCE] {
+        &self.output_resources
     }
 
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
@@ -267,37 +268,37 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
         public_inputs.into()
     }
 
-    fn get_owned_note_pub_id(&self) -> pallas::Base {
-        self.owned_note_pub_id
+    fn get_owned_resource_id(&self) -> pallas::Base {
+        self.owned_resource_id
     }
 }
 
 vp_circuit_impl!(OrRelationIntentValidityPredicateCircuit);
 vp_verifying_info_impl!(OrRelationIntentValidityPredicateCircuit);
 
-pub fn create_intent_note<R: RngCore>(
+pub fn create_intent_resource<R: RngCore>(
     mut rng: R,
     token_1: &Token,
     token_2: &Token,
-    receiver_nk_com: pallas::Base,
-    receiver_app_data_dynamic: pallas::Base,
+    receiver_npk: pallas::Base,
+    receiver_value: pallas::Base,
     nk: pallas::Base,
-) -> Note {
-    let app_data_static = OrRelationIntentValidityPredicateCircuit::encode_app_data_static(
+) -> Resource {
+    let label = OrRelationIntentValidityPredicateCircuit::encode_label(
         token_1,
         token_2,
-        receiver_nk_com,
-        receiver_app_data_dynamic,
+        receiver_npk,
+        receiver_value,
     );
     let rseed = RandomSeed::random(&mut rng);
-    let rho = Nullifier::random(&mut rng);
-    Note::new_input_note(
+    let nonce = Nullifier::random(&mut rng);
+    Resource::new_input_resource(
         *COMPRESSED_OR_RELATION_INTENT_VK,
-        app_data_static,
+        label,
         pallas::Base::zero(),
         1u64,
         nk,
-        rho,
+        nonce,
         false,
         rseed,
     )
@@ -306,40 +307,42 @@ pub fn create_intent_note<R: RngCore>(
 #[test]
 fn test_halo2_or_relation_intent_vp_circuit() {
     use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
-    use crate::{circuit::vp_examples::token::COMPRESSED_TOKEN_VK, note::tests::random_note};
+    use crate::{
+        circuit::vp_examples::token::COMPRESSED_TOKEN_VK, resource::tests::random_resource,
+    };
     use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     let circuit = {
-        let mut output_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
+        let mut output_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
         let token_1 = Token::new("token1".to_string(), 1u64);
         let token_2 = Token::new("token2".to_string(), 2u64);
-        output_notes[0].note_type.app_vk = *COMPRESSED_TOKEN_VK;
-        output_notes[0].note_type.app_data_static = token_1.encode_name();
-        output_notes[0].value = token_1.value();
+        output_resources[0].kind.logic = *COMPRESSED_TOKEN_VK;
+        output_resources[0].kind.label = token_1.encode_name();
+        output_resources[0].quantity = token_1.quantity();
 
         let nk = pallas::Base::random(&mut rng);
-        let nk_com = output_notes[0].get_nk_commitment();
-        let intent_note = create_intent_note(
+        let npk = output_resources[0].get_npk();
+        let intent_resource = create_intent_resource(
             &mut rng,
             &token_1,
             &token_2,
-            nk_com,
-            output_notes[0].app_data_dynamic,
+            npk,
+            output_resources[0].value,
             nk,
         );
-        let padding_input_note = Note::random_padding_note(&mut rng);
-        let input_notes = [intent_note, padding_input_note];
+        let padding_input_resource = Resource::random_padding_resource(&mut rng);
+        let input_resources = [intent_resource, padding_input_resource];
         OrRelationIntentValidityPredicateCircuit {
-            owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
-            input_notes,
-            output_notes,
+            owned_resource_id: input_resources[0].get_nf().unwrap().inner(),
+            input_resources,
+            output_resources,
             token_1,
             token_2,
-            receiver_nk_com: nk_com,
-            receiver_app_data_dynamic: output_notes[0].app_data_dynamic,
+            receiver_npk: npk,
+            receiver_value: output_resources[0].value,
         }
     };
     let public_inputs = circuit.get_public_inputs(&mut rng);

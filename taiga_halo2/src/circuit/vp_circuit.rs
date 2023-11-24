@@ -10,25 +10,27 @@ use crate::{
             extended_or_relation::ExtendedOrRelationConfig,
             mul::{MulChip, MulConfig},
             sub::{SubChip, SubConfig},
-            target_note_variable::{GetIsInputNoteFlagConfig, GetOwnedNoteVariableConfig},
+            target_resource_variable::{
+                GetIsInputResourceFlagConfig, GetOwnedResourceVariableConfig,
+            },
         },
-        integrity::{check_input_note, check_output_note},
-        note_commitment::{NoteCommitChip, NoteCommitConfig},
+        integrity::{check_input_resource, check_output_resource},
+        resource_commitment::{ResourceCommitChip, ResourceCommitConfig},
         vamp_ir_utils::{get_circuit_assignments, parse, VariableAssignmentError},
     },
     constant::{
-        TaigaFixedBases, NOTE_ENCRYPTION_CIPHERTEXT_NUM, NUM_NOTE, SETUP_PARAMS_MAP,
-        VP_CIRCUIT_NOTE_ENCRYPTION_PK_X_IDX, VP_CIRCUIT_NOTE_ENCRYPTION_PK_Y_IDX,
-        VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
+        TaigaFixedBases, NUM_RESOURCE, RESOURCE_ENCRYPTION_CIPHERTEXT_NUM, SETUP_PARAMS_MAP,
         VP_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX, VP_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX,
         VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX, VP_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX,
-        VP_CIRCUIT_OWNED_NOTE_PUB_ID_PUBLIC_INPUT_IDX, VP_CIRCUIT_PARAMS_SIZE,
-        VP_CIRCUIT_PUBLIC_INPUT_NUM,
+        VP_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX, VP_CIRCUIT_PARAMS_SIZE,
+        VP_CIRCUIT_PUBLIC_INPUT_NUM, VP_CIRCUIT_RESOURCE_ENCRYPTION_PK_X_IDX,
+        VP_CIRCUIT_RESOURCE_ENCRYPTION_PK_Y_IDX,
+        VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
     },
     error::TransactionError,
-    note::{Note, NoteCommitment, RandomSeed},
-    note_encryption::{NoteCiphertext, SecretKey},
     proof::Proof,
+    resource::{RandomSeed, Resource, ResourceCommitment},
+    resource_encryption::{ResourceCiphertext, SecretKey},
     utils::mod_r_p,
     vp_vk::ValidityPredicateVerifyingKey,
 };
@@ -157,7 +159,7 @@ impl VPVerifyingInfo {
             .verify(&self.vk, params, &[self.public_inputs.inner()])
     }
 
-    pub fn get_nullifiers(&self) -> [pallas::Base; NUM_NOTE] {
+    pub fn get_nullifiers(&self) -> [pallas::Base; NUM_RESOURCE] {
         [
             self.public_inputs
                 .get_from_index(VP_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX),
@@ -166,7 +168,7 @@ impl VPVerifyingInfo {
         ]
     }
 
-    pub fn get_note_commitments(&self) -> [NoteCommitment; NUM_NOTE] {
+    pub fn get_resource_commitments(&self) -> [ResourceCommitment; NUM_RESOURCE] {
         [
             self.public_inputs
                 .get_from_index(VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX)
@@ -177,9 +179,9 @@ impl VPVerifyingInfo {
         ]
     }
 
-    pub fn get_owned_note_pub_id(&self) -> pallas::Base {
+    pub fn get_owned_resource_id(&self) -> pallas::Base {
         self.public_inputs
-            .get_from_index(VP_CIRCUIT_OWNED_NOTE_PUB_ID_PUBLIC_INPUT_IDX)
+            .get_from_index(VP_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX)
     }
 }
 
@@ -270,13 +272,13 @@ impl ValidityPredicatePublicInputs {
         rseed.get_random_padding(VP_CIRCUIT_PUBLIC_INPUT_NUM - input_len)
     }
 
-    // Only pad the custom public inputs, then we can add the actual note encryption public inputs.
+    // Only pad the custom public inputs, then we can add the actual resource encryption public inputs.
     pub fn get_custom_public_input_padding(
         input_len: usize,
         rseed: &RandomSeed,
     ) -> Vec<pallas::Base> {
-        assert!(input_len < VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX);
-        rseed.get_random_padding(VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX - input_len)
+        assert!(input_len < VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX);
+        rseed.get_random_padding(VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX - input_len)
     }
 
     pub fn to_vec(&self) -> Vec<pallas::Base> {
@@ -284,13 +286,15 @@ impl ValidityPredicatePublicInputs {
     }
 
     pub fn decrypt(&self, sk: pallas::Base) -> Option<Vec<pallas::Base>> {
-        let cipher: NoteCiphertext = self.0[VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX
-            ..VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX + NOTE_ENCRYPTION_CIPHERTEXT_NUM]
+        let cipher: ResourceCiphertext = self.0
+            [VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX
+                ..VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX
+                    + RESOURCE_ENCRYPTION_CIPHERTEXT_NUM]
             .to_vec()
             .into();
         let sender_pk = pallas::Affine::from_xy(
-            self.get_from_index(VP_CIRCUIT_NOTE_ENCRYPTION_PK_X_IDX),
-            self.get_from_index(VP_CIRCUIT_NOTE_ENCRYPTION_PK_Y_IDX),
+            self.get_from_index(VP_CIRCUIT_RESOURCE_ENCRYPTION_PK_X_IDX),
+            self.get_from_index(VP_CIRCUIT_RESOURCE_ENCRYPTION_PK_Y_IDX),
         )
         .unwrap()
         .to_curve();
@@ -316,8 +320,8 @@ pub struct ValidityPredicateConfig {
     pub table_idx: TableColumn,
     pub ecc_config: EccConfig<TaigaFixedBases>,
     pub poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
-    pub get_is_input_note_flag_config: GetIsInputNoteFlagConfig,
-    pub get_owned_note_variable_config: GetOwnedNoteVariableConfig,
+    pub get_is_input_resource_flag_config: GetIsInputResourceFlagConfig,
+    pub get_owned_resource_variable_config: GetOwnedResourceVariableConfig,
     pub conditional_equal_config: ConditionalEqualConfig,
     pub conditional_select_config: ConditionalSelectConfig,
     pub extended_or_relation_config: ExtendedOrRelationConfig,
@@ -325,7 +329,7 @@ pub struct ValidityPredicateConfig {
     pub sub_config: SubConfig,
     pub mul_config: MulConfig,
     pub blake2s_config: Blake2sConfig<pallas::Base>,
-    pub note_commit_config: NoteCommitConfig,
+    pub resource_commit_config: ResourceCommitConfig,
 }
 
 impl ValidityPredicateConfig {
@@ -377,14 +381,14 @@ impl ValidityPredicateConfig {
             lagrange_coeffs[5..8].try_into().unwrap(),
         );
 
-        let get_owned_note_variable_config = GetOwnedNoteVariableConfig::configure(
+        let get_owned_resource_variable_config = GetOwnedResourceVariableConfig::configure(
             meta,
             advices[0],
             [advices[1], advices[2], advices[3], advices[4]],
         );
 
-        let get_is_input_note_flag_config =
-            GetIsInputNoteFlagConfig::configure(meta, advices[0], advices[1], advices[2]);
+        let get_is_input_resource_flag_config =
+            GetIsInputResourceFlagConfig::configure(meta, advices[0], advices[1], advices[2]);
 
         let conditional_equal_config =
             ConditionalEqualConfig::configure(meta, [advices[0], advices[1], advices[2]]);
@@ -398,7 +402,7 @@ impl ValidityPredicateConfig {
         let extended_or_relation_config =
             ExtendedOrRelationConfig::configure(meta, [advices[0], advices[1], advices[2]]);
         let blake2s_config = Blake2sConfig::configure(meta, advices);
-        let note_commit_config = NoteCommitChip::configure(
+        let resource_commit_config = ResourceCommitChip::configure(
             meta,
             advices[0..3].try_into().unwrap(),
             poseidon_config.clone(),
@@ -410,8 +414,8 @@ impl ValidityPredicateConfig {
             table_idx,
             ecc_config,
             poseidon_config,
-            get_is_input_note_flag_config,
-            get_owned_note_variable_config,
+            get_is_input_resource_flag_config,
+            get_owned_resource_variable_config,
             conditional_equal_config,
             conditional_select_config,
             extended_or_relation_config,
@@ -419,7 +423,7 @@ impl ValidityPredicateConfig {
             sub_config,
             mul_config,
             blake2s_config,
-            note_commit_config,
+            resource_commit_config,
         }
     }
 }
@@ -433,7 +437,7 @@ pub trait ValidityPredicateVerifyingInfo: DynClone {
 clone_trait_object!(ValidityPredicateVerifyingInfo);
 
 pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVerifyingInfo {
-    // Default implementation, constrains the notes integrity.
+    // Default implementation, constrains the resources integrity.
     // TODO: how to enforce the constraints in vp circuit?
     fn basic_constraints(
         &self,
@@ -455,63 +459,64 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVer
             },
         )?;
 
-        // Construct a note_commit chip
-        let note_commit_chip = NoteCommitChip::construct(config.note_commit_config.clone());
+        // Construct a resource_commit chip
+        let resource_commit_chip =
+            ResourceCommitChip::construct(config.resource_commit_config.clone());
 
-        let input_notes = self.get_input_notes();
-        let output_notes = self.get_output_notes();
-        let mut input_note_variables = vec![];
-        let mut output_note_variables = vec![];
-        for i in 0..NUM_NOTE {
-            input_note_variables.push(check_input_note(
-                layouter.namespace(|| "check input note"),
+        let input_resources = self.get_input_resources();
+        let output_resources = self.get_output_resources();
+        let mut input_resource_variables = vec![];
+        let mut output_resource_variables = vec![];
+        for i in 0..NUM_RESOURCE {
+            input_resource_variables.push(check_input_resource(
+                layouter.namespace(|| "check input resource"),
                 config.advices,
                 config.instances,
-                note_commit_chip.clone(),
-                input_notes[i],
+                resource_commit_chip.clone(),
+                input_resources[i],
                 i * 2,
             )?);
 
-            // The old_nf may not be from above input note
+            // The old_nf may not be from above input resource
             let old_nf = assign_free_advice(
                 layouter.namespace(|| "old nf"),
                 config.advices[0],
-                Value::known(output_notes[i].rho.inner()),
+                Value::known(output_resources[i].nonce.inner()),
             )?;
-            output_note_variables.push(check_output_note(
-                layouter.namespace(|| "check output note"),
+            output_resource_variables.push(check_output_resource(
+                layouter.namespace(|| "check output resource"),
                 config.advices,
                 config.instances,
-                note_commit_chip.clone(),
-                output_notes[i],
+                resource_commit_chip.clone(),
+                output_resources[i],
                 old_nf,
                 i * 2 + 1,
             )?);
         }
 
-        // Publicize the owned_note_pub_id
-        let owned_note_pub_id = assign_free_advice(
-            layouter.namespace(|| "owned_note_pub_id"),
+        // Publicize the owned_resource_id
+        let owned_resource_id = assign_free_advice(
+            layouter.namespace(|| "owned_resource_id"),
             config.advices[0],
-            Value::known(self.get_owned_note_pub_id()),
+            Value::known(self.get_owned_resource_id()),
         )?;
         layouter.constrain_instance(
-            owned_note_pub_id.cell(),
+            owned_resource_id.cell(),
             config.instances,
-            VP_CIRCUIT_OWNED_NOTE_PUB_ID_PUBLIC_INPUT_IDX,
+            VP_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX,
         )?;
 
         Ok(BasicValidityPredicateVariables {
-            owned_note_pub_id,
-            input_note_variables: input_note_variables.try_into().unwrap(),
-            output_note_variables: output_note_variables.try_into().unwrap(),
+            owned_resource_id,
+            input_resource_variables: input_resource_variables.try_into().unwrap(),
+            output_resource_variables: output_resource_variables.try_into().unwrap(),
         })
     }
 
     // VP designer need to implement the following functions.
-    // `get_input_notes` and `get_output_notes` will be used in `basic_constraints` to get the basic note info.
+    // `get_input_resources` and `get_output_resources` will be used in `basic_constraints` to get the basic resource info.
 
-    // Add custom constraints on basic note variables and user-defined variables.
+    // Add custom constraints on basic resource variables and user-defined variables.
     // It should at least contain the default vp commitment
     fn custom_constraints(
         &self,
@@ -531,89 +536,93 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVer
 
     fn get_mandatory_public_inputs(&self) -> Vec<pallas::Base> {
         let mut public_inputs = vec![];
-        self.get_input_notes()
+        self.get_input_resources()
             .iter()
-            .zip(self.get_output_notes().iter())
-            .for_each(|(input_note, output_note)| {
-                let nf = input_note.get_nf().unwrap().inner();
+            .zip(self.get_output_resources().iter())
+            .for_each(|(input_resource, output_resource)| {
+                let nf = input_resource.get_nf().unwrap().inner();
                 public_inputs.push(nf);
-                let cm = output_note.commitment();
+                let cm = output_resource.commitment();
                 public_inputs.push(cm.inner());
             });
-        public_inputs.push(self.get_owned_note_pub_id());
+        public_inputs.push(self.get_owned_resource_id());
         public_inputs
     }
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE];
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE];
+    fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE];
+    fn get_output_resources(&self) -> &[Resource; NUM_RESOURCE];
     fn get_public_inputs(&self, rng: impl RngCore) -> ValidityPredicatePublicInputs;
-    // The owned_note_pub_id is the input_note_nf or the output_note_cm_x
-    // The owned_note_pub_id is the key to look up the target variables and
-    // help determine whether the owned note is the input note or not in VP circuit.
-    fn get_owned_note_pub_id(&self) -> pallas::Base;
+    // The owned_resource_id is the input_resource_nf or the output_resource_cm_x
+    // The owned_resource_id is the key to look up the target variables and
+    // help determine whether the owned resource is the input resource or not in VP circuit.
+    fn get_owned_resource_id(&self) -> pallas::Base;
 }
 
 /// BasicValidityPredicateVariables are generally constrained in ValidityPredicateCircuit::basic_constraints
 /// and will be used in ValidityPredicateCircuit::custom_constraints
 #[derive(Debug, Clone)]
 pub struct BasicValidityPredicateVariables {
-    pub owned_note_pub_id: AssignedCell<pallas::Base, pallas::Base>,
-    pub input_note_variables: [InputNoteVariables; NUM_NOTE],
-    pub output_note_variables: [OutputNoteVariables; NUM_NOTE],
+    pub owned_resource_id: AssignedCell<pallas::Base, pallas::Base>,
+    pub input_resource_variables: [InputResourceVariables; NUM_RESOURCE],
+    pub output_resource_variables: [OutputResourceVariables; NUM_RESOURCE],
 }
 
 #[derive(Debug, Clone)]
-pub struct NoteVariables {
-    pub app_vk: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_data_static: AssignedCell<pallas::Base, pallas::Base>,
-    pub value: AssignedCell<pallas::Base, pallas::Base>,
+pub struct ResourceVariables {
+    pub logic: AssignedCell<pallas::Base, pallas::Base>,
+    pub label: AssignedCell<pallas::Base, pallas::Base>,
+    pub quantity: AssignedCell<pallas::Base, pallas::Base>,
     pub is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
-    pub app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
-    pub rho: AssignedCell<pallas::Base, pallas::Base>,
-    pub nk_com: AssignedCell<pallas::Base, pallas::Base>,
+    pub value: AssignedCell<pallas::Base, pallas::Base>,
+    pub nonce: AssignedCell<pallas::Base, pallas::Base>,
+    pub npk: AssignedCell<pallas::Base, pallas::Base>,
     pub psi: AssignedCell<pallas::Base, pallas::Base>,
     pub rcm: AssignedCell<pallas::Base, pallas::Base>,
 }
 
-// Variables in the input note
+// Variables in the input resource
 #[derive(Debug, Clone)]
-pub struct InputNoteVariables {
+pub struct InputResourceVariables {
     pub nf: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: AssignedCell<pallas::Base, pallas::Base>,
-    pub note_variables: NoteVariables,
+    pub resource_variables: ResourceVariables,
 }
 
-// Variables in the out note
+// Variables in the out resource
 #[derive(Debug, Clone)]
-pub struct OutputNoteVariables {
+pub struct OutputResourceVariables {
     pub cm: AssignedCell<pallas::Base, pallas::Base>,
-    pub note_variables: NoteVariables,
+    pub resource_variables: ResourceVariables,
 }
 
 #[derive(Debug, Clone)]
-pub struct NoteSearchableVariablePair {
-    // src_variable is the input_note_nf or the output_note_cm_x
+pub struct ResourceSearchableVariablePair {
+    // src_variable is the input_resource_nf or the output_resource_cm_x
     pub src_variable: AssignedCell<pallas::Base, pallas::Base>,
-    // target_variable is one of the parameter in the NoteVariables
+    // target_variable is one of the parameter in the ResourceVariables
     pub target_variable: AssignedCell<pallas::Base, pallas::Base>,
 }
 
 impl BasicValidityPredicateVariables {
-    pub fn get_owned_note_pub_id(&self) -> AssignedCell<pallas::Base, pallas::Base> {
-        self.owned_note_pub_id.clone()
+    pub fn get_owned_resource_id(&self) -> AssignedCell<pallas::Base, pallas::Base> {
+        self.owned_resource_id.clone()
     }
 
-    pub fn get_input_note_nfs(&self) -> [AssignedCell<pallas::Base, pallas::Base>; NUM_NOTE] {
+    pub fn get_input_resource_nfs(
+        &self,
+    ) -> [AssignedCell<pallas::Base, pallas::Base>; NUM_RESOURCE] {
         let ret: Vec<_> = self
-            .input_note_variables
+            .input_resource_variables
             .iter()
             .map(|variables| variables.nf.clone())
             .collect();
         ret.try_into().unwrap()
     }
 
-    pub fn get_output_note_cms(&self) -> [AssignedCell<pallas::Base, pallas::Base>; NUM_NOTE] {
+    pub fn get_output_resource_cms(
+        &self,
+    ) -> [AssignedCell<pallas::Base, pallas::Base>; NUM_RESOURCE] {
         let ret: Vec<_> = self
-            .output_note_variables
+            .output_resource_variables
             .iter()
             .map(|variables| variables.cm.clone())
             .collect();
@@ -622,96 +631,94 @@ impl BasicValidityPredicateVariables {
 
     fn get_variable_searchable_pairs(
         &self,
-        input_target_variable: impl Fn(&InputNoteVariables) -> AssignedCell<pallas::Base, pallas::Base>,
-        output_target_variable: impl Fn(
-            &OutputNoteVariables,
+        input_target_variable: impl Fn(
+            &InputResourceVariables,
         ) -> AssignedCell<pallas::Base, pallas::Base>,
-    ) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
-        self.input_note_variables
+        output_target_variable: impl Fn(
+            &OutputResourceVariables,
+        ) -> AssignedCell<pallas::Base, pallas::Base>,
+    ) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
+        self.input_resource_variables
             .iter()
-            .map(|variables| NoteSearchableVariablePair {
+            .map(|variables| ResourceSearchableVariablePair {
                 src_variable: variables.nf.clone(),
                 target_variable: input_target_variable(variables),
             })
-            .chain(
-                self.output_note_variables
-                    .iter()
-                    .map(|variables| NoteSearchableVariablePair {
-                        src_variable: variables.cm.clone(),
-                        target_variable: output_target_variable(variables),
-                    }),
-            )
+            .chain(self.output_resource_variables.iter().map(|variables| {
+                ResourceSearchableVariablePair {
+                    src_variable: variables.cm.clone(),
+                    target_variable: output_target_variable(variables),
+                }
+            }))
             .collect::<Vec<_>>()
             .try_into()
             .unwrap()
     }
 
-    pub fn get_app_vk_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+    pub fn get_logic_searchable_pairs(&self) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
         self.get_variable_searchable_pairs(
-            |variables| variables.note_variables.app_vk.clone(),
-            |variables| variables.note_variables.app_vk.clone(),
+            |variables| variables.resource_variables.logic.clone(),
+            |variables| variables.resource_variables.logic.clone(),
         )
     }
 
-    pub fn get_app_data_static_searchable_pairs(
+    pub fn get_label_searchable_pairs(&self) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
+        self.get_variable_searchable_pairs(
+            |variables| variables.resource_variables.label.clone(),
+            |variables| variables.resource_variables.label.clone(),
+        )
+    }
+
+    pub fn get_quantity_searchable_pairs(
         &self,
-    ) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+    ) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
         self.get_variable_searchable_pairs(
-            |variables| variables.note_variables.app_data_static.clone(),
-            |variables| variables.note_variables.app_data_static.clone(),
-        )
-    }
-
-    pub fn get_value_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
-        self.get_variable_searchable_pairs(
-            |variables| variables.note_variables.value.clone(),
-            |variables| variables.note_variables.value.clone(),
+            |variables| variables.resource_variables.quantity.clone(),
+            |variables| variables.resource_variables.quantity.clone(),
         )
     }
 
     pub fn get_is_merkle_checked_searchable_pairs(
         &self,
-    ) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+    ) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
         self.get_variable_searchable_pairs(
-            |variables| variables.note_variables.is_merkle_checked.clone(),
-            |variables| variables.note_variables.is_merkle_checked.clone(),
+            |variables| variables.resource_variables.is_merkle_checked.clone(),
+            |variables| variables.resource_variables.is_merkle_checked.clone(),
         )
     }
 
-    pub fn get_app_data_dynamic_searchable_pairs(
-        &self,
-    ) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+    pub fn get_value_searchable_pairs(&self) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
         self.get_variable_searchable_pairs(
-            |variables| variables.note_variables.app_data_dynamic.clone(),
-            |variables| variables.note_variables.app_data_dynamic.clone(),
+            |variables| variables.resource_variables.value.clone(),
+            |variables| variables.resource_variables.value.clone(),
         )
     }
 
-    pub fn get_rho_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+    pub fn get_nonce_searchable_pairs(&self) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
         self.get_variable_searchable_pairs(
-            |variables| variables.note_variables.rho.clone(),
-            |variables| variables.note_variables.rho.clone(),
+            |variables| variables.resource_variables.nonce.clone(),
+            |variables| variables.resource_variables.nonce.clone(),
         )
     }
 
-    pub fn get_nk_com_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+    pub fn get_npk_searchable_pairs(&self) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
         self.get_variable_searchable_pairs(
-            |variables| variables.note_variables.nk_com.clone(),
-            |variables| variables.note_variables.nk_com.clone(),
+            |variables| variables.resource_variables.npk.clone(),
+            |variables| variables.resource_variables.npk.clone(),
         )
     }
 
-    pub fn get_psi_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+    pub fn get_psi_searchable_pairs(&self) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
         self.get_variable_searchable_pairs(
-            |variables| variables.note_variables.psi.clone(),
-            |variables| variables.note_variables.psi.clone(),
+            |variables| variables.resource_variables.psi.clone(),
+            |variables| variables.resource_variables.psi.clone(),
         )
     }
 
-    pub fn get_rcm_searchable_pairs(&self) -> [NoteSearchableVariablePair; NUM_NOTE * 2] {
+    pub fn get_rcm_searchable_pairs(&self) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
         self.get_variable_searchable_pairs(
-            |variables| variables.note_variables.rcm.clone(),
-            |variables| variables.note_variables.rcm.clone(),
+            |variables| variables.resource_variables.rcm.clone(),
+            |variables| variables.resource_variables.rcm.clone(),
         )
     }
 }

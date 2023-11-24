@@ -1,4 +1,4 @@
-/// Multi-party token swap without intent notes
+/// Multi-party token swap without intent resources
 /// Alice has 5 "BTC" and wants 10 "ETH"
 /// Bob has 10 "ETH" and wants 15 "XAN"
 /// Carol has 15 "XAN" and wants 5 BTC""
@@ -33,7 +33,7 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
         alice_nk.get_nk().unwrap(),
         eth_token.clone(),
         alice_auth_pk,
-        alice_nk.get_commitment(),
+        alice_nk.get_npk(),
     );
 
     // Bob creates the partial transaction
@@ -48,7 +48,7 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
         bob_nk.get_nk().unwrap(),
         xan_token.clone(),
         bob_auth_pk,
-        bob_nk.get_commitment(),
+        bob_nk.get_npk(),
     );
 
     // Carol creates the partial transaction
@@ -63,7 +63,7 @@ pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Tran
         carol_nk.get_nk().unwrap(),
         btc_token,
         carol_auth_pk,
-        carol_nk.get_commitment(),
+        carol_nk.get_npk(),
     );
 
     // Solver creates the final transaction

@@ -28,13 +28,13 @@ pub(crate) fn extract_p(point: &pallas::Point) -> pallas::Base {
         .unwrap_or_else(pallas::Base::zero)
 }
 
-/// $PRF^\mathsf{nfOrchard}(nk, \rho) := Poseidon(nk, \rho)$
+/// $PRF^\mathsf{nfOrchard}(nk, nonce) := Poseidon(nk, nonce)$
 ///
 /// Defined in [Zcash Protocol Spec § 5.4.2: Pseudo Random Functions][concreteprfs].
 ///
 /// [concreteprfs]: https://zips.z.cash/protocol/nu5.pdf#concreteprfs
-pub(crate) fn prf_nf(nk: pallas::Base, rho: pallas::Base) -> pallas::Base {
-    poseidon_hash(nk, rho)
+pub(crate) fn prf_nf(nk: pallas::Base, nonce: pallas::Base) -> pallas::Base {
+    poseidon_hash(nk, nonce)
 }
 
 pub fn poseidon_hash(left: pallas::Base, right: pallas::Base) -> pallas::Base {

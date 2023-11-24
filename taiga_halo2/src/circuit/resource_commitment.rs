@@ -11,16 +11,16 @@ use halo2_proofs::{
 };
 use pasta_curves::pallas;
 
-/// compose = is_merkle_checked(bool) * 2^128 + value(64 bits)
+/// compose = is_merkle_checked(bool) * 2^128 + quantity(64 bits)
 #[derive(Clone, Debug)]
-struct ComposeMerkleCheckValue {
+struct ComposeMerkleCheckQuantity {
     q_compose: Selector,
     col_l: Column<Advice>,
     col_m: Column<Advice>,
     col_r: Column<Advice>,
 }
 
-impl ComposeMerkleCheckValue {
+impl ComposeMerkleCheckQuantity {
     fn configure(
         meta: &mut ConstraintSystem<pallas::Base>,
         col_l: Column<Advice>,
@@ -30,16 +30,16 @@ impl ComposeMerkleCheckValue {
     ) -> Self {
         let q_compose = meta.selector();
 
-        meta.create_gate("Compose is_merkle_checked and value", |meta| {
+        meta.create_gate("Compose is_merkle_checked and quantity", |meta| {
             let q_compose = meta.query_selector(q_compose);
 
-            let compose_is_merkle_checked_and_value = meta.query_advice(col_l, Rotation::cur());
+            let compose_is_merkle_checked_and_quantity = meta.query_advice(col_l, Rotation::cur());
             let is_merkle_checked = meta.query_advice(col_m, Rotation::cur());
-            let value = meta.query_advice(col_r, Rotation::cur());
+            let quantity = meta.query_advice(col_r, Rotation::cur());
 
-            // e = value + (2^128) * is_merkle_checked
-            let composition_check = compose_is_merkle_checked_and_value
-                - (value + is_merkle_checked.clone() * two_pow_128);
+            // e = quantity + (2^128) * is_merkle_checked
+            let composition_check = compose_is_merkle_checked_and_quantity
+                - (quantity + is_merkle_checked.clone() * two_pow_128);
 
             Constraints::with_selector(
                 q_compose,
@@ -65,16 +65,16 @@ impl ComposeMerkleCheckValue {
         &self,
         layouter: &mut impl Layouter<pallas::Base>,
         is_merkle_checked: &AssignedCell<pallas::Base, pallas::Base>,
-        value: &AssignedCell<pallas::Base, pallas::Base>,
+        quantity: &AssignedCell<pallas::Base, pallas::Base>,
     ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
         layouter.assign_region(
-            || "NoteCommit MessagePiece e",
+            || "Compose is_merkle_checked and quantity",
             |mut region| {
                 self.q_compose.enable(&mut region, 0)?;
 
-                let compose = is_merkle_checked.value().zip(value.value()).map(
-                    |(is_merkle_checked, value)| {
-                        value + is_merkle_checked * pallas::Base::from_u128(1 << 64).square()
+                let compose = is_merkle_checked.value().zip(quantity.value()).map(
+                    |(is_merkle_checked, quantity)| {
+                        quantity + is_merkle_checked * pallas::Base::from_u128(1 << 64).square()
                     },
                 );
                 is_merkle_checked.copy_advice(
@@ -83,7 +83,7 @@ impl ComposeMerkleCheckValue {
                     self.col_m,
                     0,
                 )?;
-                value.copy_advice(|| "value", &mut region, self.col_r, 0)?;
+                quantity.copy_advice(|| "quantity", &mut region, self.col_r, 0)?;
 
                 region.assign_advice(|| "compose", self.col_l, 0, || compose)
             },
@@ -92,26 +92,26 @@ impl ComposeMerkleCheckValue {
 }
 
 #[derive(Clone, Debug)]
-pub struct NoteCommitConfig {
-    compose_config: ComposeMerkleCheckValue,
+pub struct ResourceCommitConfig {
+    compose_config: ComposeMerkleCheckQuantity,
     poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
     lookup_config: LookupRangeCheckConfig<pallas::Base, 10>,
 }
 
 #[derive(Clone, Debug)]
-pub struct NoteCommitChip {
-    config: NoteCommitConfig,
+pub struct ResourceCommitChip {
+    config: ResourceCommitConfig,
 }
 
-impl NoteCommitChip {
+impl ResourceCommitChip {
     pub fn configure(
         meta: &mut ConstraintSystem<pallas::Base>,
         advices: [Column<Advice>; 3],
         poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
         lookup_config: LookupRangeCheckConfig<pallas::Base, 10>,
-    ) -> NoteCommitConfig {
+    ) -> ResourceCommitConfig {
         let two_pow_128 = pallas::Base::from_u128(1 << 64).square();
-        let compose_config = ComposeMerkleCheckValue::configure(
+        let compose_config = ComposeMerkleCheckQuantity::configure(
             meta,
             advices[0],
             advices[1],
@@ -119,15 +119,15 @@ impl NoteCommitChip {
             two_pow_128,
         );
 
-        NoteCommitConfig {
+        ResourceCommitConfig {
             compose_config,
             poseidon_config,
             lookup_config,
         }
     }
 
-    pub fn construct(config: NoteCommitConfig) -> Self {
-        NoteCommitChip { config }
+    pub fn construct(config: ResourceCommitConfig) -> Self {
+        ResourceCommitChip { config }
     }
 
     pub fn get_poseidon_config(&self) -> PoseidonConfig<pallas::Base, 3, 2> {
@@ -140,39 +140,39 @@ impl NoteCommitChip {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn note_commit(
+pub fn resource_commit(
     mut layouter: impl Layouter<pallas::Base>,
-    chip: NoteCommitChip,
+    chip: ResourceCommitChip,
     app_vp: AssignedCell<pallas::Base, pallas::Base>,
-    app_data_static: AssignedCell<pallas::Base, pallas::Base>,
-    app_data_dynamic: AssignedCell<pallas::Base, pallas::Base>,
-    nk_com: AssignedCell<pallas::Base, pallas::Base>,
-    rho: AssignedCell<pallas::Base, pallas::Base>,
-    psi: AssignedCell<pallas::Base, pallas::Base>,
+    label: AssignedCell<pallas::Base, pallas::Base>,
     value: AssignedCell<pallas::Base, pallas::Base>,
+    npk: AssignedCell<pallas::Base, pallas::Base>,
+    nonce: AssignedCell<pallas::Base, pallas::Base>,
+    psi: AssignedCell<pallas::Base, pallas::Base>,
+    quantity: AssignedCell<pallas::Base, pallas::Base>,
     is_merkle_checked: AssignedCell<pallas::Base, pallas::Base>,
     rcm: AssignedCell<pallas::Base, pallas::Base>,
 ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
-    // Compose the value and is_merkle_checked to one field in order to save one poseidon absorb
-    let compose_is_merkle_checked_and_value =
+    // Compose the quantity and is_merkle_checked to one field in order to save one poseidon absorb
+    let compose_is_merkle_checked_and_quantity =
         chip.config
             .compose_config
-            .assign(&mut layouter, &is_merkle_checked, &value)?;
+            .assign(&mut layouter, &is_merkle_checked, &quantity)?;
 
-    // note commitment
+    // resource commitment
     let poseidon_message = [
         app_vp,
-        app_data_static,
-        app_data_dynamic,
-        nk_com,
-        rho,
+        label,
+        value,
+        npk,
+        nonce,
         psi,
-        compose_is_merkle_checked_and_value,
+        compose_is_merkle_checked_and_quantity,
         rcm,
     ];
     poseidon_hash_gadget(
         chip.config.poseidon_config,
-        layouter.namespace(|| "note commitment"),
+        layouter.namespace(|| "resource commitment"),
         poseidon_message,
     )
 }

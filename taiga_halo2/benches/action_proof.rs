@@ -14,63 +14,63 @@ use taiga_halo2::{
         TAIGA_COMMITMENT_TREE_DEPTH,
     },
     merkle_tree::MerklePath,
-    note::{Note, NoteType, RandomSeed},
     nullifier::{Nullifier, NullifierKeyContainer},
+    resource::{RandomSeed, Resource, ResourceKind},
 };
 
 fn bench_action_proof(name: &str, c: &mut Criterion) {
     let mut rng = OsRng;
     let action_info = {
-        let input_note = {
-            let rho = Nullifier::from(pallas::Base::random(&mut rng));
+        let input_resource = {
+            let nonce = Nullifier::from(pallas::Base::random(&mut rng));
             let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
-            let note_type = {
-                let app_vk = pallas::Base::random(&mut rng);
-                let app_data_static = pallas::Base::random(&mut rng);
-                NoteType::new(app_vk, app_data_static)
+            let kind = {
+                let logic = pallas::Base::random(&mut rng);
+                let label = pallas::Base::random(&mut rng);
+                ResourceKind::new(logic, label)
             };
-            let app_data_dynamic = pallas::Base::random(&mut rng);
-            let value: u64 = rng.gen();
+            let value = pallas::Base::random(&mut rng);
+            let quantity: u64 = rng.gen();
             let rseed = RandomSeed::random(&mut rng);
-            Note {
-                note_type,
-                app_data_dynamic,
+            Resource {
+                kind,
                 value,
+                quantity,
                 nk_container: nk,
                 is_merkle_checked: true,
-                psi: rseed.get_psi(&rho),
-                rcm: rseed.get_rcm(&rho),
-                rho,
+                psi: rseed.get_psi(&nonce),
+                rcm: rseed.get_rcm(&nonce),
+                nonce,
             }
         };
-        let mut output_note = {
-            let rho = input_note.get_nf().unwrap();
-            let nk_com = NullifierKeyContainer::from_commitment(pallas::Base::random(&mut rng));
-            let note_type = {
-                let app_vk = pallas::Base::random(&mut rng);
-                let app_data_static = pallas::Base::random(&mut rng);
-                NoteType::new(app_vk, app_data_static)
+        let mut output_resource = {
+            let nonce = input_resource.get_nf().unwrap();
+            let npk = NullifierKeyContainer::from_npk(pallas::Base::random(&mut rng));
+            let kind = {
+                let logic = pallas::Base::random(&mut rng);
+                let label = pallas::Base::random(&mut rng);
+                ResourceKind::new(logic, label)
             };
-            let app_data_dynamic = pallas::Base::random(&mut rng);
-            let value: u64 = rng.gen();
+            let value = pallas::Base::random(&mut rng);
+            let quantity: u64 = rng.gen();
             let rseed = RandomSeed::random(&mut rng);
-            Note {
-                note_type,
-                app_data_dynamic,
+            Resource {
+                kind,
                 value,
-                nk_container: nk_com,
+                quantity,
+                nk_container: npk,
                 is_merkle_checked: true,
-                psi: rseed.get_psi(&rho),
-                rcm: rseed.get_rcm(&rho),
-                rho,
+                psi: rseed.get_psi(&nonce),
+                rcm: rseed.get_rcm(&nonce),
+                nonce,
             }
         };
         let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         ActionInfo::new(
-            input_note,
+            input_resource,
             input_merkle_path,
             None,
-            &mut output_note,
+            &mut output_resource,
             &mut rng,
         )
     };

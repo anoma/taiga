@@ -7,68 +7,68 @@ use rand::rngs::OsRng;
 use rand::Rng;
 use taiga_halo2::{
     circuit::{vp_circuit::ValidityPredicateCircuit, vp_examples::TrivialValidityPredicateCircuit},
-    constant::{NUM_NOTE, SETUP_PARAMS_MAP, VP_CIRCUIT_PARAMS_SIZE},
-    note::{Note, NoteType, RandomSeed},
+    constant::{NUM_RESOURCE, SETUP_PARAMS_MAP, VP_CIRCUIT_PARAMS_SIZE},
     nullifier::{Nullifier, NullifierKeyContainer},
     proof::Proof,
+    resource::{RandomSeed, Resource, ResourceKind},
 };
 
 fn bench_vp_proof(name: &str, c: &mut Criterion) {
     let mut rng = OsRng;
 
     let vp_circuit = {
-        let input_notes = [(); NUM_NOTE].map(|_| {
-            let rho = Nullifier::from(pallas::Base::random(&mut rng));
+        let input_resources = [(); NUM_RESOURCE].map(|_| {
+            let nonce = Nullifier::from(pallas::Base::random(&mut rng));
             let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
-            let note_type = {
-                let app_vk = pallas::Base::random(&mut rng);
-                let app_data_static = pallas::Base::random(&mut rng);
-                NoteType::new(app_vk, app_data_static)
+            let kind = {
+                let logic = pallas::Base::random(&mut rng);
+                let label = pallas::Base::random(&mut rng);
+                ResourceKind::new(logic, label)
             };
-            let app_data_dynamic = pallas::Base::random(&mut rng);
-            let value: u64 = rng.gen();
+            let value = pallas::Base::random(&mut rng);
+            let quantity: u64 = rng.gen();
             let rseed = RandomSeed::random(&mut rng);
-            Note {
-                note_type,
-                app_data_dynamic,
+            Resource {
+                kind,
                 value,
+                quantity,
                 nk_container: nk,
                 is_merkle_checked: true,
-                psi: rseed.get_psi(&rho),
-                rcm: rseed.get_rcm(&rho),
-                rho,
+                psi: rseed.get_psi(&nonce),
+                rcm: rseed.get_rcm(&nonce),
+                nonce,
             }
         });
-        let output_notes = input_notes
+        let output_resources = input_resources
             .iter()
             .map(|input| {
-                let rho = input.get_nf().unwrap();
-                let nk_com = NullifierKeyContainer::from_commitment(pallas::Base::random(&mut rng));
-                let note_type = {
-                    let app_vk = pallas::Base::random(&mut rng);
-                    let app_data_static = pallas::Base::random(&mut rng);
-                    NoteType::new(app_vk, app_data_static)
+                let nonce = input.get_nf().unwrap();
+                let npk = NullifierKeyContainer::from_npk(pallas::Base::random(&mut rng));
+                let kind = {
+                    let logic = pallas::Base::random(&mut rng);
+                    let label = pallas::Base::random(&mut rng);
+                    ResourceKind::new(logic, label)
                 };
-                let app_data_dynamic = pallas::Base::random(&mut rng);
-                let value: u64 = rng.gen();
+                let value = pallas::Base::random(&mut rng);
+                let quantity: u64 = rng.gen();
                 let rseed = RandomSeed::random(&mut rng);
-                Note {
-                    note_type,
-                    app_data_dynamic,
+                Resource {
+                    kind,
                     value,
-                    nk_container: nk_com,
+                    quantity,
+                    nk_container: npk,
                     is_merkle_checked: true,
-                    psi: rseed.get_psi(&rho),
-                    rcm: rseed.get_rcm(&rho),
-                    rho,
+                    psi: rseed.get_psi(&nonce),
+                    rcm: rseed.get_rcm(&nonce),
+                    nonce,
                 }
             })
             .collect::<Vec<_>>();
-        let owned_note_pub_id = input_notes[0].get_nf().unwrap().inner();
+        let owned_resource_id = input_resources[0].get_nf().unwrap().inner();
         TrivialValidityPredicateCircuit::new(
-            owned_note_pub_id,
-            input_notes,
-            output_notes.try_into().unwrap(),
+            owned_resource_id,
+            input_resources,
+            output_resources.try_into().unwrap(),
         )
     };
     let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();

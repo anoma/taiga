@@ -1,7 +1,7 @@
 #[cfg(feature = "borsh")]
 use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
 use crate::error::TransactionError;
-use crate::shielded_ptx::NoteVPVerifyingInfoSet;
+use crate::shielded_ptx::ResourceVPVerifyingInfoSet;
 use crate::{
     circuit::vp_circuit::{
         VPVerifyingInfo, ValidityPredicateVerifyingInfo, VampIRValidityPredicateCircuit,
@@ -9,10 +9,10 @@ use crate::{
     constant::{
         VP_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX, VP_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX,
         VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX, VP_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX,
-        VP_CIRCUIT_OWNED_NOTE_PUB_ID_PUBLIC_INPUT_IDX,
+        VP_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX,
     },
-    note::NoteCommitment,
     nullifier::Nullifier,
+    resource::ResourceCommitment,
 };
 
 #[cfg(feature = "borsh")]
@@ -79,11 +79,11 @@ impl ValidityPredicateByteCode {
         }
     }
 
-    // Verify vp circuit transparently and return owned note PubID for further checking
+    // Verify vp circuit transparently and return owned resource PubID for further checking
     pub fn verify_transparently(
         &self,
         action_nfs: &[Nullifier],
-        action_cms: &[NoteCommitment],
+        action_cms: &[ResourceCommitment],
     ) -> Result<pallas::Base, TransactionError> {
         // check VP transparently
         let public_inputs = match &self.circuit {
@@ -109,7 +109,7 @@ impl ValidityPredicateByteCode {
         };
 
         // check nullifiers
-        // Check the vp actually uses the input notes from action circuits.
+        // Check the vp actually uses the input resources from action circuits.
         let vp_nfs = [
             public_inputs.get_from_index(VP_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX),
             public_inputs.get_from_index(VP_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX),
@@ -121,8 +121,8 @@ impl ValidityPredicateByteCode {
             return Err(TransactionError::InconsistentNullifier);
         }
 
-        // check note_commitments
-        // Check the vp actually uses the output notes from action circuits.
+        // check resource_commitments
+        // Check the vp actually uses the output resources from action circuits.
         let vp_cms = [
             public_inputs.get_from_index(VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX),
             public_inputs.get_from_index(VP_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX),
@@ -130,10 +130,10 @@ impl ValidityPredicateByteCode {
         if !((action_cms[0].inner() == vp_cms[0] && action_cms[1].inner() == vp_cms[1])
             || (action_cms[0].inner() == vp_cms[1] && action_cms[1].inner() == vp_cms[0]))
         {
-            return Err(TransactionError::InconsistentOutputNoteCommitment);
+            return Err(TransactionError::InconsistentOutputResourceCommitment);
         }
 
-        Ok(public_inputs.get_from_index(VP_CIRCUIT_OWNED_NOTE_PUB_ID_PUBLIC_INPUT_IDX))
+        Ok(public_inputs.get_from_index(VP_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX))
     }
 }
 
@@ -148,7 +148,7 @@ impl ApplicationByteCode {
         }
     }
 
-    pub fn generate_proofs(self) -> Result<NoteVPVerifyingInfoSet, TransactionError> {
+    pub fn generate_proofs(self) -> Result<ResourceVPVerifyingInfoSet, TransactionError> {
         let app_vp_verifying_info = self.app_vp_bytecode.generate_proof()?;
 
         let app_dynamic_vp_verifying_info: Result<Vec<_>, _> = self
@@ -156,28 +156,28 @@ impl ApplicationByteCode {
             .into_iter()
             .map(|bytecode| bytecode.generate_proof())
             .collect();
-        Ok(NoteVPVerifyingInfoSet::new(
+        Ok(ResourceVPVerifyingInfoSet::new(
             app_vp_verifying_info,
             app_dynamic_vp_verifying_info?,
         ))
     }
 
-    // Verify vp circuits transparently and return owned note PubID for further checking
+    // Verify vp circuits transparently and return owned resource PubID for further checking
     pub fn verify_transparently(
         &self,
         action_nfs: &[Nullifier],
-        action_cms: &[NoteCommitment],
+        action_cms: &[ResourceCommitment],
     ) -> Result<pallas::Base, TransactionError> {
-        let owned_note_id = self
+        let owned_resource_id = self
             .app_vp_bytecode
             .verify_transparently(action_nfs, action_cms)?;
         for dynamic_vp in self.dynamic_vp_bytecode.iter() {
             let id = dynamic_vp.verify_transparently(action_nfs, action_cms)?;
-            // check: the app_vp and dynamic_vps belong to the note
-            if id != owned_note_id {
-                return Err(TransactionError::InconsistentOwnedNotePubID);
+            // check: the app_vp and dynamic_vps belong to the resource
+            if id != owned_resource_id {
+                return Err(TransactionError::InconsistentOwneResourceID);
             }
         }
-        Ok(owned_note_id)
+        Ok(owned_resource_id)
     }
 }

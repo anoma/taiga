@@ -2,15 +2,15 @@ use crate::action::{ActionInfo, ActionPublicInputs};
 use crate::circuit::vp_circuit::{VPVerifyingInfo, ValidityPredicate};
 use crate::constant::{
     ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, MAX_DYNAMIC_VP_NUM,
-    NUM_NOTE, SETUP_PARAMS_MAP,
+    NUM_RESOURCE, SETUP_PARAMS_MAP,
 };
+use crate::delta_commitment::DeltaCommitment;
 use crate::error::TransactionError;
 use crate::executable::Executable;
 use crate::merkle_tree::Anchor;
-use crate::note::{NoteCommitment, NoteValidityPredicates};
 use crate::nullifier::Nullifier;
 use crate::proof::Proof;
-use crate::value_commitment::ValueCommitment;
+use crate::resource::{ResourceCommitment, ResourceValidityPredicates};
 use halo2_proofs::plonk::Error;
 use pasta_curves::pallas;
 use rand::RngCore;
@@ -30,9 +30,9 @@ use ff::PrimeField;
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ShieldedPartialTransaction {
-    actions: [ActionVerifyingInfo; NUM_NOTE],
-    inputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
-    outputs: [NoteVPVerifyingInfoSet; NUM_NOTE],
+    actions: [ActionVerifyingInfo; NUM_RESOURCE],
+    inputs: [ResourceVPVerifyingInfoSet; NUM_RESOURCE],
+    outputs: [ResourceVPVerifyingInfoSet; NUM_RESOURCE],
     binding_sig_r: Option<pallas::Scalar>,
     hints: Vec<u8>,
 }
@@ -51,8 +51,8 @@ pub struct ActionVerifyingInfo {
 #[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "nif", derive(NifStruct))]
-#[cfg_attr(feature = "nif", module = "Taiga.Note.VerifyingInfo")]
-pub struct NoteVPVerifyingInfoSet {
+#[cfg_attr(feature = "nif", module = "Taiga.Resource.VerifyingInfo")]
+pub struct ResourceVPVerifyingInfoSet {
     app_vp_verifying_info: VPVerifyingInfo,
     app_dynamic_vp_verifying_info: Vec<VPVerifyingInfo>,
     // TODO: add verifier proof and according public inputs.
@@ -65,8 +65,8 @@ pub struct NoteVPVerifyingInfoSet {
 #[cfg_attr(feature = "nif", module = "Taiga.Shielded.PTX")]
 struct ShieldedPartialTransactionProxy {
     actions: Vec<ActionVerifyingInfo>,
-    inputs: Vec<NoteVPVerifyingInfoSet>,
-    outputs: Vec<NoteVPVerifyingInfoSet>,
+    inputs: Vec<ResourceVPVerifyingInfoSet>,
+    outputs: Vec<ResourceVPVerifyingInfoSet>,
     binding_sig_r: Option<pallas::Scalar>,
     hints: Vec<u8>,
 }
@@ -74,16 +74,16 @@ struct ShieldedPartialTransactionProxy {
 impl ShieldedPartialTransaction {
     pub fn from_bytecode<R: RngCore>(
         actions: Vec<ActionInfo>,
-        input_note_app: Vec<ApplicationByteCode>,
-        output_note_app: Vec<ApplicationByteCode>,
+        input_resource_app: Vec<ApplicationByteCode>,
+        output_resource_app: Vec<ApplicationByteCode>,
         hints: Vec<u8>,
         mut rng: R,
     ) -> Result<Self, TransactionError> {
-        let inputs: Result<Vec<_>, _> = input_note_app
+        let inputs: Result<Vec<_>, _> = input_resource_app
             .into_iter()
             .map(|bytecode| bytecode.generate_proofs())
             .collect();
-        let outputs: Result<Vec<_>, _> = output_note_app
+        let outputs: Result<Vec<_>, _> = output_resource_app
             .into_iter()
             .map(|bytecode| bytecode.generate_proofs())
             .collect();
@@ -107,8 +107,8 @@ impl ShieldedPartialTransaction {
 
     pub fn build<R: RngCore>(
         action_pairs: Vec<ActionInfo>,
-        input_note_vps: Vec<NoteValidityPredicates>,
-        output_note_vps: Vec<NoteValidityPredicates>,
+        input_resource_vps: Vec<ResourceValidityPredicates>,
+        output_resource_vps: Vec<ResourceValidityPredicates>,
         hints: Vec<u8>,
         mut rng: R,
     ) -> Result<Self, Error> {
@@ -123,15 +123,15 @@ impl ShieldedPartialTransaction {
             .collect();
 
         // Generate input vp proofs
-        let inputs: Vec<NoteVPVerifyingInfoSet> = input_note_vps
+        let inputs: Vec<ResourceVPVerifyingInfoSet> = input_resource_vps
             .iter()
-            .map(|input_note_vp| input_note_vp.build())
+            .map(|input_resource_vp| input_resource_vp.build())
             .collect();
 
         // Generate output vp proofs
-        let outputs: Vec<NoteVPVerifyingInfoSet> = output_note_vps
+        let outputs: Vec<ResourceVPVerifyingInfoSet> = output_resource_vps
             .iter()
-            .map(|output_note_vp| output_note_vp.build())
+            .map(|output_resource_vp| output_resource_vp.build())
             .collect();
 
         Ok(Self {
@@ -150,11 +150,11 @@ impl ShieldedPartialTransaction {
             verifying_info.verify()?;
         }
 
-        // Verify vp proofs from input notes
+        // Verify vp proofs from input resources
         for verifying_info in self.inputs.iter() {
             verifying_info.verify()?;
         }
-        // Verify vp proofs from output notes
+        // Verify vp proofs from output resources
         for verifying_info in self.outputs.iter() {
             verifying_info.verify()?;
         }
@@ -164,11 +164,11 @@ impl ShieldedPartialTransaction {
 
     // check the nullifiers are from action proofs
     fn check_nullifiers(&self) -> Result<(), TransactionError> {
-        assert_eq!(NUM_NOTE, 2);
+        assert_eq!(NUM_RESOURCE, 2);
         let action_nfs = self.get_nullifiers();
         for vp_info in self.inputs.iter().chain(self.outputs.iter()) {
             for nfs in vp_info.get_nullifiers().iter() {
-                // Check the vp actually uses the input notes from action circuits.
+                // Check the vp actually uses the input resources from action circuits.
                 if !((action_nfs[0].inner() == nfs[0] && action_nfs[1].inner() == nfs[1])
                     || (action_nfs[0].inner() == nfs[1] && action_nfs[1].inner() == nfs[0]))
                 {
@@ -178,49 +178,49 @@ impl ShieldedPartialTransaction {
         }
 
         for (vp_info, action_nf) in self.inputs.iter().zip(action_nfs.iter()) {
-            // Check the app vp and the sub vps use the same owned_note_id in one note
-            let owned_note_id = vp_info.app_vp_verifying_info.get_owned_note_pub_id();
+            // Check the app vp and the sub vps use the same owned_resource_id in one resource
+            let owned_resource_id = vp_info.app_vp_verifying_info.get_owned_resource_id();
             for logic_vp_verifying_info in vp_info.app_dynamic_vp_verifying_info.iter() {
-                if owned_note_id != logic_vp_verifying_info.get_owned_note_pub_id() {
-                    return Err(TransactionError::InconsistentOwnedNotePubID);
+                if owned_resource_id != logic_vp_verifying_info.get_owned_resource_id() {
+                    return Err(TransactionError::InconsistentOwneResourceID);
                 }
             }
 
-            // Check the owned_note_id that vp uses is consistent with the nf from the action circuit
-            if owned_note_id != action_nf.inner() {
-                return Err(TransactionError::InconsistentOwnedNotePubID);
+            // Check the owned_resource_id that vp uses is consistent with the nf from the action circuit
+            if owned_resource_id != action_nf.inner() {
+                return Err(TransactionError::InconsistentOwneResourceID);
             }
         }
         Ok(())
     }
 
     // check the output cms are from action proofs
-    fn check_note_commitments(&self) -> Result<(), TransactionError> {
-        assert_eq!(NUM_NOTE, 2);
+    fn check_resource_commitments(&self) -> Result<(), TransactionError> {
+        assert_eq!(NUM_RESOURCE, 2);
         let action_cms = self.get_output_cms();
         for vp_info in self.inputs.iter().chain(self.outputs.iter()) {
-            for cms in vp_info.get_note_commitments().iter() {
-                // Check the vp actually uses the output notes from action circuits.
+            for cms in vp_info.get_resource_commitments().iter() {
+                // Check the vp actually uses the output resources from action circuits.
                 if !((action_cms[0] == cms[0] && action_cms[1] == cms[1])
                     || (action_cms[0] == cms[1] && action_cms[1] == cms[0]))
                 {
-                    return Err(TransactionError::InconsistentOutputNoteCommitment);
+                    return Err(TransactionError::InconsistentOutputResourceCommitment);
                 }
             }
         }
 
         for (vp_info, action_cm) in self.outputs.iter().zip(action_cms.iter()) {
-            // Check that the app vp and the sub vps use the same owned_note_id in one note
-            let owned_note_id = vp_info.app_vp_verifying_info.get_owned_note_pub_id();
+            // Check that the app vp and the sub vps use the same owned_resource_id in one resource
+            let owned_resource_id = vp_info.app_vp_verifying_info.get_owned_resource_id();
             for logic_vp_verifying_info in vp_info.app_dynamic_vp_verifying_info.iter() {
-                if owned_note_id != logic_vp_verifying_info.get_owned_note_pub_id() {
-                    return Err(TransactionError::InconsistentOwnedNotePubID);
+                if owned_resource_id != logic_vp_verifying_info.get_owned_resource_id() {
+                    return Err(TransactionError::InconsistentOwneResourceID);
                 }
             }
 
-            // Check the owned_note_id that vp uses is consistent with the cm from the action circuit
-            if owned_note_id != action_cm.inner() {
-                return Err(TransactionError::InconsistentOwnedNotePubID);
+            // Check the owned_resource_id that vp uses is consistent with the cm from the action circuit
+            if owned_resource_id != action_cm.inner() {
+                return Err(TransactionError::InconsistentOwneResourceID);
             }
         }
         Ok(())
@@ -270,7 +270,7 @@ impl Executable for ShieldedPartialTransaction {
     fn execute(&self) -> Result<(), TransactionError> {
         self.verify_proof()?;
         self.check_nullifiers()?;
-        self.check_note_commitments()?;
+        self.check_resource_commitments()?;
         Ok(())
     }
 
@@ -281,17 +281,17 @@ impl Executable for ShieldedPartialTransaction {
             .collect()
     }
 
-    fn get_output_cms(&self) -> Vec<NoteCommitment> {
+    fn get_output_cms(&self) -> Vec<ResourceCommitment> {
         self.actions
             .iter()
             .map(|action| action.action_instance.cm)
             .collect()
     }
 
-    fn get_value_commitments(&self) -> Vec<ValueCommitment> {
+    fn get_delta_commitments(&self) -> Vec<DeltaCommitment> {
         self.actions
             .iter()
-            .map(|action| action.action_instance.cv_net)
+            .map(|action| action.action_instance.delta)
             .collect()
     }
 
@@ -340,14 +340,14 @@ impl BorshSerialize for ShieldedPartialTransaction {
 impl BorshDeserialize for ShieldedPartialTransaction {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         use byteorder::ReadBytesExt;
-        let actions: Vec<_> = (0..NUM_NOTE)
+        let actions: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| ActionVerifyingInfo::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
-        let inputs: Vec<_> = (0..NUM_NOTE)
-            .map(|_| NoteVPVerifyingInfoSet::deserialize_reader(reader))
+        let inputs: Vec<_> = (0..NUM_RESOURCE)
+            .map(|_| ResourceVPVerifyingInfoSet::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
-        let outputs: Vec<_> = (0..NUM_NOTE)
-            .map(|_| NoteVPVerifyingInfoSet::deserialize_reader(reader))
+        let outputs: Vec<_> = (0..NUM_RESOURCE)
+            .map(|_| ResourceVPVerifyingInfoSet::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
         let binding_sig_r_type = reader.read_u8()?;
         let binding_sig_r = if binding_sig_r_type == 0 {
@@ -418,7 +418,7 @@ impl ActionVerifyingInfo {
     }
 }
 
-impl NoteVPVerifyingInfoSet {
+impl ResourceVPVerifyingInfoSet {
     pub fn new(
         app_vp_verifying_info: VPVerifyingInfo,
         app_dynamic_vp_verifying_info: Vec<VPVerifyingInfo>,
@@ -465,7 +465,7 @@ impl NoteVPVerifyingInfoSet {
         Ok(())
     }
 
-    pub fn get_nullifiers(&self) -> Vec<[pallas::Base; NUM_NOTE]> {
+    pub fn get_nullifiers(&self) -> Vec<[pallas::Base; NUM_RESOURCE]> {
         let mut nfs = vec![self.app_vp_verifying_info.get_nullifiers()];
         self.app_dynamic_vp_verifying_info
             .iter()
@@ -473,11 +473,11 @@ impl NoteVPVerifyingInfoSet {
         nfs
     }
 
-    pub fn get_note_commitments(&self) -> Vec<[NoteCommitment; NUM_NOTE]> {
-        let mut cms = vec![self.app_vp_verifying_info.get_note_commitments()];
+    pub fn get_resource_commitments(&self) -> Vec<[ResourceCommitment; NUM_RESOURCE]> {
+        let mut cms = vec![self.app_vp_verifying_info.get_resource_commitments()];
         self.app_dynamic_vp_verifying_info
             .iter()
-            .for_each(|vp_info| cms.push(vp_info.get_note_commitments()));
+            .for_each(|vp_info| cms.push(vp_info.get_resource_commitments()));
         cms
     }
 }
@@ -490,8 +490,8 @@ pub mod testing {
         circuit::vp_examples::TrivialValidityPredicateCircuit,
         constant::TAIGA_COMMITMENT_TREE_DEPTH,
         merkle_tree::MerklePath,
-        note::{Note, NoteValidityPredicates, RandomSeed},
         nullifier::Nullifier,
+        resource::{RandomSeed, Resource, ResourceValidityPredicates},
         shielded_ptx::ShieldedPartialTransaction,
         utils::poseidon_hash,
     };
@@ -502,50 +502,50 @@ pub mod testing {
     pub fn create_shielded_ptx() -> ShieldedPartialTransaction {
         let mut rng = OsRng;
 
-        // Create empty VP circuit without note info
+        // Create empty VP circuit without resource info
         let trivial_vp_circuit = TrivialValidityPredicateCircuit::default();
         let trivial_vp_vk = trivial_vp_circuit.get_vp_vk();
         let compressed_trivial_vp_vk = trivial_vp_vk.get_compressed();
 
-        // Generate notes
-        let input_note_1 = {
-            let app_data_static = pallas::Base::zero();
-            // TODO: add real application dynamic VPs and encode them to app_data_dynamic later.
+        // Generate resources
+        let input_resource_1 = {
+            let label = pallas::Base::zero();
+            // TODO: add real application dynamic VPs and encode them to value later.
             let app_dynamic_vp_vk = [compressed_trivial_vp_vk, compressed_trivial_vp_vk];
-            // Encode the app_dynamic_vp_vk into app_data_dynamic
+            // Encode the app_dynamic_vp_vk into value
             // The encoding method is flexible and defined in the application vp.
             // Use poseidon hash to encode the two dynamic VPs here
-            let app_data_dynamic = poseidon_hash(app_dynamic_vp_vk[0], app_dynamic_vp_vk[1]);
-            let rho = Nullifier::from(pallas::Base::random(&mut rng));
-            let value = 5000u64;
+            let value = poseidon_hash(app_dynamic_vp_vk[0], app_dynamic_vp_vk[1]);
+            let nonce = Nullifier::from(pallas::Base::random(&mut rng));
+            let quantity = 5000u64;
             let nk = pallas::Base::random(&mut rng);
             let rseed = RandomSeed::random(&mut rng);
             let is_merkle_checked = true;
-            Note::new_input_note(
+            Resource::new_input_resource(
                 compressed_trivial_vp_vk,
-                app_data_static,
-                app_data_dynamic,
+                label,
                 value,
+                quantity,
                 nk,
-                rho,
+                nonce,
                 is_merkle_checked,
                 rseed,
             )
         };
-        let mut output_note_1 = {
-            let app_data_static = pallas::Base::zero();
-            // TODO: add real application dynamic VPs and encode them to app_data_dynamic later.
-            // If the dynamic VP is not used, set app_data_dynamic pallas::Base::zero() by default.
-            let app_data_dynamic = pallas::Base::zero();
-            let value = 5000u64;
-            let nk_com = pallas::Base::random(&mut rng);
+        let mut output_resource_1 = {
+            let label = pallas::Base::zero();
+            // TODO: add real application dynamic VPs and encode them to value later.
+            // If the dynamic VP is not used, set value pallas::Base::zero() by default.
+            let value = pallas::Base::zero();
+            let quantity = 5000u64;
+            let npk = pallas::Base::random(&mut rng);
             let is_merkle_checked = true;
-            Note::new_output_note(
+            Resource::new_output_resource(
                 compressed_trivial_vp_vk,
-                app_data_static,
-                app_data_dynamic,
+                label,
                 value,
-                nk_com,
+                quantity,
+                npk,
                 is_merkle_checked,
             )
         };
@@ -553,45 +553,45 @@ pub mod testing {
         // Construct action pair
         let merkle_path_1 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         let action_1 = ActionInfo::new(
-            input_note_1,
+            input_resource_1,
             merkle_path_1,
             None,
-            &mut output_note_1,
+            &mut output_resource_1,
             &mut rng,
         );
 
-        // Generate notes
-        let input_note_2 = {
-            let app_data_static = pallas::Base::one();
-            let app_data_dynamic = pallas::Base::zero();
-            let rho = Nullifier::from(pallas::Base::random(&mut rng));
-            let value = 10u64;
+        // Generate resources
+        let input_resource_2 = {
+            let label = pallas::Base::one();
+            let value = pallas::Base::zero();
+            let nonce = Nullifier::from(pallas::Base::random(&mut rng));
+            let quantity = 10u64;
             let nk = pallas::Base::random(&mut rng);
             let rseed = RandomSeed::random(&mut rng);
             let is_merkle_checked = true;
-            Note::new_input_note(
+            Resource::new_input_resource(
                 compressed_trivial_vp_vk,
-                app_data_static,
-                app_data_dynamic,
+                label,
                 value,
+                quantity,
                 nk,
-                rho,
+                nonce,
                 is_merkle_checked,
                 rseed,
             )
         };
-        let mut output_note_2 = {
-            let app_data_static = pallas::Base::one();
-            let app_data_dynamic = pallas::Base::zero();
-            let value = 10u64;
-            let nk_com = pallas::Base::random(&mut rng);
+        let mut output_resource_2 = {
+            let label = pallas::Base::one();
+            let value = pallas::Base::zero();
+            let quantity = 10u64;
+            let npk = pallas::Base::random(&mut rng);
             let is_merkle_checked = true;
-            Note::new_output_note(
+            Resource::new_output_resource(
                 compressed_trivial_vp_vk,
-                app_data_static,
-                app_data_dynamic,
+                label,
                 value,
-                nk_com,
+                quantity,
+                npk,
                 is_merkle_checked,
             )
         };
@@ -599,44 +599,46 @@ pub mod testing {
         // Construct action pair
         let merkle_path_2 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         let action_2 = ActionInfo::new(
-            input_note_2,
+            input_resource_2,
             merkle_path_2,
             None,
-            &mut output_note_2,
+            &mut output_resource_2,
             &mut rng,
         );
 
-        // Create vp circuit and fill the note info
+        // Create vp circuit and fill the resource info
         let mut trivial_vp_circuit = TrivialValidityPredicateCircuit {
-            owned_note_pub_id: input_note_1.get_nf().unwrap().inner(),
-            input_notes: [input_note_1, input_note_2],
-            output_notes: [output_note_1, output_note_2],
+            owned_resource_id: input_resource_1.get_nf().unwrap().inner(),
+            input_resources: [input_resource_1, input_resource_2],
+            output_resources: [output_resource_1, output_resource_2],
         };
         let input_application_vp_1 = Box::new(trivial_vp_circuit.clone());
         let trivial_app_logic_1: Box<ValidityPredicate> = Box::new(trivial_vp_circuit.clone());
         let trivial_app_logic_2 = Box::new(trivial_vp_circuit.clone());
         let trivial_dynamic_vps = vec![trivial_app_logic_1, trivial_app_logic_2];
-        let input_note_1_vps =
-            NoteValidityPredicates::new(input_application_vp_1, trivial_dynamic_vps);
+        let input_resource_1_vps =
+            ResourceValidityPredicates::new(input_application_vp_1, trivial_dynamic_vps);
 
-        // The following notes use empty logic vps and use app_data_dynamic with pallas::Base::zero() by default.
-        trivial_vp_circuit.owned_note_pub_id = input_note_2.get_nf().unwrap().inner();
+        // The following resources use empty logic vps and use value with pallas::Base::zero() by default.
+        trivial_vp_circuit.owned_resource_id = input_resource_2.get_nf().unwrap().inner();
         let input_application_vp_2 = Box::new(trivial_vp_circuit.clone());
-        let input_note_2_vps = NoteValidityPredicates::new(input_application_vp_2, vec![]);
+        let input_resource_2_vps = ResourceValidityPredicates::new(input_application_vp_2, vec![]);
 
-        trivial_vp_circuit.owned_note_pub_id = output_note_1.commitment().inner();
+        trivial_vp_circuit.owned_resource_id = output_resource_1.commitment().inner();
         let output_application_vp_1 = Box::new(trivial_vp_circuit.clone());
-        let output_note_1_vps = NoteValidityPredicates::new(output_application_vp_1, vec![]);
+        let output_resource_1_vps =
+            ResourceValidityPredicates::new(output_application_vp_1, vec![]);
 
-        trivial_vp_circuit.owned_note_pub_id = output_note_2.commitment().inner();
+        trivial_vp_circuit.owned_resource_id = output_resource_2.commitment().inner();
         let output_application_vp_2 = Box::new(trivial_vp_circuit);
-        let output_note_2_vps = NoteValidityPredicates::new(output_application_vp_2, vec![]);
+        let output_resource_2_vps =
+            ResourceValidityPredicates::new(output_application_vp_2, vec![]);
 
         // Create shielded partial tx
         ShieldedPartialTransaction::build(
             vec![action_1, action_2],
-            vec![input_note_1_vps, input_note_2_vps],
-            vec![output_note_1_vps, output_note_2_vps],
+            vec![input_resource_1_vps, input_resource_2_vps],
+            vec![output_resource_1_vps, output_resource_2_vps],
             vec![],
             &mut rng,
         )

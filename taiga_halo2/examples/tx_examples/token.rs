@@ -11,7 +11,7 @@ use taiga_halo2::{
     },
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
-    note::{Note, NoteValidityPredicates},
+    resource::{Resource, ResourceValidityPredicates},
     shielded_ptx::ShieldedPartialTransaction,
 };
 
@@ -23,20 +23,22 @@ pub fn create_token_swap_ptx<R: RngCore>(
     input_nk: pallas::Base,
     output_token: Token,
     output_auth_pk: pallas::Point,
-    output_nk_com: pallas::Base,
+    output_npk: pallas::Base,
 ) -> ShieldedPartialTransaction {
     let input_auth = TokenAuthorization::from_sk_vk(&input_auth_sk, &COMPRESSED_TOKEN_AUTH_VK);
 
-    // input note
-    let input_note = input_token.create_random_input_token_note(&mut rng, input_nk, &input_auth);
+    // input resource
+    let input_resource =
+        input_token.create_random_input_token_resource(&mut rng, input_nk, &input_auth);
 
-    // output note
+    // output resource
     let output_auth = TokenAuthorization::new(output_auth_pk, *COMPRESSED_TOKEN_AUTH_VK);
-    let mut output_note = output_token.create_random_output_token_note(output_nk_com, &output_auth);
+    let mut output_resource =
+        output_token.create_random_output_token_resource(output_npk, &output_auth);
 
-    // padding the zero notes
-    let padding_input_note = Note::random_padding_note(&mut rng);
-    let mut padding_output_note = Note::random_padding_note(&mut rng);
+    // padding the zero resources
+    let padding_input_resource = Resource::random_padding_resource(&mut rng);
+    let mut padding_output_resource = Resource::random_padding_resource(&mut rng);
 
     // Generate proving info
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
@@ -44,20 +46,20 @@ pub fn create_token_swap_ptx<R: RngCore>(
     // Create action pairs
     let actions = {
         let action_1 = ActionInfo::new(
-            *input_note.note(),
+            *input_resource.resource(),
             merkle_path.clone(),
             None,
-            &mut output_note.note,
+            &mut output_resource.resource,
             &mut rng,
         );
 
-        // Fetch a valid anchor for padding input notes
+        // Fetch a valid anchor for padding input resources
         let anchor = Anchor::from(pallas::Base::random(&mut rng));
         let action_2 = ActionInfo::new(
-            padding_input_note,
+            padding_input_resource,
             merkle_path,
             Some(anchor),
-            &mut padding_output_note,
+            &mut padding_output_resource,
             &mut rng,
         );
         vec![action_1, action_2]
@@ -65,33 +67,37 @@ pub fn create_token_swap_ptx<R: RngCore>(
 
     // Create VPs
     let (input_vps, output_vps) = {
-        let input_notes = [*input_note.note(), padding_input_note];
-        let output_notes = [*output_note.note(), padding_output_note];
+        let input_resources = [*input_resource.resource(), padding_input_resource];
+        let output_resources = [*output_resource.resource(), padding_output_resource];
         // Create the input token vps
-        let input_token_vps = input_note.generate_input_token_vps(
+        let input_token_vps = input_resource.generate_input_token_vps(
             &mut rng,
             input_auth,
             input_auth_sk,
-            input_notes,
-            output_notes,
+            input_resources,
+            output_resources,
         );
 
         // Create the output token vps
-        let output_token_vps =
-            output_note.generate_output_token_vps(&mut rng, output_auth, input_notes, output_notes);
+        let output_token_vps = output_resource.generate_output_token_vps(
+            &mut rng,
+            output_auth,
+            input_resources,
+            output_resources,
+        );
 
         // Create the padding input vps
-        let padding_input_vps = NoteValidityPredicates::create_input_padding_note_vps(
-            &padding_input_note,
-            input_notes,
-            output_notes,
+        let padding_input_vps = ResourceValidityPredicates::create_input_padding_resource_vps(
+            &padding_input_resource,
+            input_resources,
+            output_resources,
         );
 
         // Create the padding output vps
-        let padding_output_vps = NoteValidityPredicates::create_output_padding_note_vps(
-            &padding_output_note,
-            input_notes,
-            output_notes,
+        let padding_output_vps = ResourceValidityPredicates::create_output_padding_resource_vps(
+            &padding_output_resource,
+            input_resources,
+            output_resources,
         );
 
         (

@@ -4,7 +4,7 @@ use crate::{
         gadgets::{
             assign_free_advice, assign_free_constant,
             poseidon_hash::poseidon_hash_gadget,
-            target_note_variable::{get_is_input_note_flag, get_owned_note_variable},
+            target_resource_variable::{get_is_input_resource_flag, get_owned_resource_variable},
         },
         vp_circuit::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
@@ -16,14 +16,14 @@ use crate::{
         },
     },
     constant::{
-        NUM_NOTE, PRF_EXPAND_DYNAMIC_VP_1_CM_R, SETUP_PARAMS_MAP, VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_1,
-        VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_2, VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_1,
-        VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_2,
+        NUM_RESOURCE, PRF_EXPAND_DYNAMIC_VP_1_CM_R, SETUP_PARAMS_MAP,
+        VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_1, VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_2,
+        VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_1, VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_2,
     },
     error::TransactionError,
-    note::{Note, NoteValidityPredicates, RandomSeed},
     nullifier::Nullifier,
     proof::Proof,
+    resource::{RandomSeed, Resource, ResourceValidityPredicates},
     utils::poseidon_hash_n,
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
@@ -65,14 +65,14 @@ impl TokenName {
 #[derive(Clone, Debug, Default)]
 pub struct Token {
     name: TokenName,
-    value: u64,
+    quantity: u64,
 }
 
 impl Token {
-    pub fn new(name: String, value: u64) -> Self {
+    pub fn new(name: String, quantity: u64) -> Self {
         Self {
             name: TokenName(name),
-            value,
+            quantity,
         }
     }
 
@@ -80,83 +80,83 @@ impl Token {
         &self.name
     }
 
-    pub fn value(&self) -> u64 {
-        self.value
+    pub fn quantity(&self) -> u64 {
+        self.quantity
     }
 
     pub fn encode_name(&self) -> pallas::Base {
         self.name.encode()
     }
 
-    pub fn encode_value(&self) -> pallas::Base {
-        pallas::Base::from(self.value)
+    pub fn encode_quantity(&self) -> pallas::Base {
+        pallas::Base::from(self.quantity)
     }
 
-    pub fn create_random_input_token_note<R: RngCore>(
+    pub fn create_random_input_token_resource<R: RngCore>(
         &self,
         mut rng: R,
         nk: pallas::Base,
         auth: &TokenAuthorization,
-    ) -> TokenNote {
-        let app_data_static = self.encode_name();
-        let app_data_dynamic = auth.to_app_data_dynamic();
+    ) -> TokenResource {
+        let label = self.encode_name();
+        let value = auth.to_value();
         let rseed = RandomSeed::random(&mut rng);
-        let rho = Nullifier::random(&mut rng);
-        let note = Note::new_input_note(
+        let nonce = Nullifier::random(&mut rng);
+        let resource = Resource::new_input_resource(
             *COMPRESSED_TOKEN_VK,
-            app_data_static,
-            app_data_dynamic,
-            self.value(),
+            label,
+            value,
+            self.quantity(),
             nk,
-            rho,
+            nonce,
             true,
             rseed,
         );
 
-        TokenNote {
+        TokenResource {
             token_name: self.name().clone(),
-            note,
+            resource,
         }
     }
 
-    pub fn create_random_output_token_note(
+    pub fn create_random_output_token_resource(
         &self,
-        nk_com: pallas::Base,
+        npk: pallas::Base,
         auth: &TokenAuthorization,
-    ) -> TokenNote {
-        let app_data_static = self.encode_name();
-        let app_data_dynamic = auth.to_app_data_dynamic();
-        let note = Note::new_output_note(
+    ) -> TokenResource {
+        let label = self.encode_name();
+        let value = auth.to_value();
+        let resource = Resource::new_output_resource(
             *COMPRESSED_TOKEN_VK,
-            app_data_static,
-            app_data_dynamic,
-            self.value(),
-            nk_com,
+            label,
+            value,
+            self.quantity(),
+            npk,
             true,
         );
 
-        TokenNote {
+        TokenResource {
             token_name: self.name().clone(),
-            note,
+            resource,
         }
     }
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct TokenNote {
+pub struct TokenResource {
     pub token_name: TokenName,
-    pub note: Note,
+    pub resource: Resource,
 }
 
-impl std::ops::Deref for TokenNote {
-    type Target = Note;
+impl std::ops::Deref for TokenResource {
+    type Target = Resource;
 
     fn deref(&self) -> &Self::Target {
-        &self.note
+        &self.resource
     }
 }
 
-impl TokenNote {
+impl TokenResource {
     pub fn token_name(&self) -> &TokenName {
         &self.token_name
     }
@@ -165,12 +165,12 @@ impl TokenNote {
         self.token_name.encode()
     }
 
-    pub fn encode_value(&self) -> pallas::Base {
-        pallas::Base::from(self.note().value)
+    pub fn encode_quantity(&self) -> pallas::Base {
+        pallas::Base::from(self.resource().quantity)
     }
 
-    pub fn note(&self) -> &Note {
-        &self.note
+    pub fn resource(&self) -> &Resource {
+        &self.resource
     }
 
     pub fn generate_input_token_vps<R: RngCore>(
@@ -178,16 +178,19 @@ impl TokenNote {
         mut rng: R,
         auth: TokenAuthorization,
         auth_sk: pallas::Scalar,
-        input_notes: [Note; NUM_NOTE],
-        output_notes: [Note; NUM_NOTE],
-    ) -> NoteValidityPredicates {
-        let TokenNote { token_name, note } = self;
+        input_resources: [Resource; NUM_RESOURCE],
+        output_resources: [Resource; NUM_RESOURCE],
+    ) -> ResourceValidityPredicates {
+        let TokenResource {
+            token_name,
+            resource,
+        } = self;
         // token VP
-        let nf = note.get_nf().unwrap().inner();
+        let nf = resource.get_nf().unwrap().inner();
         let token_vp = TokenValidityPredicateCircuit {
-            owned_note_pub_id: nf,
-            input_notes,
-            output_notes,
+            owned_resource_id: nf,
+            input_resources,
+            output_resources,
             token_name: token_name.clone(),
             auth,
             receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
@@ -198,31 +201,34 @@ impl TokenNote {
         let token_auth_vp = SignatureVerificationValidityPredicateCircuit::from_sk_and_sign(
             &mut rng,
             nf,
-            input_notes,
-            output_notes,
+            input_resources,
+            output_resources,
             auth.vk,
             auth_sk,
             *COMPRESSED_RECEIVER_VK,
         );
 
-        NoteValidityPredicates::new(Box::new(token_vp), vec![Box::new(token_auth_vp)])
+        ResourceValidityPredicates::new(Box::new(token_vp), vec![Box::new(token_auth_vp)])
     }
 
     pub fn generate_output_token_vps<R: RngCore>(
         &self,
         mut rng: R,
         auth: TokenAuthorization,
-        input_notes: [Note; NUM_NOTE],
-        output_notes: [Note; NUM_NOTE],
-    ) -> NoteValidityPredicates {
-        let TokenNote { token_name, note } = self;
+        input_resources: [Resource; NUM_RESOURCE],
+        output_resources: [Resource; NUM_RESOURCE],
+    ) -> ResourceValidityPredicates {
+        let TokenResource {
+            token_name,
+            resource,
+        } = self;
 
-        let owned_note_pub_id = note.commitment().inner();
+        let owned_resource_id = resource.commitment().inner();
         // token VP
         let token_vp = TokenValidityPredicateCircuit {
-            owned_note_pub_id,
-            input_notes,
-            output_notes,
+            owned_resource_id,
+            input_resources,
+            output_resources,
             token_name: token_name.clone(),
             auth,
             receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
@@ -231,29 +237,29 @@ impl TokenNote {
 
         // receiver VP
         let receiver_vp = ReceiverValidityPredicateCircuit {
-            owned_note_pub_id,
-            input_notes,
-            output_notes,
+            owned_resource_id,
+            input_resources,
+            output_resources,
             vp_vk: *COMPRESSED_RECEIVER_VK,
-            nonce: pallas::Base::from_u128(rng.gen()),
+            encrypt_nonce: pallas::Base::from_u128(rng.gen()),
             sk: pallas::Base::random(&mut rng),
             rcv_pk: auth.pk,
             auth_vp_vk: *COMPRESSED_TOKEN_AUTH_VK,
         };
 
-        NoteValidityPredicates::new(Box::new(token_vp), vec![Box::new(receiver_vp)])
+        ResourceValidityPredicates::new(Box::new(token_vp), vec![Box::new(receiver_vp)])
     }
 }
 
 // TokenValidityPredicateCircuit
 #[derive(Clone, Debug)]
 pub struct TokenValidityPredicateCircuit {
-    pub owned_note_pub_id: pallas::Base,
-    pub input_notes: [Note; NUM_NOTE],
-    pub output_notes: [Note; NUM_NOTE],
-    // The token_name goes to app_data_static. It can be extended to a list and embedded to app_data_static.
+    pub owned_resource_id: pallas::Base,
+    pub input_resources: [Resource; NUM_RESOURCE],
+    pub output_resources: [Resource; NUM_RESOURCE],
+    // The token_name goes to label. It can be extended to a list and embedded to label.
     pub token_name: TokenName,
-    // The auth goes to app_data_dynamic and defines how to consume and create the note.
+    // The auth goes to value and defines how to consume and create the resource.
     pub auth: TokenAuthorization,
     pub receiver_vp_vk: pallas::Base,
     // rseed is to generate the randomness for vp commitment
@@ -278,9 +284,9 @@ impl Default for TokenAuthorization {
 impl Default for TokenValidityPredicateCircuit {
     fn default() -> Self {
         Self {
-            owned_note_pub_id: pallas::Base::zero(),
-            input_notes: [(); NUM_NOTE].map(|_| Note::default()),
-            output_notes: [(); NUM_NOTE].map(|_| Note::default()),
+            owned_resource_id: pallas::Base::zero(),
+            input_resources: [(); NUM_RESOURCE].map(|_| Resource::default()),
+            output_resources: [(); NUM_RESOURCE].map(|_| Resource::default()),
             token_name: TokenName("Token_name".to_string()),
             auth: TokenAuthorization::default(),
             receiver_vp_vk: pallas::Base::zero(),
@@ -297,7 +303,7 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
         mut layouter: impl Layouter<pallas::Base>,
         basic_variables: BasicValidityPredicateVariables,
     ) -> Result<(), Error> {
-        let owned_note_pub_id = basic_variables.get_owned_note_pub_id();
+        let owned_resource_id = basic_variables.get_owned_resource_id();
 
         let token_property = assign_free_advice(
             layouter.namespace(|| "witness token_property"),
@@ -307,18 +313,18 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
 
         // We can add more constraints on token_property or extend the token_properties.
 
-        // search target note and get the app_static_data
-        let app_data_static = get_owned_note_variable(
-            config.get_owned_note_variable_config,
-            layouter.namespace(|| "get owned note app_data_static"),
-            &owned_note_pub_id,
-            &basic_variables.get_app_data_static_searchable_pairs(),
+        // search target resource and get the label
+        let label = get_owned_resource_variable(
+            config.get_owned_resource_variable_config,
+            layouter.namespace(|| "get owned resource label"),
+            &owned_resource_id,
+            &basic_variables.get_label_searchable_pairs(),
         )?;
 
-        // check app_data_static
+        // check label
         layouter.assign_region(
-            || "check app_data_static",
-            |mut region| region.constrain_equal(token_property.cell(), app_data_static.cell()),
+            || "check label",
+            |mut region| region.constrain_equal(token_property.cell(), label.cell()),
         )?;
 
         // Construct an ECC chip
@@ -336,12 +342,12 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             Value::known(self.auth.vk),
         )?;
 
-        // search target note and get the app_data_dynamic
-        let app_data_dynamic = get_owned_note_variable(
-            config.get_owned_note_variable_config,
-            layouter.namespace(|| "get owned note app_data_dynamic"),
-            &owned_note_pub_id,
-            &basic_variables.get_app_data_dynamic_searchable_pairs(),
+        // search target resource and get the value
+        let value = get_owned_resource_variable(
+            config.get_owned_resource_variable_config,
+            layouter.namespace(|| "get owned resource value"),
+            &owned_resource_id,
+            &basic_variables.get_value_searchable_pairs(),
         )?;
 
         let receiver_vp_vk = assign_free_advice(
@@ -350,10 +356,10 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             Value::known(self.receiver_vp_vk),
         )?;
 
-        // Decode the app_data_dynamic, and check the app_data_dynamic encoding
-        let encoded_app_data_dynamic = poseidon_hash_gadget(
+        // Decode the value, and check the value encoding
+        let encoded_value = poseidon_hash_gadget(
             config.poseidon_config,
-            layouter.namespace(|| "app_data_dynamic encoding"),
+            layouter.namespace(|| "value encoding"),
             [
                 pk.inner().x(),
                 pk.inner().y(),
@@ -363,17 +369,15 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
         )?;
 
         layouter.assign_region(
-            || "check app_data_dynamic encoding",
-            |mut region| {
-                region.constrain_equal(encoded_app_data_dynamic.cell(), app_data_dynamic.cell())
-            },
+            || "check value encoding",
+            |mut region| region.constrain_equal(encoded_value.cell(), value.cell()),
         )?;
 
         // check the is_merkle_checked flag
-        let is_merkle_checked = get_owned_note_variable(
-            config.get_owned_note_variable_config,
+        let is_merkle_checked = get_owned_resource_variable(
+            config.get_owned_resource_variable_config,
             layouter.namespace(|| "get is_merkle_checked"),
-            &owned_note_pub_id,
+            &owned_resource_id,
             &basic_variables.get_is_merkle_checked_searchable_pairs(),
         )?;
         let constant_one = assign_free_constant(
@@ -387,21 +391,21 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
         )?;
 
         // VP Commitment
-        // Commt the sender(authorization method included) vp if it's an input note;
-        // Commit the receiver(note encryption constraints included) vp if it's an output note.
+        // Commt the sender(authorization method included) vp if it's an input resource;
+        // Commit the receiver(resource encryption constraints included) vp if it's an output resource.
         let first_dynamic_vp = {
-            let is_input_note = get_is_input_note_flag(
-                config.get_is_input_note_flag_config,
-                layouter.namespace(|| "get is_input_note_flag"),
-                &owned_note_pub_id,
-                &basic_variables.get_input_note_nfs(),
-                &basic_variables.get_output_note_cms(),
+            let is_input_resource = get_is_input_resource_flag(
+                config.get_is_input_resource_flag_config,
+                layouter.namespace(|| "get is_input_resource_flag"),
+                &owned_resource_id,
+                &basic_variables.get_input_resource_nfs(),
+                &basic_variables.get_output_resource_cms(),
             )?;
             layouter.assign_region(
                 || "conditional select: ",
                 |mut region| {
                     config.conditional_select_config.assign_region(
-                        &is_input_note,
+                        &is_input_resource,
                         &auth_vp_vk,
                         &receiver_vp_vk,
                         0,
@@ -460,18 +464,18 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
         Ok(())
     }
 
-    fn get_input_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.input_notes
+    fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE] {
+        &self.input_resources
     }
 
-    fn get_output_notes(&self) -> &[Note; NUM_NOTE] {
-        &self.output_notes
+    fn get_output_resources(&self) -> &[Resource; NUM_RESOURCE] {
+        &self.output_resources
     }
 
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
-        let dynamic_vp = if self.owned_note_pub_id == self.output_notes[0].commitment().inner()
-            || self.owned_note_pub_id == self.output_notes[1].commitment().inner()
+        let dynamic_vp = if self.owned_resource_id == self.output_resources[0].commitment().inner()
+            || self.owned_resource_id == self.output_resources[1].commitment().inner()
         {
             self.receiver_vp_vk
         } else {
@@ -494,8 +498,8 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
         public_inputs.into()
     }
 
-    fn get_owned_note_pub_id(&self) -> pallas::Base {
-        self.owned_note_pub_id
+    fn get_owned_resource_id(&self) -> pallas::Base {
+        self.owned_resource_id
     }
 }
 
@@ -514,7 +518,7 @@ impl TokenAuthorization {
         }
     }
 
-    pub fn to_app_data_dynamic(&self) -> pallas::Base {
+    pub fn to_value(&self) -> pallas::Base {
         let pk_coord = self.pk.to_affine().coordinates().unwrap();
         poseidon_hash_n::<4>([
             *pk_coord.x(),
@@ -534,22 +538,22 @@ impl TokenAuthorization {
 #[test]
 fn test_halo2_token_vp_circuit() {
     use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
-    use crate::note::tests::random_note;
+    use crate::resource::tests::random_resource;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     let circuit = {
-        let mut input_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
-        let output_notes = [(); NUM_NOTE].map(|_| random_note(&mut rng));
+        let mut input_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
+        let output_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
         let token_name = TokenName("Token_name".to_string());
         let auth = TokenAuthorization::random(&mut rng);
-        input_notes[0].note_type.app_data_static = token_name.encode();
-        input_notes[0].app_data_dynamic = auth.to_app_data_dynamic();
+        input_resources[0].kind.label = token_name.encode();
+        input_resources[0].value = auth.to_value();
         TokenValidityPredicateCircuit {
-            owned_note_pub_id: input_notes[0].get_nf().unwrap().inner(),
-            input_notes,
-            output_notes,
+            owned_resource_id: input_resources[0].get_nf().unwrap().inner(),
+            input_resources,
+            output_resources,
             token_name,
             auth,
             receiver_vp_vk: *COMPRESSED_RECEIVER_VK,

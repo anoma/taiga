@@ -1,19 +1,21 @@
 use crate::circuit::blake2s::{vp_commitment_gadget, Blake2sChip, Blake2sConfig};
 use crate::circuit::gadgets::assign_free_advice;
 use crate::circuit::hash_to_curve::HashToCurveConfig;
-use crate::circuit::integrity::{check_input_note, check_output_note, compute_value_commitment};
+use crate::circuit::integrity::{
+    check_input_resource, check_output_resource, compute_delta_commitment,
+};
 use crate::circuit::merkle_circuit::{
     merkle_poseidon_gadget, MerklePoseidonChip, MerklePoseidonConfig,
 };
 use crate::constant::{
-    TaigaFixedBases, ACTION_ANCHOR_PUBLIC_INPUT_ROW_IDX, ACTION_INPUT_VP_CM_1_ROW_IDX,
-    ACTION_INPUT_VP_CM_2_ROW_IDX, ACTION_NET_VALUE_CM_X_PUBLIC_INPUT_ROW_IDX,
-    ACTION_NET_VALUE_CM_Y_PUBLIC_INPUT_ROW_IDX, ACTION_NF_PUBLIC_INPUT_ROW_IDX,
+    TaigaFixedBases, ACTION_ANCHOR_PUBLIC_INPUT_ROW_IDX, ACTION_DELTA_CM_X_PUBLIC_INPUT_ROW_IDX,
+    ACTION_DELTA_CM_Y_PUBLIC_INPUT_ROW_IDX, ACTION_INPUT_VP_CM_1_ROW_IDX,
+    ACTION_INPUT_VP_CM_2_ROW_IDX, ACTION_NF_PUBLIC_INPUT_ROW_IDX,
     ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX, ACTION_OUTPUT_VP_CM_1_ROW_IDX,
     ACTION_OUTPUT_VP_CM_2_ROW_IDX, TAIGA_COMMITMENT_TREE_DEPTH,
 };
 use crate::merkle_tree::LR;
-use crate::note::Note;
+use crate::resource::Resource;
 
 use halo2_gadgets::{
     ecc::chip::{EccChip, EccConfig},
@@ -30,7 +32,7 @@ use halo2_proofs::{
 };
 use pasta_curves::pallas;
 
-use crate::circuit::note_commitment::{NoteCommitChip, NoteCommitConfig};
+use crate::circuit::resource_commitment::{ResourceCommitChip, ResourceCommitConfig};
 
 #[derive(Clone, Debug)]
 pub struct ActionConfig {
@@ -43,23 +45,23 @@ pub struct ActionConfig {
     merkle_path_selector: Selector,
     hash_to_curve_config: HashToCurveConfig,
     blake2s_config: Blake2sConfig<pallas::Base>,
-    note_commit_config: NoteCommitConfig,
+    resource_commit_config: ResourceCommitConfig,
 }
 
 /// The Action circuit.
 #[derive(Clone, Debug, Default)]
 pub struct ActionCircuit {
-    /// Input note
-    pub input_note: Note,
-    /// The authorization path of input note
+    /// Input resource
+    pub input_resource: Resource,
+    /// The authorization path of input resource
     pub merkle_path: [(pallas::Base, LR); TAIGA_COMMITMENT_TREE_DEPTH],
-    /// Output note
-    pub output_note: Note,
-    /// random scalar for net value commitment
+    /// Output resource
+    pub output_resource: Resource,
+    /// random scalar for delta commitment
     pub rcv: pallas::Scalar,
-    /// The randomness for input note application vp commitment
+    /// The randomness for input resource application vp commitment
     pub input_vp_cm_r: pallas::Base,
-    /// The randomness for output note application vp commitment
+    /// The randomness for output resource application vp commitment
     pub output_vp_cm_r: pallas::Base,
 }
 
@@ -146,7 +148,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
 
         let blake2s_config = Blake2sConfig::configure(meta, advices);
 
-        let note_commit_config = NoteCommitChip::configure(
+        let resource_commit_config = ResourceCommitChip::configure(
             meta,
             advices[0..3].try_into().unwrap(),
             poseidon_config.clone(),
@@ -163,7 +165,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             merkle_path_selector,
             hash_to_curve_config,
             blake2s_config,
-            note_commit_config,
+            resource_commit_config,
         }
     }
 
@@ -196,17 +198,17 @@ impl Circuit<pallas::Base> for ActionCircuit {
         // Construct a blake2s chip
         let blake2s_chip = Blake2sChip::construct(config.blake2s_config);
 
-        // Construct a note_commit chip
-        let note_commit_chip = NoteCommitChip::construct(config.note_commit_config);
+        // Construct a resource_commit chip
+        let resource_commit_chip = ResourceCommitChip::construct(config.resource_commit_config);
 
-        // Input note
-        // Check the input note commitment
-        let input_note_variables = check_input_note(
-            layouter.namespace(|| "check input note"),
+        // Input resource
+        // Check the input resource commitment
+        let input_resource_variables = check_input_resource(
+            layouter.namespace(|| "check input resource"),
             config.advices,
             config.instances,
-            note_commit_chip.clone(),
-            self.input_note,
+            resource_commit_chip.clone(),
+            self.input_resource,
             ACTION_NF_PUBLIC_INPUT_ROW_IDX,
         )?;
 
@@ -214,51 +216,51 @@ impl Circuit<pallas::Base> for ActionCircuit {
         let root = merkle_poseidon_gadget(
             layouter.namespace(|| "poseidon merkle"),
             merkle_chip,
-            input_note_variables.cm,
+            input_resource_variables.cm,
             &self.merkle_path,
         )?;
 
-        // Output note
-        let output_note_vars = check_output_note(
-            layouter.namespace(|| "check output note"),
+        // Output resource
+        let output_resource_vars = check_output_resource(
+            layouter.namespace(|| "check output resource"),
             config.advices,
             config.instances,
-            note_commit_chip,
-            self.output_note,
-            input_note_variables.nf,
+            resource_commit_chip,
+            self.output_resource,
+            input_resource_variables.nf,
             ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX,
         )?;
 
-        // compute and public net value commitment(input_value_commitment - output_value_commitment)
-        let cv_net = compute_value_commitment(
-            layouter.namespace(|| "net value commitment"),
+        // compute and public delta commitment(input_value_commitment - output_value_commitment)
+        let delta = compute_delta_commitment(
+            layouter.namespace(|| "delta commitment"),
             ecc_chip,
             config.hash_to_curve_config.clone(),
-            input_note_variables.note_variables.app_vk.clone(),
-            input_note_variables.note_variables.app_data_static.clone(),
-            input_note_variables.note_variables.value.clone(),
-            output_note_vars.note_variables.app_vk.clone(),
-            output_note_vars.note_variables.app_data_static.clone(),
-            output_note_vars.note_variables.value,
+            input_resource_variables.resource_variables.logic.clone(),
+            input_resource_variables.resource_variables.label.clone(),
+            input_resource_variables.resource_variables.quantity.clone(),
+            output_resource_vars.resource_variables.logic.clone(),
+            output_resource_vars.resource_variables.label.clone(),
+            output_resource_vars.resource_variables.quantity,
             self.rcv,
         )?;
         layouter.constrain_instance(
-            cv_net.inner().x().cell(),
+            delta.inner().x().cell(),
             config.instances,
-            ACTION_NET_VALUE_CM_X_PUBLIC_INPUT_ROW_IDX,
+            ACTION_DELTA_CM_X_PUBLIC_INPUT_ROW_IDX,
         )?;
         layouter.constrain_instance(
-            cv_net.inner().y().cell(),
+            delta.inner().y().cell(),
             config.instances,
-            ACTION_NET_VALUE_CM_Y_PUBLIC_INPUT_ROW_IDX,
+            ACTION_DELTA_CM_Y_PUBLIC_INPUT_ROW_IDX,
         )?;
 
         // merkle path check
         layouter.assign_region(
             || "merkle path check",
             |mut region| {
-                input_note_variables
-                    .note_variables
+                input_resource_variables
+                    .resource_variables
                     .is_merkle_checked
                     .copy_advice(
                         || "is_merkle_checked_input",
@@ -278,7 +280,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             },
         )?;
 
-        // Input note application VP commitment
+        // Input resource application VP commitment
         let input_vp_cm_r = assign_free_advice(
             layouter.namespace(|| "witness input_vp_cm_r"),
             config.advices[0],
@@ -287,7 +289,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
         let input_vp_commitment = vp_commitment_gadget(
             &mut layouter,
             &blake2s_chip,
-            input_note_variables.note_variables.app_vk.clone(),
+            input_resource_variables.resource_variables.logic.clone(),
             input_vp_cm_r,
         )?;
         layouter.constrain_instance(
@@ -301,7 +303,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             ACTION_INPUT_VP_CM_2_ROW_IDX,
         )?;
 
-        // Output note application VP commitment
+        // Output resource application VP commitment
         let output_vp_cm_r = assign_free_advice(
             layouter.namespace(|| "witness output_vp_cm_r"),
             config.advices[0],
@@ -310,7 +312,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
         let output_vp_commitment = vp_commitment_gadget(
             &mut layouter,
             &blake2s_chip,
-            output_note_vars.note_variables.app_vk.clone(),
+            output_resource_vars.resource_variables.logic.clone(),
             output_vp_cm_r,
         )?;
         layouter.constrain_instance(

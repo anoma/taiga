@@ -4,12 +4,12 @@ use crate::{
         vp_examples::{TrivialValidityPredicateCircuit, COMPRESSED_TRIVIAL_VP_VK},
     },
     constant::{
-        NUM_NOTE, POSEIDON_TO_CURVE_INPUT_LEN, PRF_EXPAND_PERSONALIZATION, PRF_EXPAND_PSI,
+        NUM_RESOURCE, POSEIDON_TO_CURVE_INPUT_LEN, PRF_EXPAND_PERSONALIZATION, PRF_EXPAND_PSI,
         PRF_EXPAND_PUBLIC_INPUT_PADDING, PRF_EXPAND_RCM, PRF_EXPAND_VCM_R,
     },
     merkle_tree::{Anchor, MerklePath, Node},
     nullifier::{Nullifier, NullifierKeyContainer},
-    shielded_ptx::NoteVPVerifyingInfoSet,
+    shielded_ptx::ResourceVPVerifyingInfoSet,
     utils::{poseidon_hash_n, poseidon_to_curve},
 };
 use blake2b_simd::Params as Blake2bParams;
@@ -29,13 +29,13 @@ use serde;
 #[cfg(feature = "borsh")]
 use borsh::{BorshDeserialize, BorshSerialize};
 
-/// A commitment to a note.
+/// A commitment to a resource.
 #[derive(Copy, Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "nif", derive(NifTuple))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct NoteCommitment(pallas::Base);
+pub struct ResourceCommitment(pallas::Base);
 
-impl NoteCommitment {
+impl ResourceCommitment {
     pub fn inner(&self) -> pallas::Base {
         self.0
     }
@@ -45,18 +45,18 @@ impl NoteCommitment {
     }
 
     pub fn from_bytes(bytes: [u8; 32]) -> CtOption<Self> {
-        pallas::Base::from_repr(bytes).map(NoteCommitment)
+        pallas::Base::from_repr(bytes).map(ResourceCommitment)
     }
 }
 
-impl From<pallas::Base> for NoteCommitment {
+impl From<pallas::Base> for ResourceCommitment {
     fn from(cm: pallas::Base) -> Self {
-        NoteCommitment(cm)
+        ResourceCommitment(cm)
     }
 }
 
 #[cfg(feature = "borsh")]
-impl BorshSerialize for NoteCommitment {
+impl BorshSerialize for ResourceCommitment {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         writer.write_all(&self.to_bytes())?;
         Ok(())
@@ -64,60 +64,60 @@ impl BorshSerialize for NoteCommitment {
 }
 
 #[cfg(feature = "borsh")]
-impl BorshDeserialize for NoteCommitment {
+impl BorshDeserialize for ResourceCommitment {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let mut repr = [0u8; 32];
         reader.read_exact(&mut repr)?;
         let value = Option::from(pallas::Base::from_repr(repr)).ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                "NoteCommitment value not in field",
+                "ResourceCommitment value not in field",
             )
         })?;
         Ok(Self(value))
     }
 }
 
-impl Hash for NoteCommitment {
+impl Hash for ResourceCommitment {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.to_bytes().as_ref().hash(state);
     }
 }
 
-/// A note
+/// A resource
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "nif", derive(NifStruct))]
-#[cfg_attr(feature = "nif", module = "Taiga.Note")]
+#[cfg_attr(feature = "nif", module = "Taiga.Resource")]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Note {
-    pub note_type: NoteType,
-    /// app_data_dynamic is the data defined in application vp and will NOT be used to derive type
-    /// sub-vps and any other data can be encoded to the app_data_dynamic
-    pub app_data_dynamic: pallas::Base,
-    /// value denotes the amount of the note.
-    pub value: u64,
+pub struct Resource {
+    pub kind: ResourceKind,
+    /// value is the fungible data of the resource
+    /// sub-vps and any other data can be encoded to the value
+    pub value: pallas::Base,
+    /// the quantity of the resource.
+    pub quantity: u64,
     /// NullifierKeyContainer contains the nullifier_key or the nullifier_key commitment.
     pub nk_container: NullifierKeyContainer,
-    /// old nullifier. Nonce which is a deterministically computed, unique nonce
-    pub rho: Nullifier,
+    /// nonce guarantees the uniqueness of the resource computable fields
+    pub nonce: Nullifier,
     /// psi is to derive the nullifier
     pub psi: pallas::Base,
-    /// rcm is the trapdoor of the note commitment
+    /// rcm is the trapdoor of the resource commitment
     pub rcm: pallas::Base,
-    /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of input note will be checked in ActionProof.
+    /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of input resource will be checked in ActionProof.
     pub is_merkle_checked: bool,
 }
 
-/// The parameters in the NoteType are used to derive note type.
+/// The parameters in the ResourceKind are used to derive resource kind.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "nif", derive(NifStruct))]
-#[cfg_attr(feature = "nif", module = "Taiga.NoteType")]
+#[cfg_attr(feature = "nif", module = "Taiga.ResourceKind")]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct NoteType {
-    /// app_vk is the compressed verifying key of VP
-    pub app_vk: pallas::Base,
-    /// app_data_static is the encoded data that is defined in application vp
-    pub app_data_static: pallas::Base,
+pub struct ResourceKind {
+    /// logic is a hash of a predicate associated with the resource
+    pub logic: pallas::Base,
+    /// label specifies the fungibility domain for the resource
+    pub label: pallas::Base,
 }
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -125,130 +125,130 @@ pub struct NoteType {
 #[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 pub struct RandomSeed([u8; 32]);
 
-/// NoteValidityPredicates includes one application(static) VP and a few dynamic VPs.
+/// ResourceValidityPredicates includes one application(static) VP and a few dynamic VPs.
 #[derive(Clone)]
-pub struct NoteValidityPredicates {
+pub struct ResourceValidityPredicates {
     application_vp: Box<ValidityPredicate>,
     dynamic_vps: Vec<Box<ValidityPredicate>>,
 }
 
-impl Note {
+impl Resource {
     #[allow(clippy::too_many_arguments)]
-    pub fn new_input_note(
-        app_vk: pallas::Base,
-        app_data_static: pallas::Base,
-        app_data_dynamic: pallas::Base,
-        value: u64,
+    pub fn new_input_resource(
+        logic: pallas::Base,
+        label: pallas::Base,
+        value: pallas::Base,
+        quantity: u64,
         nk: pallas::Base,
-        rho: Nullifier,
+        nonce: Nullifier,
         is_merkle_checked: bool,
         rseed: RandomSeed,
     ) -> Self {
-        let note_type = NoteType::new(app_vk, app_data_static);
+        let kind = ResourceKind::new(logic, label);
         Self {
-            note_type,
-            app_data_dynamic,
+            kind,
             value,
+            quantity,
             nk_container: NullifierKeyContainer::Key(nk),
             is_merkle_checked,
-            psi: rseed.get_psi(&rho),
-            rcm: rseed.get_rcm(&rho),
-            rho,
+            psi: rseed.get_psi(&nonce),
+            rcm: rseed.get_rcm(&nonce),
+            nonce,
         }
     }
 
-    // The rho, psi, and rcm are not specified until the action is constructed.
+    // The nonce, psi, and rcm are not specified until the action is constructed.
     #[allow(clippy::too_many_arguments)]
-    pub fn new_output_note(
-        app_vk: pallas::Base,
-        app_data_static: pallas::Base,
-        app_data_dynamic: pallas::Base,
-        value: u64,
-        nk_com: pallas::Base,
+    pub fn new_output_resource(
+        logic: pallas::Base,
+        label: pallas::Base,
+        value: pallas::Base,
+        quantity: u64,
+        npk: pallas::Base,
         is_merkle_checked: bool,
     ) -> Self {
-        let note_type = NoteType::new(app_vk, app_data_static);
+        let kind = ResourceKind::new(logic, label);
         Self {
-            note_type,
-            app_data_dynamic,
+            kind,
             value,
-            nk_container: NullifierKeyContainer::Commitment(nk_com),
+            quantity,
+            nk_container: NullifierKeyContainer::PublicKey(npk),
             is_merkle_checked,
             psi: pallas::Base::default(),
             rcm: pallas::Base::default(),
-            rho: Nullifier::default(),
+            nonce: Nullifier::default(),
         }
     }
 
     #[allow(clippy::too_many_arguments)]
     pub fn from_full(
-        app_vk: pallas::Base,
-        app_data_static: pallas::Base,
-        app_data_dynamic: pallas::Base,
-        value: u64,
+        logic: pallas::Base,
+        label: pallas::Base,
+        value: pallas::Base,
+        quantity: u64,
         nk_container: NullifierKeyContainer,
-        rho: Nullifier,
+        nonce: Nullifier,
         is_merkle_checked: bool,
         psi: pallas::Base,
         rcm: pallas::Base,
     ) -> Self {
-        let note_type = NoteType::new(app_vk, app_data_static);
+        let kind = ResourceKind::new(logic, label);
         Self {
-            note_type,
-            app_data_dynamic,
+            kind,
             value,
+            quantity,
             nk_container,
             is_merkle_checked,
             psi,
             rcm,
-            rho,
+            nonce,
         }
     }
 
-    pub fn random_padding_note<R: RngCore>(mut rng: R) -> Self {
-        let app_vk = *COMPRESSED_TRIVIAL_VP_VK;
-        let app_data_static = pallas::Base::random(&mut rng);
-        let note_type = NoteType::new(app_vk, app_data_static);
-        let app_data_dynamic = pallas::Base::random(&mut rng);
-        let rho = Nullifier::from(pallas::Base::random(&mut rng));
+    pub fn random_padding_resource<R: RngCore>(mut rng: R) -> Self {
+        let logic = *COMPRESSED_TRIVIAL_VP_VK;
+        let label = pallas::Base::random(&mut rng);
+        let kind = ResourceKind::new(logic, label);
+        let value = pallas::Base::random(&mut rng);
+        let nonce = Nullifier::from(pallas::Base::random(&mut rng));
         let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
         let rseed = RandomSeed::random(&mut rng);
-        Note {
-            note_type,
-            app_data_dynamic,
-            value: 0,
+        Resource {
+            kind,
+            value,
+            quantity: 0,
             nk_container: nk,
-            rho,
-            psi: rseed.get_psi(&rho),
-            rcm: rseed.get_rcm(&rho),
+            nonce,
+            psi: rseed.get_psi(&nonce),
+            rcm: rseed.get_rcm(&nonce),
             is_merkle_checked: false,
         }
     }
 
-    // note_commitment = poseidon_hash(app_vk || app_data_static || app_data_dynamic || nk_commitment || rho || psi || is_merkle_checked || value || rcm)
-    pub fn commitment(&self) -> NoteCommitment {
-        let compose_is_merkle_checked_value = if self.is_merkle_checked {
-            pallas::Base::from_u128(1 << 64).square() + pallas::Base::from(self.value)
+    // resource_commitment = poseidon_hash(logic || label || value || npk || nonce || psi || is_merkle_checked || quantity || rcm)
+    pub fn commitment(&self) -> ResourceCommitment {
+        let compose_is_merkle_checked_quantity = if self.is_merkle_checked {
+            pallas::Base::from_u128(1 << 64).square() + pallas::Base::from(self.quantity)
         } else {
-            pallas::Base::from(self.value)
+            pallas::Base::from(self.quantity)
         };
         let ret = poseidon_hash_n([
-            self.get_app_vk(),
-            self.get_app_data_static(),
-            self.app_data_dynamic,
-            self.get_nk_commitment(),
-            self.rho.inner(),
+            self.get_logic(),
+            self.get_label(),
+            self.value,
+            self.get_npk(),
+            self.nonce.inner(),
             self.psi,
-            compose_is_merkle_checked_value,
+            compose_is_merkle_checked_quantity,
             self.rcm,
         ]);
-        NoteCommitment(ret)
+        ResourceCommitment(ret)
     }
 
     pub fn get_nf(&self) -> Option<Nullifier> {
         Nullifier::derive(
             &self.nk_container,
-            &self.rho.inner(),
+            &self.nonce.inner(),
             &self.psi,
             &self.commitment(),
         )
@@ -258,20 +258,20 @@ impl Note {
         self.nk_container.get_nk()
     }
 
-    pub fn get_nk_commitment(&self) -> pallas::Base {
-        self.nk_container.get_commitment()
+    pub fn get_npk(&self) -> pallas::Base {
+        self.nk_container.get_npk()
     }
 
-    pub fn get_note_type(&self) -> pallas::Point {
-        self.note_type.derive_note_type()
+    pub fn get_kind(&self) -> pallas::Point {
+        self.kind.derive_kind()
     }
 
-    pub fn get_app_vk(&self) -> pallas::Base {
-        self.note_type.app_vk
+    pub fn get_logic(&self) -> pallas::Base {
+        self.kind.logic
     }
 
-    pub fn get_app_data_static(&self) -> pallas::Base {
-        self.note_type.app_data_static
+    pub fn get_label(&self) -> pallas::Base {
+        self.kind.label
     }
 
     pub fn get_psi(&self) -> pallas::Base {
@@ -287,30 +287,30 @@ impl Note {
         path.root(cm_node)
     }
 
-    pub fn set_rho<R: RngCore>(&mut self, input_note: &Note, mut rng: R) {
+    pub fn set_nonce<R: RngCore>(&mut self, input_resource: &Resource, mut rng: R) {
         let rseed = RandomSeed::random(&mut rng);
 
-        self.rho = input_note.get_nf().unwrap();
-        self.psi = rseed.get_psi(&self.rho);
-        self.rcm = rseed.get_rcm(&self.rho);
+        self.nonce = input_resource.get_nf().unwrap();
+        self.psi = rseed.get_psi(&self.nonce);
+        self.rcm = rseed.get_rcm(&self.nonce);
     }
 }
 
 #[cfg(feature = "borsh")]
-impl BorshSerialize for Note {
+impl BorshSerialize for Resource {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         use byteorder::{LittleEndian, WriteBytesExt};
-        // Write app_vk
-        writer.write_all(&self.note_type.app_vk.to_repr())?;
-        // Write app_data_static
-        writer.write_all(&self.note_type.app_data_static.to_repr())?;
-        // Write app_data_dynamic
-        writer.write_all(&self.app_data_dynamic.to_repr())?;
-        // Write note value
-        writer.write_u64::<LittleEndian>(self.value)?;
+        // Write logic
+        writer.write_all(&self.kind.logic.to_repr())?;
+        // Write label
+        writer.write_all(&self.kind.label.to_repr())?;
+        // Write value
+        writer.write_all(&self.value.to_repr())?;
+        // Write resource quantity
+        writer.write_u64::<LittleEndian>(self.quantity)?;
         // Write nk_container
         match self.nk_container {
-            NullifierKeyContainer::Commitment(nk) => {
+            NullifierKeyContainer::PublicKey(nk) => {
                 writer.write_u8(1)?;
                 writer.write_all(&nk.to_repr())
             }
@@ -319,8 +319,8 @@ impl BorshSerialize for Note {
                 writer.write_all(&nk.to_repr())
             }
         }?;
-        // Write rho
-        writer.write_all(&self.rho.to_bytes())?;
+        // Write nonce
+        writer.write_all(&self.nonce.to_bytes())?;
         // Write psi
         writer.write_all(&self.psi.to_repr())?;
         // Write rcm
@@ -333,31 +333,27 @@ impl BorshSerialize for Note {
 }
 
 #[cfg(feature = "borsh")]
-impl BorshDeserialize for Note {
+impl BorshDeserialize for Resource {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         use byteorder::{LittleEndian, ReadBytesExt};
         use std::io;
-        // Read app_vk
-        let mut app_vk_bytes = [0u8; 32];
-        reader.read_exact(&mut app_vk_bytes)?;
-        let app_vk = Option::from(pallas::Base::from_repr(app_vk_bytes))
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "app_vk not in field"))?;
-        // Read app_data_static
-        let mut app_data_static_bytes = [0u8; 32];
-        reader.read_exact(&mut app_data_static_bytes)?;
-        let app_data_static = Option::from(pallas::Base::from_repr(app_data_static_bytes))
-            .ok_or_else(|| {
-                io::Error::new(io::ErrorKind::InvalidData, "app_data_static not in field")
-            })?;
-        // Read app_data_dynamic
-        let mut app_data_dynamic_bytes = [0u8; 32];
-        reader.read_exact(&mut app_data_dynamic_bytes)?;
-        let app_data_dynamic = Option::from(pallas::Base::from_repr(app_data_dynamic_bytes))
-            .ok_or_else(|| {
-                io::Error::new(io::ErrorKind::InvalidData, "app_data_dynamic not in field")
-            })?;
-        // Read note value
-        let value = reader.read_u64::<LittleEndian>()?;
+        // Read logic
+        let mut logic_bytes = [0u8; 32];
+        reader.read_exact(&mut logic_bytes)?;
+        let logic = Option::from(pallas::Base::from_repr(logic_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "logic not in field"))?;
+        // Read label
+        let mut label_bytes = [0u8; 32];
+        reader.read_exact(&mut label_bytes)?;
+        let label = Option::from(pallas::Base::from_repr(label_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "label not in field"))?;
+        // Read value
+        let mut value_bytes = [0u8; 32];
+        reader.read_exact(&mut value_bytes)?;
+        let value = Option::from(pallas::Base::from_repr(value_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "value not in field"))?;
+        // Read resource quantity
+        let quantity = reader.read_u64::<LittleEndian>()?;
         // Read nk_container
         let mut nk_container_type = [0u8; 1];
         reader.read_exact(&mut nk_container_type)?;
@@ -367,15 +363,15 @@ impl BorshDeserialize for Note {
         let nk = Option::from(pallas::Base::from_repr(nk_container_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "nk not in field"))?;
         let nk_container = if nk_container_type == 0x01 {
-            NullifierKeyContainer::from_commitment(nk)
+            NullifierKeyContainer::from_npk(nk)
         } else {
             NullifierKeyContainer::from_key(nk)
         };
-        // Read rho
-        let mut rho_bytes = [0u8; 32];
-        reader.read_exact(&mut rho_bytes)?;
-        let rho = Option::from(Nullifier::from_bytes(rho_bytes))
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "rho not in field"))?;
+        // Read nonce
+        let mut nonce_bytes = [0u8; 32];
+        reader.read_exact(&mut nonce_bytes)?;
+        let nonce = Option::from(Nullifier::from_bytes(nonce_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "nonce not in field"))?;
         // Read psi
         let mut psi_bytes = [0u8; 32];
         reader.read_exact(&mut psi_bytes)?;
@@ -391,14 +387,14 @@ impl BorshDeserialize for Note {
         reader.read_exact(&mut is_merkle_checked_byte)?;
         let is_merkle_checked_byte = is_merkle_checked_byte[0];
         let is_merkle_checked = is_merkle_checked_byte == 0x01;
-        // Construct note
-        Ok(Note::from_full(
-            app_vk,
-            app_data_static,
-            app_data_dynamic,
+        // Construct resource
+        Ok(Resource::from_full(
+            logic,
+            label,
             value,
+            quantity,
             nk_container,
-            rho,
+            nonce,
             is_merkle_checked,
             psi,
             rcm,
@@ -406,24 +402,24 @@ impl BorshDeserialize for Note {
     }
 }
 
-impl NoteType {
+impl ResourceKind {
     pub fn new(vk: pallas::Base, data: pallas::Base) -> Self {
         Self {
-            app_vk: vk,
-            app_data_static: data,
+            logic: vk,
+            label: data,
         }
     }
 
-    pub fn derive_note_type(&self) -> pallas::Point {
-        let inputs = [self.app_vk, self.app_data_static];
+    pub fn derive_kind(&self) -> pallas::Point {
+        let inputs = [self.logic, self.label];
         poseidon_to_curve::<POSEIDON_TO_CURVE_INPUT_LEN>(&inputs)
     }
 }
 
-impl Hash for NoteType {
+impl Hash for ResourceKind {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.app_vk.to_repr().as_ref().hash(state);
-        self.app_data_static.to_repr().as_ref().hash(state);
+        self.logic.to_repr().as_ref().hash(state);
+        self.label.to_repr().as_ref().hash(state);
     }
 }
 
@@ -438,26 +434,26 @@ impl RandomSeed {
         Self(rseed)
     }
 
-    pub fn get_psi(&self, rho: &Nullifier) -> pallas::Base {
+    pub fn get_psi(&self, nonce: &Nullifier) -> pallas::Base {
         let mut h = Blake2bParams::new()
             .hash_length(64)
             .personal(PRF_EXPAND_PERSONALIZATION)
             .to_state();
         h.update(&[PRF_EXPAND_PSI]);
         h.update(&self.0);
-        h.update(&rho.to_bytes());
+        h.update(&nonce.to_bytes());
         let psi_bytes = *h.finalize().as_array();
         pallas::Base::from_uniform_bytes(&psi_bytes)
     }
 
-    pub fn get_rcm(&self, rho: &Nullifier) -> pallas::Base {
+    pub fn get_rcm(&self, nonce: &Nullifier) -> pallas::Base {
         let mut h = Blake2bParams::new()
             .hash_length(64)
             .personal(PRF_EXPAND_PERSONALIZATION)
             .to_state();
         h.update(&[PRF_EXPAND_RCM]);
         h.update(&self.0);
-        h.update(&rho.to_bytes());
+        h.update(&nonce.to_bytes());
         let rcm_bytes = *h.finalize().as_array();
         pallas::Base::from_uniform_bytes(&rcm_bytes)
     }
@@ -500,7 +496,7 @@ impl RandomSeed {
     }
 }
 
-impl NoteValidityPredicates {
+impl ResourceValidityPredicates {
     pub fn new(
         application_vp: Box<ValidityPredicate>,
         dynamic_vps: Vec<Box<ValidityPredicate>>,
@@ -512,7 +508,7 @@ impl NoteValidityPredicates {
     }
 
     // Generate vp proofs
-    pub fn build(&self) -> NoteVPVerifyingInfoSet {
+    pub fn build(&self) -> ResourceVPVerifyingInfoSet {
         let app_vp_verifying_info = self.application_vp.get_verifying_info();
 
         let app_dynamic_vp_verifying_info = self
@@ -521,20 +517,20 @@ impl NoteValidityPredicates {
             .map(|verifying_info| verifying_info.get_verifying_info())
             .collect();
 
-        NoteVPVerifyingInfoSet::new(app_vp_verifying_info, app_dynamic_vp_verifying_info)
+        ResourceVPVerifyingInfoSet::new(app_vp_verifying_info, app_dynamic_vp_verifying_info)
     }
 
-    // Create an input padding note vps
-    pub fn create_input_padding_note_vps(
-        note: &Note,
-        input_notes: [Note; NUM_NOTE],
-        output_notes: [Note; NUM_NOTE],
+    // Create an input padding resource vps
+    pub fn create_input_padding_resource_vps(
+        resource: &Resource,
+        input_resources: [Resource; NUM_RESOURCE],
+        output_resources: [Resource; NUM_RESOURCE],
     ) -> Self {
-        let note_id = note.get_nf().unwrap().inner();
+        let owned_resource_id = resource.get_nf().unwrap().inner();
         let application_vp = Box::new(TrivialValidityPredicateCircuit::new(
-            note_id,
-            input_notes,
-            output_notes,
+            owned_resource_id,
+            input_resources,
+            output_resources,
         ));
         Self {
             application_vp,
@@ -542,17 +538,17 @@ impl NoteValidityPredicates {
         }
     }
 
-    // Create an output padding note vps
-    pub fn create_output_padding_note_vps(
-        note: &Note,
-        input_notes: [Note; NUM_NOTE],
-        output_notes: [Note; NUM_NOTE],
+    // Create an output padding resource vps
+    pub fn create_output_padding_resource_vps(
+        resource: &Resource,
+        input_resources: [Resource; NUM_RESOURCE],
+        output_resources: [Resource; NUM_RESOURCE],
     ) -> Self {
-        let note_id = note.commitment().inner();
+        let owned_resource_id = resource.commitment().inner();
         let application_vp = Box::new(TrivialValidityPredicateCircuit::new(
-            note_id,
-            input_notes,
-            output_notes,
+            owned_resource_id,
+            input_resources,
+            output_resources,
         ));
         Self {
             application_vp,
@@ -563,77 +559,77 @@ impl NoteValidityPredicates {
 
 #[cfg(test)]
 pub mod tests {
-    use super::{Note, NoteType, RandomSeed};
+    use super::{RandomSeed, Resource, ResourceKind};
     use crate::nullifier::tests::*;
     use halo2_proofs::arithmetic::Field;
     use pasta_curves::pallas;
     use rand::{Rng, RngCore};
 
-    pub fn random_note_type<R: RngCore>(mut rng: R) -> NoteType {
-        let app_vk = pallas::Base::random(&mut rng);
-        let app_data_static = pallas::Base::random(&mut rng);
-        NoteType::new(app_vk, app_data_static)
+    pub fn random_kind<R: RngCore>(mut rng: R) -> ResourceKind {
+        let logic = pallas::Base::random(&mut rng);
+        let label = pallas::Base::random(&mut rng);
+        ResourceKind::new(logic, label)
     }
 
-    pub fn random_note<R: RngCore>(mut rng: R) -> Note {
-        let rho = random_nullifier(&mut rng);
+    pub fn random_resource<R: RngCore>(mut rng: R) -> Resource {
+        let nonce = random_nullifier(&mut rng);
         let rseed = RandomSeed::random(&mut rng);
-        Note {
-            note_type: random_note_type(&mut rng),
-            app_data_dynamic: pallas::Base::random(&mut rng),
-            value: rng.gen(),
+        Resource {
+            kind: random_kind(&mut rng),
+            value: pallas::Base::random(&mut rng),
+            quantity: rng.gen(),
             nk_container: random_nullifier_key(&mut rng),
             is_merkle_checked: true,
-            psi: rseed.get_psi(&rho),
-            rcm: rseed.get_rcm(&rho),
-            rho,
+            psi: rseed.get_psi(&nonce),
+            rcm: rseed.get_rcm(&nonce),
+            nonce,
         }
     }
 
     #[cfg(feature = "borsh")]
     #[test]
-    fn note_borsh_serialization_test() {
+    fn resource_borsh_serialization_test() {
         use borsh::BorshDeserialize;
         use rand::rngs::OsRng;
 
-        use crate::note::NoteCommitment;
+        use crate::resource::ResourceCommitment;
         let mut rng = OsRng;
 
-        let input_note = random_note(&mut rng);
+        let input_resource = random_resource(&mut rng);
         {
             // BorshSerialize
-            let borsh = borsh::to_vec(&input_note).unwrap();
+            let borsh = borsh::to_vec(&input_resource).unwrap();
             // BorshDeserialize
-            let de_note: Note = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
-            assert_eq!(input_note, de_note);
+            let de_resource: Resource = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
+            assert_eq!(input_resource, de_resource);
         }
 
-        let mut output_note = input_note;
+        let mut output_resource = input_resource;
         {
-            output_note.nk_container = random_nullifier_key_commitment(&mut rng);
+            output_resource.nk_container = random_nullifier_key_commitment(&mut rng);
             // BorshSerialize
-            let borsh = borsh::to_vec(&output_note).unwrap();
+            let borsh = borsh::to_vec(&output_resource).unwrap();
             // BorshDeserialize
-            let de_note: Note = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
-            assert_eq!(output_note, de_note);
+            let de_resource: Resource = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
+            assert_eq!(output_resource, de_resource);
         }
 
-        let icm = input_note.commitment();
+        let icm = input_resource.commitment();
         {
             // BorshSerialize
             let borsh = borsh::to_vec(&icm).unwrap();
             // BorshDeserialize
-            let de_icm: NoteCommitment =
+            let de_icm: ResourceCommitment =
                 BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
             assert_eq!(icm, de_icm);
         }
 
-        let ocm = output_note.commitment();
+        let ocm = output_resource.commitment();
         {
             // BorshSerialize
             let borsh = borsh::to_vec(&ocm).unwrap();
             // BorshDeserialize
-            let de_ocm: NoteCommitment =
+            let de_ocm: ResourceCommitment =
                 BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
             assert_eq!(ocm, de_ocm);
         }

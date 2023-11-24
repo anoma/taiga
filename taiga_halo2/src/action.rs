@@ -1,10 +1,10 @@
 use crate::{
     circuit::action_circuit::ActionCircuit,
     constant::{PRF_EXPAND_INPUT_VP_CM_R, PRF_EXPAND_OUTPUT_VP_CM_R},
+    delta_commitment::DeltaCommitment,
     merkle_tree::{Anchor, MerklePath},
-    note::{Note, NoteCommitment, RandomSeed},
     nullifier::Nullifier,
-    value_commitment::ValueCommitment,
+    resource::{RandomSeed, Resource, ResourceCommitment},
     vp_commitment::ValidityPredicateCommitment,
 };
 use pasta_curves::pallas;
@@ -25,17 +25,17 @@ use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg_attr(feature = "nif", module = "Taiga.Action.PublicInputs")]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActionPublicInputs {
-    /// The root of the note commitment Merkle tree.
+    /// The root of the resource commitment Merkle tree.
     pub anchor: Anchor,
-    /// The nullifier of input note.
+    /// The nullifier of input resource.
     pub nf: Nullifier,
-    /// The commitment to the output note.
-    pub cm: NoteCommitment,
-    /// net value commitment
-    pub cv_net: ValueCommitment,
-    /// The commitment to input note application(static) vp
+    /// The commitment to the output resource.
+    pub cm: ResourceCommitment,
+    /// Resource delta is used to reason about total quantities of different kinds of resources.
+    pub delta: DeltaCommitment,
+    /// The commitment to input resource application(static) vp
     pub input_vp_commitment: ValidityPredicateCommitment,
-    /// The commitment to output note application(static) vp
+    /// The commitment to output resource application(static) vp
     pub output_vp_commitment: ValidityPredicateCommitment,
 }
 
@@ -44,11 +44,11 @@ pub struct ActionPublicInputs {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 pub struct ActionInfo {
-    input_note: Note,
+    input_resource: Resource,
     input_merkle_path: MerklePath,
     input_anchor: Anchor,
-    output_note: Note,
-    // rseed is to generate the randomness of the value commitment and vp commitments
+    output_resource: Resource,
+    // rseed is to generate the randomness of the delta commitment and vp commitments
     rseed: RandomSeed,
 }
 
@@ -60,8 +60,8 @@ impl ActionPublicInputs {
             self.nf.inner(),
             self.anchor.inner(),
             self.cm.inner(),
-            self.cv_net.get_x(),
-            self.cv_net.get_y(),
+            self.delta.get_x(),
+            self.delta.get_y(),
             input_vp_commitment[0],
             input_vp_commitment[1],
             output_vp_commitment[0],
@@ -76,7 +76,7 @@ impl BorshSerialize for ActionPublicInputs {
         writer.write_all(&self.anchor.to_bytes())?;
         writer.write_all(&self.nf.to_bytes())?;
         writer.write_all(&self.cm.to_bytes())?;
-        writer.write_all(&self.cv_net.to_bytes())?;
+        writer.write_all(&self.delta.to_bytes())?;
         writer.write_all(&self.input_vp_commitment.to_bytes())?;
         writer.write_all(&self.output_vp_commitment.to_bytes())?;
         Ok(())
@@ -94,11 +94,11 @@ impl BorshDeserialize for ActionPublicInputs {
         let nf = Option::from(Nullifier::from_bytes(nf_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "nf not in field"))?;
         let cm_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let cm = Option::from(NoteCommitment::from_bytes(cm_bytes))
+        let cm = Option::from(ResourceCommitment::from_bytes(cm_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "cm not in field"))?;
-        let cv_net_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let cv_net = Option::from(ValueCommitment::from_bytes(cv_net_bytes))
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "cv_net not in field"))?;
+        let detla_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let delta = Option::from(DeltaCommitment::from_bytes(detla_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "delta not in field"))?;
         let input_vp_commitment_bytes = <[u8; 32]>::deserialize_reader(reader)?;
         let input_vp_commitment =
             ValidityPredicateCommitment::from_bytes(input_vp_commitment_bytes);
@@ -110,7 +110,7 @@ impl BorshDeserialize for ActionPublicInputs {
             anchor,
             nf,
             cm,
-            cv_net,
+            delta,
             input_vp_commitment,
             output_vp_commitment,
         })
@@ -118,98 +118,98 @@ impl BorshDeserialize for ActionPublicInputs {
 }
 
 impl ActionInfo {
-    // The dummy input note must provide a valid custom_anchor, but a random merkle path
-    // The normal input note only needs to provide a valid merkle path. The anchor will be calculated from the note and path.
-    // The rho of output_note will be reset to the nullifier of input_note
+    // The dummy input resource must provide a valid custom_anchor, but a random merkle path
+    // The normal input resource only needs to provide a valid merkle path. The anchor will be calculated from the resource and path.
+    // The nonce of output_resource will be set to the nullifier of input_resource
     pub fn new<R: RngCore>(
-        input_note: Note,
+        input_resource: Resource,
         input_merkle_path: MerklePath,
         custom_anchor: Option<Anchor>,
-        output_note: &mut Note,
+        output_resource: &mut Resource,
         mut rng: R,
     ) -> Self {
         let input_anchor = match custom_anchor {
             Some(anchor) => anchor,
-            None => input_note.calculate_root(&input_merkle_path),
+            None => input_resource.calculate_root(&input_merkle_path),
         };
 
-        output_note.set_rho(&input_note, &mut rng);
+        output_resource.set_nonce(&input_resource, &mut rng);
 
         Self {
-            input_note,
+            input_resource,
             input_merkle_path,
             input_anchor,
-            output_note: *output_note,
+            output_resource: *output_resource,
             rseed: RandomSeed::random(&mut rng),
         }
     }
 
-    // Get the randomness of value commitment
+    // Get the randomness of delta commitment
     pub fn get_rcv(&self) -> pallas::Scalar {
         self.rseed.get_rcv()
     }
 
-    // Get the randomness of input note application vp commitment
+    // Get the randomness of input resource application vp commitment
     pub fn get_input_vp_com_r(&self) -> pallas::Base {
         self.rseed.get_vp_cm_r(PRF_EXPAND_INPUT_VP_CM_R)
     }
 
-    // Get the randomness of output note application vp commitment
+    // Get the randomness of output resource application vp commitment
     pub fn get_output_vp_com_r(&self) -> pallas::Base {
         self.rseed.get_vp_cm_r(PRF_EXPAND_OUTPUT_VP_CM_R)
     }
 
     // Only used in transparent scenario: the achor is untrusted, recalculate root when executing it transparently.
     pub fn calculate_root(&self) -> Anchor {
-        self.input_note.calculate_root(&self.input_merkle_path)
+        self.input_resource.calculate_root(&self.input_merkle_path)
     }
 
-    // Get value commitment
-    pub fn get_value_commitment(&self, blind_r: &pallas::Scalar) -> ValueCommitment {
-        ValueCommitment::commit(&self.input_note, &self.output_note, blind_r)
+    // Get delta commitment
+    pub fn get_delta_commitment(&self, blind_r: &pallas::Scalar) -> DeltaCommitment {
+        DeltaCommitment::commit(&self.input_resource, &self.output_resource, blind_r)
     }
 
-    pub fn get_input_note_nullifer(&self) -> Nullifier {
-        self.input_note.get_nf().unwrap()
+    pub fn get_input_resource_nullifer(&self) -> Nullifier {
+        self.input_resource.get_nf().unwrap()
     }
 
-    pub fn get_output_note_cm(&self) -> NoteCommitment {
-        self.output_note.commitment()
+    pub fn get_output_resource_cm(&self) -> ResourceCommitment {
+        self.output_resource.commitment()
     }
 
     pub fn build(&self) -> (ActionPublicInputs, ActionCircuit) {
-        let nf = self.get_input_note_nullifer();
+        let nf = self.get_input_resource_nullifer();
         assert_eq!(
-            nf, self.output_note.rho,
-            "The nf of input note should be equal to the rho of output note"
+            nf, self.output_resource.nonce,
+            "The nf of input resource must be equal to the nonce of output resource"
         );
 
-        let cm = self.get_output_note_cm();
+        let cm = self.get_output_resource_cm();
 
         let rcv = self.get_rcv();
-        let cv_net = self.get_value_commitment(&rcv);
+        let delta = self.get_delta_commitment(&rcv);
 
         let input_vp_cm_r = self.get_input_vp_com_r();
         let input_vp_commitment =
-            ValidityPredicateCommitment::commit(&self.input_note.get_app_vk(), &input_vp_cm_r);
+            ValidityPredicateCommitment::commit(&self.input_resource.get_logic(), &input_vp_cm_r);
 
         let output_vp_cm_r = self.get_output_vp_com_r();
         let output_vp_commitment =
-            ValidityPredicateCommitment::commit(&self.output_note.get_app_vk(), &output_vp_cm_r);
+            ValidityPredicateCommitment::commit(&self.output_resource.get_logic(), &output_vp_cm_r);
 
         let action = ActionPublicInputs {
             nf,
             cm,
             anchor: self.input_anchor,
-            cv_net,
+            delta,
             input_vp_commitment,
             output_vp_commitment,
         };
 
         let action_circuit = ActionCircuit {
-            input_note: self.input_note,
+            input_resource: self.input_resource,
             merkle_path: self.input_merkle_path.get_path().try_into().unwrap(),
-            output_note: self.output_note,
+            output_resource: self.output_resource,
             rcv,
             input_vp_cm_r,
             output_vp_cm_r,
@@ -224,18 +224,18 @@ pub mod tests {
     use super::ActionInfo;
     use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
     use crate::merkle_tree::MerklePath;
-    use crate::note::tests::random_note;
+    use crate::resource::tests::random_resource;
     use rand::RngCore;
 
     pub fn random_action_info<R: RngCore>(mut rng: R) -> ActionInfo {
-        let input_note = random_note(&mut rng);
-        let mut output_note = random_note(&mut rng);
+        let input_resource = random_resource(&mut rng);
+        let mut output_resource = random_resource(&mut rng);
         let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
         ActionInfo::new(
-            input_note,
+            input_resource,
             input_merkle_path,
             None,
-            &mut output_note,
+            &mut output_resource,
             &mut rng,
         )
     }

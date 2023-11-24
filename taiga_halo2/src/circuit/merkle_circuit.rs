@@ -60,7 +60,7 @@ impl MerklePoseidonChip {
 pub fn merkle_poseidon_gadget(
     mut layouter: impl Layouter<pallas::Base>,
     chip: MerklePoseidonChip,
-    note_x: AssignedCell<pallas::Base, pallas::Base>,
+    resource: AssignedCell<pallas::Base, pallas::Base>,
     merkle_path: &[(pallas::Base, LR)],
 ) -> Result<AssignedCell<pallas::Base, pallas::Base>, Error> {
     fn swap(
@@ -83,7 +83,7 @@ pub fn merkle_poseidon_gadget(
         chip.swap(layouter, pair, swap)
     }
 
-    let mut cur = note_x;
+    let mut cur = resource;
     for e in merkle_path.iter() {
         let pair = {
             let pair = (cur, Value::known(e.0));

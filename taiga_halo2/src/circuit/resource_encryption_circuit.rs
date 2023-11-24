@@ -3,8 +3,8 @@ use crate::circuit::gadgets::{
     assign_free_advice, assign_free_constant,
 };
 use crate::constant::{
-    BaseFieldGenerators, TaigaFixedBases, NOTE_ENCRYPTION_PLAINTEXT_NUM, POSEIDON_RATE,
-    POSEIDON_WIDTH, VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
+    BaseFieldGenerators, TaigaFixedBases, POSEIDON_RATE, POSEIDON_WIDTH,
+    RESOURCE_ENCRYPTION_PLAINTEXT_NUM, VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
 };
 use ff::PrimeField;
 use halo2_gadgets::{
@@ -23,14 +23,14 @@ use halo2_proofs::{
 use pasta_curves::pallas;
 
 #[allow(clippy::too_many_arguments)]
-pub fn note_encryption_gadget(
+pub fn resource_encryption_gadget(
     mut layouter: impl Layouter<pallas::Base>,
     advice: Column<Advice>,
     instances: Column<Instance>,
     poseidon_config: PoseidonConfig<pallas::Base, POSEIDON_WIDTH, POSEIDON_RATE>,
     add_chip: AddChip<pallas::Base>,
     ecc_chip: EccChip<TaigaFixedBases>,
-    nonce: AssignedCell<pallas::Base, pallas::Base>,
+    encrypt_nonce: AssignedCell<pallas::Base, pallas::Base>,
     sender_sk: AssignedCell<pallas::Base, pallas::Base>,
     rcv_pk: NonIdentityPoint<pallas::Affine, EccChip<TaigaFixedBases>>,
     message: &mut Vec<AssignedCell<pallas::Base, pallas::Base>>,
@@ -42,7 +42,7 @@ pub fn note_encryption_gadget(
         Value::known(pallas::Base::zero()),
     )?;
     let paddings =
-        std::iter::repeat(padding_zero).take(NOTE_ENCRYPTION_PLAINTEXT_NUM - message.len());
+        std::iter::repeat(padding_zero).take(RESOURCE_ENCRYPTION_PLAINTEXT_NUM - message.len());
     message.extend(paddings);
 
     // Compute symmetric secret key
@@ -55,16 +55,16 @@ pub fn note_encryption_gadget(
     let sender_pk = generator.mul(layouter.namespace(|| "sender_sk * generator"), sender_sk)?;
     let (secret_key, _) = rcv_pk.mul(layouter.namespace(|| "sender_sk * rcv_pk"), sk)?;
 
-    // length_nonce = length * 2^128 + nonce
+    // length_nonce = length * 2^128 + encrypt_nonce
     let length_var = assign_free_constant(
         layouter.namespace(|| "constant zero"),
         advice,
         pallas::Base::from(message.len() as u64) * pallas::Base::from_u128(1 << 64).square(),
     )?;
     let length_nonce = add_chip.add(
-        layouter.namespace(|| "length_nonce = length || nonce"),
+        layouter.namespace(|| "length_nonce = length || encrypt_nonce"),
         &length_var,
-        &nonce,
+        &encrypt_nonce,
     )?;
 
     // Init poseidon sponge state
@@ -109,8 +109,8 @@ pub fn note_encryption_gadget(
             .for_each(|s| cipher.push(s.clone().into()));
     }
 
-    // Add nonce
-    cipher.push(nonce);
+    // Add encrypt_nonce
+    cipher.push(encrypt_nonce);
 
     // Compute MAC
     state = <PoseidonChip<_, POSEIDON_WIDTH, POSEIDON_RATE> as PoseidonInstructions<
@@ -130,7 +130,7 @@ pub fn note_encryption_gadget(
         layouter.constrain_instance(
             ele.cell(),
             instances,
-            VP_CIRCUIT_NOTE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX + i,
+            VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX + i,
         )?;
     }
 
