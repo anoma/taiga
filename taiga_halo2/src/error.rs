@@ -10,11 +10,11 @@ pub enum TransactionError {
     InvalidBindingSignature,
     /// Binding signature is missing.
     MissingBindingSignatures,
-    /// Nullifier is not consistent between the action and the vp.
+    /// Nullifier is not consistent between the compliance and the vp.
     InconsistentNullifier,
-    /// Output resource commitment is not consistent between the action and the vp.
+    /// Output resource commitment is not consistent between the compliance and the vp.
     InconsistentOutputResourceCommitment,
-    /// Owned resource id is not consistent between the action and the vp.
+    /// Owned resource id is not consistent between the compliance and the vp.
     InconsistentOwneResourceID,
     /// IO error
     IoError(std::io::Error),
@@ -36,13 +36,13 @@ impl Display for TransactionError {
             InvalidBindingSignature => f.write_str("Binding signature was invalid"),
             MissingBindingSignatures => f.write_str("Binding signature is missing"),
             InconsistentNullifier => {
-                f.write_str("Nullifier is not consistent between the action and the vp")
+                f.write_str("Nullifier is not consistent between the compliance and the vp")
             }
             InconsistentOutputResourceCommitment => f.write_str(
-                "Output resource commitment is not consistent between the action and the vp",
+                "Output resource commitment is not consistent between the compliance and the vp",
             ),
             InconsistentOwneResourceID => {
-                f.write_str("Owned resource id is not consistent between the action and the vp")
+                f.write_str("Owned resource id is not consistent between the compliance and the vp")
             }
             IoError(e) => f.write_str(&format!("IoError error: {e}")),
             MissingTransparentResourceNullifierKey => {

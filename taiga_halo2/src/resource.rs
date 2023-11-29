@@ -104,7 +104,7 @@ pub struct Resource {
     pub psi: pallas::Base,
     /// rcm is the trapdoor of the resource commitment
     pub rcm: pallas::Base,
-    /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of input resource will be checked in ActionProof.
+    /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of input resource will be checked in ComplianceProof.
     pub is_merkle_checked: bool,
 }
 
@@ -157,7 +157,7 @@ impl Resource {
         }
     }
 
-    // The nonce, psi, and rcm are not specified until the action is constructed.
+    // The nonce, psi, and rcm are not specified until the compliance is constructed.
     #[allow(clippy::too_many_arguments)]
     pub fn new_output_resource(
         logic: pallas::Base,

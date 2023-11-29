@@ -8,19 +8,19 @@ use pasta_curves::{pallas, vesta};
 use rand::rngs::OsRng;
 use rand::Rng;
 use taiga_halo2::{
-    action::ActionInfo,
+    compliance::ComplianceInfo,
     constant::{
-        ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, SETUP_PARAMS_MAP,
-        TAIGA_COMMITMENT_TREE_DEPTH,
+        COMPLIANCE_CIRCUIT_PARAMS_SIZE, COMPLIANCE_PROVING_KEY, COMPLIANCE_VERIFYING_KEY,
+        SETUP_PARAMS_MAP, TAIGA_COMMITMENT_TREE_DEPTH,
     },
     merkle_tree::MerklePath,
     nullifier::{Nullifier, NullifierKeyContainer},
     resource::{RandomSeed, Resource, ResourceKind},
 };
 
-fn bench_action_proof(name: &str, c: &mut Criterion) {
+fn bench_compliance_proof(name: &str, c: &mut Criterion) {
     let mut rng = OsRng;
-    let action_info = {
+    let compliance_info = {
         let input_resource = {
             let nonce = Nullifier::from(pallas::Base::random(&mut rng));
             let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
@@ -66,7 +66,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
             }
         };
         let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        ActionInfo::new(
+        ComplianceInfo::new(
             input_resource,
             input_merkle_path,
             None,
@@ -74,8 +74,10 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
             &mut rng,
         )
     };
-    let (action, action_circuit) = action_info.build();
-    let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
+    let (compliance, compliance_circuit) = compliance_info.build();
+    let params = SETUP_PARAMS_MAP
+        .get(&COMPLIANCE_CIRCUIT_PARAMS_SIZE)
+        .unwrap();
 
     // Prover bench
     let prover_name = name.to_string() + "-prover";
@@ -84,9 +86,9 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
             let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
             create_proof(
                 params,
-                &ACTION_PROVING_KEY,
-                &[action_circuit.clone()],
-                &[&[&action.to_instance()]],
+                &COMPLIANCE_PROVING_KEY,
+                &[compliance_circuit.clone()],
+                &[&[&compliance.to_instance()]],
                 &mut rng,
                 &mut transcript,
             )
@@ -101,9 +103,9 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
         let mut transcript = Blake2bWrite::<_, vesta::Affine, _>::init(vec![]);
         create_proof(
             params,
-            &ACTION_PROVING_KEY,
-            &[action_circuit],
-            &[&[&action.to_instance()]],
+            &COMPLIANCE_PROVING_KEY,
+            &[compliance_circuit],
+            &[&[&compliance.to_instance()]],
             &mut rng,
             &mut transcript,
         )
@@ -118,9 +120,9 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
             let mut transcript = Blake2bRead::init(&proof[..]);
             assert!(verify_proof(
                 params,
-                &ACTION_VERIFYING_KEY,
+                &COMPLIANCE_VERIFYING_KEY,
                 strategy,
-                &[&[&action.to_instance()]],
+                &[&[&compliance.to_instance()]],
                 &mut transcript
             )
             .is_ok());
@@ -128,7 +130,7 @@ fn bench_action_proof(name: &str, c: &mut Criterion) {
     });
 }
 fn criterion_benchmark(c: &mut Criterion) {
-    bench_action_proof("halo2-action-proof", c);
+    bench_compliance_proof("halo2-compliance-proof", c);
 }
 
 criterion_group!(benches, criterion_benchmark);

@@ -1,7 +1,7 @@
-# Action proof performance
+# Compliance proof performance
 ```
-action-proof-prover     time:   [3.6500 s 3.1445 s 3.7210 s]
-action-proof-verifier   time:   [35.858 ms 36.359 ms 36.873 ms]
+compliance-proof-prover     time:   [3.6500 s 3.1445 s 3.7210 s]
+compliance-proof-verifier   time:   [35.858 ms 36.359 ms 36.873 ms]
 ```
 
 # VP proof performance

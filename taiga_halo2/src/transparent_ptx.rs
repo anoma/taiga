@@ -1,5 +1,5 @@
 use crate::{
-    action::ActionInfo, circuit::vp_bytecode::ApplicationByteCode, constant::NUM_RESOURCE,
+    circuit::vp_bytecode::ApplicationByteCode, compliance::ComplianceInfo, constant::NUM_RESOURCE,
     delta_commitment::DeltaCommitment, error::TransactionError, executable::Executable,
     merkle_tree::Anchor, nullifier::Nullifier, resource::ResourceCommitment,
 };
@@ -15,7 +15,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TransparentPartialTransaction {
-    actions: Vec<ActionInfo>,
+    compliances: Vec<ComplianceInfo>,
     input_resource_app: Vec<ApplicationByteCode>,
     output_resource_app: Vec<ApplicationByteCode>,
     hints: Vec<u8>,
@@ -23,17 +23,17 @@ pub struct TransparentPartialTransaction {
 
 impl TransparentPartialTransaction {
     pub fn new(
-        actions: Vec<ActionInfo>,
+        compliances: Vec<ComplianceInfo>,
         input_resource_app: Vec<ApplicationByteCode>,
         output_resource_app: Vec<ApplicationByteCode>,
         hints: Vec<u8>,
     ) -> Self {
-        assert_eq!(actions.len(), NUM_RESOURCE);
+        assert_eq!(compliances.len(), NUM_RESOURCE);
         assert_eq!(input_resource_app.len(), NUM_RESOURCE);
         assert_eq!(output_resource_app.len(), NUM_RESOURCE);
 
         Self {
-            actions,
+            compliances,
             input_resource_app,
             output_resource_app,
             hints,
@@ -44,18 +44,18 @@ impl TransparentPartialTransaction {
 impl Executable for TransparentPartialTransaction {
     fn execute(&self) -> Result<(), TransactionError> {
         // check VPs, nullifiers, and resource commitments
-        let action_nfs = self.get_nullifiers();
-        let action_cms = self.get_output_cms();
-        for (vp, nf) in self.input_resource_app.iter().zip(action_nfs.iter()) {
-            let owned_resource_id = vp.verify_transparently(&action_nfs, &action_cms)?;
+        let compliance_nfs = self.get_nullifiers();
+        let compliance_cms = self.get_output_cms();
+        for (vp, nf) in self.input_resource_app.iter().zip(compliance_nfs.iter()) {
+            let owned_resource_id = vp.verify_transparently(&compliance_nfs, &compliance_cms)?;
             // Check all resources are checked
             if owned_resource_id != nf.inner() {
                 return Err(TransactionError::InconsistentOwneResourceID);
             }
         }
 
-        for (vp, cm) in self.output_resource_app.iter().zip(action_cms.iter()) {
-            let owned_resource_id = vp.verify_transparently(&action_nfs, &action_cms)?;
+        for (vp, cm) in self.output_resource_app.iter().zip(compliance_cms.iter()) {
+            let owned_resource_id = vp.verify_transparently(&compliance_nfs, &compliance_cms)?;
             // Check all resources are checked
             if owned_resource_id != cm.inner() {
                 return Err(TransactionError::InconsistentOwneResourceID);
@@ -65,35 +65,35 @@ impl Executable for TransparentPartialTransaction {
         Ok(())
     }
 
-    // get nullifiers from actions
+    // get nullifiers from compliances
     fn get_nullifiers(&self) -> Vec<Nullifier> {
-        self.actions
+        self.compliances
             .iter()
-            .map(|action| action.get_input_resource_nullifer())
+            .map(|compliance| compliance.get_input_resource_nullifer())
             .collect()
     }
 
-    // get output cms from actions
+    // get output cms from compliances
     fn get_output_cms(&self) -> Vec<ResourceCommitment> {
-        self.actions
+        self.compliances
             .iter()
-            .map(|action| action.get_output_resource_cm())
+            .map(|compliance| compliance.get_output_resource_cm())
             .collect()
     }
 
     fn get_delta_commitments(&self) -> Vec<DeltaCommitment> {
-        self.actions
+        self.compliances
             .iter()
-            .map(|action| action.get_delta_commitment(&pallas::Scalar::zero()))
+            .map(|compliance| compliance.get_delta_commitment(&pallas::Scalar::zero()))
             .collect()
     }
 
     fn get_anchors(&self) -> Vec<Anchor> {
         // TODO: We have easier way to check the anchor in transparent scenario, but keep consistent with sheilded right now.
         // TODO: we can skip the root if the is_merkle_checked flag is false?
-        self.actions
+        self.compliances
             .iter()
-            .map(|action| action.calculate_root())
+            .map(|compliance| compliance.calculate_root())
             .collect()
     }
 }
@@ -119,7 +119,7 @@ pub mod testing {
             resource
         };
         let merkle_path_1 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let action_1 = ActionInfo::new(
+        let compliance_1 = ComplianceInfo::new(
             input_resource_1,
             merkle_path_1,
             None,
@@ -135,7 +135,7 @@ pub mod testing {
             resource
         };
         let merkle_path_2 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let action_2 = ActionInfo::new(
+        let compliance_2 = ComplianceInfo::new(
             input_resource_2,
             merkle_path_2,
             None,
@@ -185,7 +185,7 @@ pub mod testing {
         };
 
         TransparentPartialTransaction::new(
-            vec![action_1, action_2],
+            vec![compliance_1, compliance_2],
             vec![input_resource_1_app, input_resource_2_app],
             vec![output_resource_1_app, output_resource_2_app],
             vec![],

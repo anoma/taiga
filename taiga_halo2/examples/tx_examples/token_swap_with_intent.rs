@@ -9,12 +9,12 @@ use halo2_proofs::arithmetic::Field;
 use pasta_curves::{group::Curve, pallas};
 use rand::{CryptoRng, RngCore};
 use taiga_halo2::{
-    action::ActionInfo,
     circuit::vp_examples::{
         or_relation_intent::{create_intent_resource, OrRelationIntentValidityPredicateCircuit},
         signature_verification::COMPRESSED_TOKEN_AUTH_VK,
         token::{Token, TokenAuthorization},
     },
+    compliance::ComplianceInfo,
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
     nullifier::NullifierKeyContainer,
@@ -59,9 +59,9 @@ pub fn create_token_intent_ptx<R: RngCore>(
 
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
-    // Create action pairs
-    let actions = {
-        let action_1 = ActionInfo::new(
+    // Create compliance pairs
+    let compliances = {
+        let compliance_1 = ComplianceInfo::new(
             *input_resource.resource(),
             merkle_path.clone(),
             None,
@@ -71,14 +71,14 @@ pub fn create_token_intent_ptx<R: RngCore>(
 
         // Fetch a valid anchor for padding input resources
         let anchor = Anchor::from(pallas::Base::random(&mut rng));
-        let action_2 = ActionInfo::new(
+        let compliance_2 = ComplianceInfo::new(
             padding_input_resource,
             merkle_path,
             Some(anchor),
             &mut padding_output_resource,
             &mut rng,
         );
-        vec![action_1, action_2]
+        vec![compliance_1, compliance_2]
     };
 
     // Create VPs
@@ -130,8 +130,9 @@ pub fn create_token_intent_ptx<R: RngCore>(
     };
 
     // Create shielded partial tx
-    let ptx = ShieldedPartialTransaction::build(actions, input_vps, output_vps, vec![], &mut rng)
-        .unwrap();
+    let ptx =
+        ShieldedPartialTransaction::build(compliances, input_vps, output_vps, vec![], &mut rng)
+            .unwrap();
 
     (ptx, input_nk, input_resource_npk, input_resource.value)
 }
@@ -173,9 +174,9 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     // Fetch a valid anchor for dummy resources
     let anchor = Anchor::from(pallas::Base::random(&mut rng));
 
-    // Create action pairs
-    let actions = {
-        let action_1 = ActionInfo::new(
+    // Create compliance pairs
+    let compliances = {
+        let compliance_1 = ComplianceInfo::new(
             intent_resource,
             merkle_path.clone(),
             Some(anchor),
@@ -183,14 +184,14 @@ pub fn consume_token_intent_ptx<R: RngCore>(
             &mut rng,
         );
 
-        let action_2 = ActionInfo::new(
+        let compliance_2 = ComplianceInfo::new(
             padding_input_resource,
             merkle_path,
             Some(anchor),
             &mut padding_output_resource,
             &mut rng,
         );
-        vec![action_1, action_2]
+        vec![compliance_1, compliance_2]
     };
 
     // Create VPs
@@ -241,7 +242,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     };
 
     // Create shielded partial tx
-    ShieldedPartialTransaction::build(actions, input_vps, output_vps, vec![], &mut rng).unwrap()
+    ShieldedPartialTransaction::build(compliances, input_vps, output_vps, vec![], &mut rng).unwrap()
 }
 
 pub fn create_token_swap_intent_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {

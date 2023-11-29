@@ -1,4 +1,4 @@
-use crate::circuit::action_circuit::ActionCircuit;
+use crate::circuit::compliance_circuit::ComplianceCircuit;
 use crate::utils::to_field_elements;
 use group::Group;
 use halo2_gadgets::{
@@ -44,15 +44,15 @@ pub const BASE_BITS_NUM: usize = 255;
 /// The number of resources in a (partial)tx.
 pub const NUM_RESOURCE: usize = 2;
 
-pub const ACTION_NF_PUBLIC_INPUT_ROW_IDX: usize = 0;
-pub const ACTION_ANCHOR_PUBLIC_INPUT_ROW_IDX: usize = 1;
-pub const ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX: usize = 2;
-pub const ACTION_DELTA_CM_X_PUBLIC_INPUT_ROW_IDX: usize = 3;
-pub const ACTION_DELTA_CM_Y_PUBLIC_INPUT_ROW_IDX: usize = 4;
-pub const ACTION_INPUT_VP_CM_1_ROW_IDX: usize = 5;
-pub const ACTION_INPUT_VP_CM_2_ROW_IDX: usize = 6;
-pub const ACTION_OUTPUT_VP_CM_1_ROW_IDX: usize = 7;
-pub const ACTION_OUTPUT_VP_CM_2_ROW_IDX: usize = 8;
+pub const COMPLIANCE_NF_PUBLIC_INPUT_ROW_IDX: usize = 0;
+pub const COMPLIANCE_ANCHOR_PUBLIC_INPUT_ROW_IDX: usize = 1;
+pub const COMPLIANCE_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX: usize = 2;
+pub const COMPLIANCE_DELTA_CM_X_PUBLIC_INPUT_ROW_IDX: usize = 3;
+pub const COMPLIANCE_DELTA_CM_Y_PUBLIC_INPUT_ROW_IDX: usize = 4;
+pub const COMPLIANCE_INPUT_VP_CM_1_ROW_IDX: usize = 5;
+pub const COMPLIANCE_INPUT_VP_CM_2_ROW_IDX: usize = 6;
+pub const COMPLIANCE_OUTPUT_VP_CM_1_ROW_IDX: usize = 7;
+pub const COMPLIANCE_OUTPUT_VP_CM_2_ROW_IDX: usize = 8;
 
 pub const POSEIDON_TO_CURVE_INPUT_LEN: usize = 3;
 pub const CURVE_ID: &str = "pallas";
@@ -113,7 +113,7 @@ lazy_static! {
 }
 
 pub const PARAMS_SIZE: u32 = 15;
-pub const ACTION_CIRCUIT_PARAMS_SIZE: u32 = PARAMS_SIZE;
+pub const COMPLIANCE_CIRCUIT_PARAMS_SIZE: u32 = PARAMS_SIZE;
 pub const VP_CIRCUIT_PARAMS_SIZE: u32 = PARAMS_SIZE;
 
 // Setup params map
@@ -130,13 +130,15 @@ lazy_static! {
     };
 }
 
-// Action proving key and verifying key
+// Compliance proving key and verifying key
 lazy_static! {
-    pub static ref ACTION_VERIFYING_KEY: VerifyingKey<vesta::Affine> =
-        ACTION_PROVING_KEY.get_vk().clone();
-    pub static ref ACTION_PROVING_KEY: ProvingKey<vesta::Affine> = {
-        let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
-        let empty_circuit: ActionCircuit = Default::default();
+    pub static ref COMPLIANCE_VERIFYING_KEY: VerifyingKey<vesta::Affine> =
+        COMPLIANCE_PROVING_KEY.get_vk().clone();
+    pub static ref COMPLIANCE_PROVING_KEY: ProvingKey<vesta::Affine> = {
+        let params = SETUP_PARAMS_MAP
+            .get(&COMPLIANCE_CIRCUIT_PARAMS_SIZE)
+            .unwrap();
+        let empty_circuit: ComplianceCircuit = Default::default();
         let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
         keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail")
     };
@@ -6135,17 +6137,17 @@ fn export_params() {
 // Consider loading the key from file when the keys are stablized.
 // #[ignore]
 // #[test]
-// fn export_action_proving_key() {
+// fn export_compliance_proving_key() {
 //     use std::io::Write;
 
-//     let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
-//     let empty_circuit: ActionCircuit = Default::default();
+//     let params = SETUP_PARAMS_MAP.get(&COMPLIANCE_CIRCUIT_PARAMS_SIZE).unwrap();
+//     let empty_circuit: ComplianceCircuit = Default::default();
 //     let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
 //     let pk = keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail");
 //     let mut bytes = vec![];
 //     pk.write(&mut bytes).unwrap();
-//     let mut file = std::fs::File::create("./params/action_proving_key")
-//         .unwrap_or_else(|err| panic!("cannot create action_proving_key with {}", err));
+//     let mut file = std::fs::File::create("./params/compliance_proving_key")
+//         .unwrap_or_else(|err| panic!("cannot create compliance_proving_key with {}", err));
 //     file.write_all(&bytes).unwrap();
 // }
 

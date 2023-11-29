@@ -1,8 +1,8 @@
-use crate::action::{ActionInfo, ActionPublicInputs};
 use crate::circuit::vp_circuit::{VPVerifyingInfo, ValidityPredicate};
+use crate::compliance::{ComplianceInfo, CompliancePublicInputs};
 use crate::constant::{
-    ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, MAX_DYNAMIC_VP_NUM,
-    NUM_RESOURCE, SETUP_PARAMS_MAP,
+    COMPLIANCE_CIRCUIT_PARAMS_SIZE, COMPLIANCE_PROVING_KEY, COMPLIANCE_VERIFYING_KEY,
+    MAX_DYNAMIC_VP_NUM, NUM_RESOURCE, SETUP_PARAMS_MAP,
 };
 use crate::delta_commitment::DeltaCommitment;
 use crate::error::TransactionError;
@@ -30,7 +30,7 @@ use ff::PrimeField;
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ShieldedPartialTransaction {
-    actions: [ActionVerifyingInfo; NUM_RESOURCE],
+    compliances: [ComplianceVerifyingInfo; NUM_RESOURCE],
     inputs: [ResourceVPVerifyingInfoSet; NUM_RESOURCE],
     outputs: [ResourceVPVerifyingInfoSet; NUM_RESOURCE],
     binding_sig_r: Option<pallas::Scalar>,
@@ -42,9 +42,9 @@ pub struct ShieldedPartialTransaction {
 #[cfg_attr(feature = "nif", module = "Taiga.Action.VerifyingInfo")]
 #[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ActionVerifyingInfo {
-    action_proof: Proof,
-    action_instance: ActionPublicInputs,
+pub struct ComplianceVerifyingInfo {
+    compliance_proof: Proof,
+    compliance_instance: CompliancePublicInputs,
 }
 
 #[derive(Debug, Clone)]
@@ -64,7 +64,7 @@ pub struct ResourceVPVerifyingInfoSet {
 #[cfg_attr(feature = "nif", derive(NifStruct))]
 #[cfg_attr(feature = "nif", module = "Taiga.Shielded.PTX")]
 struct ShieldedPartialTransactionProxy {
-    actions: Vec<ActionVerifyingInfo>,
+    compliances: Vec<ComplianceVerifyingInfo>,
     inputs: Vec<ResourceVPVerifyingInfoSet>,
     outputs: Vec<ResourceVPVerifyingInfoSet>,
     binding_sig_r: Option<pallas::Scalar>,
@@ -73,7 +73,7 @@ struct ShieldedPartialTransactionProxy {
 
 impl ShieldedPartialTransaction {
     pub fn from_bytecode<R: RngCore>(
-        actions: Vec<ActionInfo>,
+        compliances: Vec<ComplianceInfo>,
         input_resource_app: Vec<ApplicationByteCode>,
         output_resource_app: Vec<ApplicationByteCode>,
         hints: Vec<u8>,
@@ -88,16 +88,16 @@ impl ShieldedPartialTransaction {
             .map(|bytecode| bytecode.generate_proofs())
             .collect();
         let mut rcv_sum = pallas::Scalar::zero();
-        let actions: Vec<ActionVerifyingInfo> = actions
+        let compliances: Vec<ComplianceVerifyingInfo> = compliances
             .iter()
-            .map(|action_info| {
-                rcv_sum += action_info.get_rcv();
-                ActionVerifyingInfo::create(action_info, &mut rng).unwrap()
+            .map(|compliance_info| {
+                rcv_sum += compliance_info.get_rcv();
+                ComplianceVerifyingInfo::create(compliance_info, &mut rng).unwrap()
             })
             .collect();
 
         Ok(Self {
-            actions: actions.try_into().unwrap(),
+            compliances: compliances.try_into().unwrap(),
             inputs: inputs?.try_into().unwrap(),
             outputs: outputs?.try_into().unwrap(),
             binding_sig_r: Some(rcv_sum),
@@ -106,19 +106,19 @@ impl ShieldedPartialTransaction {
     }
 
     pub fn build<R: RngCore>(
-        action_pairs: Vec<ActionInfo>,
+        compliance_pairs: Vec<ComplianceInfo>,
         input_resource_vps: Vec<ResourceValidityPredicates>,
         output_resource_vps: Vec<ResourceValidityPredicates>,
         hints: Vec<u8>,
         mut rng: R,
     ) -> Result<Self, Error> {
-        // Generate action proofs
+        // Generate compliance proofs
         let mut rcv_sum = pallas::Scalar::zero();
-        let actions: Vec<ActionVerifyingInfo> = action_pairs
+        let compliances: Vec<ComplianceVerifyingInfo> = compliance_pairs
             .iter()
-            .map(|action_info| {
-                rcv_sum += action_info.get_rcv();
-                ActionVerifyingInfo::create(action_info, &mut rng).unwrap()
+            .map(|compliance_info| {
+                rcv_sum += compliance_info.get_rcv();
+                ComplianceVerifyingInfo::create(compliance_info, &mut rng).unwrap()
             })
             .collect();
 
@@ -135,7 +135,7 @@ impl ShieldedPartialTransaction {
             .collect();
 
         Ok(Self {
-            actions: actions.try_into().unwrap(),
+            compliances: compliances.try_into().unwrap(),
             inputs: inputs.try_into().unwrap(),
             outputs: outputs.try_into().unwrap(),
             binding_sig_r: Some(rcv_sum),
@@ -145,8 +145,8 @@ impl ShieldedPartialTransaction {
 
     // verify zk proof
     pub fn verify_proof(&self) -> Result<(), TransactionError> {
-        // Verify action proofs
-        for verifying_info in self.actions.iter() {
+        // Verify compliance proofs
+        for verifying_info in self.compliances.iter() {
             verifying_info.verify()?;
         }
 
@@ -162,22 +162,22 @@ impl ShieldedPartialTransaction {
         Ok(())
     }
 
-    // check the nullifiers are from action proofs
+    // check the nullifiers are from compliance proofs
     fn check_nullifiers(&self) -> Result<(), TransactionError> {
         assert_eq!(NUM_RESOURCE, 2);
-        let action_nfs = self.get_nullifiers();
+        let compliance_nfs = self.get_nullifiers();
         for vp_info in self.inputs.iter().chain(self.outputs.iter()) {
             for nfs in vp_info.get_nullifiers().iter() {
-                // Check the vp actually uses the input resources from action circuits.
-                if !((action_nfs[0].inner() == nfs[0] && action_nfs[1].inner() == nfs[1])
-                    || (action_nfs[0].inner() == nfs[1] && action_nfs[1].inner() == nfs[0]))
+                // Check the vp actually uses the input resources from compliance circuits.
+                if !((compliance_nfs[0].inner() == nfs[0] && compliance_nfs[1].inner() == nfs[1])
+                    || (compliance_nfs[0].inner() == nfs[1] && compliance_nfs[1].inner() == nfs[0]))
                 {
                     return Err(TransactionError::InconsistentNullifier);
                 }
             }
         }
 
-        for (vp_info, action_nf) in self.inputs.iter().zip(action_nfs.iter()) {
+        for (vp_info, compliance_nf) in self.inputs.iter().zip(compliance_nfs.iter()) {
             // Check the app vp and the sub vps use the same owned_resource_id in one resource
             let owned_resource_id = vp_info.app_vp_verifying_info.get_owned_resource_id();
             for logic_vp_verifying_info in vp_info.app_dynamic_vp_verifying_info.iter() {
@@ -186,30 +186,30 @@ impl ShieldedPartialTransaction {
                 }
             }
 
-            // Check the owned_resource_id that vp uses is consistent with the nf from the action circuit
-            if owned_resource_id != action_nf.inner() {
+            // Check the owned_resource_id that vp uses is consistent with the nf from the compliance circuit
+            if owned_resource_id != compliance_nf.inner() {
                 return Err(TransactionError::InconsistentOwneResourceID);
             }
         }
         Ok(())
     }
 
-    // check the output cms are from action proofs
+    // check the output cms are from compliance proofs
     fn check_resource_commitments(&self) -> Result<(), TransactionError> {
         assert_eq!(NUM_RESOURCE, 2);
-        let action_cms = self.get_output_cms();
+        let compliance_cms = self.get_output_cms();
         for vp_info in self.inputs.iter().chain(self.outputs.iter()) {
             for cms in vp_info.get_resource_commitments().iter() {
-                // Check the vp actually uses the output resources from action circuits.
-                if !((action_cms[0] == cms[0] && action_cms[1] == cms[1])
-                    || (action_cms[0] == cms[1] && action_cms[1] == cms[0]))
+                // Check the vp actually uses the output resources from compliance circuits.
+                if !((compliance_cms[0] == cms[0] && compliance_cms[1] == cms[1])
+                    || (compliance_cms[0] == cms[1] && compliance_cms[1] == cms[0]))
                 {
                     return Err(TransactionError::InconsistentOutputResourceCommitment);
                 }
             }
         }
 
-        for (vp_info, action_cm) in self.outputs.iter().zip(action_cms.iter()) {
+        for (vp_info, compliance_cm) in self.outputs.iter().zip(compliance_cms.iter()) {
             // Check that the app vp and the sub vps use the same owned_resource_id in one resource
             let owned_resource_id = vp_info.app_vp_verifying_info.get_owned_resource_id();
             for logic_vp_verifying_info in vp_info.app_dynamic_vp_verifying_info.iter() {
@@ -218,8 +218,8 @@ impl ShieldedPartialTransaction {
                 }
             }
 
-            // Check the owned_resource_id that vp uses is consistent with the cm from the action circuit
-            if owned_resource_id != action_cm.inner() {
+            // Check the owned_resource_id that vp uses is consistent with the cm from the compliance circuit
+            if owned_resource_id != compliance_cm.inner() {
                 return Err(TransactionError::InconsistentOwneResourceID);
             }
         }
@@ -229,7 +229,7 @@ impl ShieldedPartialTransaction {
     // Conversion to the generic length proxy
     fn to_proxy(&self) -> ShieldedPartialTransactionProxy {
         ShieldedPartialTransactionProxy {
-            actions: self.actions.to_vec(),
+            compliances: self.compliances.to_vec(),
             inputs: self.inputs.to_vec(),
             outputs: self.outputs.to_vec(),
             binding_sig_r: self.binding_sig_r,
@@ -253,11 +253,11 @@ impl ShieldedPartialTransaction {
 
 impl ShieldedPartialTransactionProxy {
     fn to_concrete(&self) -> Option<ShieldedPartialTransaction> {
-        let actions = self.actions.clone().try_into().ok()?;
+        let compliances = self.compliances.clone().try_into().ok()?;
         let inputs = self.inputs.clone().try_into().ok()?;
         let outputs = self.outputs.clone().try_into().ok()?;
         Some(ShieldedPartialTransaction {
-            actions,
+            compliances,
             inputs,
             outputs,
             binding_sig_r: self.binding_sig_r,
@@ -275,30 +275,30 @@ impl Executable for ShieldedPartialTransaction {
     }
 
     fn get_nullifiers(&self) -> Vec<Nullifier> {
-        self.actions
+        self.compliances
             .iter()
-            .map(|action| action.action_instance.nf)
+            .map(|compliance| compliance.compliance_instance.nf)
             .collect()
     }
 
     fn get_output_cms(&self) -> Vec<ResourceCommitment> {
-        self.actions
+        self.compliances
             .iter()
-            .map(|action| action.action_instance.cm)
+            .map(|compliance| compliance.compliance_instance.cm)
             .collect()
     }
 
     fn get_delta_commitments(&self) -> Vec<DeltaCommitment> {
-        self.actions
+        self.compliances
             .iter()
-            .map(|action| action.action_instance.delta)
+            .map(|compliance| compliance.compliance_instance.delta)
             .collect()
     }
 
     fn get_anchors(&self) -> Vec<Anchor> {
-        self.actions
+        self.compliances
             .iter()
-            .map(|action| action.action_instance.anchor)
+            .map(|compliance| compliance.compliance_instance.anchor)
             .collect()
     }
 }
@@ -307,8 +307,8 @@ impl Executable for ShieldedPartialTransaction {
 impl BorshSerialize for ShieldedPartialTransaction {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         use byteorder::WriteBytesExt;
-        for action in self.actions.iter() {
-            action.serialize(writer)?;
+        for compliance in self.compliances.iter() {
+            compliance.serialize(writer)?;
         }
 
         for input in self.inputs.iter() {
@@ -340,8 +340,8 @@ impl BorshSerialize for ShieldedPartialTransaction {
 impl BorshDeserialize for ShieldedPartialTransaction {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         use byteorder::ReadBytesExt;
-        let actions: Vec<_> = (0..NUM_RESOURCE)
-            .map(|_| ActionVerifyingInfo::deserialize_reader(reader))
+        let compliances: Vec<_> = (0..NUM_RESOURCE)
+            .map(|_| ComplianceVerifyingInfo::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
         let inputs: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| ResourceVPVerifyingInfoSet::deserialize_reader(reader))
@@ -366,7 +366,7 @@ impl BorshDeserialize for ShieldedPartialTransaction {
 
         let hints = Vec::<u8>::deserialize_reader(reader)?;
         Ok(ShieldedPartialTransaction {
-            actions: actions.try_into().unwrap(),
+            compliances: compliances.try_into().unwrap(),
             inputs: inputs.try_into().unwrap(),
             outputs: outputs.try_into().unwrap(),
             binding_sig_r,
@@ -391,29 +391,33 @@ impl<'a> Decoder<'a> for ShieldedPartialTransaction {
     }
 }
 
-impl ActionVerifyingInfo {
-    pub fn create<R: RngCore>(action_info: &ActionInfo, mut rng: R) -> Result<Self, Error> {
-        let (action_instance, circuit) = action_info.build();
-        let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
-        let action_proof = Proof::create(
-            &ACTION_PROVING_KEY,
+impl ComplianceVerifyingInfo {
+    pub fn create<R: RngCore>(compliance_info: &ComplianceInfo, mut rng: R) -> Result<Self, Error> {
+        let (compliance_instance, circuit) = compliance_info.build();
+        let params = SETUP_PARAMS_MAP
+            .get(&COMPLIANCE_CIRCUIT_PARAMS_SIZE)
+            .unwrap();
+        let compliance_proof = Proof::create(
+            &COMPLIANCE_PROVING_KEY,
             params,
             circuit,
-            &[&action_instance.to_instance()],
+            &[&compliance_instance.to_instance()],
             &mut rng,
         )?;
         Ok(Self {
-            action_proof,
-            action_instance,
+            compliance_proof,
+            compliance_instance,
         })
     }
 
     pub fn verify(&self) -> Result<(), Error> {
-        let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
-        self.action_proof.verify(
-            &ACTION_VERIFYING_KEY,
+        let params = SETUP_PARAMS_MAP
+            .get(&COMPLIANCE_CIRCUIT_PARAMS_SIZE)
+            .unwrap();
+        self.compliance_proof.verify(
+            &COMPLIANCE_VERIFYING_KEY,
             params,
-            &[&self.action_instance.to_instance()],
+            &[&self.compliance_instance.to_instance()],
         )
     }
 }
@@ -485,9 +489,9 @@ impl ResourceVPVerifyingInfoSet {
 #[cfg(test)]
 pub mod testing {
     use crate::{
-        action::ActionInfo,
         circuit::vp_circuit::{ValidityPredicate, ValidityPredicateVerifyingInfo},
         circuit::vp_examples::TrivialValidityPredicateCircuit,
+        compliance::ComplianceInfo,
         constant::TAIGA_COMMITMENT_TREE_DEPTH,
         merkle_tree::MerklePath,
         nullifier::Nullifier,
@@ -550,9 +554,9 @@ pub mod testing {
             )
         };
 
-        // Construct action pair
+        // Construct compliance pair
         let merkle_path_1 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let action_1 = ActionInfo::new(
+        let compliance_1 = ComplianceInfo::new(
             input_resource_1,
             merkle_path_1,
             None,
@@ -596,9 +600,9 @@ pub mod testing {
             )
         };
 
-        // Construct action pair
+        // Construct compliance pair
         let merkle_path_2 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let action_2 = ActionInfo::new(
+        let compliance_2 = ComplianceInfo::new(
             input_resource_2,
             merkle_path_2,
             None,
@@ -636,7 +640,7 @@ pub mod testing {
 
         // Create shielded partial tx
         ShieldedPartialTransaction::build(
-            vec![action_1, action_2],
+            vec![compliance_1, compliance_2],
             vec![input_resource_1_vps, input_resource_2_vps],
             vec![output_resource_1_vps, output_resource_2_vps],
             vec![],
