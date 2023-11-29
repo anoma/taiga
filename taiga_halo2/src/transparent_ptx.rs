@@ -90,7 +90,7 @@ impl Executable for TransparentPartialTransaction {
 
     fn get_anchors(&self) -> Vec<Anchor> {
         // TODO: We have easier way to check the anchor in transparent scenario, but keep consistent with sheilded right now.
-        // TODO: we can skip the root if the is_ephemeral flag is false?
+        // TODO: we can skip the root if the is_ephemeral flag is true?
         self.compliances
             .iter()
             .map(|compliance| compliance.calculate_root())

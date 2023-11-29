@@ -26,8 +26,8 @@ use halo2_gadgets::{
 use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
     plonk::{
-        Advice, Circuit, Column, ConstraintSystem, Constraints, Error, Instance, Selector,
-        TableColumn,
+        Advice, Circuit, Column, ConstraintSystem, Constraints, Error, Expression, Instance,
+        Selector, TableColumn,
     },
     poly::Rotation,
 };
@@ -128,12 +128,13 @@ impl Circuit<pallas::Base> for ComplianceCircuit {
             let is_ephemeral_input = meta.query_advice(advices[0], Rotation::cur());
             let anchor = meta.query_advice(advices[1], Rotation::cur());
             let root = meta.query_advice(advices[2], Rotation::cur());
+            let constant_one = Expression::Constant(pallas::Base::one());
 
             Constraints::with_selector(
                 merkle_path_selector,
                 [(
-                    "is_ephemeral is false, or root = anchor",
-                    is_ephemeral_input * (root - anchor),
+                    "is_ephemeral is true, or root = anchor",
+                    (constant_one - is_ephemeral_input) * (root - anchor),
                 )],
             )
         });

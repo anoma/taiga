@@ -109,7 +109,7 @@ impl Token {
             self.quantity(),
             nk,
             nonce,
-            true,
+            false,
             rseed,
         );
 
@@ -132,7 +132,7 @@ impl Token {
             value,
             self.quantity(),
             npk,
-            true,
+            false,
         );
 
         TokenResource {
@@ -380,14 +380,14 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             &owned_resource_id,
             &basic_variables.get_is_ephemeral_searchable_pairs(),
         )?;
-        let constant_one = assign_free_constant(
-            layouter.namespace(|| "one"),
+        let constant_zero = assign_free_constant(
+            layouter.namespace(|| "zero"),
             config.advices[0],
-            pallas::Base::one(),
+            pallas::Base::zero(),
         )?;
         layouter.assign_region(
             || "check is_ephemeral",
-            |mut region| region.constrain_equal(is_ephemeral.cell(), constant_one.cell()),
+            |mut region| region.constrain_equal(is_ephemeral.cell(), constant_zero.cell()),
         )?;
 
         // VP Commitment

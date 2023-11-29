@@ -108,7 +108,7 @@ impl Swap {
             1u64,
             self.sell.resource().nk_container.get_nk().unwrap(),
             self.sell.resource().get_nf().unwrap(),
-            false,
+            true,
             rseed,
         )
     }

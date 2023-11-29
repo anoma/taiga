@@ -299,7 +299,7 @@ pub fn create_intent_resource<R: RngCore>(
         1u64,
         nk,
         nonce,
-        false,
+        true,
         rseed,
     )
 }

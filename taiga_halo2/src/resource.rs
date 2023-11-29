@@ -104,7 +104,7 @@ pub struct Resource {
     pub psi: pallas::Base,
     /// rcm is the trapdoor of the resource commitment
     pub rcm: pallas::Base,
-    /// If the is_ephemeral flag is true, the merkle path authorization(membership) of input resource will be checked in ComplianceProof.
+    /// If the is_ephemeral flag is false, the merkle path authorization(membership) of input resource will be checked in ComplianceProof.
     pub is_ephemeral: bool,
 }
 
@@ -221,7 +221,7 @@ impl Resource {
             nonce,
             psi: rseed.get_psi(&nonce),
             rcm: rseed.get_rcm(&nonce),
-            is_ephemeral: false,
+            is_ephemeral: true,
         }
     }
 
@@ -579,7 +579,7 @@ pub mod tests {
             value: pallas::Base::random(&mut rng),
             quantity: rng.gen(),
             nk_container: random_nullifier_key(&mut rng),
-            is_ephemeral: true,
+            is_ephemeral: false,
             psi: rseed.get_psi(&nonce),
             rcm: rseed.get_rcm(&nonce),
             nonce,

@@ -24,7 +24,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// value is the fungible data of the resource
 /// nk is the nullifier key
 /// nonce guarantees the uniqueness of the resource computable fields
-/// is_ephemeral is true for normal resources, false for intent(ephemeral) resources
+/// is_ephemeral is false for normal resources, true for intent(ephemeral) resources
 ///
 /// In practice, input resources are fetched and decrypted from blockchain storage.
 /// The create_input_resource API is only for test.
