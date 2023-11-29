@@ -104,8 +104,8 @@ pub struct Resource {
     pub psi: pallas::Base,
     /// rcm is the trapdoor of the resource commitment
     pub rcm: pallas::Base,
-    /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of input resource will be checked in ComplianceProof.
-    pub is_merkle_checked: bool,
+    /// If the is_ephemeral flag is true, the merkle path authorization(membership) of input resource will be checked in ComplianceProof.
+    pub is_ephemeral: bool,
 }
 
 /// The parameters in the ResourceKind are used to derive resource kind.
@@ -141,7 +141,7 @@ impl Resource {
         quantity: u64,
         nk: pallas::Base,
         nonce: Nullifier,
-        is_merkle_checked: bool,
+        is_ephemeral: bool,
         rseed: RandomSeed,
     ) -> Self {
         let kind = ResourceKind::new(logic, label);
@@ -150,7 +150,7 @@ impl Resource {
             value,
             quantity,
             nk_container: NullifierKeyContainer::Key(nk),
-            is_merkle_checked,
+            is_ephemeral,
             psi: rseed.get_psi(&nonce),
             rcm: rseed.get_rcm(&nonce),
             nonce,
@@ -165,7 +165,7 @@ impl Resource {
         value: pallas::Base,
         quantity: u64,
         npk: pallas::Base,
-        is_merkle_checked: bool,
+        is_ephemeral: bool,
     ) -> Self {
         let kind = ResourceKind::new(logic, label);
         Self {
@@ -173,7 +173,7 @@ impl Resource {
             value,
             quantity,
             nk_container: NullifierKeyContainer::PublicKey(npk),
-            is_merkle_checked,
+            is_ephemeral,
             psi: pallas::Base::default(),
             rcm: pallas::Base::default(),
             nonce: Nullifier::default(),
@@ -188,7 +188,7 @@ impl Resource {
         quantity: u64,
         nk_container: NullifierKeyContainer,
         nonce: Nullifier,
-        is_merkle_checked: bool,
+        is_ephemeral: bool,
         psi: pallas::Base,
         rcm: pallas::Base,
     ) -> Self {
@@ -198,7 +198,7 @@ impl Resource {
             value,
             quantity,
             nk_container,
-            is_merkle_checked,
+            is_ephemeral,
             psi,
             rcm,
             nonce,
@@ -221,13 +221,13 @@ impl Resource {
             nonce,
             psi: rseed.get_psi(&nonce),
             rcm: rseed.get_rcm(&nonce),
-            is_merkle_checked: false,
+            is_ephemeral: false,
         }
     }
 
-    // resource_commitment = poseidon_hash(logic || label || value || npk || nonce || psi || is_merkle_checked || quantity || rcm)
+    // resource_commitment = poseidon_hash(logic || label || value || npk || nonce || psi || is_ephemeral || quantity || rcm)
     pub fn commitment(&self) -> ResourceCommitment {
-        let compose_is_merkle_checked_quantity = if self.is_merkle_checked {
+        let compose_is_ephemeral_quantity = if self.is_ephemeral {
             pallas::Base::from_u128(1 << 64).square() + pallas::Base::from(self.quantity)
         } else {
             pallas::Base::from(self.quantity)
@@ -239,7 +239,7 @@ impl Resource {
             self.get_npk(),
             self.nonce.inner(),
             self.psi,
-            compose_is_merkle_checked_quantity,
+            compose_is_ephemeral_quantity,
             self.rcm,
         ]);
         ResourceCommitment(ret)
@@ -325,8 +325,8 @@ impl BorshSerialize for Resource {
         writer.write_all(&self.psi.to_repr())?;
         // Write rcm
         writer.write_all(&self.rcm.to_repr())?;
-        // Write is_merkle_checked
-        writer.write_u8(if self.is_merkle_checked { 1 } else { 0 })?;
+        // Write is_ephemeral
+        writer.write_u8(if self.is_ephemeral { 1 } else { 0 })?;
 
         Ok(())
     }
@@ -382,11 +382,11 @@ impl BorshDeserialize for Resource {
         reader.read_exact(&mut rcm_bytes)?;
         let rcm = Option::from(pallas::Base::from_repr(rcm_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "rcm not in field"))?;
-        // Read is_merkle_checked
-        let mut is_merkle_checked_byte = [0u8; 1];
-        reader.read_exact(&mut is_merkle_checked_byte)?;
-        let is_merkle_checked_byte = is_merkle_checked_byte[0];
-        let is_merkle_checked = is_merkle_checked_byte == 0x01;
+        // Read is_ephemeral
+        let mut is_ephemeral_byte = [0u8; 1];
+        reader.read_exact(&mut is_ephemeral_byte)?;
+        let is_ephemeral_byte = is_ephemeral_byte[0];
+        let is_ephemeral = is_ephemeral_byte == 0x01;
         // Construct resource
         Ok(Resource::from_full(
             logic,
@@ -395,7 +395,7 @@ impl BorshDeserialize for Resource {
             quantity,
             nk_container,
             nonce,
-            is_merkle_checked,
+            is_ephemeral,
             psi,
             rcm,
         ))
@@ -579,7 +579,7 @@ pub mod tests {
             value: pallas::Base::random(&mut rng),
             quantity: rng.gen(),
             nk_container: random_nullifier_key(&mut rng),
-            is_merkle_checked: true,
+            is_ephemeral: true,
             psi: rseed.get_psi(&nonce),
             rcm: rseed.get_rcm(&nonce),
             nonce,

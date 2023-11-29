@@ -118,12 +118,12 @@ pub fn check_input_resource(
         Value::known(input_resource.get_rcm()),
     )?;
 
-    // Witness is_merkle_checked
-    // is_merkle_checked will be boolean-constrained in the resource_commit.
-    let is_merkle_checked = assign_free_advice(
-        layouter.namespace(|| "witness is_merkle_checked"),
+    // Witness is_ephemeral
+    // is_ephemeral will be boolean-constrained in the resource_commit.
+    let is_ephemeral = assign_free_advice(
+        layouter.namespace(|| "witness is_ephemeral"),
         advices[0],
-        Value::known(pallas::Base::from(input_resource.is_merkle_checked)),
+        Value::known(pallas::Base::from(input_resource.is_ephemeral)),
     )?;
 
     // Check resource commitment
@@ -137,7 +137,7 @@ pub fn check_input_resource(
         nonce.clone(),
         psi.clone(),
         quantity.clone(),
-        is_merkle_checked.clone(),
+        is_ephemeral.clone(),
         rcm.clone(),
     )?;
 
@@ -158,7 +158,7 @@ pub fn check_input_resource(
         logic,
         quantity,
         label,
-        is_merkle_checked,
+        is_ephemeral,
         value,
         nonce,
         npk,
@@ -232,12 +232,12 @@ pub fn check_output_resource(
         Value::known(output_resource.get_psi()),
     )?;
 
-    // Witness is_merkle_checked
-    // is_merkle_checked will be boolean-constrained in the resource_commit.
-    let is_merkle_checked = assign_free_advice(
-        layouter.namespace(|| "witness is_merkle_checked"),
+    // Witness is_ephemeral
+    // is_ephemeral will be boolean-constrained in the resource_commit.
+    let is_ephemeral = assign_free_advice(
+        layouter.namespace(|| "witness is_ephemeral"),
         advices[0],
-        Value::known(pallas::Base::from(output_resource.is_merkle_checked)),
+        Value::known(pallas::Base::from(output_resource.is_ephemeral)),
     )?;
 
     // Check resource commitment
@@ -251,7 +251,7 @@ pub fn check_output_resource(
         old_nf.clone(),
         psi.clone(),
         quantity.clone(),
-        is_merkle_checked.clone(),
+        is_ephemeral.clone(),
         rcm.clone(),
     )?;
 
@@ -262,7 +262,7 @@ pub fn check_output_resource(
         logic,
         label,
         quantity,
-        is_merkle_checked,
+        is_ephemeral,
         value,
         nonce: old_nf,
         npk,

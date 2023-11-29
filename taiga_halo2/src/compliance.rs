@@ -3,7 +3,6 @@
 /// only once and strictly after it was created. Its commitment and nullifier must be derived correctly according
 /// to the rules for commitment/nullifier derivation. It also requires explicit check of the presence of all
 /// other required proofs
-
 use crate::{
     circuit::compliance_circuit::ComplianceCircuit,
     constant::{PRF_EXPAND_INPUT_VP_CM_R, PRF_EXPAND_OUTPUT_VP_CM_R},

@@ -125,15 +125,15 @@ impl Circuit<pallas::Base> for ComplianceCircuit {
         let merkle_path_selector = meta.selector();
         meta.create_gate("merkle path check", |meta| {
             let merkle_path_selector = meta.query_selector(merkle_path_selector);
-            let is_merkle_checked_input = meta.query_advice(advices[0], Rotation::cur());
+            let is_ephemeral_input = meta.query_advice(advices[0], Rotation::cur());
             let anchor = meta.query_advice(advices[1], Rotation::cur());
             let root = meta.query_advice(advices[2], Rotation::cur());
 
             Constraints::with_selector(
                 merkle_path_selector,
                 [(
-                    "is_merkle_checked is false, or root = anchor",
-                    is_merkle_checked_input * (root - anchor),
+                    "is_ephemeral is false, or root = anchor",
+                    is_ephemeral_input * (root - anchor),
                 )],
             )
         });
@@ -262,13 +262,8 @@ impl Circuit<pallas::Base> for ComplianceCircuit {
             |mut region| {
                 input_resource_variables
                     .resource_variables
-                    .is_merkle_checked
-                    .copy_advice(
-                        || "is_merkle_checked_input",
-                        &mut region,
-                        config.advices[0],
-                        0,
-                    )?;
+                    .is_ephemeral
+                    .copy_advice(|| "is_ephemeral_input", &mut region, config.advices[0], 0)?;
                 region.assign_advice_from_instance(
                     || "anchor",
                     config.instances,

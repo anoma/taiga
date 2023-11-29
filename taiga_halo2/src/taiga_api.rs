@@ -24,7 +24,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// value is the fungible data of the resource
 /// nk is the nullifier key
 /// nonce guarantees the uniqueness of the resource computable fields
-/// is_merkle_checked is true for normal resources, false for intent(ephemeral) resources
+/// is_ephemeral is true for normal resources, false for intent(ephemeral) resources
 ///
 /// In practice, input resources are fetched and decrypted from blockchain storage.
 /// The create_input_resource API is only for test.
@@ -34,7 +34,7 @@ pub fn create_input_resource(
     value: pallas::Base,
     quantity: u64,
     nk: pallas::Base,
-    is_merkle_checked: bool,
+    is_ephemeral: bool,
 ) -> Resource {
     let rng = OsRng;
     let nonce = Nullifier::random(rng);
@@ -46,7 +46,7 @@ pub fn create_input_resource(
         quantity,
         nk,
         nonce,
-        is_merkle_checked,
+        is_ephemeral,
         rseed,
     )
 }
@@ -59,9 +59,9 @@ pub fn create_output_resource(
     quantity: u64,
     // The owner of output resource has the nullifer key and exposes the nullifier_key commitment to output creator.
     npk: pallas::Base,
-    is_merkle_checked: bool,
+    is_ephemeral: bool,
 ) -> Resource {
-    Resource::new_output_resource(logic, label, value, quantity, npk, is_merkle_checked)
+    Resource::new_output_resource(logic, label, value, quantity, npk, is_ephemeral)
 }
 
 /// Resource borsh serialization
@@ -80,7 +80,7 @@ pub fn create_output_resource(
 /// |   nonce               | pallas::Base  |   32      |
 /// |   psi                 | pallas::Base  |   32      |
 /// |   rcm                 | pallas::Base  |   32      |
-/// |   is_merkle_checked   | u8            |   1       |
+/// |   is_ephemeral        | u8            |   1       |
 #[cfg(feature = "borsh")]
 pub fn resource_serialize(resource: &Resource) -> std::io::Result<Vec<u8>> {
     let mut result = Vec::with_capacity(RESOURCE_SIZE);

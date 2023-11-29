@@ -524,7 +524,7 @@ pub mod testing {
             let quantity = 5000u64;
             let nk = pallas::Base::random(&mut rng);
             let rseed = RandomSeed::random(&mut rng);
-            let is_merkle_checked = true;
+            let is_ephemeral = true;
             Resource::new_input_resource(
                 compressed_trivial_vp_vk,
                 label,
@@ -532,7 +532,7 @@ pub mod testing {
                 quantity,
                 nk,
                 nonce,
-                is_merkle_checked,
+                is_ephemeral,
                 rseed,
             )
         };
@@ -543,14 +543,14 @@ pub mod testing {
             let value = pallas::Base::zero();
             let quantity = 5000u64;
             let npk = pallas::Base::random(&mut rng);
-            let is_merkle_checked = true;
+            let is_ephemeral = true;
             Resource::new_output_resource(
                 compressed_trivial_vp_vk,
                 label,
                 value,
                 quantity,
                 npk,
-                is_merkle_checked,
+                is_ephemeral,
             )
         };
 
@@ -572,7 +572,7 @@ pub mod testing {
             let quantity = 10u64;
             let nk = pallas::Base::random(&mut rng);
             let rseed = RandomSeed::random(&mut rng);
-            let is_merkle_checked = true;
+            let is_ephemeral = true;
             Resource::new_input_resource(
                 compressed_trivial_vp_vk,
                 label,
@@ -580,7 +580,7 @@ pub mod testing {
                 quantity,
                 nk,
                 nonce,
-                is_merkle_checked,
+                is_ephemeral,
                 rseed,
             )
         };
@@ -589,14 +589,14 @@ pub mod testing {
             let value = pallas::Base::zero();
             let quantity = 10u64;
             let npk = pallas::Base::random(&mut rng);
-            let is_merkle_checked = true;
+            let is_ephemeral = true;
             Resource::new_output_resource(
                 compressed_trivial_vp_vk,
                 label,
                 value,
                 quantity,
                 npk,
-                is_merkle_checked,
+                is_ephemeral,
             )
         };
 
