@@ -4,8 +4,9 @@ use crate::{
         vp_examples::{TrivialValidityPredicateCircuit, COMPRESSED_TRIVIAL_VP_VK},
     },
     constant::{
-        NUM_RESOURCE, POSEIDON_TO_CURVE_INPUT_LEN, PRF_EXPAND_PERSONALIZATION, PRF_EXPAND_PSI,
-        PRF_EXPAND_PUBLIC_INPUT_PADDING, PRF_EXPAND_RCM, PRF_EXPAND_VCM_R,
+        NUM_RESOURCE, POSEIDON_TO_CURVE_INPUT_LEN, PRF_EXPAND_PERSONALIZATION,
+        PRF_EXPAND_PERSONALIZATION_TO_FIELD, PRF_EXPAND_PSI, PRF_EXPAND_PUBLIC_INPUT_PADDING,
+        PRF_EXPAND_RCM, PRF_EXPAND_VCM_R,
     },
     merkle_tree::{Anchor, MerklePath, Node},
     nullifier::{Nullifier, NullifierKeyContainer},
@@ -270,12 +271,22 @@ impl Resource {
 
     // psi is the randomness used to derive the nullifier
     pub fn get_psi(&self) -> pallas::Base {
-        poseidon_hash_n([self.rseed, self.nonce.inner()])
+        poseidon_hash_n([
+            *PRF_EXPAND_PERSONALIZATION_TO_FIELD,
+            pallas::Base::from(PRF_EXPAND_PSI as u64),
+            self.rseed,
+            self.nonce.inner(),
+        ])
     }
 
     // rcm is the randomness of resource commitment
     pub fn get_rcm(&self) -> pallas::Base {
-        poseidon_hash_n([self.rseed, self.nonce.inner()])
+        poseidon_hash_n([
+            *PRF_EXPAND_PERSONALIZATION_TO_FIELD,
+            pallas::Base::from(PRF_EXPAND_RCM as u64),
+            self.rseed,
+            self.nonce.inner(),
+        ])
     }
 
     pub fn calculate_root(&self, path: &MerklePath) -> Anchor {

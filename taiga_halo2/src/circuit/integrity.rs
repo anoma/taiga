@@ -4,7 +4,10 @@ use crate::circuit::{
     resource_commitment::{resource_commit, ResourceCommitChip},
     vp_circuit::{InputResourceVariables, OutputResourceVariables, ResourceVariables},
 };
-use crate::constant::{TaigaFixedBases, TaigaFixedBasesFull, POSEIDON_TO_CURVE_INPUT_LEN};
+use crate::constant::{
+    TaigaFixedBases, TaigaFixedBasesFull, POSEIDON_TO_CURVE_INPUT_LEN,
+    PRF_EXPAND_PERSONALIZATION_TO_FIELD, PRF_EXPAND_PSI, PRF_EXPAND_RCM,
+};
 use crate::resource::Resource;
 use crate::utils::poseidon_to_curve;
 use halo2_gadgets::{
@@ -233,19 +236,49 @@ pub fn check_output_resource(
         Value::known(output_resource.rseed),
     )?;
 
-    // TODO: constrain on psi and rcm derivation
     // Witness rcm
-    let rcm = assign_free_advice(
-        layouter.namespace(|| "witness rcm"),
+    let prf_expand_personalization = assign_free_constant(
+        layouter.namespace(|| "constant PRF_EXPAND_PERSONALIZATION_TO_FIELD"),
         advices[0],
-        Value::known(output_resource.get_rcm()),
+        *PRF_EXPAND_PERSONALIZATION_TO_FIELD,
+    )?;
+    let rcm_message = {
+        let prf_expand_rcm = assign_free_constant(
+            layouter.namespace(|| "constant PRF_EXPAND_RCM"),
+            advices[0],
+            pallas::Base::from(PRF_EXPAND_RCM as u64),
+        )?;
+        [
+            prf_expand_personalization.clone(),
+            prf_expand_rcm,
+            rseed.clone(),
+            old_nf.clone(),
+        ]
+    };
+    let rcm = poseidon_hash_gadget(
+        resource_commit_chip.get_poseidon_config(),
+        layouter.namespace(|| "derive the rcm"),
+        rcm_message,
     )?;
 
     // Witness psi
-    let psi = assign_free_advice(
-        layouter.namespace(|| "witness psi_output"),
-        advices[0],
-        Value::known(output_resource.get_psi()),
+    let psi_message = {
+        let prf_expand_psi = assign_free_constant(
+            layouter.namespace(|| "constant PRF_EXPAND_PSI"),
+            advices[0],
+            pallas::Base::from(PRF_EXPAND_PSI as u64),
+        )?;
+        [
+            prf_expand_personalization,
+            prf_expand_psi,
+            rseed.clone(),
+            old_nf.clone(),
+        ]
+    };
+    let psi = poseidon_hash_gadget(
+        resource_commit_chip.get_poseidon_config(),
+        layouter.namespace(|| "derive the psi"),
+        psi_message,
     )?;
 
     // Witness is_ephemeral

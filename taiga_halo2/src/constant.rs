@@ -27,6 +27,11 @@ pub const TRANSACTION_BINDING_HASH_PERSONALIZATION: &[u8; 16] = b"TxBindingSigHa
 pub const VP_COMMITMENT_PERSONALIZATION: &[u8; 8] = b"VPCommit";
 
 pub const PRF_EXPAND_PERSONALIZATION: &[u8; 16] = b"Taiga_ExpandSeed";
+lazy_static! {
+    pub static ref PRF_EXPAND_PERSONALIZATION_TO_FIELD: pallas::Base =
+        to_field_elements(PRF_EXPAND_PERSONALIZATION)[0];
+}
+
 pub const PRF_EXPAND_PSI: u8 = 0;
 pub const PRF_EXPAND_RCM: u8 = 1;
 pub const PRF_EXPAND_PUBLIC_INPUT_PADDING: u8 = 2;
