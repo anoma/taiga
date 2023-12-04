@@ -34,7 +34,7 @@ pub fn create_token_swap_ptx<R: RngCore>(
     // output resource
     let output_auth = TokenAuthorization::new(output_auth_pk, *COMPRESSED_TOKEN_AUTH_VK);
     let mut output_resource =
-        output_token.create_random_output_token_resource(output_npk, &output_auth);
+        output_token.create_random_output_token_resource(&mut rng, output_npk, &output_auth);
 
     // padding the zero resources
     let padding_input_resource = Resource::random_padding_resource(&mut rng);

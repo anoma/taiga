@@ -15,7 +15,7 @@ use taiga_halo2::{
     },
     merkle_tree::MerklePath,
     nullifier::{Nullifier, NullifierKeyContainer},
-    resource::{RandomSeed, Resource, ResourceKind},
+    resource::{Resource, ResourceKind},
 };
 
 fn bench_compliance_proof(name: &str, c: &mut Criterion) {
@@ -31,16 +31,15 @@ fn bench_compliance_proof(name: &str, c: &mut Criterion) {
             };
             let value = pallas::Base::random(&mut rng);
             let quantity: u64 = rng.gen();
-            let rseed = RandomSeed::random(&mut rng);
+            let rseed = pallas::Base::random(&mut rng);
             Resource {
                 kind,
                 value,
                 quantity,
                 nk_container: nk,
                 is_ephemeral: false,
-                psi: rseed.get_psi(&nonce),
-                rcm: rseed.get_rcm(&nonce),
                 nonce,
+                rseed,
             }
         };
         let mut output_resource = {
@@ -53,16 +52,15 @@ fn bench_compliance_proof(name: &str, c: &mut Criterion) {
             };
             let value = pallas::Base::random(&mut rng);
             let quantity: u64 = rng.gen();
-            let rseed = RandomSeed::random(&mut rng);
+            let rseed = pallas::Base::random(&mut rng);
             Resource {
                 kind,
                 value,
                 quantity,
                 nk_container: npk,
                 is_ephemeral: false,
-                psi: rseed.get_psi(&nonce),
-                rcm: rseed.get_rcm(&nonce),
                 nonce,
+                rseed,
             }
         };
         let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);

@@ -100,7 +100,7 @@ impl Token {
     ) -> TokenResource {
         let label = self.encode_name();
         let value = auth.to_value();
-        let rseed = RandomSeed::random(&mut rng);
+        let rseed = pallas::Base::random(&mut rng);
         let nonce = Nullifier::random(&mut rng);
         let resource = Resource::new_input_resource(
             *COMPRESSED_TOKEN_VK,
@@ -119,13 +119,15 @@ impl Token {
         }
     }
 
-    pub fn create_random_output_token_resource(
+    pub fn create_random_output_token_resource<R: RngCore>(
         &self,
+        mut rng: R,
         npk: pallas::Base,
         auth: &TokenAuthorization,
     ) -> TokenResource {
         let label = self.encode_name();
         let value = auth.to_value();
+        let rseed = pallas::Base::random(&mut rng);
         let resource = Resource::new_output_resource(
             *COMPRESSED_TOKEN_VK,
             label,
@@ -133,6 +135,7 @@ impl Token {
             self.quantity(),
             npk,
             false,
+            rseed,
         );
 
         TokenResource {

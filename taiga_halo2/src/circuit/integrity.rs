@@ -104,6 +104,15 @@ pub fn check_input_resource(
         Value::known(input_resource.nonce.inner()),
     )?;
 
+    // Witness rseed
+    let rseed = assign_free_advice(
+        layouter.namespace(|| "witness rseed"),
+        advices[0],
+        Value::known(input_resource.rseed),
+    )?;
+
+    // We don't need the constraints on psi and rcm derivation for input resource.
+    // If the psi and rcm are not correct, the existence checking would fail.
     // Witness psi
     let psi = assign_free_advice(
         layouter.namespace(|| "witness psi_input"),
@@ -162,8 +171,7 @@ pub fn check_input_resource(
         value,
         nonce,
         npk,
-        psi,
-        rcm,
+        rseed,
     };
 
     Ok(InputResourceVariables {
@@ -218,6 +226,14 @@ pub fn check_output_resource(
         output_resource.quantity,
     )?;
 
+    // Witness rseed
+    let rseed = assign_free_advice(
+        layouter.namespace(|| "witness rseed"),
+        advices[0],
+        Value::known(output_resource.rseed),
+    )?;
+
+    // TODO: constrain on psi and rcm derivation
     // Witness rcm
     let rcm = assign_free_advice(
         layouter.namespace(|| "witness rcm"),
@@ -266,8 +282,7 @@ pub fn check_output_resource(
         value,
         nonce: old_nf,
         npk,
-        psi,
-        rcm,
+        rseed,
     };
 
     Ok(OutputResourceVariables {

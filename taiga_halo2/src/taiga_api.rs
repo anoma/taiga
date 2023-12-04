@@ -6,14 +6,15 @@ use crate::{
 use crate::{
     error::TransactionError,
     nullifier::Nullifier,
-    resource::{RandomSeed, Resource},
+    resource::Resource,
     shielded_ptx::ShieldedPartialTransaction,
     transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
 };
+use ff::Field;
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
 
-pub const RESOURCE_SIZE: usize = 234;
+pub const RESOURCE_SIZE: usize = 202;
 
 #[cfg(feature = "borsh")]
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -36,9 +37,9 @@ pub fn create_input_resource(
     nk: pallas::Base,
     is_ephemeral: bool,
 ) -> Resource {
-    let rng = OsRng;
-    let nonce = Nullifier::random(rng);
-    let rseed = RandomSeed::random(rng);
+    let mut rng = OsRng;
+    let nonce = Nullifier::random(&mut rng);
+    let rseed = pallas::Base::random(&mut rng);
     Resource::new_input_resource(
         logic,
         label,
@@ -61,12 +62,14 @@ pub fn create_output_resource(
     npk: pallas::Base,
     is_ephemeral: bool,
 ) -> Resource {
-    Resource::new_output_resource(logic, label, value, quantity, npk, is_ephemeral)
+    let mut rng = OsRng;
+    let rseed = pallas::Base::random(&mut rng);
+    Resource::new_output_resource(logic, label, value, quantity, npk, is_ephemeral, rseed)
 }
 
 /// Resource borsh serialization
 ///
-/// Resource size: 234 bytes
+/// Resource size: 202 bytes
 ///
 /// Resource layout:
 /// |   Parameters          | type          |size(bytes)|
@@ -78,9 +81,8 @@ pub fn create_output_resource(
 /// |   nk_container type   | u8            |   1       |
 /// |   npk                 | pallas::Base  |   32      |
 /// |   nonce               | pallas::Base  |   32      |
-/// |   psi                 | pallas::Base  |   32      |
-/// |   rcm                 | pallas::Base  |   32      |
 /// |   is_ephemeral        | u8            |   1       |
+/// |   rseed               | pallas::Base  |   32      |
 #[cfg(feature = "borsh")]
 pub fn resource_serialize(resource: &Resource) -> std::io::Result<Vec<u8>> {
     let mut result = Vec::with_capacity(RESOURCE_SIZE);

@@ -138,7 +138,7 @@ impl ComplianceInfo {
             None => input_resource.calculate_root(&input_merkle_path),
         };
 
-        output_resource.set_nonce(&input_resource, &mut rng);
+        output_resource.set_nonce(&input_resource);
 
         Self {
             input_resource,
