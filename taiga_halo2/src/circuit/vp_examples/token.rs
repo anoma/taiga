@@ -1,3 +1,4 @@
+use crate::circuit::vp_bytecode::{ValidityPredicateByteCode, ValidityPredicateRepresentation};
 use crate::{
     circuit::{
         blake2s::{vp_commitment_gadget, Blake2sChip},
@@ -28,8 +29,9 @@ use crate::{
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
+use borsh::{BorshDeserialize, BorshSerialize};
 use ff::Field;
-use group::{Curve, Group};
+use group::{Curve, Group, GroupEncoding};
 use halo2_gadgets::ecc::{chip::EccChip, NonIdentityPoint};
 use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
@@ -46,7 +48,7 @@ lazy_static! {
     pub static ref COMPRESSED_TOKEN_VK: pallas::Base = TOKEN_VK.get_compressed();
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub struct TokenName(String);
 
 impl TokenName {
@@ -284,6 +286,20 @@ impl Default for TokenAuthorization {
     }
 }
 
+impl TokenValidityPredicateCircuit {
+    pub fn to_bytecode(&self) -> ValidityPredicateByteCode {
+        ValidityPredicateByteCode::new(ValidityPredicateRepresentation::Token, self.to_bytes())
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        borsh::to_vec(&self).unwrap()
+    }
+
+    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        BorshDeserialize::deserialize(&mut bytes.as_ref()).unwrap()
+    }
+}
+
 impl Default for TokenValidityPredicateCircuit {
     fn default() -> Self {
         Self {
@@ -509,6 +525,78 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
 vp_circuit_impl!(TokenValidityPredicateCircuit);
 vp_verifying_info_impl!(TokenValidityPredicateCircuit);
 
+impl BorshSerialize for TokenValidityPredicateCircuit {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        writer.write_all(&self.owned_resource_id.to_repr())?;
+        for input in self.input_resources.iter() {
+            input.serialize(writer)?;
+        }
+
+        for output in self.output_resources.iter() {
+            output.serialize(writer)?;
+        }
+
+        self.token_name.serialize(writer)?;
+
+        writer.write_all(&self.auth.pk.to_bytes())?;
+        writer.write_all(&self.auth.vk.to_repr())?;
+        writer.write_all(&self.receiver_vp_vk.to_repr())?;
+        self.rseed.serialize(writer)?;
+
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for TokenValidityPredicateCircuit {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let owned_resource_id_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let owned_resource_id = Option::from(pallas::Base::from_repr(owned_resource_id_bytes))
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "owned_resource_id not in field",
+                )
+            })?;
+        let input_resources: Vec<_> = (0..NUM_RESOURCE)
+            .map(|_| Resource::deserialize_reader(reader))
+            .collect::<Result<_, _>>()?;
+        let output_resources: Vec<_> = (0..NUM_RESOURCE)
+            .map(|_| Resource::deserialize_reader(reader))
+            .collect::<Result<_, _>>()?;
+        let token_name = TokenName::deserialize_reader(reader)?;
+        let pk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let pk = Option::from(pallas::Point::from_bytes(&pk_bytes)).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "owned_resource_id not in point",
+            )
+        })?;
+        let vk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let vk = Option::from(pallas::Base::from_repr(vk_bytes)).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "vk not in field")
+        })?;
+        let auth = TokenAuthorization { pk, vk };
+        let receiver_vp_vk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let receiver_vp_vk = Option::from(pallas::Base::from_repr(receiver_vp_vk_bytes))
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "receiver_vp_vk not in field",
+                )
+            })?;
+        let rseed = RandomSeed::deserialize_reader(reader)?;
+        Ok(Self {
+            owned_resource_id,
+            input_resources: input_resources.try_into().unwrap(),
+            output_resources: output_resources.try_into().unwrap(),
+            token_name,
+            auth,
+            receiver_vp_vk,
+            rseed,
+        })
+    }
+}
+
 impl TokenAuthorization {
     pub fn new(pk: pallas::Point, vk: pallas::Base) -> Self {
         Self { pk, vk }
@@ -562,6 +650,12 @@ fn test_halo2_token_vp_circuit() {
             receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
             rseed: RandomSeed::random(&mut rng),
         }
+    };
+
+    // Test serialization
+    let circuit = {
+        let circuit_bytes = circuit.to_bytes();
+        TokenValidityPredicateCircuit::from_bytes(&circuit_bytes)
     };
 
     let public_inputs = circuit.get_public_inputs(&mut rng);

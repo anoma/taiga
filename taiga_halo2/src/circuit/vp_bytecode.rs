@@ -1,3 +1,5 @@
+#[cfg(feature = "examples")]
+use crate::circuit::vp_examples::token::TokenValidityPredicateCircuit;
 #[cfg(feature = "borsh")]
 use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
 use crate::error::TransactionError;
@@ -31,6 +33,7 @@ pub enum ValidityPredicateRepresentation {
     // Native halo2 circuits don't have a unified representatioin, enumerate the vp circuit examples for the moment.
     // TODO: figure out if we can have a unified circuit presentation. In theory, it's possible to separate the circuit system and proving system.
     Trivial,
+    Token,
     // TODO: add other vp types here if needed
 }
 
@@ -74,6 +77,11 @@ impl ValidityPredicateByteCode {
                 let vp = TrivialValidityPredicateCircuit::from_bytes(&self.inputs);
                 Ok(vp.get_verifying_info())
             }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::Token => {
+                let vp = TokenValidityPredicateCircuit::from_bytes(&self.inputs);
+                Ok(vp.get_verifying_info())
+            }
             #[allow(unreachable_patterns)]
             _ => Err(TransactionError::InvalidValidityPredicateRepresentation),
         }
@@ -102,6 +110,11 @@ impl ValidityPredicateByteCode {
             #[cfg(feature = "borsh")]
             ValidityPredicateRepresentation::Trivial => {
                 let vp = TrivialValidityPredicateCircuit::from_bytes(&self.inputs);
+                vp.verify_transparently()?
+            }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::Token => {
+                let vp = TokenValidityPredicateCircuit::from_bytes(&self.inputs);
                 vp.verify_transparently()?
             }
             #[allow(unreachable_patterns)]
