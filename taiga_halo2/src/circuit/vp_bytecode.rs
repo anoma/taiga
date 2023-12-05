@@ -2,6 +2,7 @@
 use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
 #[cfg(feature = "examples")]
 use crate::circuit::vp_examples::{
+    receiver_vp::ReceiverValidityPredicateCircuit,
     signature_verification::SignatureVerificationValidityPredicateCircuit,
     token::TokenValidityPredicateCircuit,
 };
@@ -38,6 +39,7 @@ pub enum ValidityPredicateRepresentation {
     Trivial,
     Token,
     SignatureVerification,
+    Receiver,
     // TODO: add other vp types here if needed
 }
 
@@ -91,6 +93,11 @@ impl ValidityPredicateByteCode {
                 let vp = SignatureVerificationValidityPredicateCircuit::from_bytes(&self.inputs);
                 Ok(vp.get_verifying_info())
             }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::Receiver => {
+                let vp = ReceiverValidityPredicateCircuit::from_bytes(&self.inputs);
+                Ok(vp.get_verifying_info())
+            }
             #[allow(unreachable_patterns)]
             _ => Err(TransactionError::InvalidValidityPredicateRepresentation),
         }
@@ -129,6 +136,11 @@ impl ValidityPredicateByteCode {
             #[cfg(feature = "examples")]
             ValidityPredicateRepresentation::SignatureVerification => {
                 let vp = SignatureVerificationValidityPredicateCircuit::from_bytes(&self.inputs);
+                vp.verify_transparently()?
+            }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::Receiver => {
+                let vp = ReceiverValidityPredicateCircuit::from_bytes(&self.inputs);
                 vp.verify_transparently()?
             }
             #[allow(unreachable_patterns)]

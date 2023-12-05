@@ -6,6 +6,7 @@ use crate::{
             target_resource_variable::get_owned_resource_variable,
         },
         resource_encryption_circuit::resource_encryption_gadget,
+        vp_bytecode::{ValidityPredicateByteCode, ValidityPredicateRepresentation},
         vp_circuit::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
@@ -21,8 +22,8 @@ use crate::{
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
-use group::Group;
-use group::{cofactor::CofactorCurveAffine, Curve};
+use borsh::{BorshDeserialize, BorshSerialize};
+use group::{cofactor::CofactorCurveAffine, ff::PrimeField, Curve, Group, GroupEncoding};
 use halo2_gadgets::ecc::{chip::EccChip, NonIdentityPoint};
 use halo2_proofs::{
     arithmetic::CurveAffine,
@@ -33,6 +34,7 @@ use lazy_static::lazy_static;
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
 use rand::RngCore;
+
 const CIPHER_LEN: usize = 9;
 
 lazy_static! {
@@ -52,6 +54,20 @@ pub struct ReceiverValidityPredicateCircuit {
     pub sk: pallas::Base,
     pub rcv_pk: pallas::Point,
     pub auth_vp_vk: pallas::Base,
+}
+
+impl ReceiverValidityPredicateCircuit {
+    pub fn to_bytecode(&self) -> ValidityPredicateByteCode {
+        ValidityPredicateByteCode::new(ValidityPredicateRepresentation::Receiver, self.to_bytes())
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        borsh::to_vec(&self).unwrap()
+    }
+
+    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        BorshDeserialize::deserialize(&mut bytes.as_ref()).unwrap()
+    }
 }
 
 impl Default for ReceiverValidityPredicateCircuit {
@@ -282,6 +298,82 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
 vp_circuit_impl!(ReceiverValidityPredicateCircuit);
 vp_verifying_info_impl!(ReceiverValidityPredicateCircuit);
 
+impl BorshSerialize for ReceiverValidityPredicateCircuit {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        writer.write_all(&self.owned_resource_id.to_repr())?;
+        for input in self.input_resources.iter() {
+            input.serialize(writer)?;
+        }
+
+        for output in self.output_resources.iter() {
+            output.serialize(writer)?;
+        }
+
+        writer.write_all(&self.vp_vk.to_repr())?;
+        writer.write_all(&self.encrypt_nonce.to_repr())?;
+        writer.write_all(&self.sk.to_repr())?;
+        writer.write_all(&self.rcv_pk.to_bytes())?;
+        writer.write_all(&self.auth_vp_vk.to_repr())?;
+
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for ReceiverValidityPredicateCircuit {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let owned_resource_id_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let owned_resource_id = Option::from(pallas::Base::from_repr(owned_resource_id_bytes))
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "owned_resource_id not in field",
+                )
+            })?;
+        let input_resources: Vec<_> = (0..NUM_RESOURCE)
+            .map(|_| Resource::deserialize_reader(reader))
+            .collect::<Result<_, _>>()?;
+        let output_resources: Vec<_> = (0..NUM_RESOURCE)
+            .map(|_| Resource::deserialize_reader(reader))
+            .collect::<Result<_, _>>()?;
+        let vp_vk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let vp_vk = Option::from(pallas::Base::from_repr(vp_vk_bytes)).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "vp_vk not in field")
+        })?;
+        let encrypt_nonce_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let encrypt_nonce =
+            Option::from(pallas::Base::from_repr(encrypt_nonce_bytes)).ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "encrypt_nonce not in field",
+                )
+            })?;
+        let sk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let sk = Option::from(pallas::Base::from_repr(sk_bytes)).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "sk not in field")
+        })?;
+        let rcv_pk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let rcv_pk = Option::from(pallas::Point::from_bytes(&rcv_pk_bytes)).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "rcv_pk not in point")
+        })?;
+
+        let auth_vp_vk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let auth_vp_vk =
+            Option::from(pallas::Base::from_repr(auth_vp_vk_bytes)).ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "auth_vp_vk not in field")
+            })?;
+        Ok(Self {
+            owned_resource_id,
+            input_resources: input_resources.try_into().unwrap(),
+            output_resources: output_resources.try_into().unwrap(),
+            vp_vk,
+            encrypt_nonce,
+            sk,
+            rcv_pk,
+            auth_vp_vk,
+        })
+    }
+}
+
 #[test]
 fn test_halo2_receiver_vp_circuit() {
     use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
@@ -321,6 +413,13 @@ fn test_halo2_receiver_vp_circuit() {
             rcv_sk,
         )
     };
+
+    // Test serialization
+    let circuit = {
+        let circuit_bytes = circuit.to_bytes();
+        ReceiverValidityPredicateCircuit::from_bytes(&circuit_bytes)
+    };
+
     let public_inputs = circuit.get_public_inputs(&mut rng);
 
     let prover = MockProver::<pallas::Base>::run(
