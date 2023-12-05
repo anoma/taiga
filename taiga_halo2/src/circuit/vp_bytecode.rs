@@ -1,7 +1,10 @@
-#[cfg(feature = "examples")]
-use crate::circuit::vp_examples::token::TokenValidityPredicateCircuit;
 #[cfg(feature = "borsh")]
 use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
+#[cfg(feature = "examples")]
+use crate::circuit::vp_examples::{
+    signature_verification::SignatureVerificationValidityPredicateCircuit,
+    token::TokenValidityPredicateCircuit,
+};
 use crate::error::TransactionError;
 use crate::shielded_ptx::ResourceVPVerifyingInfoSet;
 use crate::{
@@ -34,6 +37,7 @@ pub enum ValidityPredicateRepresentation {
     // TODO: figure out if we can have a unified circuit presentation. In theory, it's possible to separate the circuit system and proving system.
     Trivial,
     Token,
+    SignatureVerification,
     // TODO: add other vp types here if needed
 }
 
@@ -82,6 +86,11 @@ impl ValidityPredicateByteCode {
                 let vp = TokenValidityPredicateCircuit::from_bytes(&self.inputs);
                 Ok(vp.get_verifying_info())
             }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::SignatureVerification => {
+                let vp = SignatureVerificationValidityPredicateCircuit::from_bytes(&self.inputs);
+                Ok(vp.get_verifying_info())
+            }
             #[allow(unreachable_patterns)]
             _ => Err(TransactionError::InvalidValidityPredicateRepresentation),
         }
@@ -115,6 +124,11 @@ impl ValidityPredicateByteCode {
             #[cfg(feature = "examples")]
             ValidityPredicateRepresentation::Token => {
                 let vp = TokenValidityPredicateCircuit::from_bytes(&self.inputs);
+                vp.verify_transparently()?
+            }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::SignatureVerification => {
+                let vp = SignatureVerificationValidityPredicateCircuit::from_bytes(&self.inputs);
                 vp.verify_transparently()?
             }
             #[allow(unreachable_patterns)]

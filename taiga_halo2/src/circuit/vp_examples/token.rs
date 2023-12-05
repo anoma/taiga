@@ -1,4 +1,3 @@
-use crate::circuit::vp_bytecode::{ValidityPredicateByteCode, ValidityPredicateRepresentation};
 use crate::{
     circuit::{
         blake2s::{vp_commitment_gadget, Blake2sChip},
@@ -7,6 +6,7 @@ use crate::{
             poseidon_hash::poseidon_hash_gadget,
             target_resource_variable::{get_is_input_resource_flag, get_owned_resource_variable},
         },
+        vp_bytecode::{ValidityPredicateByteCode, ValidityPredicateRepresentation},
         vp_circuit::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
