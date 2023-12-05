@@ -11,6 +11,7 @@ use crate::{
             assign_free_advice,
             target_resource_variable::{get_is_input_resource_flag, get_owned_resource_variable},
         },
+        vp_bytecode::{ValidityPredicateByteCode, ValidityPredicateRepresentation},
         vp_circuit::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
@@ -24,13 +25,14 @@ use crate::{
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
+use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_proofs::arithmetic::Field;
 use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
 use lazy_static::lazy_static;
-use pasta_curves::pallas;
+use pasta_curves::{group::ff::PrimeField, pallas};
 use rand::rngs::OsRng;
 use rand::RngCore;
 
@@ -54,6 +56,21 @@ impl CascadeIntentValidityPredicateCircuit {
     // We can encode at most three resources to label if needed.
     pub fn encode_label(cascade_resource_cm: pallas::Base) -> pallas::Base {
         cascade_resource_cm
+    }
+
+    pub fn to_bytecode(&self) -> ValidityPredicateByteCode {
+        ValidityPredicateByteCode::new(
+            ValidityPredicateRepresentation::CascadeIntent,
+            self.to_bytes(),
+        )
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        borsh::to_vec(&self).unwrap()
+    }
+
+    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        BorshDeserialize::deserialize(&mut bytes.as_ref()).unwrap()
     }
 }
 
@@ -149,6 +166,55 @@ impl ValidityPredicateCircuit for CascadeIntentValidityPredicateCircuit {
 vp_circuit_impl!(CascadeIntentValidityPredicateCircuit);
 vp_verifying_info_impl!(CascadeIntentValidityPredicateCircuit);
 
+impl BorshSerialize for CascadeIntentValidityPredicateCircuit {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        writer.write_all(&self.owned_resource_id.to_repr())?;
+        for input in self.input_resources.iter() {
+            input.serialize(writer)?;
+        }
+
+        for output in self.output_resources.iter() {
+            output.serialize(writer)?;
+        }
+
+        writer.write_all(&self.cascade_resource_cm.to_repr())?;
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for CascadeIntentValidityPredicateCircuit {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let owned_resource_id_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let owned_resource_id = Option::from(pallas::Base::from_repr(owned_resource_id_bytes))
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "owned_resource_id not in field",
+                )
+            })?;
+        let input_resources: Vec<_> = (0..NUM_RESOURCE)
+            .map(|_| Resource::deserialize_reader(reader))
+            .collect::<Result<_, _>>()?;
+        let output_resources: Vec<_> = (0..NUM_RESOURCE)
+            .map(|_| Resource::deserialize_reader(reader))
+            .collect::<Result<_, _>>()?;
+        let cascade_resource_cm_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let cascade_resource_cm = Option::from(pallas::Base::from_repr(cascade_resource_cm_bytes))
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "cascade_resource_cm not in field",
+                )
+            })?;
+        Ok(Self {
+            owned_resource_id,
+            input_resources: input_resources.try_into().unwrap(),
+            output_resources: output_resources.try_into().unwrap(),
+            cascade_resource_cm,
+        })
+    }
+}
+
 pub fn create_intent_resource<R: RngCore>(
     mut rng: R,
     cascade_resource_cm: pallas::Base,
@@ -193,6 +259,13 @@ fn test_halo2_cascade_intent_vp_circuit() {
             cascade_resource_cm,
         }
     };
+
+    // Test serialization
+    let circuit = {
+        let circuit_bytes = circuit.to_bytes();
+        CascadeIntentValidityPredicateCircuit::from_bytes(&circuit_bytes)
+    };
+
     let public_inputs = circuit.get_public_inputs(&mut rng);
 
     let prover = MockProver::<pallas::Base>::run(
