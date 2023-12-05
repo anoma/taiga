@@ -64,7 +64,7 @@ impl TokenName {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, BorshSerialize, BorshDeserialize)]
 pub struct Token {
     name: TokenName,
     quantity: u64,
@@ -147,7 +147,7 @@ impl Token {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, BorshDeserialize, BorshSerialize)]
 pub struct TokenResource {
     pub token_name: TokenName,
     pub resource: Resource,
@@ -537,9 +537,7 @@ impl BorshSerialize for TokenValidityPredicateCircuit {
         }
 
         self.token_name.serialize(writer)?;
-
-        writer.write_all(&self.auth.pk.to_bytes())?;
-        writer.write_all(&self.auth.vk.to_repr())?;
+        self.auth.serialize(writer)?;
         writer.write_all(&self.receiver_vp_vk.to_repr())?;
         self.rseed.serialize(writer)?;
 
@@ -564,18 +562,7 @@ impl BorshDeserialize for TokenValidityPredicateCircuit {
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
         let token_name = TokenName::deserialize_reader(reader)?;
-        let pk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let pk = Option::from(pallas::Point::from_bytes(&pk_bytes)).ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "owned_resource_id not in point",
-            )
-        })?;
-        let vk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let vk = Option::from(pallas::Base::from_repr(vk_bytes)).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "vk not in field")
-        })?;
-        let auth = TokenAuthorization { pk, vk };
+        let auth = TokenAuthorization::deserialize_reader(reader)?;
         let receiver_vp_vk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
         let receiver_vp_vk = Option::from(pallas::Base::from_repr(receiver_vp_vk_bytes))
             .ok_or_else(|| {
@@ -594,6 +581,32 @@ impl BorshDeserialize for TokenValidityPredicateCircuit {
             receiver_vp_vk,
             rseed,
         })
+    }
+}
+
+impl BorshSerialize for TokenAuthorization {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        writer.write_all(&self.pk.to_bytes())?;
+        writer.write_all(&self.vk.to_repr())?;
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for TokenAuthorization {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let pk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let pk = Option::from(pallas::Point::from_bytes(&pk_bytes)).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "owned_resource_id not in point",
+            )
+        })?;
+        let vk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let vk = Option::from(pallas::Base::from_repr(vk_bytes)).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "vk not in field")
+        })?;
+
+        Ok(Self { pk, vk })
     }
 }
 

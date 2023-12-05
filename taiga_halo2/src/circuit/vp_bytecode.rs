@@ -2,6 +2,7 @@
 use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
 #[cfg(feature = "examples")]
 use crate::circuit::vp_examples::{
+    partial_fulfillment_intent::PartialFulfillmentIntentValidityPredicateCircuit,
     receiver_vp::ReceiverValidityPredicateCircuit,
     signature_verification::SignatureVerificationValidityPredicateCircuit,
     token::TokenValidityPredicateCircuit,
@@ -40,7 +41,8 @@ pub enum ValidityPredicateRepresentation {
     Token,
     SignatureVerification,
     Receiver,
-    // TODO: add other vp types here if needed
+    PartialFulfillmentIntent,
+    // Add other native vp types here if needed
 }
 
 #[derive(Clone, Debug)]
@@ -98,6 +100,11 @@ impl ValidityPredicateByteCode {
                 let vp = ReceiverValidityPredicateCircuit::from_bytes(&self.inputs);
                 Ok(vp.get_verifying_info())
             }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::PartialFulfillmentIntent => {
+                let vp = PartialFulfillmentIntentValidityPredicateCircuit::from_bytes(&self.inputs);
+                Ok(vp.get_verifying_info())
+            }
             #[allow(unreachable_patterns)]
             _ => Err(TransactionError::InvalidValidityPredicateRepresentation),
         }
@@ -141,6 +148,11 @@ impl ValidityPredicateByteCode {
             #[cfg(feature = "examples")]
             ValidityPredicateRepresentation::Receiver => {
                 let vp = ReceiverValidityPredicateCircuit::from_bytes(&self.inputs);
+                vp.verify_transparently()?
+            }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::PartialFulfillmentIntent => {
+                let vp = PartialFulfillmentIntentValidityPredicateCircuit::from_bytes(&self.inputs);
                 vp.verify_transparently()?
             }
             #[allow(unreachable_patterns)]
