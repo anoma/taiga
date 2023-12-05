@@ -8,11 +8,12 @@ use crate::circuit::merkle_circuit::{
     merkle_poseidon_gadget, MerklePoseidonChip, MerklePoseidonConfig,
 };
 use crate::constant::{
-    TaigaFixedBases, ACTION_ANCHOR_PUBLIC_INPUT_ROW_IDX, ACTION_DELTA_CM_X_PUBLIC_INPUT_ROW_IDX,
-    ACTION_DELTA_CM_Y_PUBLIC_INPUT_ROW_IDX, ACTION_INPUT_VP_CM_1_ROW_IDX,
-    ACTION_INPUT_VP_CM_2_ROW_IDX, ACTION_NF_PUBLIC_INPUT_ROW_IDX,
-    ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX, ACTION_OUTPUT_VP_CM_1_ROW_IDX,
-    ACTION_OUTPUT_VP_CM_2_ROW_IDX, TAIGA_COMMITMENT_TREE_DEPTH,
+    TaigaFixedBases, COMPLIANCE_ANCHOR_PUBLIC_INPUT_ROW_IDX,
+    COMPLIANCE_DELTA_CM_X_PUBLIC_INPUT_ROW_IDX, COMPLIANCE_DELTA_CM_Y_PUBLIC_INPUT_ROW_IDX,
+    COMPLIANCE_INPUT_VP_CM_1_ROW_IDX, COMPLIANCE_INPUT_VP_CM_2_ROW_IDX,
+    COMPLIANCE_NF_PUBLIC_INPUT_ROW_IDX, COMPLIANCE_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX,
+    COMPLIANCE_OUTPUT_VP_CM_1_ROW_IDX, COMPLIANCE_OUTPUT_VP_CM_2_ROW_IDX,
+    TAIGA_COMMITMENT_TREE_DEPTH,
 };
 use crate::merkle_tree::LR;
 use crate::resource::Resource;
@@ -25,8 +26,8 @@ use halo2_gadgets::{
 use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
     plonk::{
-        Advice, Circuit, Column, ConstraintSystem, Constraints, Error, Instance, Selector,
-        TableColumn,
+        Advice, Circuit, Column, ConstraintSystem, Constraints, Error, Expression, Instance,
+        Selector, TableColumn,
     },
     poly::Rotation,
 };
@@ -35,7 +36,7 @@ use pasta_curves::pallas;
 use crate::circuit::resource_commitment::{ResourceCommitChip, ResourceCommitConfig};
 
 #[derive(Clone, Debug)]
-pub struct ActionConfig {
+pub struct ComplianceConfig {
     instances: Column<Instance>,
     advices: [Column<Advice>; 10],
     table_idx: TableColumn,
@@ -48,9 +49,9 @@ pub struct ActionConfig {
     resource_commit_config: ResourceCommitConfig,
 }
 
-/// The Action circuit.
+/// The Compliance circuit.
 #[derive(Clone, Debug, Default)]
-pub struct ActionCircuit {
+pub struct ComplianceCircuit {
     /// Input resource
     pub input_resource: Resource,
     /// The authorization path of input resource
@@ -65,8 +66,8 @@ pub struct ActionCircuit {
     pub output_vp_cm_r: pallas::Base,
 }
 
-impl Circuit<pallas::Base> for ActionCircuit {
-    type Config = ActionConfig;
+impl Circuit<pallas::Base> for ComplianceCircuit {
+    type Config = ComplianceConfig;
     type FloorPlanner = floor_planner::V1;
 
     fn without_witnesses(&self) -> Self {
@@ -124,15 +125,16 @@ impl Circuit<pallas::Base> for ActionCircuit {
         let merkle_path_selector = meta.selector();
         meta.create_gate("merkle path check", |meta| {
             let merkle_path_selector = meta.query_selector(merkle_path_selector);
-            let is_merkle_checked_input = meta.query_advice(advices[0], Rotation::cur());
+            let is_ephemeral_input = meta.query_advice(advices[0], Rotation::cur());
             let anchor = meta.query_advice(advices[1], Rotation::cur());
             let root = meta.query_advice(advices[2], Rotation::cur());
+            let constant_one = Expression::Constant(pallas::Base::one());
 
             Constraints::with_selector(
                 merkle_path_selector,
                 [(
-                    "is_merkle_checked is false, or root = anchor",
-                    is_merkle_checked_input * (root - anchor),
+                    "is_ephemeral is true, or root = anchor",
+                    (constant_one - is_ephemeral_input) * (root - anchor),
                 )],
             )
         });
@@ -209,7 +211,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             config.instances,
             resource_commit_chip.clone(),
             self.input_resource,
-            ACTION_NF_PUBLIC_INPUT_ROW_IDX,
+            COMPLIANCE_NF_PUBLIC_INPUT_ROW_IDX,
         )?;
 
         // Check the merkle tree path validity and public the root
@@ -228,7 +230,7 @@ impl Circuit<pallas::Base> for ActionCircuit {
             resource_commit_chip,
             self.output_resource,
             input_resource_variables.nf,
-            ACTION_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX,
+            COMPLIANCE_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX,
         )?;
 
         // compute and public delta commitment(input_value_commitment - output_value_commitment)
@@ -247,12 +249,12 @@ impl Circuit<pallas::Base> for ActionCircuit {
         layouter.constrain_instance(
             delta.inner().x().cell(),
             config.instances,
-            ACTION_DELTA_CM_X_PUBLIC_INPUT_ROW_IDX,
+            COMPLIANCE_DELTA_CM_X_PUBLIC_INPUT_ROW_IDX,
         )?;
         layouter.constrain_instance(
             delta.inner().y().cell(),
             config.instances,
-            ACTION_DELTA_CM_Y_PUBLIC_INPUT_ROW_IDX,
+            COMPLIANCE_DELTA_CM_Y_PUBLIC_INPUT_ROW_IDX,
         )?;
 
         // merkle path check
@@ -261,17 +263,12 @@ impl Circuit<pallas::Base> for ActionCircuit {
             |mut region| {
                 input_resource_variables
                     .resource_variables
-                    .is_merkle_checked
-                    .copy_advice(
-                        || "is_merkle_checked_input",
-                        &mut region,
-                        config.advices[0],
-                        0,
-                    )?;
+                    .is_ephemeral
+                    .copy_advice(|| "is_ephemeral_input", &mut region, config.advices[0], 0)?;
                 region.assign_advice_from_instance(
                     || "anchor",
                     config.instances,
-                    ACTION_ANCHOR_PUBLIC_INPUT_ROW_IDX,
+                    COMPLIANCE_ANCHOR_PUBLIC_INPUT_ROW_IDX,
                     config.advices[1],
                     0,
                 )?;
@@ -295,12 +292,12 @@ impl Circuit<pallas::Base> for ActionCircuit {
         layouter.constrain_instance(
             input_vp_commitment[0].cell(),
             config.instances,
-            ACTION_INPUT_VP_CM_1_ROW_IDX,
+            COMPLIANCE_INPUT_VP_CM_1_ROW_IDX,
         )?;
         layouter.constrain_instance(
             input_vp_commitment[1].cell(),
             config.instances,
-            ACTION_INPUT_VP_CM_2_ROW_IDX,
+            COMPLIANCE_INPUT_VP_CM_2_ROW_IDX,
         )?;
 
         // Output resource application VP commitment
@@ -318,12 +315,12 @@ impl Circuit<pallas::Base> for ActionCircuit {
         layouter.constrain_instance(
             output_vp_commitment[0].cell(),
             config.instances,
-            ACTION_OUTPUT_VP_CM_1_ROW_IDX,
+            COMPLIANCE_OUTPUT_VP_CM_1_ROW_IDX,
         )?;
         layouter.constrain_instance(
             output_vp_commitment[1].cell(),
             config.instances,
-            ACTION_OUTPUT_VP_CM_2_ROW_IDX,
+            COMPLIANCE_OUTPUT_VP_CM_2_ROW_IDX,
         )?;
 
         Ok(())
@@ -331,10 +328,11 @@ impl Circuit<pallas::Base> for ActionCircuit {
 }
 
 #[test]
-fn test_halo2_action_circuit() {
-    use crate::action::tests::random_action_info;
+fn test_halo2_compliance_circuit() {
+    use crate::compliance::tests::random_compliance_info;
     use crate::constant::{
-        ACTION_CIRCUIT_PARAMS_SIZE, ACTION_PROVING_KEY, ACTION_VERIFYING_KEY, SETUP_PARAMS_MAP,
+        COMPLIANCE_CIRCUIT_PARAMS_SIZE, COMPLIANCE_PROVING_KEY, COMPLIANCE_VERIFYING_KEY,
+        SETUP_PARAMS_MAP,
     };
     use crate::proof::Proof;
     use halo2_proofs::dev::MockProver;
@@ -342,26 +340,35 @@ fn test_halo2_action_circuit() {
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
-    let action_info = random_action_info(&mut rng);
-    let (action, action_circuit) = action_info.build();
-    let instances = vec![action.to_instance()];
-    let prover =
-        MockProver::<pallas::Base>::run(ACTION_CIRCUIT_PARAMS_SIZE, &action_circuit, instances)
-            .unwrap();
+    let compliance_info = random_compliance_info(&mut rng);
+    let (compliance, compliance_circuit) = compliance_info.build();
+    let instances = vec![compliance.to_instance()];
+    let prover = MockProver::<pallas::Base>::run(
+        COMPLIANCE_CIRCUIT_PARAMS_SIZE,
+        &compliance_circuit,
+        instances,
+    )
+    .unwrap();
     assert_eq!(prover.verify(), Ok(()));
 
-    // Create action proof
-    let params = SETUP_PARAMS_MAP.get(&ACTION_CIRCUIT_PARAMS_SIZE).unwrap();
+    // Create compliance proof
+    let params = SETUP_PARAMS_MAP
+        .get(&COMPLIANCE_CIRCUIT_PARAMS_SIZE)
+        .unwrap();
     let proof = Proof::create(
-        &ACTION_PROVING_KEY,
+        &COMPLIANCE_PROVING_KEY,
         params,
-        action_circuit,
-        &[&action.to_instance()],
+        compliance_circuit,
+        &[&compliance.to_instance()],
         &mut rng,
     )
     .unwrap();
 
     assert!(proof
-        .verify(&ACTION_VERIFYING_KEY, params, &[&action.to_instance()])
+        .verify(
+            &COMPLIANCE_VERIFYING_KEY,
+            params,
+            &[&compliance.to_instance()]
+        )
         .is_ok());
 }

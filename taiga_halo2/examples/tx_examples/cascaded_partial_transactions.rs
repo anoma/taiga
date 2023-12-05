@@ -5,12 +5,12 @@ use halo2_proofs::arithmetic::Field;
 use pasta_curves::pallas;
 use rand::{CryptoRng, RngCore};
 use taiga_halo2::{
-    action::ActionInfo,
     circuit::vp_examples::{
         cascade_intent::{create_intent_resource, CascadeIntentValidityPredicateCircuit},
         signature_verification::COMPRESSED_TOKEN_AUTH_VK,
         token::{Token, TokenAuthorization},
     },
+    compliance::ComplianceInfo,
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
     resource::ResourceValidityPredicates,
@@ -31,7 +31,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
         input_token_1.create_random_input_token_resource(&mut rng, alice_nk, &alice_auth);
     let output_token_1 = Token::new("btc".to_string(), 1u64);
     let mut output_resource_1 =
-        output_token_1.create_random_output_token_resource(bob_npk, &bob_auth);
+        output_token_1.create_random_output_token_resource(&mut rng, bob_npk, &bob_auth);
     let input_token_2 = Token::new("eth".to_string(), 2u64);
     let input_resource_2 =
         input_token_2.create_random_input_token_resource(&mut rng, alice_nk, &alice_auth);
@@ -43,10 +43,10 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
         create_intent_resource(&mut rng, input_resource_3.commitment().inner(), alice_nk);
     let output_token_2 = Token::new("eth".to_string(), 2u64);
     let mut output_resource_2 =
-        output_token_2.create_random_output_token_resource(bob_npk, &bob_auth);
+        output_token_2.create_random_output_token_resource(&mut rng, bob_npk, &bob_auth);
     let output_token_3 = Token::new("xan".to_string(), 3u64);
     let mut output_resource_3 =
-        output_token_3.create_random_output_token_resource(bob_npk, &bob_auth);
+        output_token_3.create_random_output_token_resource(&mut rng, bob_npk, &bob_auth);
 
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
@@ -57,9 +57,9 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
     // Alice consumes 1 "BTC" and 2 "ETH".
     // Alice creates a cascade intent resource and 1 "BTC" to Bob.
     let ptx_1 = {
-        // Create action pairs
-        let actions = {
-            let action_1 = ActionInfo::new(
+        // Create compliance pairs
+        let compliances = {
+            let compliance_1 = ComplianceInfo::new(
                 *input_resource_1.resource(),
                 merkle_path.clone(),
                 None,
@@ -67,14 +67,14 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
                 &mut rng,
             );
 
-            let action_2 = ActionInfo::new(
+            let compliance_2 = ComplianceInfo::new(
                 *input_resource_2.resource(),
                 merkle_path.clone(),
                 None,
                 &mut cascade_intent_resource,
                 &mut rng,
             );
-            vec![action_1, action_2]
+            vec![compliance_1, compliance_2]
         };
 
         // Create VPs
@@ -127,16 +127,17 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
         };
 
         // Create shielded partial tx
-        ShieldedPartialTransaction::build(actions, input_vps, output_vps, vec![], &mut rng).unwrap()
+        ShieldedPartialTransaction::build(compliances, input_vps, output_vps, vec![], &mut rng)
+            .unwrap()
     };
 
     // The second partial transaction:
     // Alice consumes the intent resource and 3 "XAN";
     // Alice creates 2 "ETH" and 3 "XAN" to Bob
     let ptx_2 = {
-        // Create action pairs
-        let actions = {
-            let action_1 = ActionInfo::new(
+        // Create compliance pairs
+        let compliances = {
+            let compliance_1 = ComplianceInfo::new(
                 cascade_intent_resource,
                 merkle_path.clone(),
                 Some(anchor),
@@ -144,14 +145,14 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
                 &mut rng,
             );
 
-            let action_2 = ActionInfo::new(
+            let compliance_2 = ComplianceInfo::new(
                 *input_resource_3.resource(),
                 merkle_path,
                 None,
                 &mut output_resource_3.resource,
                 &mut rng,
             );
-            vec![action_1, action_2]
+            vec![compliance_1, compliance_2]
         };
 
         // Create VPs
@@ -203,7 +204,8 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
         };
 
         // Create shielded partial tx
-        ShieldedPartialTransaction::build(actions, input_vps, output_vps, vec![], &mut rng).unwrap()
+        ShieldedPartialTransaction::build(compliances, input_vps, output_vps, vec![], &mut rng)
+            .unwrap()
     };
 
     // Create the final transaction

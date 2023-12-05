@@ -1,18 +1,20 @@
 #[cfg(feature = "borsh")]
 use crate::{
-    action::ActionInfo, circuit::vp_bytecode::ApplicationByteCode, transaction::TransactionResult,
+    circuit::vp_bytecode::ApplicationByteCode, compliance::ComplianceInfo,
+    transaction::TransactionResult,
 };
 use crate::{
     error::TransactionError,
     nullifier::Nullifier,
-    resource::{RandomSeed, Resource},
+    resource::Resource,
     shielded_ptx::ShieldedPartialTransaction,
     transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
 };
+use ff::Field;
 use pasta_curves::pallas;
 use rand::rngs::OsRng;
 
-pub const RESOURCE_SIZE: usize = 234;
+pub const RESOURCE_SIZE: usize = 202;
 
 #[cfg(feature = "borsh")]
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -23,7 +25,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 /// value is the fungible data of the resource
 /// nk is the nullifier key
 /// nonce guarantees the uniqueness of the resource computable fields
-/// is_merkle_checked is true for normal resources, false for intent(ephemeral) resources
+/// is_ephemeral is false for normal resources, true for intent(ephemeral) resources
 ///
 /// In practice, input resources are fetched and decrypted from blockchain storage.
 /// The create_input_resource API is only for test.
@@ -33,11 +35,11 @@ pub fn create_input_resource(
     value: pallas::Base,
     quantity: u64,
     nk: pallas::Base,
-    is_merkle_checked: bool,
+    is_ephemeral: bool,
 ) -> Resource {
-    let rng = OsRng;
-    let nonce = Nullifier::random(rng);
-    let rseed = RandomSeed::random(rng);
+    let mut rng = OsRng;
+    let nonce = Nullifier::random(&mut rng);
+    let rseed = pallas::Base::random(&mut rng);
     Resource::new_input_resource(
         logic,
         label,
@@ -45,7 +47,7 @@ pub fn create_input_resource(
         quantity,
         nk,
         nonce,
-        is_merkle_checked,
+        is_ephemeral,
         rseed,
     )
 }
@@ -58,14 +60,16 @@ pub fn create_output_resource(
     quantity: u64,
     // The owner of output resource has the nullifer key and exposes the nullifier_key commitment to output creator.
     npk: pallas::Base,
-    is_merkle_checked: bool,
+    is_ephemeral: bool,
 ) -> Resource {
-    Resource::new_output_resource(logic, label, value, quantity, npk, is_merkle_checked)
+    let mut rng = OsRng;
+    let rseed = pallas::Base::random(&mut rng);
+    Resource::new_output_resource(logic, label, value, quantity, npk, is_ephemeral, rseed)
 }
 
 /// Resource borsh serialization
 ///
-/// Resource size: 234 bytes
+/// Resource size: 202 bytes
 ///
 /// Resource layout:
 /// |   Parameters          | type          |size(bytes)|
@@ -77,9 +81,8 @@ pub fn create_output_resource(
 /// |   nk_container type   | u8            |   1       |
 /// |   npk                 | pallas::Base  |   32      |
 /// |   nonce               | pallas::Base  |   32      |
-/// |   psi                 | pallas::Base  |   32      |
-/// |   rcm                 | pallas::Base  |   32      |
-/// |   is_merkle_checked   | u8            |   1       |
+/// |   is_ephemeral        | u8            |   1       |
+/// |   rseed               | pallas::Base  |   32      |
 #[cfg(feature = "borsh")]
 pub fn resource_serialize(resource: &Resource) -> std::io::Result<Vec<u8>> {
     let mut result = Vec::with_capacity(RESOURCE_SIZE);
@@ -104,7 +107,7 @@ pub fn resource_deserialize(bytes: Vec<u8>) -> std::io::Result<Resource> {
 /// Shielded Partial Transaction layout:
 /// | Parameters                        | type                  | size(bytes)   |
 /// |       -                           |       -               |   -           |
-/// | 2 action proofs                   | ActionVerifyingInfo   | 4676 * 2      |
+/// | 2 compliance proofs               | ComplianceVerifyingInfo| 4676 * 2      |
 /// | input1 static vp proof            | VPVerifyingInfo       | 158216        |
 /// | input1 dynamic vp num(by borsh)   | u32                   | 4             |
 /// | input1 dynamic vp proof           | VPVerifyingInfo       | 158216 * num  |
@@ -160,14 +163,14 @@ pub fn transaction_deserialize(bytes: Vec<u8>) -> std::io::Result<Transaction> {
 /// Create a shielded partial transaction from vp bytecode
 #[cfg(feature = "borsh")]
 pub fn create_shielded_partial_transaction(
-    actions: Vec<ActionInfo>,
+    compliances: Vec<ComplianceInfo>,
     input_resource_app: Vec<ApplicationByteCode>,
     output_resource_app: Vec<ApplicationByteCode>,
     hints: Vec<u8>,
 ) -> Result<ShieldedPartialTransaction, TransactionError> {
     let rng = OsRng;
     ShieldedPartialTransaction::from_bytecode(
-        actions,
+        compliances,
         input_resource_app,
         output_resource_app,
         hints,
@@ -252,8 +255,8 @@ pub mod tests {
     // #[ignore]
     #[test]
     fn ptx_example_test() {
-        use crate::action::ActionInfo;
         use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
+        use crate::compliance::ComplianceInfo;
         use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
         use crate::merkle_tree::MerklePath;
         use crate::resource::tests::random_resource;
@@ -265,7 +268,7 @@ pub mod tests {
         let input_resource_1_nf = input_resource_1.get_nf().unwrap();
         let mut output_resource_1 = random_resource(&mut rng);
         let merkle_path_1 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let action_1 = ActionInfo::new(
+        let compliance_1 = ComplianceInfo::new(
             input_resource_1,
             merkle_path_1,
             None,
@@ -277,7 +280,7 @@ pub mod tests {
         let input_resource_2_nf = input_resource_2.get_nf().unwrap();
         let mut output_resource_2 = random_resource(&mut rng);
         let merkle_path_2 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let action_2 = ActionInfo::new(
+        let compliance_2 = ComplianceInfo::new(
             input_resource_2,
             merkle_path_2,
             None,
@@ -328,7 +331,7 @@ pub mod tests {
 
         // construct ptx
         let ptx = create_shielded_partial_transaction(
-            vec![action_1, action_2],
+            vec![compliance_1, compliance_2],
             vec![input_resource_1_app, input_resource_2_app],
             vec![output_resource_1_app, output_resource_2_app],
             vec![],

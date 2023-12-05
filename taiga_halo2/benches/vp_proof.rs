@@ -10,7 +10,7 @@ use taiga_halo2::{
     constant::{NUM_RESOURCE, SETUP_PARAMS_MAP, VP_CIRCUIT_PARAMS_SIZE},
     nullifier::{Nullifier, NullifierKeyContainer},
     proof::Proof,
-    resource::{RandomSeed, Resource, ResourceKind},
+    resource::{Resource, ResourceKind},
 };
 
 fn bench_vp_proof(name: &str, c: &mut Criterion) {
@@ -27,16 +27,15 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
             };
             let value = pallas::Base::random(&mut rng);
             let quantity: u64 = rng.gen();
-            let rseed = RandomSeed::random(&mut rng);
+            let rseed = pallas::Base::random(&mut rng);
             Resource {
                 kind,
                 value,
                 quantity,
                 nk_container: nk,
-                is_merkle_checked: true,
-                psi: rseed.get_psi(&nonce),
-                rcm: rseed.get_rcm(&nonce),
+                is_ephemeral: false,
                 nonce,
+                rseed,
             }
         });
         let output_resources = input_resources
@@ -51,16 +50,15 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
                 };
                 let value = pallas::Base::random(&mut rng);
                 let quantity: u64 = rng.gen();
-                let rseed = RandomSeed::random(&mut rng);
+                let rseed = pallas::Base::random(&mut rng);
                 Resource {
                     kind,
                     value,
                     quantity,
                     nk_container: npk,
-                    is_merkle_checked: true,
-                    psi: rseed.get_psi(&nonce),
-                    rcm: rseed.get_rcm(&nonce),
+                    is_ephemeral: false,
                     nonce,
+                    rseed,
                 }
             })
             .collect::<Vec<_>>();

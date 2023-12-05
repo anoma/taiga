@@ -5,7 +5,7 @@ use crate::{
         vp_examples::token::{Token, TokenAuthorization, TokenResource, TOKEN_VK},
     },
     constant::NUM_RESOURCE,
-    resource::{RandomSeed, Resource},
+    resource::Resource,
     utils::poseidon_hash_n,
 };
 use halo2_proofs::arithmetic::Field;
@@ -56,6 +56,7 @@ impl Swap {
         assert_eq!(offer.quantity() % ratio, 0);
 
         let offer_resource = offer.create_random_output_token_resource(
+            &mut rng,
             self.sell.resource().nk_container.get_npk(),
             &self.auth,
         );
@@ -71,6 +72,7 @@ impl Swap {
             );
             *returned_token
                 .create_random_output_token_resource(
+                    &mut rng,
                     self.sell.resource().nk_container.get_npk(),
                     &self.auth,
                 )
@@ -99,7 +101,7 @@ impl Swap {
     }
 
     pub fn create_intent_resource<R: RngCore>(&self, mut rng: R) -> Resource {
-        let rseed = RandomSeed::random(&mut rng);
+        let rseed = pallas::Base::random(&mut rng);
 
         Resource::new_input_resource(
             *COMPRESSED_PARTIAL_FULFILLMENT_INTENT_VK,
@@ -108,7 +110,7 @@ impl Swap {
             1u64,
             self.sell.resource().nk_container.get_nk().unwrap(),
             self.sell.resource().get_nf().unwrap(),
-            false,
+            true,
             rseed,
         )
     }

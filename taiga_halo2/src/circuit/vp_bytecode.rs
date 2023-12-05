@@ -82,8 +82,8 @@ impl ValidityPredicateByteCode {
     // Verify vp circuit transparently and return owned resource PubID for further checking
     pub fn verify_transparently(
         &self,
-        action_nfs: &[Nullifier],
-        action_cms: &[ResourceCommitment],
+        compliance_nfs: &[Nullifier],
+        compliance_cms: &[ResourceCommitment],
     ) -> Result<pallas::Base, TransactionError> {
         // check VP transparently
         let public_inputs = match &self.circuit {
@@ -109,26 +109,26 @@ impl ValidityPredicateByteCode {
         };
 
         // check nullifiers
-        // Check the vp actually uses the input resources from action circuits.
+        // Check the vp actually uses the input resources from compliance circuits.
         let vp_nfs = [
             public_inputs.get_from_index(VP_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX),
             public_inputs.get_from_index(VP_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX),
         ];
 
-        if !((action_nfs[0].inner() == vp_nfs[0] && action_nfs[1].inner() == vp_nfs[1])
-            || (action_nfs[0].inner() == vp_nfs[1] && action_nfs[1].inner() == vp_nfs[0]))
+        if !((compliance_nfs[0].inner() == vp_nfs[0] && compliance_nfs[1].inner() == vp_nfs[1])
+            || (compliance_nfs[0].inner() == vp_nfs[1] && compliance_nfs[1].inner() == vp_nfs[0]))
         {
             return Err(TransactionError::InconsistentNullifier);
         }
 
         // check resource_commitments
-        // Check the vp actually uses the output resources from action circuits.
+        // Check the vp actually uses the output resources from compliance circuits.
         let vp_cms = [
             public_inputs.get_from_index(VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX),
             public_inputs.get_from_index(VP_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX),
         ];
-        if !((action_cms[0].inner() == vp_cms[0] && action_cms[1].inner() == vp_cms[1])
-            || (action_cms[0].inner() == vp_cms[1] && action_cms[1].inner() == vp_cms[0]))
+        if !((compliance_cms[0].inner() == vp_cms[0] && compliance_cms[1].inner() == vp_cms[1])
+            || (compliance_cms[0].inner() == vp_cms[1] && compliance_cms[1].inner() == vp_cms[0]))
         {
             return Err(TransactionError::InconsistentOutputResourceCommitment);
         }
@@ -165,14 +165,14 @@ impl ApplicationByteCode {
     // Verify vp circuits transparently and return owned resource PubID for further checking
     pub fn verify_transparently(
         &self,
-        action_nfs: &[Nullifier],
-        action_cms: &[ResourceCommitment],
+        compliance_nfs: &[Nullifier],
+        compliance_cms: &[ResourceCommitment],
     ) -> Result<pallas::Base, TransactionError> {
         let owned_resource_id = self
             .app_vp_bytecode
-            .verify_transparently(action_nfs, action_cms)?;
+            .verify_transparently(compliance_nfs, compliance_cms)?;
         for dynamic_vp in self.dynamic_vp_bytecode.iter() {
-            let id = dynamic_vp.verify_transparently(action_nfs, action_cms)?;
+            let id = dynamic_vp.verify_transparently(compliance_nfs, compliance_cms)?;
             // check: the app_vp and dynamic_vps belong to the resource
             if id != owned_resource_id {
                 return Err(TransactionError::InconsistentOwneResourceID);

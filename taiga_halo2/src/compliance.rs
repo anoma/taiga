@@ -1,5 +1,10 @@
+/// A resource machine compliance proof is required to ensure that the provided transaction is well-formed.
+/// This proof, among other checks, includes the check that the resource was created only once, was consumed
+/// only once and strictly after it was created. Its commitment and nullifier must be derived correctly according
+/// to the rules for commitment/nullifier derivation. It also requires explicit check of the presence of all
+/// other required proofs
 use crate::{
-    circuit::action_circuit::ActionCircuit,
+    circuit::compliance_circuit::ComplianceCircuit,
     constant::{PRF_EXPAND_INPUT_VP_CM_R, PRF_EXPAND_OUTPUT_VP_CM_R},
     delta_commitment::DeltaCommitment,
     merkle_tree::{Anchor, MerklePath},
@@ -19,12 +24,12 @@ use serde;
 #[cfg(feature = "borsh")]
 use borsh::{BorshDeserialize, BorshSerialize};
 
-/// The public inputs of action proof.
+/// The public inputs of compliance proof.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "nif", derive(NifStruct))]
-#[cfg_attr(feature = "nif", module = "Taiga.Action.PublicInputs")]
+#[cfg_attr(feature = "nif", module = "Taiga.Compliance.PublicInputs")]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ActionPublicInputs {
+pub struct CompliancePublicInputs {
     /// The root of the resource commitment Merkle tree.
     pub anchor: Anchor,
     /// The nullifier of input resource.
@@ -39,11 +44,11 @@ pub struct ActionPublicInputs {
     pub output_vp_commitment: ValidityPredicateCommitment,
 }
 
-/// The information to build ActionPublicInputs and ActionCircuit.
+/// The information to build CompliancePublicInputs and ComplianceCircuit.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
-pub struct ActionInfo {
+pub struct ComplianceInfo {
     input_resource: Resource,
     input_merkle_path: MerklePath,
     input_anchor: Anchor,
@@ -52,7 +57,7 @@ pub struct ActionInfo {
     rseed: RandomSeed,
 }
 
-impl ActionPublicInputs {
+impl CompliancePublicInputs {
     pub fn to_instance(&self) -> Vec<pallas::Base> {
         let input_vp_commitment = self.input_vp_commitment.to_public_inputs();
         let output_vp_commitment = self.output_vp_commitment.to_public_inputs();
@@ -71,7 +76,7 @@ impl ActionPublicInputs {
 }
 
 #[cfg(feature = "borsh")]
-impl BorshSerialize for ActionPublicInputs {
+impl BorshSerialize for CompliancePublicInputs {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         writer.write_all(&self.anchor.to_bytes())?;
         writer.write_all(&self.nf.to_bytes())?;
@@ -84,7 +89,7 @@ impl BorshSerialize for ActionPublicInputs {
 }
 
 #[cfg(feature = "borsh")]
-impl BorshDeserialize for ActionPublicInputs {
+impl BorshDeserialize for CompliancePublicInputs {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         use std::io;
         let anchor_bytes = <[u8; 32]>::deserialize_reader(reader)?;
@@ -106,7 +111,7 @@ impl BorshDeserialize for ActionPublicInputs {
         let output_vp_commitment =
             ValidityPredicateCommitment::from_bytes(output_vp_commitment_bytes);
 
-        Ok(ActionPublicInputs {
+        Ok(CompliancePublicInputs {
             anchor,
             nf,
             cm,
@@ -117,7 +122,7 @@ impl BorshDeserialize for ActionPublicInputs {
     }
 }
 
-impl ActionInfo {
+impl ComplianceInfo {
     // The dummy input resource must provide a valid custom_anchor, but a random merkle path
     // The normal input resource only needs to provide a valid merkle path. The anchor will be calculated from the resource and path.
     // The nonce of output_resource will be set to the nullifier of input_resource
@@ -133,7 +138,7 @@ impl ActionInfo {
             None => input_resource.calculate_root(&input_merkle_path),
         };
 
-        output_resource.set_nonce(&input_resource, &mut rng);
+        output_resource.set_nonce(&input_resource);
 
         Self {
             input_resource,
@@ -177,7 +182,7 @@ impl ActionInfo {
         self.output_resource.commitment()
     }
 
-    pub fn build(&self) -> (ActionPublicInputs, ActionCircuit) {
+    pub fn build(&self) -> (CompliancePublicInputs, ComplianceCircuit) {
         let nf = self.get_input_resource_nullifer();
         assert_eq!(
             nf, self.output_resource.nonce,
@@ -197,7 +202,7 @@ impl ActionInfo {
         let output_vp_commitment =
             ValidityPredicateCommitment::commit(&self.output_resource.get_logic(), &output_vp_cm_r);
 
-        let action = ActionPublicInputs {
+        let compliance = CompliancePublicInputs {
             nf,
             cm,
             anchor: self.input_anchor,
@@ -206,7 +211,7 @@ impl ActionInfo {
             output_vp_commitment,
         };
 
-        let action_circuit = ActionCircuit {
+        let compliance_circuit = ComplianceCircuit {
             input_resource: self.input_resource,
             merkle_path: self.input_merkle_path.get_path().try_into().unwrap(),
             output_resource: self.output_resource,
@@ -215,23 +220,23 @@ impl ActionInfo {
             output_vp_cm_r,
         };
 
-        (action, action_circuit)
+        (compliance, compliance_circuit)
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use super::ActionInfo;
+    use super::ComplianceInfo;
     use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
     use crate::merkle_tree::MerklePath;
     use crate::resource::tests::random_resource;
     use rand::RngCore;
 
-    pub fn random_action_info<R: RngCore>(mut rng: R) -> ActionInfo {
+    pub fn random_compliance_info<R: RngCore>(mut rng: R) -> ComplianceInfo {
         let input_resource = random_resource(&mut rng);
         let mut output_resource = random_resource(&mut rng);
         let input_merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        ActionInfo::new(
+        ComplianceInfo::new(
             input_resource,
             input_merkle_path,
             None,

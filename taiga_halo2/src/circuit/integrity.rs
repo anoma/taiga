@@ -4,7 +4,10 @@ use crate::circuit::{
     resource_commitment::{resource_commit, ResourceCommitChip},
     vp_circuit::{InputResourceVariables, OutputResourceVariables, ResourceVariables},
 };
-use crate::constant::{TaigaFixedBases, TaigaFixedBasesFull, POSEIDON_TO_CURVE_INPUT_LEN};
+use crate::constant::{
+    TaigaFixedBases, TaigaFixedBasesFull, POSEIDON_TO_CURVE_INPUT_LEN,
+    PRF_EXPAND_PERSONALIZATION_TO_FIELD, PRF_EXPAND_PSI, PRF_EXPAND_RCM,
+};
 use crate::resource::Resource;
 use crate::utils::poseidon_to_curve;
 use halo2_gadgets::{
@@ -104,6 +107,15 @@ pub fn check_input_resource(
         Value::known(input_resource.nonce.inner()),
     )?;
 
+    // Witness rseed
+    let rseed = assign_free_advice(
+        layouter.namespace(|| "witness rseed"),
+        advices[0],
+        Value::known(input_resource.rseed),
+    )?;
+
+    // We don't need the constraints on psi and rcm derivation for input resource.
+    // If the psi and rcm are not correct, the existence checking would fail.
     // Witness psi
     let psi = assign_free_advice(
         layouter.namespace(|| "witness psi_input"),
@@ -118,12 +130,12 @@ pub fn check_input_resource(
         Value::known(input_resource.get_rcm()),
     )?;
 
-    // Witness is_merkle_checked
-    // is_merkle_checked will be boolean-constrained in the resource_commit.
-    let is_merkle_checked = assign_free_advice(
-        layouter.namespace(|| "witness is_merkle_checked"),
+    // Witness is_ephemeral
+    // is_ephemeral will be boolean-constrained in the resource_commit.
+    let is_ephemeral = assign_free_advice(
+        layouter.namespace(|| "witness is_ephemeral"),
         advices[0],
-        Value::known(pallas::Base::from(input_resource.is_merkle_checked)),
+        Value::known(pallas::Base::from(input_resource.is_ephemeral)),
     )?;
 
     // Check resource commitment
@@ -137,7 +149,7 @@ pub fn check_input_resource(
         nonce.clone(),
         psi.clone(),
         quantity.clone(),
-        is_merkle_checked.clone(),
+        is_ephemeral.clone(),
         rcm.clone(),
     )?;
 
@@ -158,12 +170,11 @@ pub fn check_input_resource(
         logic,
         quantity,
         label,
-        is_merkle_checked,
+        is_ephemeral,
         value,
         nonce,
         npk,
-        psi,
-        rcm,
+        rseed,
     };
 
     Ok(InputResourceVariables {
@@ -218,26 +229,64 @@ pub fn check_output_resource(
         output_resource.quantity,
     )?;
 
-    // Witness rcm
-    let rcm = assign_free_advice(
-        layouter.namespace(|| "witness rcm"),
+    // Witness rseed
+    let rseed = assign_free_advice(
+        layouter.namespace(|| "witness rseed"),
         advices[0],
-        Value::known(output_resource.get_rcm()),
+        Value::known(output_resource.rseed),
+    )?;
+
+    // Witness rcm
+    let prf_expand_personalization = assign_free_constant(
+        layouter.namespace(|| "constant PRF_EXPAND_PERSONALIZATION_TO_FIELD"),
+        advices[0],
+        *PRF_EXPAND_PERSONALIZATION_TO_FIELD,
+    )?;
+    let rcm_message = {
+        let prf_expand_rcm = assign_free_constant(
+            layouter.namespace(|| "constant PRF_EXPAND_RCM"),
+            advices[0],
+            pallas::Base::from(PRF_EXPAND_RCM as u64),
+        )?;
+        [
+            prf_expand_personalization.clone(),
+            prf_expand_rcm,
+            rseed.clone(),
+            old_nf.clone(),
+        ]
+    };
+    let rcm = poseidon_hash_gadget(
+        resource_commit_chip.get_poseidon_config(),
+        layouter.namespace(|| "derive the rcm"),
+        rcm_message,
     )?;
 
     // Witness psi
-    let psi = assign_free_advice(
-        layouter.namespace(|| "witness psi_output"),
-        advices[0],
-        Value::known(output_resource.get_psi()),
+    let psi_message = {
+        let prf_expand_psi = assign_free_constant(
+            layouter.namespace(|| "constant PRF_EXPAND_PSI"),
+            advices[0],
+            pallas::Base::from(PRF_EXPAND_PSI as u64),
+        )?;
+        [
+            prf_expand_personalization,
+            prf_expand_psi,
+            rseed.clone(),
+            old_nf.clone(),
+        ]
+    };
+    let psi = poseidon_hash_gadget(
+        resource_commit_chip.get_poseidon_config(),
+        layouter.namespace(|| "derive the psi"),
+        psi_message,
     )?;
 
-    // Witness is_merkle_checked
-    // is_merkle_checked will be boolean-constrained in the resource_commit.
-    let is_merkle_checked = assign_free_advice(
-        layouter.namespace(|| "witness is_merkle_checked"),
+    // Witness is_ephemeral
+    // is_ephemeral will be boolean-constrained in the resource_commit.
+    let is_ephemeral = assign_free_advice(
+        layouter.namespace(|| "witness is_ephemeral"),
         advices[0],
-        Value::known(pallas::Base::from(output_resource.is_merkle_checked)),
+        Value::known(pallas::Base::from(output_resource.is_ephemeral)),
     )?;
 
     // Check resource commitment
@@ -251,7 +300,7 @@ pub fn check_output_resource(
         old_nf.clone(),
         psi.clone(),
         quantity.clone(),
-        is_merkle_checked.clone(),
+        is_ephemeral.clone(),
         rcm.clone(),
     )?;
 
@@ -262,12 +311,11 @@ pub fn check_output_resource(
         logic,
         label,
         quantity,
-        is_merkle_checked,
+        is_ephemeral,
         value,
         nonce: old_nf,
         npk,
-        psi,
-        rcm,
+        rseed,
     };
 
     Ok(OutputResourceVariables {

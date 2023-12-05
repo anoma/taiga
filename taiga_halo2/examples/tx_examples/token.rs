@@ -4,11 +4,11 @@ use pasta_curves::pallas;
 use rand::RngCore;
 
 use taiga_halo2::{
-    action::ActionInfo,
     circuit::vp_examples::{
         signature_verification::COMPRESSED_TOKEN_AUTH_VK,
         token::{Token, TokenAuthorization},
     },
+    compliance::ComplianceInfo,
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
     resource::{Resource, ResourceValidityPredicates},
@@ -34,7 +34,7 @@ pub fn create_token_swap_ptx<R: RngCore>(
     // output resource
     let output_auth = TokenAuthorization::new(output_auth_pk, *COMPRESSED_TOKEN_AUTH_VK);
     let mut output_resource =
-        output_token.create_random_output_token_resource(output_npk, &output_auth);
+        output_token.create_random_output_token_resource(&mut rng, output_npk, &output_auth);
 
     // padding the zero resources
     let padding_input_resource = Resource::random_padding_resource(&mut rng);
@@ -43,9 +43,9 @@ pub fn create_token_swap_ptx<R: RngCore>(
     // Generate proving info
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
-    // Create action pairs
-    let actions = {
-        let action_1 = ActionInfo::new(
+    // Create compliance pairs
+    let compliances = {
+        let compliance_1 = ComplianceInfo::new(
             *input_resource.resource(),
             merkle_path.clone(),
             None,
@@ -55,14 +55,14 @@ pub fn create_token_swap_ptx<R: RngCore>(
 
         // Fetch a valid anchor for padding input resources
         let anchor = Anchor::from(pallas::Base::random(&mut rng));
-        let action_2 = ActionInfo::new(
+        let compliance_2 = ComplianceInfo::new(
             padding_input_resource,
             merkle_path,
             Some(anchor),
             &mut padding_output_resource,
             &mut rng,
         );
-        vec![action_1, action_2]
+        vec![compliance_1, compliance_2]
     };
 
     // Create VPs
@@ -107,5 +107,5 @@ pub fn create_token_swap_ptx<R: RngCore>(
     };
 
     // Create shielded partial tx
-    ShieldedPartialTransaction::build(actions, input_vps, output_vps, vec![], &mut rng).unwrap()
+    ShieldedPartialTransaction::build(compliances, input_vps, output_vps, vec![], &mut rng).unwrap()
 }

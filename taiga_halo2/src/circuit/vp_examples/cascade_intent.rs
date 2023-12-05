@@ -24,6 +24,7 @@ use crate::{
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
+use halo2_proofs::arithmetic::Field;
 use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
@@ -154,7 +155,7 @@ pub fn create_intent_resource<R: RngCore>(
     nk: pallas::Base,
 ) -> Resource {
     let label = CascadeIntentValidityPredicateCircuit::encode_label(cascade_resource_cm);
-    let rseed = RandomSeed::random(&mut rng);
+    let rseed = pallas::Base::random(&mut rng);
     let nonce = Nullifier::random(&mut rng);
     Resource::new_input_resource(
         *COMPRESSED_CASCADE_INTENT_VK,
@@ -163,7 +164,7 @@ pub fn create_intent_resource<R: RngCore>(
         1u64,
         nk,
         nonce,
-        false,
+        true,
         rseed,
     )
 }

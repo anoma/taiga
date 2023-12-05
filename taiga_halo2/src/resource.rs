@@ -4,8 +4,9 @@ use crate::{
         vp_examples::{TrivialValidityPredicateCircuit, COMPRESSED_TRIVIAL_VP_VK},
     },
     constant::{
-        NUM_RESOURCE, POSEIDON_TO_CURVE_INPUT_LEN, PRF_EXPAND_PERSONALIZATION, PRF_EXPAND_PSI,
-        PRF_EXPAND_PUBLIC_INPUT_PADDING, PRF_EXPAND_RCM, PRF_EXPAND_VCM_R,
+        NUM_RESOURCE, POSEIDON_TO_CURVE_INPUT_LEN, PRF_EXPAND_PERSONALIZATION,
+        PRF_EXPAND_PERSONALIZATION_TO_FIELD, PRF_EXPAND_PSI, PRF_EXPAND_PUBLIC_INPUT_PADDING,
+        PRF_EXPAND_RCM, PRF_EXPAND_VCM_R,
     },
     merkle_tree::{Anchor, MerklePath, Node},
     nullifier::{Nullifier, NullifierKeyContainer},
@@ -100,12 +101,10 @@ pub struct Resource {
     pub nk_container: NullifierKeyContainer,
     /// nonce guarantees the uniqueness of the resource computable fields
     pub nonce: Nullifier,
-    /// psi is to derive the nullifier
-    pub psi: pallas::Base,
-    /// rcm is the trapdoor of the resource commitment
-    pub rcm: pallas::Base,
-    /// If the is_merkle_checked flag is true, the merkle path authorization(membership) of input resource will be checked in ActionProof.
-    pub is_merkle_checked: bool,
+    /// If the is_ephemeral flag is false, the merkle path authorization(membership) of input resource will be checked in ComplianceProof.
+    pub is_ephemeral: bool,
+    /// randomness seed used to derive whatever randomness needed (e.g., the resource commitment randomness and nullifier derivation randomness)
+    pub rseed: pallas::Base,
 }
 
 /// The parameters in the ResourceKind are used to derive resource kind.
@@ -141,8 +140,8 @@ impl Resource {
         quantity: u64,
         nk: pallas::Base,
         nonce: Nullifier,
-        is_merkle_checked: bool,
-        rseed: RandomSeed,
+        is_ephemeral: bool,
+        rseed: pallas::Base,
     ) -> Self {
         let kind = ResourceKind::new(logic, label);
         Self {
@@ -150,14 +149,13 @@ impl Resource {
             value,
             quantity,
             nk_container: NullifierKeyContainer::Key(nk),
-            is_merkle_checked,
-            psi: rseed.get_psi(&nonce),
-            rcm: rseed.get_rcm(&nonce),
+            is_ephemeral,
             nonce,
+            rseed,
         }
     }
 
-    // The nonce, psi, and rcm are not specified until the action is constructed.
+    // The nonce, psi, and rcm are not specified until the compliance is constructed.
     #[allow(clippy::too_many_arguments)]
     pub fn new_output_resource(
         logic: pallas::Base,
@@ -165,7 +163,8 @@ impl Resource {
         value: pallas::Base,
         quantity: u64,
         npk: pallas::Base,
-        is_merkle_checked: bool,
+        is_ephemeral: bool,
+        rseed: pallas::Base,
     ) -> Self {
         let kind = ResourceKind::new(logic, label);
         Self {
@@ -173,9 +172,8 @@ impl Resource {
             value,
             quantity,
             nk_container: NullifierKeyContainer::PublicKey(npk),
-            is_merkle_checked,
-            psi: pallas::Base::default(),
-            rcm: pallas::Base::default(),
+            is_ephemeral,
+            rseed,
             nonce: Nullifier::default(),
         }
     }
@@ -188,9 +186,8 @@ impl Resource {
         quantity: u64,
         nk_container: NullifierKeyContainer,
         nonce: Nullifier,
-        is_merkle_checked: bool,
-        psi: pallas::Base,
-        rcm: pallas::Base,
+        is_ephemeral: bool,
+        rseed: pallas::Base,
     ) -> Self {
         let kind = ResourceKind::new(logic, label);
         Self {
@@ -198,10 +195,9 @@ impl Resource {
             value,
             quantity,
             nk_container,
-            is_merkle_checked,
-            psi,
-            rcm,
+            is_ephemeral,
             nonce,
+            rseed,
         }
     }
 
@@ -212,22 +208,21 @@ impl Resource {
         let value = pallas::Base::random(&mut rng);
         let nonce = Nullifier::from(pallas::Base::random(&mut rng));
         let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
-        let rseed = RandomSeed::random(&mut rng);
+        let rseed = pallas::Base::random(&mut rng);
         Resource {
             kind,
             value,
             quantity: 0,
             nk_container: nk,
             nonce,
-            psi: rseed.get_psi(&nonce),
-            rcm: rseed.get_rcm(&nonce),
-            is_merkle_checked: false,
+            rseed,
+            is_ephemeral: true,
         }
     }
 
-    // resource_commitment = poseidon_hash(logic || label || value || npk || nonce || psi || is_merkle_checked || quantity || rcm)
+    // resource_commitment = poseidon_hash(logic || label || value || npk || nonce || psi || is_ephemeral || quantity || rcm)
     pub fn commitment(&self) -> ResourceCommitment {
-        let compose_is_merkle_checked_quantity = if self.is_merkle_checked {
+        let compose_is_ephemeral_quantity = if self.is_ephemeral {
             pallas::Base::from_u128(1 << 64).square() + pallas::Base::from(self.quantity)
         } else {
             pallas::Base::from(self.quantity)
@@ -238,9 +233,9 @@ impl Resource {
             self.value,
             self.get_npk(),
             self.nonce.inner(),
-            self.psi,
-            compose_is_merkle_checked_quantity,
-            self.rcm,
+            self.get_psi(),
+            compose_is_ephemeral_quantity,
+            self.get_rcm(),
         ]);
         ResourceCommitment(ret)
     }
@@ -249,7 +244,7 @@ impl Resource {
         Nullifier::derive(
             &self.nk_container,
             &self.nonce.inner(),
-            &self.psi,
+            &self.get_psi(),
             &self.commitment(),
         )
     }
@@ -274,12 +269,24 @@ impl Resource {
         self.kind.label
     }
 
+    // psi is the randomness used to derive the nullifier
     pub fn get_psi(&self) -> pallas::Base {
-        self.psi
+        poseidon_hash_n([
+            *PRF_EXPAND_PERSONALIZATION_TO_FIELD,
+            pallas::Base::from(PRF_EXPAND_PSI as u64),
+            self.rseed,
+            self.nonce.inner(),
+        ])
     }
 
+    // rcm is the randomness of resource commitment
     pub fn get_rcm(&self) -> pallas::Base {
-        self.rcm
+        poseidon_hash_n([
+            *PRF_EXPAND_PERSONALIZATION_TO_FIELD,
+            pallas::Base::from(PRF_EXPAND_RCM as u64),
+            self.rseed,
+            self.nonce.inner(),
+        ])
     }
 
     pub fn calculate_root(&self, path: &MerklePath) -> Anchor {
@@ -287,12 +294,8 @@ impl Resource {
         path.root(cm_node)
     }
 
-    pub fn set_nonce<R: RngCore>(&mut self, input_resource: &Resource, mut rng: R) {
-        let rseed = RandomSeed::random(&mut rng);
-
+    pub fn set_nonce(&mut self, input_resource: &Resource) {
         self.nonce = input_resource.get_nf().unwrap();
-        self.psi = rseed.get_psi(&self.nonce);
-        self.rcm = rseed.get_rcm(&self.nonce);
     }
 }
 
@@ -321,12 +324,10 @@ impl BorshSerialize for Resource {
         }?;
         // Write nonce
         writer.write_all(&self.nonce.to_bytes())?;
-        // Write psi
-        writer.write_all(&self.psi.to_repr())?;
-        // Write rcm
-        writer.write_all(&self.rcm.to_repr())?;
-        // Write is_merkle_checked
-        writer.write_u8(if self.is_merkle_checked { 1 } else { 0 })?;
+        // Write is_ephemeral
+        writer.write_u8(if self.is_ephemeral { 1 } else { 0 })?;
+        // Write rseed
+        writer.write_all(&self.rseed.to_repr())?;
 
         Ok(())
     }
@@ -372,21 +373,18 @@ impl BorshDeserialize for Resource {
         reader.read_exact(&mut nonce_bytes)?;
         let nonce = Option::from(Nullifier::from_bytes(nonce_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "nonce not in field"))?;
-        // Read psi
-        let mut psi_bytes = [0u8; 32];
-        reader.read_exact(&mut psi_bytes)?;
-        let psi = Option::from(pallas::Base::from_repr(psi_bytes))
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "psi not in field"))?;
-        // Read rcm
-        let mut rcm_bytes = [0u8; 32];
-        reader.read_exact(&mut rcm_bytes)?;
-        let rcm = Option::from(pallas::Base::from_repr(rcm_bytes))
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "rcm not in field"))?;
-        // Read is_merkle_checked
-        let mut is_merkle_checked_byte = [0u8; 1];
-        reader.read_exact(&mut is_merkle_checked_byte)?;
-        let is_merkle_checked_byte = is_merkle_checked_byte[0];
-        let is_merkle_checked = is_merkle_checked_byte == 0x01;
+
+        // Read is_ephemeral
+        let mut is_ephemeral_byte = [0u8; 1];
+        reader.read_exact(&mut is_ephemeral_byte)?;
+        let is_ephemeral_byte = is_ephemeral_byte[0];
+        let is_ephemeral = is_ephemeral_byte == 0x01;
+
+        // Read rseed
+        let mut rseed_bytes = [0u8; 32];
+        reader.read_exact(&mut rseed_bytes)?;
+        let rseed = Option::from(pallas::Base::from_repr(rseed_bytes))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "rseed not in field"))?;
         // Construct resource
         Ok(Resource::from_full(
             logic,
@@ -395,9 +393,8 @@ impl BorshDeserialize for Resource {
             quantity,
             nk_container,
             nonce,
-            is_merkle_checked,
-            psi,
-            rcm,
+            is_ephemeral,
+            rseed,
         ))
     }
 }
@@ -432,30 +429,6 @@ impl RandomSeed {
 
     pub fn from_bytes(rseed: [u8; 32]) -> Self {
         Self(rseed)
-    }
-
-    pub fn get_psi(&self, nonce: &Nullifier) -> pallas::Base {
-        let mut h = Blake2bParams::new()
-            .hash_length(64)
-            .personal(PRF_EXPAND_PERSONALIZATION)
-            .to_state();
-        h.update(&[PRF_EXPAND_PSI]);
-        h.update(&self.0);
-        h.update(&nonce.to_bytes());
-        let psi_bytes = *h.finalize().as_array();
-        pallas::Base::from_uniform_bytes(&psi_bytes)
-    }
-
-    pub fn get_rcm(&self, nonce: &Nullifier) -> pallas::Base {
-        let mut h = Blake2bParams::new()
-            .hash_length(64)
-            .personal(PRF_EXPAND_PERSONALIZATION)
-            .to_state();
-        h.update(&[PRF_EXPAND_RCM]);
-        h.update(&self.0);
-        h.update(&nonce.to_bytes());
-        let rcm_bytes = *h.finalize().as_array();
-        pallas::Base::from_uniform_bytes(&rcm_bytes)
     }
 
     pub fn get_random_padding(&self, padding_len: usize) -> Vec<pallas::Base> {
@@ -559,7 +532,7 @@ impl ResourceValidityPredicates {
 
 #[cfg(test)]
 pub mod tests {
-    use super::{RandomSeed, Resource, ResourceKind};
+    use super::{Resource, ResourceKind};
     use crate::nullifier::tests::*;
     use halo2_proofs::arithmetic::Field;
     use pasta_curves::pallas;
@@ -573,16 +546,15 @@ pub mod tests {
 
     pub fn random_resource<R: RngCore>(mut rng: R) -> Resource {
         let nonce = random_nullifier(&mut rng);
-        let rseed = RandomSeed::random(&mut rng);
+        let rseed = pallas::Base::random(&mut rng);
         Resource {
             kind: random_kind(&mut rng),
             value: pallas::Base::random(&mut rng),
             quantity: rng.gen(),
             nk_container: random_nullifier_key(&mut rng),
-            is_merkle_checked: true,
-            psi: rseed.get_psi(&nonce),
-            rcm: rseed.get_rcm(&nonce),
+            is_ephemeral: false,
             nonce,
+            rseed,
         }
     }
 

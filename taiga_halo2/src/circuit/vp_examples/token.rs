@@ -100,7 +100,7 @@ impl Token {
     ) -> TokenResource {
         let label = self.encode_name();
         let value = auth.to_value();
-        let rseed = RandomSeed::random(&mut rng);
+        let rseed = pallas::Base::random(&mut rng);
         let nonce = Nullifier::random(&mut rng);
         let resource = Resource::new_input_resource(
             *COMPRESSED_TOKEN_VK,
@@ -109,7 +109,7 @@ impl Token {
             self.quantity(),
             nk,
             nonce,
-            true,
+            false,
             rseed,
         );
 
@@ -119,20 +119,23 @@ impl Token {
         }
     }
 
-    pub fn create_random_output_token_resource(
+    pub fn create_random_output_token_resource<R: RngCore>(
         &self,
+        mut rng: R,
         npk: pallas::Base,
         auth: &TokenAuthorization,
     ) -> TokenResource {
         let label = self.encode_name();
         let value = auth.to_value();
+        let rseed = pallas::Base::random(&mut rng);
         let resource = Resource::new_output_resource(
             *COMPRESSED_TOKEN_VK,
             label,
             value,
             self.quantity(),
             npk,
-            true,
+            false,
+            rseed,
         );
 
         TokenResource {
@@ -373,21 +376,21 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             |mut region| region.constrain_equal(encoded_value.cell(), value.cell()),
         )?;
 
-        // check the is_merkle_checked flag
-        let is_merkle_checked = get_owned_resource_variable(
+        // check the is_ephemeral flag
+        let is_ephemeral = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get is_merkle_checked"),
+            layouter.namespace(|| "get is_ephemeral"),
             &owned_resource_id,
-            &basic_variables.get_is_merkle_checked_searchable_pairs(),
+            &basic_variables.get_is_ephemeral_searchable_pairs(),
         )?;
-        let constant_one = assign_free_constant(
-            layouter.namespace(|| "one"),
+        let constant_zero = assign_free_constant(
+            layouter.namespace(|| "zero"),
             config.advices[0],
-            pallas::Base::one(),
+            pallas::Base::zero(),
         )?;
         layouter.assign_region(
-            || "check is_merkle_checked",
-            |mut region| region.constrain_equal(is_merkle_checked.cell(), constant_one.cell()),
+            || "check is_ephemeral",
+            |mut region| region.constrain_equal(is_ephemeral.cell(), constant_zero.cell()),
         )?;
 
         // VP Commitment

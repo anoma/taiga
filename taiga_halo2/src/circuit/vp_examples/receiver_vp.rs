@@ -172,21 +172,30 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             &basic_variables.get_npk_searchable_pairs(),
         )?;
 
-        let psi = get_owned_resource_variable(
+        let is_ephemeral = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource psi"),
+            layouter.namespace(|| "get owned resource is_ephemeral"),
             &owned_resource_id,
-            &basic_variables.get_psi_searchable_pairs(),
+            &basic_variables.get_is_ephemeral_searchable_pairs(),
         )?;
 
-        let rcm = get_owned_resource_variable(
+        let rseed = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource psi"),
+            layouter.namespace(|| "get owned resource rseed"),
             &owned_resource_id,
-            &basic_variables.get_rcm_searchable_pairs(),
+            &basic_variables.get_rseed_searchable_pairs(),
         )?;
 
-        let mut message = vec![logic, label, value, quantity, nonce, npk, psi, rcm];
+        let mut message = vec![
+            logic,
+            label,
+            value,
+            quantity,
+            nonce,
+            npk,
+            is_ephemeral,
+            rseed,
+        ];
 
         let add_chip = AddChip::<pallas::Base>::construct(config.add_config.clone(), ());
 
@@ -249,8 +258,8 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             pallas::Base::from(target_resource.quantity),
             target_resource.nonce.inner(),
             target_resource.get_npk(),
-            target_resource.psi,
-            target_resource.rcm,
+            pallas::Base::from(target_resource.is_ephemeral as u64),
+            target_resource.rseed,
         ];
         let plaintext = ResourcePlaintext::padding(&message);
         let key = SecretKey::from_dh_exchange(&self.rcv_pk, &mod_r_p(self.sk));
@@ -332,6 +341,9 @@ fn test_halo2_receiver_vp_circuit() {
     );
     assert_eq!(de_cipher[4], circuit.output_resources[0].nonce.inner());
     assert_eq!(de_cipher[5], circuit.output_resources[0].get_npk());
-    assert_eq!(de_cipher[6], circuit.output_resources[0].get_psi());
-    assert_eq!(de_cipher[7], circuit.output_resources[0].get_rcm());
+    assert_eq!(
+        de_cipher[6],
+        pallas::Base::from(circuit.output_resources[0].is_ephemeral)
+    );
+    assert_eq!(de_cipher[7], circuit.output_resources[0].rseed);
 }
