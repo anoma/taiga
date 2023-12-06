@@ -15,7 +15,7 @@ use crate::{
     error::TransactionError,
     proof::Proof,
     resource::{RandomSeed, Resource},
-    utils::{mod_r_p, poseidon_hash_n},
+    utils::{mod_r_p, poseidon_hash_n, read_base_field, read_point, read_scalar_field},
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
@@ -326,33 +326,16 @@ impl BorshSerialize for SignatureVerificationValidityPredicateCircuit {
 
 impl BorshDeserialize for SignatureVerificationValidityPredicateCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let owned_resource_id_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let owned_resource_id = Option::from(pallas::Base::from_repr(owned_resource_id_bytes))
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "owned_resource_id not in field",
-                )
-            })?;
+        let owned_resource_id = read_base_field(reader)?;
         let input_resources: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
         let output_resources: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
-        let vp_vk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let vp_vk = Option::from(pallas::Base::from_repr(vp_vk_bytes)).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "vp_vk not in field")
-        })?;
+        let vp_vk = read_base_field(reader)?;
         let signature = SchnorrSignature::deserialize_reader(reader)?;
-        let receiver_vp_vk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let receiver_vp_vk = Option::from(pallas::Base::from_repr(receiver_vp_vk_bytes))
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "receiver_vp_vk not in field",
-                )
-            })?;
+        let receiver_vp_vk = read_base_field(reader)?;
         Ok(Self {
             owned_resource_id,
             input_resources: input_resources.try_into().unwrap(),
@@ -376,18 +359,9 @@ impl BorshSerialize for SchnorrSignature {
 
 impl BorshDeserialize for SchnorrSignature {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let pk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let pk = Option::from(pallas::Point::from_bytes(&pk_bytes)).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "pk not in point")
-        })?;
-        let r_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let r = Option::from(pallas::Point::from_bytes(&r_bytes)).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "r not in point")
-        })?;
-        let s_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let s = Option::from(pallas::Scalar::from_repr(s_bytes)).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "s not in field")
-        })?;
+        let pk = read_point(reader)?;
+        let r = read_point(reader)?;
+        let s = read_scalar_field(reader)?;
         Ok(Self { pk, r, s })
     }
 }

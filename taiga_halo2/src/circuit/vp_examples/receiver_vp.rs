@@ -18,7 +18,7 @@ use crate::{
     proof::Proof,
     resource::{RandomSeed, Resource},
     resource_encryption::{ResourceCiphertext, ResourcePlaintext, SecretKey},
-    utils::mod_r_p,
+    utils::{mod_r_p, read_base_field, read_point},
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
@@ -321,46 +321,18 @@ impl BorshSerialize for ReceiverValidityPredicateCircuit {
 
 impl BorshDeserialize for ReceiverValidityPredicateCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let owned_resource_id_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let owned_resource_id = Option::from(pallas::Base::from_repr(owned_resource_id_bytes))
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "owned_resource_id not in field",
-                )
-            })?;
+        let owned_resource_id = read_base_field(reader)?;
         let input_resources: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
         let output_resources: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
-        let vp_vk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let vp_vk = Option::from(pallas::Base::from_repr(vp_vk_bytes)).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "vp_vk not in field")
-        })?;
-        let encrypt_nonce_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let encrypt_nonce =
-            Option::from(pallas::Base::from_repr(encrypt_nonce_bytes)).ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "encrypt_nonce not in field",
-                )
-            })?;
-        let sk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let sk = Option::from(pallas::Base::from_repr(sk_bytes)).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "sk not in field")
-        })?;
-        let rcv_pk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let rcv_pk = Option::from(pallas::Point::from_bytes(&rcv_pk_bytes)).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "rcv_pk not in point")
-        })?;
-
-        let auth_vp_vk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let auth_vp_vk =
-            Option::from(pallas::Base::from_repr(auth_vp_vk_bytes)).ok_or_else(|| {
-                std::io::Error::new(std::io::ErrorKind::InvalidData, "auth_vp_vk not in field")
-            })?;
+        let vp_vk = read_base_field(reader)?;
+        let encrypt_nonce = read_base_field(reader)?;
+        let sk = read_base_field(reader)?;
+        let rcv_pk = read_point(reader)?;
+        let auth_vp_vk = read_base_field(reader)?;
         Ok(Self {
             owned_resource_id,
             input_resources: input_resources.try_into().unwrap(),

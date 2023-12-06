@@ -22,6 +22,7 @@ use crate::{
     nullifier::Nullifier,
     proof::Proof,
     resource::{RandomSeed, Resource},
+    utils::read_base_field,
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
@@ -184,28 +185,14 @@ impl BorshSerialize for CascadeIntentValidityPredicateCircuit {
 
 impl BorshDeserialize for CascadeIntentValidityPredicateCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let owned_resource_id_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let owned_resource_id = Option::from(pallas::Base::from_repr(owned_resource_id_bytes))
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "owned_resource_id not in field",
-                )
-            })?;
+        let owned_resource_id = read_base_field(reader)?;
         let input_resources: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
         let output_resources: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
-        let cascade_resource_cm_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let cascade_resource_cm = Option::from(pallas::Base::from_repr(cascade_resource_cm_bytes))
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "cascade_resource_cm not in field",
-                )
-            })?;
+        let cascade_resource_cm = read_base_field(reader)?;
         Ok(Self {
             owned_resource_id,
             input_resources: input_resources.try_into().unwrap(),

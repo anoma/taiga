@@ -31,7 +31,7 @@ use crate::{
     proof::Proof,
     resource::{RandomSeed, Resource, ResourceCommitment},
     resource_encryption::{ResourceCiphertext, SecretKey},
-    utils::mod_r_p,
+    utils::{mod_r_p, read_base_field},
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use dyn_clone::{clone_trait_object, DynClone};
@@ -204,8 +204,6 @@ impl BorshSerialize for VPVerifyingInfo {
 #[cfg(feature = "borsh")]
 impl BorshDeserialize for VPVerifyingInfo {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        use ff::PrimeField;
-        use std::io;
         // Read vk
         use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
         let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
@@ -214,12 +212,7 @@ impl BorshDeserialize for VPVerifyingInfo {
         let proof = Proof::deserialize_reader(reader)?;
         // Read public inputs
         let public_inputs: Vec<_> = (0..VP_CIRCUIT_PUBLIC_INPUT_NUM)
-            .map(|_| {
-                let bytes = <[u8; 32]>::deserialize_reader(reader)?;
-                Option::from(pallas::Base::from_repr(bytes)).ok_or_else(|| {
-                    io::Error::new(io::ErrorKind::InvalidData, "public input not in field")
-                })
-            })
+            .map(|_| read_base_field(reader))
             .collect::<Result<_, _>>()?;
         Ok(VPVerifyingInfo {
             vk,

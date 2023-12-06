@@ -25,7 +25,7 @@ use crate::{
     nullifier::Nullifier,
     proof::Proof,
     resource::{RandomSeed, Resource, ResourceValidityPredicates},
-    utils::poseidon_hash_n,
+    utils::{poseidon_hash_n, read_base_field, read_point},
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
@@ -547,14 +547,7 @@ impl BorshSerialize for TokenValidityPredicateCircuit {
 
 impl BorshDeserialize for TokenValidityPredicateCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let owned_resource_id_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let owned_resource_id = Option::from(pallas::Base::from_repr(owned_resource_id_bytes))
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "owned_resource_id not in field",
-                )
-            })?;
+        let owned_resource_id = read_base_field(reader)?;
         let input_resources: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
@@ -563,14 +556,7 @@ impl BorshDeserialize for TokenValidityPredicateCircuit {
             .collect::<Result<_, _>>()?;
         let token_name = TokenName::deserialize_reader(reader)?;
         let auth = TokenAuthorization::deserialize_reader(reader)?;
-        let receiver_vp_vk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let receiver_vp_vk = Option::from(pallas::Base::from_repr(receiver_vp_vk_bytes))
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "receiver_vp_vk not in field",
-                )
-            })?;
+        let receiver_vp_vk = read_base_field(reader)?;
         let rseed = RandomSeed::deserialize_reader(reader)?;
         Ok(Self {
             owned_resource_id,
@@ -594,17 +580,8 @@ impl BorshSerialize for TokenAuthorization {
 
 impl BorshDeserialize for TokenAuthorization {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let pk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let pk = Option::from(pallas::Point::from_bytes(&pk_bytes)).ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "owned_resource_id not in point",
-            )
-        })?;
-        let vk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let vk = Option::from(pallas::Base::from_repr(vk_bytes)).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "vk not in field")
-        })?;
+        let pk = read_point(reader)?;
+        let vk = read_base_field(reader)?;
 
         Ok(Self { pk, vk })
     }

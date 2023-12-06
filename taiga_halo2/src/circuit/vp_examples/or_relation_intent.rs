@@ -23,6 +23,7 @@ use crate::{
     proof::Proof,
     resource::{RandomSeed, Resource},
     utils::poseidon_hash_n,
+    utils::read_base_field,
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
@@ -317,14 +318,7 @@ impl BorshSerialize for OrRelationIntentValidityPredicateCircuit {
 
 impl BorshDeserialize for OrRelationIntentValidityPredicateCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let owned_resource_id_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let owned_resource_id = Option::from(pallas::Base::from_repr(owned_resource_id_bytes))
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "owned_resource_id not in field",
-                )
-            })?;
+        let owned_resource_id = read_base_field(reader)?;
         let input_resources: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
@@ -333,19 +327,8 @@ impl BorshDeserialize for OrRelationIntentValidityPredicateCircuit {
             .collect::<Result<_, _>>()?;
         let token_1 = Token::deserialize_reader(reader)?;
         let token_2 = Token::deserialize_reader(reader)?;
-        let receiver_npk_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let receiver_npk =
-            Option::from(pallas::Base::from_repr(receiver_npk_bytes)).ok_or_else(|| {
-                std::io::Error::new(std::io::ErrorKind::InvalidData, "receiver_npk not in field")
-            })?;
-        let receiver_value_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let receiver_value = Option::from(pallas::Base::from_repr(receiver_value_bytes))
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "receiver_value not in field",
-                )
-            })?;
+        let receiver_npk = read_base_field(reader)?;
+        let receiver_value = read_base_field(reader)?;
         Ok(Self {
             owned_resource_id,
             input_resources: input_resources.try_into().unwrap(),

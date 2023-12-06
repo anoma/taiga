@@ -3,7 +3,7 @@ use halo2_gadgets::poseidon::primitives as poseidon;
 use halo2_proofs::arithmetic::CurveAffine;
 use pasta_curves::{
     arithmetic::CurveExt,
-    group::{ff::PrimeField, Curve},
+    group::{ff::PrimeField, Curve, GroupEncoding},
     hashtocurve, pallas,
 };
 
@@ -95,4 +95,25 @@ pub fn to_field_elements(bytes: &[u8]) -> Vec<pallas::Base> {
             pallas::Base::from_repr(field_bytes).unwrap()
         })
         .collect::<Vec<pallas::Base>>()
+}
+
+pub fn read_base_field<R: std::io::Read>(reader: &mut R) -> std::io::Result<pallas::Base> {
+    let mut bytes = [0u8; 32];
+    reader.read_exact(&mut bytes)?;
+    Option::from(pallas::Base::from_repr(bytes))
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "invalid base field"))
+}
+
+pub fn read_scalar_field<R: std::io::Read>(reader: &mut R) -> std::io::Result<pallas::Scalar> {
+    let mut bytes = [0u8; 32];
+    reader.read_exact(&mut bytes)?;
+    Option::from(pallas::Scalar::from_repr(bytes))
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "invalid scalar field"))
+}
+
+pub fn read_point<R: std::io::Read>(reader: &mut R) -> std::io::Result<pallas::Point> {
+    let mut bytes = [0u8; 32];
+    reader.read_exact(&mut bytes)?;
+    Option::from(pallas::Point::from_bytes(&bytes))
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "invalid point"))
 }
