@@ -2,7 +2,7 @@ use std::hash::{Hash, Hasher};
 
 use crate::merkle_tree::LR::{L, R};
 use crate::resource::ResourceCommitment;
-use crate::utils::poseidon_hash;
+use crate::utils::{poseidon_hash, read_base_field};
 use crate::{constant::TAIGA_COMMITMENT_TREE_DEPTH, resource::Resource};
 use ff::PrimeField;
 use halo2_proofs::arithmetic::Field;
@@ -68,11 +68,7 @@ impl BorshSerialize for Anchor {
 #[cfg(feature = "borsh")]
 impl BorshDeserialize for Anchor {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let mut repr = [0u8; 32];
-        reader.read_exact(&mut repr)?;
-        let value = Option::from(pallas::Base::from_repr(repr)).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "Anchor not in field")
-        })?;
+        let value = read_base_field(reader)?;
         Ok(Self(value))
     }
 }
@@ -208,11 +204,7 @@ impl BorshSerialize for Node {
 #[cfg(feature = "borsh")]
 impl BorshDeserialize for Node {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let mut repr = [0u8; 32];
-        reader.read_exact(&mut repr)?;
-        let value = Option::from(pallas::Base::from_repr(repr)).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "Node value not in field")
-        })?;
+        let value = read_base_field(reader)?;
         Ok(Self(value))
     }
 }

@@ -5,6 +5,7 @@ use crate::{
             assign_free_advice, poseidon_hash::poseidon_hash_gadget,
             target_resource_variable::get_owned_resource_variable,
         },
+        vp_bytecode::{ValidityPredicateByteCode, ValidityPredicateRepresentation},
         vp_circuit::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
@@ -14,10 +15,11 @@ use crate::{
     error::TransactionError,
     proof::Proof,
     resource::{RandomSeed, Resource},
-    utils::{mod_r_p, poseidon_hash_n},
+    utils::{mod_r_p, poseidon_hash_n, read_base_field, read_point, read_scalar_field},
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
+use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_gadgets::ecc::{chip::EccChip, FixedPoint, NonIdentityPoint, ScalarFixed, ScalarVar};
 use halo2_proofs::{
     arithmetic::Field,
@@ -27,7 +29,7 @@ use halo2_proofs::{
 use lazy_static::lazy_static;
 use pasta_curves::{
     arithmetic::CurveAffine,
-    group::{Curve, Group},
+    group::{ff::PrimeField, Curve, Group, GroupEncoding},
     pallas,
 };
 use rand::rngs::OsRng;
@@ -148,6 +150,21 @@ impl SignatureVerificationValidityPredicateCircuit {
             signature,
             receiver_vp_vk,
         }
+    }
+
+    pub fn to_bytecode(&self) -> ValidityPredicateByteCode {
+        ValidityPredicateByteCode::new(
+            ValidityPredicateRepresentation::SignatureVerification,
+            self.to_bytes(),
+        )
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        borsh::to_vec(&self).unwrap()
+    }
+
+    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        BorshDeserialize::deserialize(&mut bytes.as_ref()).unwrap()
     }
 }
 
@@ -288,6 +305,67 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
 vp_circuit_impl!(SignatureVerificationValidityPredicateCircuit);
 vp_verifying_info_impl!(SignatureVerificationValidityPredicateCircuit);
 
+impl BorshSerialize for SignatureVerificationValidityPredicateCircuit {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        writer.write_all(&self.owned_resource_id.to_repr())?;
+        for input in self.input_resources.iter() {
+            input.serialize(writer)?;
+        }
+
+        for output in self.output_resources.iter() {
+            output.serialize(writer)?;
+        }
+
+        writer.write_all(&self.vp_vk.to_repr())?;
+        self.signature.serialize(writer)?;
+        writer.write_all(&self.receiver_vp_vk.to_repr())?;
+
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for SignatureVerificationValidityPredicateCircuit {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let owned_resource_id = read_base_field(reader)?;
+        let input_resources: Vec<_> = (0..NUM_RESOURCE)
+            .map(|_| Resource::deserialize_reader(reader))
+            .collect::<Result<_, _>>()?;
+        let output_resources: Vec<_> = (0..NUM_RESOURCE)
+            .map(|_| Resource::deserialize_reader(reader))
+            .collect::<Result<_, _>>()?;
+        let vp_vk = read_base_field(reader)?;
+        let signature = SchnorrSignature::deserialize_reader(reader)?;
+        let receiver_vp_vk = read_base_field(reader)?;
+        Ok(Self {
+            owned_resource_id,
+            input_resources: input_resources.try_into().unwrap(),
+            output_resources: output_resources.try_into().unwrap(),
+            vp_vk,
+            signature,
+            receiver_vp_vk,
+        })
+    }
+}
+
+impl BorshSerialize for SchnorrSignature {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        writer.write_all(&self.pk.to_bytes())?;
+        writer.write_all(&self.r.to_bytes())?;
+        writer.write_all(&self.s.to_repr())?;
+
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for SchnorrSignature {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let pk = read_point(reader)?;
+        let r = read_point(reader)?;
+        let s = read_scalar_field(reader)?;
+        Ok(Self { pk, r, s })
+    }
+}
+
 #[test]
 fn test_halo2_sig_verification_vp_circuit() {
     use crate::circuit::vp_examples::{
@@ -317,6 +395,13 @@ fn test_halo2_sig_verification_vp_circuit() {
             *COMPRESSED_RECEIVER_VK,
         )
     };
+
+    // Test serialization
+    let circuit = {
+        let circuit_bytes = circuit.to_bytes();
+        SignatureVerificationValidityPredicateCircuit::from_bytes(&circuit_bytes)
+    };
+
     let public_inputs = circuit.get_public_inputs(&mut rng);
 
     let prover = MockProver::<pallas::Base>::run(

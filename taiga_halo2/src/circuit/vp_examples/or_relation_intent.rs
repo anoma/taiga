@@ -10,6 +10,7 @@ use crate::{
             poseidon_hash::poseidon_hash_gadget,
             target_resource_variable::{get_is_input_resource_flag, get_owned_resource_variable},
         },
+        vp_bytecode::{ValidityPredicateByteCode, ValidityPredicateRepresentation},
         vp_circuit::{
             BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
             ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
@@ -22,16 +23,18 @@ use crate::{
     proof::Proof,
     resource::{RandomSeed, Resource},
     utils::poseidon_hash_n,
+    utils::read_base_field,
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
+use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_proofs::arithmetic::Field;
 use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
     plonk::{keygen_pk, keygen_vk, Circuit, ConstraintSystem, Error},
 };
 use lazy_static::lazy_static;
-use pasta_curves::pallas;
+use pasta_curves::{group::ff::PrimeField, pallas};
 use rand::rngs::OsRng;
 use rand::RngCore;
 
@@ -74,6 +77,21 @@ impl OrRelationIntentValidityPredicateCircuit {
             receiver_npk,
             receiver_value,
         ])
+    }
+
+    pub fn to_bytecode(&self) -> ValidityPredicateByteCode {
+        ValidityPredicateByteCode::new(
+            ValidityPredicateRepresentation::OrRelationIntent,
+            self.to_bytes(),
+        )
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        borsh::to_vec(&self).unwrap()
+    }
+
+    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        BorshDeserialize::deserialize(&mut bytes.as_ref()).unwrap()
     }
 }
 
@@ -277,6 +295,52 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
 vp_circuit_impl!(OrRelationIntentValidityPredicateCircuit);
 vp_verifying_info_impl!(OrRelationIntentValidityPredicateCircuit);
 
+impl BorshSerialize for OrRelationIntentValidityPredicateCircuit {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        writer.write_all(&self.owned_resource_id.to_repr())?;
+        for input in self.input_resources.iter() {
+            input.serialize(writer)?;
+        }
+
+        for output in self.output_resources.iter() {
+            output.serialize(writer)?;
+        }
+
+        self.token_1.serialize(writer)?;
+        self.token_2.serialize(writer)?;
+
+        writer.write_all(&self.receiver_npk.to_repr())?;
+        writer.write_all(&self.receiver_value.to_repr())?;
+
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for OrRelationIntentValidityPredicateCircuit {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let owned_resource_id = read_base_field(reader)?;
+        let input_resources: Vec<_> = (0..NUM_RESOURCE)
+            .map(|_| Resource::deserialize_reader(reader))
+            .collect::<Result<_, _>>()?;
+        let output_resources: Vec<_> = (0..NUM_RESOURCE)
+            .map(|_| Resource::deserialize_reader(reader))
+            .collect::<Result<_, _>>()?;
+        let token_1 = Token::deserialize_reader(reader)?;
+        let token_2 = Token::deserialize_reader(reader)?;
+        let receiver_npk = read_base_field(reader)?;
+        let receiver_value = read_base_field(reader)?;
+        Ok(Self {
+            owned_resource_id,
+            input_resources: input_resources.try_into().unwrap(),
+            output_resources: output_resources.try_into().unwrap(),
+            token_1,
+            token_2,
+            receiver_npk,
+            receiver_value,
+        })
+    }
+}
+
 pub fn create_intent_resource<R: RngCore>(
     mut rng: R,
     token_1: &Token,
@@ -346,6 +410,13 @@ fn test_halo2_or_relation_intent_vp_circuit() {
             receiver_value: output_resources[0].value,
         }
     };
+
+    // Test serialization
+    let circuit = {
+        let circuit_bytes = circuit.to_bytes();
+        OrRelationIntentValidityPredicateCircuit::from_bytes(&circuit_bytes)
+    };
+
     let public_inputs = circuit.get_public_inputs(&mut rng);
 
     let prover = MockProver::<pallas::Base>::run(

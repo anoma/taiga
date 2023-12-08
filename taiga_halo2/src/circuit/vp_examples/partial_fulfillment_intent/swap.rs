@@ -8,6 +8,7 @@ use crate::{
     resource::Resource,
     utils::poseidon_hash_n,
 };
+use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_proofs::arithmetic::Field;
 use halo2_proofs::{
     circuit::{Layouter, Value},
@@ -16,7 +17,7 @@ use halo2_proofs::{
 use pasta_curves::pallas;
 use rand::RngCore;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, BorshSerialize, BorshDeserialize)]
 pub struct Swap {
     pub sell: TokenResource,
     pub buy: Token,

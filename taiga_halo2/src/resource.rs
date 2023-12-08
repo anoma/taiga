@@ -11,7 +11,7 @@ use crate::{
     merkle_tree::{Anchor, MerklePath, Node},
     nullifier::{Nullifier, NullifierKeyContainer},
     shielded_ptx::ResourceVPVerifyingInfoSet,
-    utils::{poseidon_hash_n, poseidon_to_curve},
+    utils::{poseidon_hash_n, poseidon_to_curve, read_base_field},
 };
 use blake2b_simd::Params as Blake2bParams;
 use ff::{FromUniformBytes, PrimeField};
@@ -67,14 +67,7 @@ impl BorshSerialize for ResourceCommitment {
 #[cfg(feature = "borsh")]
 impl BorshDeserialize for ResourceCommitment {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let mut repr = [0u8; 32];
-        reader.read_exact(&mut repr)?;
-        let value = Option::from(pallas::Base::from_repr(repr)).ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "ResourceCommitment value not in field",
-            )
-        })?;
+        let value = read_base_field(reader)?;
         Ok(Self(value))
     }
 }
@@ -339,30 +332,16 @@ impl BorshDeserialize for Resource {
         use byteorder::{LittleEndian, ReadBytesExt};
         use std::io;
         // Read logic
-        let mut logic_bytes = [0u8; 32];
-        reader.read_exact(&mut logic_bytes)?;
-        let logic = Option::from(pallas::Base::from_repr(logic_bytes))
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "logic not in field"))?;
+        let logic = read_base_field(reader)?;
         // Read label
-        let mut label_bytes = [0u8; 32];
-        reader.read_exact(&mut label_bytes)?;
-        let label = Option::from(pallas::Base::from_repr(label_bytes))
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "label not in field"))?;
+        let label = read_base_field(reader)?;
         // Read value
-        let mut value_bytes = [0u8; 32];
-        reader.read_exact(&mut value_bytes)?;
-        let value = Option::from(pallas::Base::from_repr(value_bytes))
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "value not in field"))?;
+        let value = read_base_field(reader)?;
         // Read resource quantity
         let quantity = reader.read_u64::<LittleEndian>()?;
         // Read nk_container
-        let mut nk_container_type = [0u8; 1];
-        reader.read_exact(&mut nk_container_type)?;
-        let nk_container_type = nk_container_type[0];
-        let mut nk_container_bytes = [0u8; 32];
-        reader.read_exact(&mut nk_container_bytes)?;
-        let nk = Option::from(pallas::Base::from_repr(nk_container_bytes))
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "nk not in field"))?;
+        let nk_container_type = reader.read_u8()?;
+        let nk = read_base_field(reader)?;
         let nk_container = if nk_container_type == 0x01 {
             NullifierKeyContainer::from_npk(nk)
         } else {
@@ -381,10 +360,8 @@ impl BorshDeserialize for Resource {
         let is_ephemeral = is_ephemeral_byte == 0x01;
 
         // Read rseed
-        let mut rseed_bytes = [0u8; 32];
-        reader.read_exact(&mut rseed_bytes)?;
-        let rseed = Option::from(pallas::Base::from_repr(rseed_bytes))
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "rseed not in field"))?;
+        let rseed = read_base_field(reader)?;
+
         // Construct resource
         Ok(Resource::from_full(
             logic,

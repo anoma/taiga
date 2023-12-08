@@ -1,5 +1,14 @@
 #[cfg(feature = "borsh")]
 use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
+#[cfg(feature = "examples")]
+use crate::circuit::vp_examples::{
+    cascade_intent::CascadeIntentValidityPredicateCircuit,
+    or_relation_intent::OrRelationIntentValidityPredicateCircuit,
+    partial_fulfillment_intent::PartialFulfillmentIntentValidityPredicateCircuit,
+    receiver_vp::ReceiverValidityPredicateCircuit,
+    signature_verification::SignatureVerificationValidityPredicateCircuit,
+    token::TokenValidityPredicateCircuit,
+};
 use crate::error::TransactionError;
 use crate::shielded_ptx::ResourceVPVerifyingInfoSet;
 use crate::{
@@ -31,7 +40,13 @@ pub enum ValidityPredicateRepresentation {
     // Native halo2 circuits don't have a unified representatioin, enumerate the vp circuit examples for the moment.
     // TODO: figure out if we can have a unified circuit presentation. In theory, it's possible to separate the circuit system and proving system.
     Trivial,
-    // TODO: add other vp types here if needed
+    Token,
+    SignatureVerification,
+    Receiver,
+    PartialFulfillmentIntent,
+    OrRelationIntent,
+    CascadeIntent,
+    // Add other native vp types here if needed
 }
 
 #[derive(Clone, Debug)]
@@ -74,6 +89,36 @@ impl ValidityPredicateByteCode {
                 let vp = TrivialValidityPredicateCircuit::from_bytes(&self.inputs);
                 Ok(vp.get_verifying_info())
             }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::Token => {
+                let vp = TokenValidityPredicateCircuit::from_bytes(&self.inputs);
+                Ok(vp.get_verifying_info())
+            }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::SignatureVerification => {
+                let vp = SignatureVerificationValidityPredicateCircuit::from_bytes(&self.inputs);
+                Ok(vp.get_verifying_info())
+            }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::Receiver => {
+                let vp = ReceiverValidityPredicateCircuit::from_bytes(&self.inputs);
+                Ok(vp.get_verifying_info())
+            }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::PartialFulfillmentIntent => {
+                let vp = PartialFulfillmentIntentValidityPredicateCircuit::from_bytes(&self.inputs);
+                Ok(vp.get_verifying_info())
+            }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::OrRelationIntent => {
+                let vp = OrRelationIntentValidityPredicateCircuit::from_bytes(&self.inputs);
+                Ok(vp.get_verifying_info())
+            }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::CascadeIntent => {
+                let vp = CascadeIntentValidityPredicateCircuit::from_bytes(&self.inputs);
+                Ok(vp.get_verifying_info())
+            }
             #[allow(unreachable_patterns)]
             _ => Err(TransactionError::InvalidValidityPredicateRepresentation),
         }
@@ -102,6 +147,36 @@ impl ValidityPredicateByteCode {
             #[cfg(feature = "borsh")]
             ValidityPredicateRepresentation::Trivial => {
                 let vp = TrivialValidityPredicateCircuit::from_bytes(&self.inputs);
+                vp.verify_transparently()?
+            }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::Token => {
+                let vp = TokenValidityPredicateCircuit::from_bytes(&self.inputs);
+                vp.verify_transparently()?
+            }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::SignatureVerification => {
+                let vp = SignatureVerificationValidityPredicateCircuit::from_bytes(&self.inputs);
+                vp.verify_transparently()?
+            }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::Receiver => {
+                let vp = ReceiverValidityPredicateCircuit::from_bytes(&self.inputs);
+                vp.verify_transparently()?
+            }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::PartialFulfillmentIntent => {
+                let vp = PartialFulfillmentIntentValidityPredicateCircuit::from_bytes(&self.inputs);
+                vp.verify_transparently()?
+            }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::OrRelationIntent => {
+                let vp = OrRelationIntentValidityPredicateCircuit::from_bytes(&self.inputs);
+                vp.verify_transparently()?
+            }
+            #[cfg(feature = "examples")]
+            ValidityPredicateRepresentation::CascadeIntent => {
+                let vp = CascadeIntentValidityPredicateCircuit::from_bytes(&self.inputs);
                 vp.verify_transparently()?
             }
             #[allow(unreachable_patterns)]
