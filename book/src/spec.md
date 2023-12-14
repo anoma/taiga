@@ -239,7 +239,7 @@ Certain applications might allow to create more value from less input value, whi
 |$PRF^{\texttt{rcm\_note}}$|Blake2b|$ \mathrm{F}_p \times \mathrm{F}_p \times \mathrm{F}_p \rightarrow \mathrm{F}_p$|Used to derive note commitment randomness|
 |$PRF^{ψ}$|Blake2b|$\mathrm{F}_p \times \mathrm{F}_p \times \mathrm{F}_p \rightarrow \mathrm{F}_p$|Used to derive ψ|
 |`NKCommit`|Poseidon|$\mathrm{F}_p \rightarrow \mathrm{F}_p$|$NKCommit(nk) = Poseidon(nk,\texttt{user\_derived\_key})$; used to protect `nk` stored in a note. `user_derived_key` is currently not used
-|`NoteCommit`|[Sincemilla](https://zcash.github.io/halo2/design/gadgets/sinsemilla.html)|$\mathrm{F}_p \rightarrow \mathrm{F}_p \times \mathrm{F}_p$|
+|`NoteCommit`|[Sinsemilla](https://zcash.github.io/halo2/design/gadgets/sinsemilla.html)|$\mathrm{F}_p \rightarrow \mathrm{F}_p \times \mathrm{F}_p$|
 |`ValueCommit`|Pedersen with variable type|$\mathrm{F}_p \rightarrow \mathrm{F}_q$|$cv = [v_i] * NT_i - [v_o] * NT_o + [r]R$
 |`VPCommit`|Blake2s||Efficient over both $\mathrm{F}_p$ and $\mathrm{F}_q$
 |`VKCommit`|-||Efficient over the outer curve's scalar field|
