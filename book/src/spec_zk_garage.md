@@ -68,7 +68,7 @@ We blend commitments / hash into a single abstract interface.
 - `Com_r(...) ⟶ com` efficient over $\mathbb{F}_r$
 - `Com(...) ⟶ com` efficient over **both** $\mathbb{F}_q$ and $\mathbb{F}_r$
 
-Commitments are binding by default (i.e. can be instantiated with hash). If we want blinding (possibly across differnt commitments), we add `rcm` explicitly.
+Commitments are binding by default (i.e. can be instantiated with hash). If we want blinding (possibly across different commitments), we add `rcm` explicitly.
 
 TODO: Fix the exact instantiations / implementations.
 
@@ -170,7 +170,7 @@ Public inputs (`x`):
     - a public parameter to `vp`, i.e. immutable data, so that user can customize a global `vp` for example.
 - vp public output: `vp_memo` 
     - a public "output" of vp can encode arbitrary data.
-    - e.g. encode `rk` to support Sapling/Orchard-type auth. But if we make this choice, then a signature verfication needs to be done on every `rk`.
+    - e.g. encode `rk` to support Sapling/Orchard-type auth. But if we make this choice, then a signature verification needs to be done on every `rk`.
 - spent note nullifiers, `nf_1, …, nf_m`
 - created note commitments, `cm_1, …, cm_n`
 - for receiving vp: `ce_1, …, ce_n`
@@ -198,11 +198,11 @@ Arithmetized over $\mathbb{F}_r$. Represented as a Plonk circuit, `ActionCircuit
 Public inputs (`x`):
 - Merkle root `rt`
 - Spent note nullifier `nf`, which commits to note application type, value, and data
-    - User VP commitment: `com_vp_addr_send` (commiting to `desc_vp_addr_send`)
+    - User VP commitment: `com_vp_addr_send` (committing to `desc_vp_addr_send`)
     - Application VP commitment: `com_vp_app`
     - `EnableSpend`
 - Output note commitment `cm`
-    - User VP commitment: `com_vp_addr_recv` (commiting to `desc_vp_addr_recv`)
+    - User VP commitment: `com_vp_addr_recv` (committing to `desc_vp_addr_recv`)
     - Application VP commitment: `com_vp_app`
     - `EnableOutput`
 
@@ -283,14 +283,14 @@ For each epoch the state consists of:
     - Only `cm` is hashed in derivation of `rt`, note encryption `ce` is simply stored alongside `cm`
 - Set of spent note nullifiers, $NF$
     - Supporting add: $NF.add(nf)$
-    - Supports memership checks
+    - Supports membership checks
     
 The state should make past `rt` accessible as well (TODO: can be simplify this?)
 
 ### Taiga Transaction `tx`
 
 A Taiga transaction `tx` contains k actions, upto k spent notes, and upto k created notes:
-- Each $i$-th action specfies:
+- Each $i$-th action specifies:
     - `ActionCircuit` proof `π_action_i`
     - public input `(rt_i, nf_i, enableSpend, cm_i, enableOutput)`, resulting in overall list of `NF_tx` and `CM_tx`:
         - If `enableSpend = 1`, then `nf_i` is added to `NF_tx`
@@ -334,7 +334,7 @@ Why? We can verify a collection of Action and VP proofs efficiently for all proo
 
 ### Decomposition of Plonk verifier
 
-Verification `Verify(desc, x, π)` requires both $F_p$ and $F_q$ arithmetics are needed. To make recursive proof verification more efficient, we can decompose the verifer computation into $F_p$ part and $F_q$ part.
+Verification `Verify(desc, x, π)` requires both $F_p$ and $F_q$ arithmetics are needed. To make recursive proof verification more efficient, we can decompose the verifier computation into $F_p$ part and $F_q$ part.
 
 Specifically, we need to construct two circuits `V_q(desc_C, x, π, intval), V_p(intval)`, efficient over $\mathbb{F}_r$ and $\mathbb{F}_q$ respectively, such that `V(desc_C, x, π) = 1` iff `V_q(desc_C, x, π, intval) = 1` and `V_p(intval) = 1`. Note that `V_p` only take input the intermediate value.
 
@@ -356,7 +356,7 @@ Specifically, we need to construct two circuits `V_q(desc_C, x, π, intval), V_p
 ### Transaction w/ recursive proof
 
 A (recursive) Taiga transaction `tx` contains k actions, upto k spent notes, and upto k created notes:
-- Each $i$-th action specfies:
+- Each $i$-th action specifies:
     - public input `(rt_i, nf_i, enableSpend, cm_i, enableOutput)`, resulting in overall list of `NF_tx` and `CM_tx`:
         - If `enableSpend = 1`, then `nf_i` is added to `NF_tx`
         - If `enableOutput = 1`, then `cm_i` is added to `CM_tx` and `tx` also provide `ce_i`, which is added to `CE_tx`

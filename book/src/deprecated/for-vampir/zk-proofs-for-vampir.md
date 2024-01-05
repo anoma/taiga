@@ -2,7 +2,7 @@
 
 ## ZK proofs in a nutshell
 Zero-knowledge proofs are new cryptographic primitives leading to very useful applications. Two entities called *prover* and *verifier* interact.
-They both know an arithmetic circuit and the prover knows a witness for the circuit. It means that pluging the witness into the circuit makes the circuit consistent. The verifier computes the verifier key from the circuit, and can verify a proof using the verifier key. 
+They both know an arithmetic circuit and the prover knows a witness for the circuit. It means that plugging the witness into the circuit makes the circuit consistent. The verifier computes the verifier key from the circuit, and can verify a proof using the verifier key. 
 * Setting. The prover and the verifier know a circuit $\mathcal C$. The verifier key can be derived as $\text{vk} = \text{Precomputation}(\mathcal C)$.
 * Proof. The prover computes a proof $π$ of from the circuit $\mathcal C$ and the witness $ω$: $π = \text{Proof}(ω, \mathcal C)$.
 * Verification. The verifier can check the proof by computing the boolean $\text{Verify}(π, \text{vk})$.
