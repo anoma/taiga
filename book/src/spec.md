@@ -19,7 +19,7 @@ Cycles of curves serve as a solution to the problem of non-native arithmetic by 
 ### 1.3 Proving system interfaces
 ||Interface|Description|
 |-|-|-|
-|__Generate Verifier key__|`keygen_vk(C) ⟶ vk`|`C` is turned into a *circuit description* or *verifying key* `vk`, a succint representation of the circuit that the verifier uses to verify a proof|
+|__Generate Verifier key__|`keygen_vk(C) ⟶ vk`|`C` is turned into a *circuit description* or *verifying key* `vk`, a succinct representation of the circuit that the verifier uses to verify a proof|
 |__Generate Proving key__|`keygen_pk(C, vk) ⟶ pk`|Generate a proving key from a verifying key and an instance of circuit|
 |__Prove__|`P(C, pk, x, w) ⟶ π`|Prove that a circuit is satisfied given instance `x` and witness `w`|
 |__Verify__|`V(vk, x, π) ⟶ 0/1`|Verify the proof|
@@ -308,7 +308,7 @@ For each epoch the state consists of:
     - Only `cm` is hashed in derivation of `rt`, note encryption `ce` is simply stored alongside `cm`
 - Set of input note nullifiers, $NF$
     - Supporting add: $NF.add(nf)$
-    - Supports memership checks
+    - Supports membership checks
  
 The state should make past `rt` accessible as well.
 

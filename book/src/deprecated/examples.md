@@ -67,7 +67,7 @@ let (proof, public_inputs) = blinding_circuit
       .gen_proof::<Opc>(&pp_blind, pk, b"Test")
       .unwrap();
 ```
-From a proof, the verifier can check the public inputs against the blinded verifier key `vk_blind` (see [here](https://github.com/anoma/taiga/blob/main/src/doc_examples/blinding.rs)), and verifiy the proof:
+From a proof, the verifier can check the public inputs against the blinded verifier key `vk_blind` (see [here](https://github.com/anoma/taiga/blob/main/src/doc_examples/blinding.rs)), and verify the proof:
 ```rust
 let verifier_data = VerifierData::new(vk, public_inputs);
 verify_proof::<Fq, OP, Opc>(

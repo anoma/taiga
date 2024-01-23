@@ -6139,7 +6139,7 @@ fn export_params() {
 
 // It takes 4 seconds to generate one proving key.
 // It may be fine to generate the key once when compiling.
-// Consider loading the key from file when the keys are stablized.
+// Consider loading the key from file when the keys are stabilized.
 // #[ignore]
 // #[test]
 // fn export_compliance_proving_key() {

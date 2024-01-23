@@ -1,4 +1,4 @@
-# Exectuion model examples
+# Execution model examples
 
 Let's see how different use cases can be handled with the Taiga execution model.
 

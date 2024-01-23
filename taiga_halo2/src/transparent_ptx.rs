@@ -69,7 +69,7 @@ impl Executable for TransparentPartialTransaction {
     fn get_nullifiers(&self) -> Vec<Nullifier> {
         self.compliances
             .iter()
-            .map(|compliance| compliance.get_input_resource_nullifer())
+            .map(|compliance| compliance.get_input_resource_nullifier())
             .collect()
     }
 
@@ -89,7 +89,7 @@ impl Executable for TransparentPartialTransaction {
     }
 
     fn get_anchors(&self) -> Vec<Anchor> {
-        // TODO: We have easier way to check the anchor in transparent scenario, but keep consistent with sheilded right now.
+        // TODO: We have easier way to check the anchor in transparent scenario, but keep consistent with shielded right now.
         // TODO: we can skip the root if the is_ephemeral flag is true?
         self.compliances
             .iter()

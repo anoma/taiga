@@ -49,7 +49,7 @@ impl<F: Field> SubChip<F> {
     ) -> <Self as Chip<F>>::Config {
         let s_sub = meta.selector();
 
-        // Define our substraction gate!
+        // Define our subtraction gate!
         meta.create_gate("sub", |meta| {
             let lhs = meta.query_advice(advice[0], Rotation::cur());
             let rhs = meta.query_advice(advice[1], Rotation::cur());
@@ -85,7 +85,7 @@ impl<F: Field> SubInstructions<F> for SubChip<F> {
         layouter.assign_region(
             || "sub",
             |mut region: Region<'_, F>| {
-                // We only want to use a single substraction gate in this region,
+                // We only want to use a single subtraction gate in this region,
                 // so we enable it at region offset 0; this means it will constrain
                 // cells at offsets 0 and 1.
                 config.s_sub.enable(&mut region, 0)?;
@@ -97,7 +97,7 @@ impl<F: Field> SubInstructions<F> for SubChip<F> {
                 a.copy_advice(|| "lhs", &mut region, config.advice[0], 0)?;
                 b.copy_advice(|| "rhs", &mut region, config.advice[1], 0)?;
 
-                // Now we can compute the substraction result, which is to be assigned
+                // Now we can compute the subtraction result, which is to be assigned
                 // into the output position.
                 let value = a.value().copied() - b.value();
 

@@ -2,7 +2,7 @@
 /// In this example, Alice wants to spend three(more than the fixed NUM_RESOURCE) different kinds of tokens/resources simultaneously.
 /// She needs to distribute the resources to two partial transactions. She can use the intent to cascade the partial transactions.
 /// In the first partial transaction, she spends two resources and creates a cascade intent resource to encode and check the third resource info.
-/// In the sencond partial transaction, she spends the cascade resource and the third resource.
+/// In the second partial transaction, she spends the cascade resource and the third resource.
 ///
 use crate::{
     circuit::{

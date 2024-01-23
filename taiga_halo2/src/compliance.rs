@@ -164,7 +164,7 @@ impl ComplianceInfo {
         self.rseed.get_vp_cm_r(PRF_EXPAND_OUTPUT_VP_CM_R)
     }
 
-    // Only used in transparent scenario: the achor is untrusted, recalculate root when executing it transparently.
+    // Only used in transparent scenario: the anchor is untrusted, recalculate root when executing it transparently.
     pub fn calculate_root(&self) -> Anchor {
         self.input_resource.calculate_root(&self.input_merkle_path)
     }
@@ -174,7 +174,7 @@ impl ComplianceInfo {
         DeltaCommitment::commit(&self.input_resource, &self.output_resource, blind_r)
     }
 
-    pub fn get_input_resource_nullifer(&self) -> Nullifier {
+    pub fn get_input_resource_nullifier(&self) -> Nullifier {
         self.input_resource.get_nf().unwrap()
     }
 
@@ -183,7 +183,7 @@ impl ComplianceInfo {
     }
 
     pub fn build(&self) -> (CompliancePublicInputs, ComplianceCircuit) {
-        let nf = self.get_input_resource_nullifer();
+        let nf = self.get_input_resource_nullifier();
         assert_eq!(
             nf, self.output_resource.nonce,
             "The nf of input resource must be equal to the nonce of output resource"

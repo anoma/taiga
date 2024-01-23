@@ -58,7 +58,7 @@ pub fn create_output_resource(
     label: pallas::Base,
     value: pallas::Base,
     quantity: u64,
-    // The owner of output resource has the nullifer key and exposes the nullifier_key commitment to output creator.
+    // The owner of output resource has the nullifier key and exposes the nullifier_key commitment to output creator.
     npk: pallas::Base,
     is_ephemeral: bool,
 ) -> Resource {
