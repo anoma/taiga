@@ -11,7 +11,7 @@ use crate::{
     merkle_tree::{Anchor, MerklePath, Node},
     nullifier::{Nullifier, NullifierKeyContainer},
     shielded_ptx::ResourceVPVerifyingInfoSet,
-    utils::{poseidon_hash_n, poseidon_to_curve, read_base_field},
+    utils::{poseidon_hash_n, poseidon_to_curve},
 };
 use blake2b_simd::Params as Blake2bParams;
 use ff::{FromUniformBytes, PrimeField};
@@ -67,7 +67,7 @@ impl BorshSerialize for ResourceCommitment {
 #[cfg(feature = "borsh")]
 impl BorshDeserialize for ResourceCommitment {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let value = read_base_field(reader)?;
+        let value = crate::utils::read_base_field(reader)?;
         Ok(Self(value))
     }
 }
@@ -329,6 +329,7 @@ impl BorshSerialize for Resource {
 #[cfg(feature = "borsh")]
 impl BorshDeserialize for Resource {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        use crate::utils::read_base_field;
         use byteorder::{LittleEndian, ReadBytesExt};
         use std::io;
         // Read logic

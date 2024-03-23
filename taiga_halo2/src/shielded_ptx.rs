@@ -11,7 +11,6 @@ use crate::merkle_tree::Anchor;
 use crate::nullifier::Nullifier;
 use crate::proof::Proof;
 use crate::resource::{ResourceCommitment, ResourceValidityPredicates};
-use crate::utils::read_scalar_field;
 use halo2_proofs::plonk::Error;
 use pasta_curves::pallas;
 use rand::RngCore;
@@ -354,7 +353,7 @@ impl BorshDeserialize for ShieldedPartialTransaction {
         let binding_sig_r = if binding_sig_r_type == 0 {
             None
         } else {
-            let r = read_scalar_field(reader)?;
+            let r = crate::utils::read_scalar_field(reader)?;
             Some(r)
         };
 

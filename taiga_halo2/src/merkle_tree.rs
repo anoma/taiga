@@ -2,7 +2,7 @@ use std::hash::{Hash, Hasher};
 
 use crate::merkle_tree::LR::{L, R};
 use crate::resource::ResourceCommitment;
-use crate::utils::{poseidon_hash, read_base_field};
+use crate::utils::poseidon_hash;
 use crate::{constant::TAIGA_COMMITMENT_TREE_DEPTH, resource::Resource};
 use ff::PrimeField;
 use halo2_proofs::arithmetic::Field;
@@ -68,7 +68,7 @@ impl BorshSerialize for Anchor {
 #[cfg(feature = "borsh")]
 impl BorshDeserialize for Anchor {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let value = read_base_field(reader)?;
+        let value = crate::utils::read_base_field(reader)?;
         Ok(Self(value))
     }
 }
@@ -204,7 +204,7 @@ impl BorshSerialize for Node {
 #[cfg(feature = "borsh")]
 impl BorshDeserialize for Node {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let value = read_base_field(reader)?;
+        let value = crate::utils::read_base_field(reader)?;
         Ok(Self(value))
     }
 }
