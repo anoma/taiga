@@ -132,8 +132,8 @@ impl ResourcePlaintext {
         self.0.to_vec()
     }
 
-    pub fn padding(msg: &Vec<pallas::Base>) -> Self {
-        let mut plaintext = msg.clone();
+    pub fn padding(msg: &[pallas::Base]) -> Self {
+        let mut plaintext = msg.to_owned();
         let padding = std::iter::repeat(pallas::Base::zero())
             .take(RESOURCE_ENCRYPTION_PLAINTEXT_NUM - msg.len());
         plaintext.extend(padding);
@@ -183,7 +183,7 @@ fn test_halo2_resource_encryption() {
         pallas::Base::one(),
         pallas::Base::one(),
     ];
-    let plaintext = ResourcePlaintext::padding(&message.to_vec());
+    let plaintext = ResourcePlaintext::padding(message.as_ref());
     let encrypt_nonce = pallas::Base::from_u128(23333u128);
 
     // Encryption

@@ -431,7 +431,7 @@ impl<F: PrimeField> Blake2sChip<F> {
     pub fn encode_result(
         &self,
         layouter: &mut impl Layouter<F>,
-        ret: &Vec<Blake2sWord<F>>,
+        ret: &[Blake2sWord<F>],
     ) -> Result<[AssignedCell<F, F>; 2], Error> {
         let mut fields = vec![];
         assert_eq!(ret.len(), 8);
@@ -976,7 +976,7 @@ impl<F: PrimeField> Blake2sWord<F> {
         })
     }
 
-    pub fn word_rotate(bits: &Vec<AssignedCell<F, F>>, by: usize) -> Vec<AssignedCell<F, F>> {
+    pub fn word_rotate(bits: &[AssignedCell<F, F>], by: usize) -> Vec<AssignedCell<F, F>> {
         assert!(bits.len() == 32);
         let by = by % 32;
         bits.iter()

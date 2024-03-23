@@ -147,8 +147,7 @@ impl Encoder for ValidityPredicatePublicInputs {
 impl<'a> Decoder<'a> for ValidityPredicatePublicInputs {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         let val: Vec<pallas::Base> = Decoder::decode(term)?;
-        val.try_into()
-            .map_err(|_e| rustler::Error::Atom("failure to decode"))
+        Ok(val.into())
     }
 }
 
