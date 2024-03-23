@@ -31,7 +31,7 @@ use crate::{
     proof::Proof,
     resource::{RandomSeed, Resource, ResourceCommitment},
     resource_encryption::{ResourceCiphertext, SecretKey},
-    utils::{mod_r_p, read_base_field},
+    utils::mod_r_p,
     vp_vk::ValidityPredicateVerifyingKey,
 };
 use dyn_clone::{clone_trait_object, DynClone};
@@ -206,6 +206,7 @@ impl BorshDeserialize for VPVerifyingInfo {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         // Read vk
         use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
+        use crate::utils::read_base_field;
         let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
         let vk = VerifyingKey::read::<_, TrivialValidityPredicateCircuit>(reader, params)?;
         // Read proof

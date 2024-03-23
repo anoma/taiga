@@ -9,7 +9,6 @@ use crate::{
     error::TransactionError,
     proof::Proof,
     resource::{RandomSeed, Resource},
-    utils::read_base_field,
     vp_commitment::ValidityPredicateCommitment,
     vp_vk::ValidityPredicateVerifyingKey,
 };
@@ -134,7 +133,7 @@ impl BorshSerialize for TrivialValidityPredicateCircuit {
 #[cfg(feature = "borsh")]
 impl BorshDeserialize for TrivialValidityPredicateCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let owned_resource_id = read_base_field(reader)?;
+        let owned_resource_id = crate::utils::read_base_field(reader)?;
         let input_resources: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;

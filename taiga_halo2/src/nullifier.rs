@@ -2,7 +2,7 @@ use std::hash::Hash;
 
 use crate::{
     resource::ResourceCommitment,
-    utils::{poseidon_hash_n, prf_nf, read_base_field},
+    utils::{poseidon_hash_n, prf_nf},
 };
 use halo2_proofs::arithmetic::Field;
 use pasta_curves::group::ff::PrimeField;
@@ -91,7 +91,7 @@ impl BorshSerialize for Nullifier {
 #[cfg(feature = "borsh")]
 impl BorshDeserialize for Nullifier {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let value = read_base_field(reader)?;
+        let value = crate::utils::read_base_field(reader)?;
         Ok(Self(value))
     }
 }
