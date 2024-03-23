@@ -50,7 +50,7 @@ impl Executable for TransparentPartialTransaction {
             let owned_resource_id = vp.verify_transparently(&compliance_nfs, &compliance_cms)?;
             // Check all resources are checked
             if owned_resource_id != nf.inner() {
-                return Err(TransactionError::InconsistentOwneResourceID);
+                return Err(TransactionError::InconsistentOwnedResourceID);
             }
         }
 
@@ -58,7 +58,7 @@ impl Executable for TransparentPartialTransaction {
             let owned_resource_id = vp.verify_transparently(&compliance_nfs, &compliance_cms)?;
             // Check all resources are checked
             if owned_resource_id != cm.inner() {
-                return Err(TransactionError::InconsistentOwneResourceID);
+                return Err(TransactionError::InconsistentOwnedResourceID);
             }
         }
 

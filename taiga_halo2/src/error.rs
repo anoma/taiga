@@ -15,7 +15,7 @@ pub enum TransactionError {
     /// Output resource commitment is not consistent between the compliance and the vp.
     InconsistentOutputResourceCommitment,
     /// Owned resource id is not consistent between the compliance and the vp.
-    InconsistentOwneResourceID,
+    InconsistentOwnedResourceID,
     /// IO error
     IoError(std::io::Error),
     /// Transparent resource nullifier key is missing
@@ -41,7 +41,7 @@ impl Display for TransactionError {
             InconsistentOutputResourceCommitment => f.write_str(
                 "Output resource commitment is not consistent between the compliance and the vp",
             ),
-            InconsistentOwneResourceID => {
+            InconsistentOwnedResourceID => {
                 f.write_str("Owned resource id is not consistent between the compliance and the vp")
             }
             IoError(e) => f.write_str(&format!("IoError error: {e}")),

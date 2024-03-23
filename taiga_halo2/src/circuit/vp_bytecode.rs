@@ -250,7 +250,7 @@ impl ApplicationByteCode {
             let id = dynamic_vp.verify_transparently(compliance_nfs, compliance_cms)?;
             // check: the app_vp and dynamic_vps belong to the resource
             if id != owned_resource_id {
-                return Err(TransactionError::InconsistentOwneResourceID);
+                return Err(TransactionError::InconsistentOwnedResourceID);
             }
         }
         Ok(owned_resource_id)
