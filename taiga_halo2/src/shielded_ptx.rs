@@ -182,13 +182,13 @@ impl ShieldedPartialTransaction {
             let owned_resource_id = vp_info.app_vp_verifying_info.get_owned_resource_id();
             for logic_vp_verifying_info in vp_info.app_dynamic_vp_verifying_info.iter() {
                 if owned_resource_id != logic_vp_verifying_info.get_owned_resource_id() {
-                    return Err(TransactionError::InconsistentOwneResourceID);
+                    return Err(TransactionError::InconsistentOwnedResourceID);
                 }
             }
 
             // Check the owned_resource_id that vp uses is consistent with the nf from the compliance circuit
             if owned_resource_id != compliance_nf.inner() {
-                return Err(TransactionError::InconsistentOwneResourceID);
+                return Err(TransactionError::InconsistentOwnedResourceID);
             }
         }
         Ok(())
@@ -214,13 +214,13 @@ impl ShieldedPartialTransaction {
             let owned_resource_id = vp_info.app_vp_verifying_info.get_owned_resource_id();
             for logic_vp_verifying_info in vp_info.app_dynamic_vp_verifying_info.iter() {
                 if owned_resource_id != logic_vp_verifying_info.get_owned_resource_id() {
-                    return Err(TransactionError::InconsistentOwneResourceID);
+                    return Err(TransactionError::InconsistentOwnedResourceID);
                 }
             }
 
             // Check the owned_resource_id that vp uses is consistent with the cm from the compliance circuit
             if owned_resource_id != compliance_cm.inner() {
-                return Err(TransactionError::InconsistentOwneResourceID);
+                return Err(TransactionError::InconsistentOwnedResourceID);
             }
         }
         Ok(())
