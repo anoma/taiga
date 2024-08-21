@@ -36,7 +36,7 @@ name = "compliance_proof"
 harness = false
 
 [[bench]]
-name = "vp_proof"
+name = "resource_logic_proof"
 harness = false
 
 # [[example]]

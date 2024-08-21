@@ -1,4 +1,4 @@
 pub mod circuit;
-pub mod vp;
+pub mod resource_logic;
 
 pub fn main() {}

@@ -9,7 +9,7 @@ use halo2_proofs::arithmetic::Field;
 use pasta_curves::{group::Curve, pallas};
 use rand::{CryptoRng, RngCore};
 use taiga_halo2::{
-    circuit::vp_examples::token::Token,
+    circuit::resource_logic_examples::token::Token,
     nullifier::NullifierKeyContainer,
     transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
 };

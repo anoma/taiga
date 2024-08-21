@@ -1,7 +1,9 @@
 use crate::{
     circuit::{
-        vp_circuit::ValidityPredicate,
-        vp_examples::{TrivialValidityPredicateCircuit, COMPRESSED_TRIVIAL_VP_VK},
+        resource_logic_circuit::ResourceLogic,
+        resource_logic_examples::{
+            TrivialResourceLogicCircuit, COMPRESSED_TRIVIAL_RESOURCE_LOGIC_VK,
+        },
     },
     constant::{
         NUM_RESOURCE, POSEIDON_TO_CURVE_INPUT_LEN, PRF_EXPAND_PERSONALIZATION,
@@ -10,7 +12,7 @@ use crate::{
     },
     merkle_tree::{Anchor, MerklePath, Node},
     nullifier::{Nullifier, NullifierKeyContainer},
-    shielded_ptx::ResourceVPVerifyingInfoSet,
+    shielded_ptx::ResourceLogicVerifyingInfoSet,
     utils::{poseidon_hash_n, poseidon_to_curve},
 };
 use blake2b_simd::Params as Blake2bParams;
@@ -86,7 +88,7 @@ impl Hash for ResourceCommitment {
 pub struct Resource {
     pub kind: ResourceKind,
     /// value is the fungible data of the resource
-    /// sub-vps and any other data can be encoded to the value
+    /// sub-resource_logics and any other data can be encoded to the value
     pub value: pallas::Base,
     /// the quantity of the resource.
     pub quantity: u64,
@@ -117,11 +119,11 @@ pub struct ResourceKind {
 #[cfg_attr(feature = "borsh", derive(BorshSerialize, BorshDeserialize))]
 pub struct RandomSeed([u8; 32]);
 
-/// ResourceValidityPredicates includes one application(static) VP and a few dynamic VPs.
+/// ResourceLogics consists of one application(static) resource logic and a few user(dynamic) resource logics.
 #[derive(Clone)]
-pub struct ResourceValidityPredicates {
-    application_vp: Box<ValidityPredicate>,
-    dynamic_vps: Vec<Box<ValidityPredicate>>,
+pub struct ResourceLogics {
+    application_resource_logic: Box<ResourceLogic>,
+    dynamic_resource_logics: Vec<Box<ResourceLogic>>,
 }
 
 impl Resource {
@@ -195,7 +197,7 @@ impl Resource {
     }
 
     pub fn random_padding_resource<R: RngCore>(mut rng: R) -> Self {
-        let logic = *COMPRESSED_TRIVIAL_VP_VK;
+        let logic = *COMPRESSED_TRIVIAL_RESOURCE_LOGIC_VK;
         let label = pallas::Base::random(&mut rng);
         let kind = ResourceKind::new(logic, label);
         let value = pallas::Base::random(&mut rng);
@@ -435,7 +437,7 @@ impl RandomSeed {
         pallas::Scalar::from_uniform_bytes(&bytes)
     }
 
-    pub fn get_vp_cm_r(&self, tag: u8) -> pallas::Base {
+    pub fn get_resource_logic_cm_r(&self, tag: u8) -> pallas::Base {
         let mut h = Blake2bParams::new()
             .hash_length(64)
             .personal(PRF_EXPAND_PERSONALIZATION)
@@ -447,63 +449,67 @@ impl RandomSeed {
     }
 }
 
-impl ResourceValidityPredicates {
+impl ResourceLogics {
     pub fn new(
-        application_vp: Box<ValidityPredicate>,
-        dynamic_vps: Vec<Box<ValidityPredicate>>,
+        application_resource_logic: Box<ResourceLogic>,
+        dynamic_resource_logics: Vec<Box<ResourceLogic>>,
     ) -> Self {
         Self {
-            application_vp,
-            dynamic_vps,
+            application_resource_logic,
+            dynamic_resource_logics,
         }
     }
 
-    // Generate vp proofs
-    pub fn build(&self) -> ResourceVPVerifyingInfoSet {
-        let app_vp_verifying_info = self.application_vp.get_verifying_info();
+    // Generate resource logic proofs
+    pub fn build(&self) -> ResourceLogicVerifyingInfoSet {
+        let app_resource_logic_verifying_info =
+            self.application_resource_logic.get_verifying_info();
 
-        let app_dynamic_vp_verifying_info = self
-            .dynamic_vps
+        let app_dynamic_resource_logic_verifying_info = self
+            .dynamic_resource_logics
             .iter()
             .map(|verifying_info| verifying_info.get_verifying_info())
             .collect();
 
-        ResourceVPVerifyingInfoSet::new(app_vp_verifying_info, app_dynamic_vp_verifying_info)
+        ResourceLogicVerifyingInfoSet::new(
+            app_resource_logic_verifying_info,
+            app_dynamic_resource_logic_verifying_info,
+        )
     }
 
-    // Create an input padding resource vps
-    pub fn create_input_padding_resource_vps(
+    // Create resource logics for an input padding resource
+    pub fn create_input_padding_resource_resource_logics(
         resource: &Resource,
         input_resources: [Resource; NUM_RESOURCE],
         output_resources: [Resource; NUM_RESOURCE],
     ) -> Self {
         let owned_resource_id = resource.get_nf().unwrap().inner();
-        let application_vp = Box::new(TrivialValidityPredicateCircuit::new(
+        let application_resource_logic = Box::new(TrivialResourceLogicCircuit::new(
             owned_resource_id,
             input_resources,
             output_resources,
         ));
         Self {
-            application_vp,
-            dynamic_vps: vec![],
+            application_resource_logic,
+            dynamic_resource_logics: vec![],
         }
     }
 
-    // Create an output padding resource vps
-    pub fn create_output_padding_resource_vps(
+    // Create resource logics for an output padding resource
+    pub fn create_output_padding_resource_resource_logics(
         resource: &Resource,
         input_resources: [Resource; NUM_RESOURCE],
         output_resources: [Resource; NUM_RESOURCE],
     ) -> Self {
         let owned_resource_id = resource.commitment().inner();
-        let application_vp = Box::new(TrivialValidityPredicateCircuit::new(
+        let application_resource_logic = Box::new(TrivialResourceLogicCircuit::new(
             owned_resource_id,
             input_resources,
             output_resources,
         ));
         Self {
-            application_vp,
-            dynamic_vps: vec![],
+            application_resource_logic,
+            dynamic_resource_logics: vec![],
         }
     }
 }

@@ -24,7 +24,7 @@ pub const RESOURCE_COMMITMENT_PERSONALIZATION: &str = "Taiga-NoteCommit";
 
 pub const TRANSACTION_BINDING_HASH_PERSONALIZATION: &[u8; 16] = b"TxBindingSigHash";
 
-pub const VP_COMMITMENT_PERSONALIZATION: &[u8; 8] = b"VPCommit";
+pub const RESOURCE_LOGIC_COMMITMENT_PERSONALIZATION: &[u8; 8] = b"VPCommit";
 
 pub const PRF_EXPAND_PERSONALIZATION: &[u8; 16] = b"Taiga_ExpandSeed";
 lazy_static! {
@@ -36,10 +36,10 @@ pub const PRF_EXPAND_PSI: u8 = 0;
 pub const PRF_EXPAND_RCM: u8 = 1;
 pub const PRF_EXPAND_PUBLIC_INPUT_PADDING: u8 = 2;
 pub const PRF_EXPAND_VCM_R: u8 = 3;
-pub const PRF_EXPAND_INPUT_VP_CM_R: u8 = 4;
-pub const PRF_EXPAND_OUTPUT_VP_CM_R: u8 = 5;
-pub const PRF_EXPAND_DYNAMIC_VP_1_CM_R: u8 = 6;
-pub const PRF_EXPAND_DYNAMIC_VP_2_CM_R: u8 = 7;
+pub const PRF_EXPAND_INPUT_RESOURCE_LOGIC_CM_R: u8 = 4;
+pub const PRF_EXPAND_OUTPUT_RESOURCE_LOGIC_CM_R: u8 = 5;
+pub const PRF_EXPAND_DYNAMIC_RESOURCE_LOGIC_1_CM_R: u8 = 6;
+pub const PRF_EXPAND_DYNAMIC_RESOURCE_LOGIC_2_CM_R: u8 = 7;
 
 /// Commitment merkle tree depth
 pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
@@ -54,39 +54,42 @@ pub const COMPLIANCE_ANCHOR_PUBLIC_INPUT_ROW_IDX: usize = 1;
 pub const COMPLIANCE_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX: usize = 2;
 pub const COMPLIANCE_DELTA_CM_X_PUBLIC_INPUT_ROW_IDX: usize = 3;
 pub const COMPLIANCE_DELTA_CM_Y_PUBLIC_INPUT_ROW_IDX: usize = 4;
-pub const COMPLIANCE_INPUT_VP_CM_1_ROW_IDX: usize = 5;
-pub const COMPLIANCE_INPUT_VP_CM_2_ROW_IDX: usize = 6;
-pub const COMPLIANCE_OUTPUT_VP_CM_1_ROW_IDX: usize = 7;
-pub const COMPLIANCE_OUTPUT_VP_CM_2_ROW_IDX: usize = 8;
+pub const COMPLIANCE_INPUT_RESOURCE_LOGIC_CM_1_ROW_IDX: usize = 5;
+pub const COMPLIANCE_INPUT_RESOURCE_LOGIC_CM_2_ROW_IDX: usize = 6;
+pub const COMPLIANCE_OUTPUT_RESOURCE_LOGIC_CM_1_ROW_IDX: usize = 7;
+pub const COMPLIANCE_OUTPUT_RESOURCE_LOGIC_CM_2_ROW_IDX: usize = 8;
 
 pub const POSEIDON_TO_CURVE_INPUT_LEN: usize = 3;
 pub const CURVE_ID: &str = "pallas";
 pub const VALUE_BASE_DOMAIN_POSTFIX: &str = "Taiga-NoteType";
 
-pub const VP_CIRCUIT_PUBLIC_INPUT_NUM: usize = VP_CIRCUIT_MANDATORY_PUBLIC_INPUT_NUM
-    + VP_CIRCUIT_CUSTOM_PUBLIC_INPUT_NUM
-    + VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_NUM;
-pub const VP_CIRCUIT_MANDATORY_PUBLIC_INPUT_NUM: usize = 9;
-pub const VP_CIRCUIT_CUSTOM_PUBLIC_INPUT_NUM: usize = 2;
-pub const VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_NUM: usize =
+pub const RESOURCE_LOGIC_CIRCUIT_PUBLIC_INPUT_NUM: usize =
+    RESOURCE_LOGIC_CIRCUIT_MANDATORY_PUBLIC_INPUT_NUM
+        + RESOURCE_LOGIC_CIRCUIT_CUSTOM_PUBLIC_INPUT_NUM
+        + RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_NUM;
+pub const RESOURCE_LOGIC_CIRCUIT_MANDATORY_PUBLIC_INPUT_NUM: usize = 9;
+pub const RESOURCE_LOGIC_CIRCUIT_CUSTOM_PUBLIC_INPUT_NUM: usize = 2;
+pub const RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_NUM: usize =
     RESOURCE_ENCRYPTION_CIPHERTEXT_NUM + 2; // ciphertext(12) + public_key(2)
 
-pub const VP_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX: usize = 0;
-pub const VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX: usize = 1;
-pub const VP_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX: usize = 2;
-pub const VP_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX: usize = 3;
-pub const VP_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX: usize = 4;
-pub const VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_1: usize = 5;
-pub const VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_2: usize = 6;
-pub const VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_1: usize = 7;
-pub const VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_2: usize = 8;
-pub const VP_CIRCUIT_CUSTOM_PUBLIC_INPUT_BEGIN_IDX: usize = VP_CIRCUIT_MANDATORY_PUBLIC_INPUT_NUM;
-pub const VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX: usize =
-    VP_CIRCUIT_MANDATORY_PUBLIC_INPUT_NUM + VP_CIRCUIT_CUSTOM_PUBLIC_INPUT_NUM;
-pub const VP_CIRCUIT_RESOURCE_ENCRYPTION_NONCE_IDX: usize = 21;
-pub const VP_CIRCUIT_RESOURCE_ENCRYPTION_MAC_IDX: usize = 22;
-pub const VP_CIRCUIT_RESOURCE_ENCRYPTION_PK_X_IDX: usize = 23;
-pub const VP_CIRCUIT_RESOURCE_ENCRYPTION_PK_Y_IDX: usize = 24;
+pub const RESOURCE_LOGIC_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX: usize = 0;
+pub const RESOURCE_LOGIC_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX: usize = 1;
+pub const RESOURCE_LOGIC_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX: usize = 2;
+pub const RESOURCE_LOGIC_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX: usize = 3;
+pub const RESOURCE_LOGIC_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX: usize = 4;
+pub const RESOURCE_LOGIC_CIRCUIT_FIRST_DYNAMIC_RESOURCE_LOGIC_CM_1: usize = 5;
+pub const RESOURCE_LOGIC_CIRCUIT_FIRST_DYNAMIC_RESOURCE_LOGIC_CM_2: usize = 6;
+pub const RESOURCE_LOGIC_CIRCUIT_SECOND_DYNAMIC_RESOURCE_LOGIC_CM_1: usize = 7;
+pub const RESOURCE_LOGIC_CIRCUIT_SECOND_DYNAMIC_RESOURCE_LOGIC_CM_2: usize = 8;
+pub const RESOURCE_LOGIC_CIRCUIT_CUSTOM_PUBLIC_INPUT_BEGIN_IDX: usize =
+    RESOURCE_LOGIC_CIRCUIT_MANDATORY_PUBLIC_INPUT_NUM;
+pub const RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX: usize =
+    RESOURCE_LOGIC_CIRCUIT_MANDATORY_PUBLIC_INPUT_NUM
+        + RESOURCE_LOGIC_CIRCUIT_CUSTOM_PUBLIC_INPUT_NUM;
+pub const RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_NONCE_IDX: usize = 21;
+pub const RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_MAC_IDX: usize = 22;
+pub const RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PK_X_IDX: usize = 23;
+pub const RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PK_Y_IDX: usize = 24;
 
 // Resource encryption
 pub const RESOURCE_ENCRYPTION_PLAINTEXT_NUM: usize = 10;
@@ -119,7 +122,7 @@ lazy_static! {
 
 pub const PARAMS_SIZE: u32 = 15;
 pub const COMPLIANCE_CIRCUIT_PARAMS_SIZE: u32 = PARAMS_SIZE;
-pub const VP_CIRCUIT_PARAMS_SIZE: u32 = PARAMS_SIZE;
+pub const RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE: u32 = PARAMS_SIZE;
 
 // Setup params map
 lazy_static! {
@@ -155,7 +158,7 @@ lazy_static! {
         CommitDomain::new(RESOURCE_COMMITMENT_PERSONALIZATION);
     pub static ref RESOURCE_COMMITMENT_GENERATOR: pallas::Affine = RESOURCE_COMMIT_DOMAIN.Q().to_affine();
     pub static ref RESOURCE_COMMITMENT_R_GENERATOR: pallas::Affine = RESOURCE_COMMIT_DOMAIN.R().to_affine();
-    // Generator used in NullifierK and VP
+    // The Generator is used in NullifierK and resource logic
     pub static ref GENERATOR: pallas::Affine = pallas::Point::generator().to_affine();
     // pub static ref R_ZS_AND_US: Vec<(u64, [pallas::Base; H])> =
     //     find_zs_and_us(*RESOURCE_COMMITMENT_R_GENERATOR, NUM_WINDOWS).unwrap();
@@ -6097,7 +6100,7 @@ impl FixedPoint<pallas::Affine> for Short {
     }
 }
 
-pub const MAX_DYNAMIC_VP_NUM: usize = 2;
+pub const MAX_DYNAMIC_RESOURCE_LOGIC_NUM: usize = 2;
 
 #[ignore]
 #[test]
@@ -6158,17 +6161,17 @@ fn export_params() {
 
 // #[ignore]
 // #[test]
-// fn export_trivial_vp_proving_key() {
-//     use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
+// fn export_trivial_resource_logic_proving_key() {
+//     use crate::circuit::resource_logic_examples::TrivialResourceLogicCircuit;
 //     use std::io::Write;
 
-//     let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
-//     let empty_circuit = TrivialValidityPredicateCircuit::default();
+//     let params = SETUP_PARAMS_MAP.get(&RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE).unwrap();
+//     let empty_circuit = TrivialResourceLogicCircuit::default();
 //     let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
 //     let pk = keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail");
 //     let mut bytes = vec![];
 //     pk.write(&mut bytes).unwrap();
-//     let mut file = std::fs::File::create("./params/trivial_vp_proving_key")
-//         .unwrap_or_else(|err| panic!("cannot create trivial_vp_proving_key with {}", err));
+//     let mut file = std::fs::File::create("./params/trivial_resource_logic_proving_key")
+//         .unwrap_or_else(|err| panic!("cannot create trivial_resource_logic_proving_key with {}", err));
 //     file.write_all(&bytes).unwrap();
 // }

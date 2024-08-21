@@ -2,7 +2,7 @@ use super::{PartialFulfillmentIntentLabel, COMPRESSED_PARTIAL_FULFILLMENT_INTENT
 use crate::{
     circuit::{
         gadgets::assign_free_advice,
-        vp_examples::token::{Token, TokenAuthorization, TokenResource, TOKEN_VK},
+        resource_logic_examples::token::{Token, TokenAuthorization, TokenResource, TOKEN_VK},
     },
     constant::NUM_RESOURCE,
     resource::Resource,
@@ -122,8 +122,8 @@ impl Swap {
         column: Column<Advice>,
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<PartialFulfillmentIntentLabel, Error> {
-        let token_vp_vk = assign_free_advice(
-            layouter.namespace(|| "witness token vp vk"),
+        let token_resource_logic_vk = assign_free_advice(
+            layouter.namespace(|| "witness token resource_logic vk"),
             column,
             Value::known(TOKEN_VK.get_compressed()),
         )?;
@@ -165,7 +165,7 @@ impl Swap {
         )?;
 
         Ok(PartialFulfillmentIntentLabel {
-            token_vp_vk,
+            token_resource_logic_vk,
             sold_token,
             sold_token_quantity,
             bought_token,

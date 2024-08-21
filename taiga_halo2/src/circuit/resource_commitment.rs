@@ -137,7 +137,7 @@ impl ResourceCommitChip {
 pub fn resource_commit(
     mut layouter: impl Layouter<pallas::Base>,
     chip: ResourceCommitChip,
-    app_vp: AssignedCell<pallas::Base, pallas::Base>,
+    app_resource_logic: AssignedCell<pallas::Base, pallas::Base>,
     label: AssignedCell<pallas::Base, pallas::Base>,
     value: AssignedCell<pallas::Base, pallas::Base>,
     npk: AssignedCell<pallas::Base, pallas::Base>,
@@ -155,7 +155,7 @@ pub fn resource_commit(
 
     // resource commitment
     let poseidon_message = [
-        app_vp,
+        app_resource_logic,
         label,
         value,
         npk,

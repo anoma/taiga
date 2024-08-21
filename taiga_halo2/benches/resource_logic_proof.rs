@@ -6,17 +6,20 @@ use pasta_curves::pallas;
 use rand::rngs::OsRng;
 use rand::Rng;
 use taiga_halo2::{
-    circuit::{vp_circuit::ValidityPredicateCircuit, vp_examples::TrivialValidityPredicateCircuit},
-    constant::{NUM_RESOURCE, SETUP_PARAMS_MAP, VP_CIRCUIT_PARAMS_SIZE},
+    circuit::{
+        resource_logic_circuit::ResourceLogicCircuit,
+        resource_logic_examples::TrivialResourceLogicCircuit,
+    },
+    constant::{NUM_RESOURCE, RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE, SETUP_PARAMS_MAP},
     nullifier::{Nullifier, NullifierKeyContainer},
     proof::Proof,
     resource::{Resource, ResourceKind},
 };
 
-fn bench_vp_proof(name: &str, c: &mut Criterion) {
+fn bench_resource_logic_proof(name: &str, c: &mut Criterion) {
     let mut rng = OsRng;
 
-    let vp_circuit = {
+    let resource_logic_circuit = {
         let input_resources = [(); NUM_RESOURCE].map(|_| {
             let nonce = Nullifier::from(pallas::Base::random(&mut rng));
             let nk = NullifierKeyContainer::from_key(pallas::Base::random(&mut rng));
@@ -63,17 +66,19 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
             })
             .collect::<Vec<_>>();
         let owned_resource_id = input_resources[0].get_nf().unwrap().inner();
-        TrivialValidityPredicateCircuit::new(
+        TrivialResourceLogicCircuit::new(
             owned_resource_id,
             input_resources,
             output_resources.try_into().unwrap(),
         )
     };
-    let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
-    let empty_circuit: TrivialValidityPredicateCircuit = Default::default();
+    let params = SETUP_PARAMS_MAP
+        .get(&RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE)
+        .unwrap();
+    let empty_circuit: TrivialResourceLogicCircuit = Default::default();
     let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
     let pk = keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail");
-    let public_inputs = vp_circuit.get_public_inputs(&mut rng);
+    let public_inputs = resource_logic_circuit.get_public_inputs(&mut rng);
 
     // Prover bench
     let prover_name = name.to_string() + "-prover";
@@ -82,7 +87,7 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
             Proof::create(
                 &pk,
                 &params,
-                vp_circuit.clone(),
+                resource_logic_circuit.clone(),
                 &[public_inputs.inner()],
                 &mut rng,
             )
@@ -95,7 +100,7 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
     let proof = Proof::create(
         &pk,
         &params,
-        vp_circuit.clone(),
+        resource_logic_circuit.clone(),
         &[public_inputs.inner()],
         &mut rng,
     )
@@ -111,7 +116,7 @@ fn bench_vp_proof(name: &str, c: &mut Criterion) {
     });
 }
 fn criterion_benchmark(c: &mut Criterion) {
-    bench_vp_proof("halo2-vp-proof", c);
+    bench_resource_logic_proof("halo2-resource-logic-proof", c);
 }
 
 criterion_group!(benches, criterion_benchmark);

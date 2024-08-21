@@ -4,14 +4,14 @@ use pasta_curves::pallas;
 use rand::RngCore;
 
 use taiga_halo2::{
-    circuit::vp_examples::{
+    circuit::resource_logic_examples::{
         signature_verification::COMPRESSED_TOKEN_AUTH_VK,
         token::{Token, TokenAuthorization},
     },
     compliance::ComplianceInfo,
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
-    resource::{Resource, ResourceValidityPredicates},
+    resource::{Resource, ResourceLogics},
     shielded_ptx::ShieldedPartialTransaction,
 };
 
@@ -65,12 +65,12 @@ pub fn create_token_swap_ptx<R: RngCore>(
         vec![compliance_1, compliance_2]
     };
 
-    // Create VPs
-    let (input_vps, output_vps) = {
+    // Create resource logics
+    let (input_resource_logics, output_resource_logics) = {
         let input_resources = [*input_resource.resource(), padding_input_resource];
         let output_resources = [*output_resource.resource(), padding_output_resource];
-        // Create the input token vps
-        let input_token_vps = input_resource.generate_input_token_vps(
+        // Create resource_logics for the input token
+        let input_token_resource_logics = input_resource.generate_input_token_resource_logics(
             &mut rng,
             input_auth,
             input_auth_sk,
@@ -78,34 +78,43 @@ pub fn create_token_swap_ptx<R: RngCore>(
             output_resources,
         );
 
-        // Create the output token vps
-        let output_token_vps = output_resource.generate_output_token_vps(
+        // Create resource logics for the output token
+        let output_token_resource_logics = output_resource.generate_output_token_resource_logics(
             &mut rng,
             output_auth,
             input_resources,
             output_resources,
         );
 
-        // Create the padding input vps
-        let padding_input_vps = ResourceValidityPredicates::create_input_padding_resource_vps(
-            &padding_input_resource,
-            input_resources,
-            output_resources,
-        );
+        // Create resource logics for the padding input
+        let padding_input_resource_logics =
+            ResourceLogics::create_input_padding_resource_resource_logics(
+                &padding_input_resource,
+                input_resources,
+                output_resources,
+            );
 
-        // Create the padding output vps
-        let padding_output_vps = ResourceValidityPredicates::create_output_padding_resource_vps(
-            &padding_output_resource,
-            input_resources,
-            output_resources,
-        );
+        // Create resource logics for the padding output
+        let padding_output_resource_logics =
+            ResourceLogics::create_output_padding_resource_resource_logics(
+                &padding_output_resource,
+                input_resources,
+                output_resources,
+            );
 
         (
-            vec![input_token_vps, padding_input_vps],
-            vec![output_token_vps, padding_output_vps],
+            vec![input_token_resource_logics, padding_input_resource_logics],
+            vec![output_token_resource_logics, padding_output_resource_logics],
         )
     };
 
     // Create shielded partial tx
-    ShieldedPartialTransaction::build(compliances, input_vps, output_vps, vec![], &mut rng).unwrap()
+    ShieldedPartialTransaction::build(
+        compliances,
+        input_resource_logics,
+        output_resource_logics,
+        vec![],
+        &mut rng,
+    )
+    .unwrap()
 }

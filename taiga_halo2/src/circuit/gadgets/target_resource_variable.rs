@@ -1,4 +1,4 @@
-use crate::circuit::vp_circuit::ResourceSearchableVariablePair;
+use crate::circuit::resource_logic_circuit::ResourceSearchableVariablePair;
 use crate::constant::NUM_RESOURCE;
 use halo2_gadgets::utilities::bool_check;
 use halo2_proofs::{

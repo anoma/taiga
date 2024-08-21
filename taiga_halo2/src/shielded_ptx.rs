@@ -1,8 +1,8 @@
-use crate::circuit::vp_circuit::{VPVerifyingInfo, ValidityPredicate};
+use crate::circuit::resource_logic_circuit::{ResourceLogic, ResourceLogicVerifyingInfo};
 use crate::compliance::{ComplianceInfo, CompliancePublicInputs};
 use crate::constant::{
     COMPLIANCE_CIRCUIT_PARAMS_SIZE, COMPLIANCE_PROVING_KEY, COMPLIANCE_VERIFYING_KEY,
-    MAX_DYNAMIC_VP_NUM, NUM_RESOURCE, SETUP_PARAMS_MAP,
+    MAX_DYNAMIC_RESOURCE_LOGIC_NUM, NUM_RESOURCE, SETUP_PARAMS_MAP,
 };
 use crate::delta_commitment::DeltaCommitment;
 use crate::error::TransactionError;
@@ -10,7 +10,7 @@ use crate::executable::Executable;
 use crate::merkle_tree::Anchor;
 use crate::nullifier::Nullifier;
 use crate::proof::Proof;
-use crate::resource::{ResourceCommitment, ResourceValidityPredicates};
+use crate::resource::{ResourceCommitment, ResourceLogics};
 use halo2_proofs::plonk::Error;
 use pasta_curves::pallas;
 use rand::RngCore;
@@ -21,7 +21,7 @@ use rustler::{Decoder, Encoder, Env, NifResult, NifStruct, Term};
 #[cfg(feature = "serde")]
 use serde;
 
-use crate::circuit::vp_bytecode::ApplicationByteCode;
+use crate::circuit::resource_logic_bytecode::ApplicationByteCode;
 #[cfg(feature = "borsh")]
 use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg(feature = "borsh")]
@@ -31,8 +31,8 @@ use ff::PrimeField;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ShieldedPartialTransaction {
     compliances: [ComplianceVerifyingInfo; NUM_RESOURCE],
-    inputs: [ResourceVPVerifyingInfoSet; NUM_RESOURCE],
-    outputs: [ResourceVPVerifyingInfoSet; NUM_RESOURCE],
+    inputs: [ResourceLogicVerifyingInfoSet; NUM_RESOURCE],
+    outputs: [ResourceLogicVerifyingInfoSet; NUM_RESOURCE],
     binding_sig_r: Option<pallas::Scalar>,
     hints: Vec<u8>,
 }
@@ -52,11 +52,11 @@ pub struct ComplianceVerifyingInfo {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "nif", derive(NifStruct))]
 #[cfg_attr(feature = "nif", module = "Taiga.Resource.VerifyingInfo")]
-pub struct ResourceVPVerifyingInfoSet {
-    app_vp_verifying_info: VPVerifyingInfo,
-    app_dynamic_vp_verifying_info: Vec<VPVerifyingInfo>,
-    // TODO: add verifier proof and according public inputs.
-    // When the verifier proof is added, we may need to reconsider the structure of `VPVerifyingInfo`
+pub struct ResourceLogicVerifyingInfoSet {
+    app_resource_logic_verifying_info: ResourceLogicVerifyingInfo,
+    app_dynamic_resource_logic_verifying_info: Vec<ResourceLogicVerifyingInfo>,
+    // TODO function privacy: add verifier proof and the corresponding public inputs.
+    // When the verifier proof is added, we may need to reconsider the structure of `ResourceLogicVerifyingInfo`
 }
 
 // Is easier to derive traits for
@@ -65,8 +65,8 @@ pub struct ResourceVPVerifyingInfoSet {
 #[cfg_attr(feature = "nif", module = "Taiga.Shielded.PTX")]
 struct ShieldedPartialTransactionProxy {
     compliances: Vec<ComplianceVerifyingInfo>,
-    inputs: Vec<ResourceVPVerifyingInfoSet>,
-    outputs: Vec<ResourceVPVerifyingInfoSet>,
+    inputs: Vec<ResourceLogicVerifyingInfoSet>,
+    outputs: Vec<ResourceLogicVerifyingInfoSet>,
     binding_sig_r: Option<pallas::Scalar>,
     hints: Vec<u8>,
 }
@@ -107,8 +107,8 @@ impl ShieldedPartialTransaction {
 
     pub fn build<R: RngCore>(
         compliance_pairs: Vec<ComplianceInfo>,
-        input_resource_vps: Vec<ResourceValidityPredicates>,
-        output_resource_vps: Vec<ResourceValidityPredicates>,
+        input_resource_resource_logics: Vec<ResourceLogics>,
+        output_resource_resource_logics: Vec<ResourceLogics>,
         hints: Vec<u8>,
         mut rng: R,
     ) -> Result<Self, Error> {
@@ -122,16 +122,16 @@ impl ShieldedPartialTransaction {
             })
             .collect();
 
-        // Generate input vp proofs
-        let inputs: Vec<ResourceVPVerifyingInfoSet> = input_resource_vps
+        // Generate input resource logic proofs
+        let inputs: Vec<ResourceLogicVerifyingInfoSet> = input_resource_resource_logics
             .iter()
-            .map(|input_resource_vp| input_resource_vp.build())
+            .map(|input_resource_resource_logic| input_resource_resource_logic.build())
             .collect();
 
-        // Generate output vp proofs
-        let outputs: Vec<ResourceVPVerifyingInfoSet> = output_resource_vps
+        // Generate output resource logic proofs
+        let outputs: Vec<ResourceLogicVerifyingInfoSet> = output_resource_resource_logics
             .iter()
-            .map(|output_resource_vp| output_resource_vp.build())
+            .map(|output_resource_resource_logic| output_resource_resource_logic.build())
             .collect();
 
         Ok(Self {
@@ -150,11 +150,11 @@ impl ShieldedPartialTransaction {
             verifying_info.verify()?;
         }
 
-        // Verify vp proofs from input resources
+        // Verify resource logic proofs of input resources
         for verifying_info in self.inputs.iter() {
             verifying_info.verify()?;
         }
-        // Verify vp proofs from output resources
+        // Verify resource logic proofs of output resources
         for verifying_info in self.outputs.iter() {
             verifying_info.verify()?;
         }
@@ -166,9 +166,9 @@ impl ShieldedPartialTransaction {
     fn check_nullifiers(&self) -> Result<(), TransactionError> {
         assert_eq!(NUM_RESOURCE, 2);
         let compliance_nfs = self.get_nullifiers();
-        for vp_info in self.inputs.iter().chain(self.outputs.iter()) {
-            for nfs in vp_info.get_nullifiers().iter() {
-                // Check the vp actually uses the input resources from compliance circuits.
+        for resource_logic_info in self.inputs.iter().chain(self.outputs.iter()) {
+            for nfs in resource_logic_info.get_nullifiers().iter() {
+                // Check the resource logic actually uses the input resources from compliance circuits.
                 if !((compliance_nfs[0].inner() == nfs[0] && compliance_nfs[1].inner() == nfs[1])
                     || (compliance_nfs[0].inner() == nfs[1] && compliance_nfs[1].inner() == nfs[0]))
                 {
@@ -177,16 +177,22 @@ impl ShieldedPartialTransaction {
             }
         }
 
-        for (vp_info, compliance_nf) in self.inputs.iter().zip(compliance_nfs.iter()) {
-            // Check the app vp and the sub vps use the same owned_resource_id in one resource
-            let owned_resource_id = vp_info.app_vp_verifying_info.get_owned_resource_id();
-            for logic_vp_verifying_info in vp_info.app_dynamic_vp_verifying_info.iter() {
-                if owned_resource_id != logic_vp_verifying_info.get_owned_resource_id() {
+        for (resource_logic_info, compliance_nf) in self.inputs.iter().zip(compliance_nfs.iter()) {
+            // Check the app resource logic and the sub resource logics use the same owned_resource_id in one resource
+            let owned_resource_id = resource_logic_info
+                .app_resource_logic_verifying_info
+                .get_owned_resource_id();
+            for logic_resource_logic_verifying_info in resource_logic_info
+                .app_dynamic_resource_logic_verifying_info
+                .iter()
+            {
+                if owned_resource_id != logic_resource_logic_verifying_info.get_owned_resource_id()
+                {
                     return Err(TransactionError::InconsistentOwnedResourceID);
                 }
             }
 
-            // Check the owned_resource_id that vp uses is consistent with the nf from the compliance circuit
+            // Check the owned_resource_id that resource logic uses is consistent with the nf from the compliance circuit
             if owned_resource_id != compliance_nf.inner() {
                 return Err(TransactionError::InconsistentOwnedResourceID);
             }
@@ -198,9 +204,9 @@ impl ShieldedPartialTransaction {
     fn check_resource_commitments(&self) -> Result<(), TransactionError> {
         assert_eq!(NUM_RESOURCE, 2);
         let compliance_cms = self.get_output_cms();
-        for vp_info in self.inputs.iter().chain(self.outputs.iter()) {
-            for cms in vp_info.get_resource_commitments().iter() {
-                // Check the vp actually uses the output resources from compliance circuits.
+        for resource_logic_info in self.inputs.iter().chain(self.outputs.iter()) {
+            for cms in resource_logic_info.get_resource_commitments().iter() {
+                // Check the resource logic actually uses the output resources from compliance circuits.
                 if !((compliance_cms[0] == cms[0] && compliance_cms[1] == cms[1])
                     || (compliance_cms[0] == cms[1] && compliance_cms[1] == cms[0]))
                 {
@@ -209,16 +215,22 @@ impl ShieldedPartialTransaction {
             }
         }
 
-        for (vp_info, compliance_cm) in self.outputs.iter().zip(compliance_cms.iter()) {
-            // Check that the app vp and the sub vps use the same owned_resource_id in one resource
-            let owned_resource_id = vp_info.app_vp_verifying_info.get_owned_resource_id();
-            for logic_vp_verifying_info in vp_info.app_dynamic_vp_verifying_info.iter() {
-                if owned_resource_id != logic_vp_verifying_info.get_owned_resource_id() {
+        for (resource_logic_info, compliance_cm) in self.outputs.iter().zip(compliance_cms.iter()) {
+            // Check that the app resource logic and the sub resource_logics use the same owned_resource_id in one resource
+            let owned_resource_id = resource_logic_info
+                .app_resource_logic_verifying_info
+                .get_owned_resource_id();
+            for logic_resource_logic_verifying_info in resource_logic_info
+                .app_dynamic_resource_logic_verifying_info
+                .iter()
+            {
+                if owned_resource_id != logic_resource_logic_verifying_info.get_owned_resource_id()
+                {
                     return Err(TransactionError::InconsistentOwnedResourceID);
                 }
             }
 
-            // Check the owned_resource_id that vp uses is consistent with the cm from the compliance circuit
+            // Check the owned_resource_id that resource logic uses is consistent with the cm from the compliance circuit
             if owned_resource_id != compliance_cm.inner() {
                 return Err(TransactionError::InconsistentOwnedResourceID);
             }
@@ -344,10 +356,10 @@ impl BorshDeserialize for ShieldedPartialTransaction {
             .map(|_| ComplianceVerifyingInfo::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
         let inputs: Vec<_> = (0..NUM_RESOURCE)
-            .map(|_| ResourceVPVerifyingInfoSet::deserialize_reader(reader))
+            .map(|_| ResourceLogicVerifyingInfoSet::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
         let outputs: Vec<_> = (0..NUM_RESOURCE)
-            .map(|_| ResourceVPVerifyingInfoSet::deserialize_reader(reader))
+            .map(|_| ResourceLogicVerifyingInfoSet::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
         let binding_sig_r_type = reader.read_u8()?;
         let binding_sig_r = if binding_sig_r_type == 0 {
@@ -415,66 +427,70 @@ impl ComplianceVerifyingInfo {
     }
 }
 
-impl ResourceVPVerifyingInfoSet {
+impl ResourceLogicVerifyingInfoSet {
     pub fn new(
-        app_vp_verifying_info: VPVerifyingInfo,
-        app_dynamic_vp_verifying_info: Vec<VPVerifyingInfo>,
+        app_resource_logic_verifying_info: ResourceLogicVerifyingInfo,
+        app_dynamic_resource_logic_verifying_info: Vec<ResourceLogicVerifyingInfo>,
     ) -> Self {
-        assert!(app_dynamic_vp_verifying_info.len() <= MAX_DYNAMIC_VP_NUM);
+        assert!(app_dynamic_resource_logic_verifying_info.len() <= MAX_DYNAMIC_RESOURCE_LOGIC_NUM);
 
         Self {
-            app_vp_verifying_info,
-            app_dynamic_vp_verifying_info,
+            app_resource_logic_verifying_info,
+            app_dynamic_resource_logic_verifying_info,
         }
     }
 
     // TODO: remove it.
     pub fn build(
-        application_vp: Box<ValidityPredicate>,
-        dynamic_vps: Vec<Box<ValidityPredicate>>,
+        application_resource_logic: Box<ResourceLogic>,
+        dynamic_resource_logics: Vec<Box<ResourceLogic>>,
     ) -> Self {
-        assert!(dynamic_vps.len() <= MAX_DYNAMIC_VP_NUM);
+        assert!(dynamic_resource_logics.len() <= MAX_DYNAMIC_RESOURCE_LOGIC_NUM);
 
-        let app_vp_verifying_info = application_vp.get_verifying_info();
+        let app_resource_logic_verifying_info = application_resource_logic.get_verifying_info();
 
-        let app_dynamic_vp_verifying_info = dynamic_vps
+        let app_dynamic_resource_logic_verifying_info = dynamic_resource_logics
             .into_iter()
             .map(|verifying_info| verifying_info.get_verifying_info())
             .collect();
 
         Self {
-            app_vp_verifying_info,
-            app_dynamic_vp_verifying_info,
+            app_resource_logic_verifying_info,
+            app_dynamic_resource_logic_verifying_info,
         }
     }
 
     pub fn verify(&self) -> Result<(), Error> {
-        // Verify application vp proof
-        self.app_vp_verifying_info.verify()?;
+        // Verify the application resource logic proof
+        self.app_resource_logic_verifying_info.verify()?;
 
-        // Verify application dynamic vp proofs
-        for verify_info in self.app_dynamic_vp_verifying_info.iter() {
+        // Verify application dynamic resource logic proofs
+        for verify_info in self.app_dynamic_resource_logic_verifying_info.iter() {
             verify_info.verify()?;
         }
 
-        // TODO: Verify vp verifier proofs
+        // TODO function privacy: Verify resource logic verifier proofs
 
         Ok(())
     }
 
     pub fn get_nullifiers(&self) -> Vec<[pallas::Base; NUM_RESOURCE]> {
-        let mut nfs = vec![self.app_vp_verifying_info.get_nullifiers()];
-        self.app_dynamic_vp_verifying_info
+        let mut nfs = vec![self.app_resource_logic_verifying_info.get_nullifiers()];
+        self.app_dynamic_resource_logic_verifying_info
             .iter()
-            .for_each(|vp_info| nfs.push(vp_info.get_nullifiers()));
+            .for_each(|resource_logic_info| nfs.push(resource_logic_info.get_nullifiers()));
         nfs
     }
 
     pub fn get_resource_commitments(&self) -> Vec<[ResourceCommitment; NUM_RESOURCE]> {
-        let mut cms = vec![self.app_vp_verifying_info.get_resource_commitments()];
-        self.app_dynamic_vp_verifying_info
+        let mut cms = vec![self
+            .app_resource_logic_verifying_info
+            .get_resource_commitments()];
+        self.app_dynamic_resource_logic_verifying_info
             .iter()
-            .for_each(|vp_info| cms.push(vp_info.get_resource_commitments()));
+            .for_each(|resource_logic_info| {
+                cms.push(resource_logic_info.get_resource_commitments())
+            });
         cms
     }
 }
@@ -482,13 +498,13 @@ impl ResourceVPVerifyingInfoSet {
 #[cfg(test)]
 pub mod testing {
     use crate::{
-        circuit::vp_circuit::{ValidityPredicate, ValidityPredicateVerifyingInfo},
-        circuit::vp_examples::TrivialValidityPredicateCircuit,
+        circuit::resource_logic_circuit::{ResourceLogic, ResourceLogicVerifyingInfoTrait},
+        circuit::resource_logic_examples::TrivialResourceLogicCircuit,
         compliance::ComplianceInfo,
         constant::TAIGA_COMMITMENT_TREE_DEPTH,
         merkle_tree::MerklePath,
         nullifier::Nullifier,
-        resource::{Resource, ResourceValidityPredicates},
+        resource::{Resource, ResourceLogics},
         shielded_ptx::ShieldedPartialTransaction,
         utils::poseidon_hash,
     };
@@ -499,27 +515,33 @@ pub mod testing {
     pub fn create_shielded_ptx() -> ShieldedPartialTransaction {
         let mut rng = OsRng;
 
-        // Create empty VP circuit without resource info
-        let trivial_vp_circuit = TrivialValidityPredicateCircuit::default();
-        let trivial_vp_vk = trivial_vp_circuit.get_vp_vk();
-        let compressed_trivial_vp_vk = trivial_vp_vk.get_compressed();
+        // Create empty resource logic circuit without resource info
+        let trivial_resource_logic_circuit = TrivialResourceLogicCircuit::default();
+        let trivial_resource_logic_vk = trivial_resource_logic_circuit.get_resource_logic_vk();
+        let compressed_trivial_resource_logic_vk = trivial_resource_logic_vk.get_compressed();
 
         // Generate resources
         let input_resource_1 = {
             let label = pallas::Base::zero();
-            // TODO: add real application dynamic VPs and encode them to value later.
-            let app_dynamic_vp_vk = [compressed_trivial_vp_vk, compressed_trivial_vp_vk];
-            // Encode the app_dynamic_vp_vk into value
-            // The encoding method is flexible and defined in the application vp.
-            // Use poseidon hash to encode the two dynamic VPs here
-            let value = poseidon_hash(app_dynamic_vp_vk[0], app_dynamic_vp_vk[1]);
+            // TODO: add real application dynamic resource logics and encode them to value later.
+            let app_dynamic_resource_logic_vk = [
+                compressed_trivial_resource_logic_vk,
+                compressed_trivial_resource_logic_vk,
+            ];
+            // Encode the app_dynamic_resource_logic_vk into value
+            // The encoding method is flexible and defined in the application resource logic.
+            // Use poseidon hash to encode the two dynamic resource logics here
+            let value = poseidon_hash(
+                app_dynamic_resource_logic_vk[0],
+                app_dynamic_resource_logic_vk[1],
+            );
             let nonce = Nullifier::from(pallas::Base::random(&mut rng));
             let quantity = 5000u64;
             let nk = pallas::Base::random(&mut rng);
             let rseed = pallas::Base::random(&mut rng);
             let is_ephemeral = false;
             Resource::new_input_resource(
-                compressed_trivial_vp_vk,
+                compressed_trivial_resource_logic_vk,
                 label,
                 value,
                 quantity,
@@ -531,15 +553,15 @@ pub mod testing {
         };
         let mut output_resource_1 = {
             let label = pallas::Base::zero();
-            // TODO: add real application dynamic VPs and encode them to value later.
-            // If the dynamic VP is not used, set value pallas::Base::zero() by default.
+            // TODO: add real application dynamic resource logics and encode them to value later.
+            // If the dynamic resource logic is not used, set value pallas::Base::zero() by default.
             let value = pallas::Base::zero();
             let quantity = 5000u64;
             let npk = pallas::Base::random(&mut rng);
             let rseed = pallas::Base::random(&mut rng);
             let is_ephemeral = false;
             Resource::new_output_resource(
-                compressed_trivial_vp_vk,
+                compressed_trivial_resource_logic_vk,
                 label,
                 value,
                 quantity,
@@ -569,7 +591,7 @@ pub mod testing {
             let rseed = pallas::Base::random(&mut rng);
             let is_ephemeral = false;
             Resource::new_input_resource(
-                compressed_trivial_vp_vk,
+                compressed_trivial_resource_logic_vk,
                 label,
                 value,
                 quantity,
@@ -587,7 +609,7 @@ pub mod testing {
             let rseed = pallas::Base::random(&mut rng);
             let is_ephemeral = false;
             Resource::new_output_resource(
-                compressed_trivial_vp_vk,
+                compressed_trivial_resource_logic_vk,
                 label,
                 value,
                 quantity,
@@ -607,39 +629,50 @@ pub mod testing {
             &mut rng,
         );
 
-        // Create vp circuit and fill the resource info
-        let mut trivial_vp_circuit = TrivialValidityPredicateCircuit {
+        // Create resource logic circuit and fill the resource info
+        let mut trivial_resource_logic_circuit = TrivialResourceLogicCircuit {
             owned_resource_id: input_resource_1.get_nf().unwrap().inner(),
             input_resources: [input_resource_1, input_resource_2],
             output_resources: [output_resource_1, output_resource_2],
         };
-        let input_application_vp_1 = Box::new(trivial_vp_circuit.clone());
-        let trivial_app_logic_1: Box<ValidityPredicate> = Box::new(trivial_vp_circuit.clone());
-        let trivial_app_logic_2 = Box::new(trivial_vp_circuit.clone());
-        let trivial_dynamic_vps = vec![trivial_app_logic_1, trivial_app_logic_2];
-        let input_resource_1_vps =
-            ResourceValidityPredicates::new(input_application_vp_1, trivial_dynamic_vps);
+        let input_application_resource_logic_1 = Box::new(trivial_resource_logic_circuit.clone());
+        let trivial_app_logic_1: Box<ResourceLogic> =
+            Box::new(trivial_resource_logic_circuit.clone());
+        let trivial_app_logic_2 = Box::new(trivial_resource_logic_circuit.clone());
+        let trivial_dynamic_resource_logics = vec![trivial_app_logic_1, trivial_app_logic_2];
+        let input_resource_1_resource_logics = ResourceLogics::new(
+            input_application_resource_logic_1,
+            trivial_dynamic_resource_logics,
+        );
 
-        // The following resources use empty logic vps and use value with pallas::Base::zero() by default.
-        trivial_vp_circuit.owned_resource_id = input_resource_2.get_nf().unwrap().inner();
-        let input_application_vp_2 = Box::new(trivial_vp_circuit.clone());
-        let input_resource_2_vps = ResourceValidityPredicates::new(input_application_vp_2, vec![]);
+        // The following resources use empty logic resource_logics and use value with pallas::Base::zero() by default.
+        trivial_resource_logic_circuit.owned_resource_id =
+            input_resource_2.get_nf().unwrap().inner();
+        let input_application_resource_logic_2 = Box::new(trivial_resource_logic_circuit.clone());
+        let input_resource_2_resource_logics =
+            ResourceLogics::new(input_application_resource_logic_2, vec![]);
 
-        trivial_vp_circuit.owned_resource_id = output_resource_1.commitment().inner();
-        let output_application_vp_1 = Box::new(trivial_vp_circuit.clone());
-        let output_resource_1_vps =
-            ResourceValidityPredicates::new(output_application_vp_1, vec![]);
+        trivial_resource_logic_circuit.owned_resource_id = output_resource_1.commitment().inner();
+        let output_application_resource_logic_1 = Box::new(trivial_resource_logic_circuit.clone());
+        let output_resource_1_resource_logics =
+            ResourceLogics::new(output_application_resource_logic_1, vec![]);
 
-        trivial_vp_circuit.owned_resource_id = output_resource_2.commitment().inner();
-        let output_application_vp_2 = Box::new(trivial_vp_circuit);
-        let output_resource_2_vps =
-            ResourceValidityPredicates::new(output_application_vp_2, vec![]);
+        trivial_resource_logic_circuit.owned_resource_id = output_resource_2.commitment().inner();
+        let output_application_resource_logic_2 = Box::new(trivial_resource_logic_circuit);
+        let output_resource_2_resource_logics =
+            ResourceLogics::new(output_application_resource_logic_2, vec![]);
 
         // Create shielded partial tx
         ShieldedPartialTransaction::build(
             vec![compliance_1, compliance_2],
-            vec![input_resource_1_vps, input_resource_2_vps],
-            vec![output_resource_1_vps, output_resource_2_vps],
+            vec![
+                input_resource_1_resource_logics,
+                input_resource_2_resource_logics,
+            ],
+            vec![
+                output_resource_1_resource_logics,
+                output_resource_2_resource_logics,
+            ],
             vec![],
             &mut rng,
         )

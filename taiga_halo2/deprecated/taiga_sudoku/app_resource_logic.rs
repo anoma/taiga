@@ -17,18 +17,18 @@ use taiga_halo2::{
             triple_mul::TripleMulConfig,
         },
         resource_circuit::ResourceConfig,
-        vp_circuit::{
-            BasicValidityPredicateVariables, InputResourceVariables, OutputResourceVariables,
-            VPVerifyingInfo, ValidityPredicateCircuit, ValidityPredicateConfig,
-            ValidityPredicateInfo, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
+        resource_logic_circuit::{
+            BasicResourceLogicVariables, InputResourceVariables, OutputResourceVariables,
+            ResourceLogicVerifyingInfoTrait, ResourceLogicCircuit, ResourceLogicConfig,
+            ResourceLogicInfo, ResourceLogicPublicInputs, ResourceLogicVerifyingInfo,
         },
     },
     constant::{NUM_RESOURCE, SETUP_PARAMS_MAP},
     resource::{Resource, RandomSeed},
     proof::Proof,
     utils::poseidon_hash,
-    vp_circuit_impl,
-    vp_vk::ValidityPredicateVerifyingKey,
+    resource_logic_circuit_impl,
+    resource_logic_vk::ResourceLogicVerifyingKey,
 };
 
 use crate::gadgets::{
@@ -106,7 +106,7 @@ impl Default for SudokuState {
 }
 
 #[derive(Clone, Debug, Default)]
-struct SudokuAppValidityPredicateCircuit {
+struct SudokuAppResourceLogicCircuit {
     owned_resource_id: pallas::Base,
     input_resources: [Resource; NUM_RESOURCE],
     output_resources: [Resource; NUM_RESOURCE],
@@ -118,7 +118,7 @@ struct SudokuAppValidityPredicateCircuit {
 }
 
 #[derive(Clone, Debug)]
-struct SudokuAppValidityPredicateConfig {
+struct SudokuAppResourceLogicConfig {
     resource_config: ResourceConfig,
     advices: [Column<Advice>; 10],
     get_is_input_resource_flag_config: GetIsInputResourceFlagConfig,
@@ -130,7 +130,7 @@ struct SudokuAppValidityPredicateConfig {
     mul_config: MulConfig,
 }
 
-impl SudokuAppValidityPredicateConfig {
+impl SudokuAppResourceLogicConfig {
     pub fn sub_chip(&self) -> SubChip<pallas::Base> {
         SubChip::construct(self.sub_config.clone(), ())
     }
@@ -140,7 +140,7 @@ impl SudokuAppValidityPredicateConfig {
     }
 }
 
-impl ValidityPredicateConfig for SudokuAppValidityPredicateConfig {
+impl ResourceLogicConfig for SudokuAppResourceLogicConfig {
     fn get_resource_config(&self) -> ResourceConfig {
         self.resource_config.clone()
     }
@@ -176,12 +176,12 @@ impl ValidityPredicateConfig for SudokuAppValidityPredicateConfig {
     }
 }
 
-impl SudokuAppValidityPredicateCircuit {
+impl SudokuAppResourceLogicCircuit {
     // Copy from valid_puzzle/circuit.rs
     #[allow(clippy::too_many_arguments)]
     fn check_puzzle(
         mut layouter: impl Layouter<pallas::Base>,
-        config: &SudokuAppValidityPredicateConfig,
+        config: &SudokuAppResourceLogicConfig,
         // advice: Column<Advice>,
         state: &[AssignedCell<pallas::Base, pallas::Base>],
     ) -> Result<(), Error> {
@@ -434,7 +434,7 @@ impl SudokuAppValidityPredicateCircuit {
     }
 }
 
-impl ValidityPredicateInfo for SudokuAppValidityPredicateCircuit {
+impl ResourceLogicInfo for SudokuAppResourceLogicCircuit {
     fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE] {
         &self.input_resources
     }
@@ -443,9 +443,9 @@ impl ValidityPredicateInfo for SudokuAppValidityPredicateCircuit {
         &self.output_resources
     }
 
-    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
+    fn get_public_inputs(&self, mut rng: impl RngCore) -> ResourceLogicPublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
-        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
+        let padding = ResourceLogicPublicInputs::get_public_input_padding(
             public_inputs.len(),
             &RandomSeed::random(&mut rng),
         );
@@ -458,14 +458,14 @@ impl ValidityPredicateInfo for SudokuAppValidityPredicateCircuit {
     }
 }
 
-impl ValidityPredicateCircuit for SudokuAppValidityPredicateCircuit {
-    type VPConfig = SudokuAppValidityPredicateConfig;
+impl ResourceLogicCircuit for SudokuAppResourceLogicCircuit {
+    type ResourceLogicConfig = SudokuAppResourceLogicConfig;
     // Add custom constraints
     fn custom_constraints(
         &self,
-        config: Self::VPConfig,
+        config: Self::ResourceLogicConfig,
         mut layouter: impl Layouter<pallas::Base>,
-        basic_variables: BasicValidityPredicateVariables,
+        basic_variables: BasicResourceLogicVariables,
     ) -> Result<(), Error> {
         let owned_resource_id = basic_variables.get_owned_resource_id();
         let is_input_resource = get_is_input_resource_flag(
@@ -589,7 +589,7 @@ impl ValidityPredicateCircuit for SudokuAppValidityPredicateCircuit {
     }
 }
 
-vp_circuit_impl!(SudokuAppValidityPredicateCircuit);
+resource_logic_circuit_impl!(SudokuAppResourceLogicCircuit);
 
 #[cfg(test)]
 pub mod tests {
@@ -648,8 +648,8 @@ pub mod tests {
 }
 
 #[test]
-fn test_halo2_sudoku_app_vp_circuit_init() {
-    use crate::app_vp::tests::{random_input_resource, random_output_resource};
+fn test_halo2_sudoku_app_resource_logic_circuit_init() {
+    use crate::app_resource_logic::tests::{random_input_resource, random_output_resource};
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
@@ -667,7 +667,7 @@ fn test_halo2_sudoku_app_vp_circuit_init() {
             poseidon_hash(encoded_init_state, current_state.encode());
         output_resources[0].quantity = 1u64;
         let owned_resource_id = output_resources[0].commitment().inner();
-        SudokuAppValidityPredicateCircuit {
+        SudokuAppResourceLogicCircuit {
             owned_resource_id,
             input_resources,
             output_resources: output_resources.try_into().unwrap(),
@@ -684,8 +684,8 @@ fn test_halo2_sudoku_app_vp_circuit_init() {
 }
 
 #[test]
-fn test_halo2_sudoku_app_vp_circuit_update() {
-    use crate::app_vp::tests::{random_input_resource, random_output_resource};
+fn test_halo2_sudoku_app_resource_logic_circuit_update() {
+    use crate::app_resource_logic::tests::{random_input_resource, random_output_resource};
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
@@ -744,7 +744,7 @@ fn test_halo2_sudoku_app_vp_circuit_update() {
             poseidon_hash(encoded_init_state, current_state.encode());
         output_resources[0].quantity = 1u64;
         output_resources[0].kind.app_vk = input_resources[0].kind.app_vk;
-        SudokuAppValidityPredicateCircuit {
+        SudokuAppResourceLogicCircuit {
             owned_resource_id: input_resources[0].get_nf().unwrap().inner(),
             input_resources,
             output_resources: output_resources.try_into().unwrap(),
@@ -761,8 +761,8 @@ fn test_halo2_sudoku_app_vp_circuit_update() {
 }
 
 #[test]
-fn halo2_sudoku_app_vp_circuit_final() {
-    use crate::app_vp::tests::{random_input_resource, random_output_resource};
+fn halo2_sudoku_app_resource_logic_circuit_final() {
+    use crate::app_resource_logic::tests::{random_input_resource, random_output_resource};
     use halo2_proofs::dev::MockProver;
 
     let mut rng = OsRng;
@@ -820,7 +820,7 @@ fn halo2_sudoku_app_vp_circuit_final() {
             poseidon_hash(encoded_init_state, current_state.encode());
         output_resources[0].quantity = 0u64;
         output_resources[0].kind.app_vk = input_resources[0].kind.app_vk;
-        SudokuAppValidityPredicateCircuit {
+        SudokuAppResourceLogicCircuit {
             owned_resource_id: input_resources[0].get_nf().unwrap().inner(),
             input_resources,
             output_resources: output_resources.try_into().unwrap(),

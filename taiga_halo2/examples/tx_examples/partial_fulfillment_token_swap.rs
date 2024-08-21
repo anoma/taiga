@@ -9,8 +9,8 @@ use halo2_proofs::arithmetic::Field;
 use pasta_curves::{group::Curve, pallas};
 use rand::{CryptoRng, RngCore};
 use taiga_halo2::{
-    circuit::vp_examples::{
-        partial_fulfillment_intent::{PartialFulfillmentIntentValidityPredicateCircuit, Swap},
+    circuit::resource_logic_examples::{
+        partial_fulfillment_intent::{PartialFulfillmentIntentResourceLogicCircuit, Swap},
         signature_verification::COMPRESSED_TOKEN_AUTH_VK,
         token::{Token, TokenAuthorization, TokenResource},
     },
@@ -18,7 +18,7 @@ use taiga_halo2::{
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
     nullifier::NullifierKeyContainer,
-    resource::{Resource, ResourceValidityPredicates},
+    resource::{Resource, ResourceLogics},
     shielded_ptx::ShieldedPartialTransaction,
     transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
 };
@@ -60,12 +60,12 @@ pub fn create_token_intent_ptx<R: RngCore>(
         vec![compliance_1, compliance_2]
     };
 
-    // Create VPs
-    let (input_vps, output_vps) = {
+    // Create resource logics
+    let (input_resource_logics, output_resource_logics) = {
         let input_resources = [*swap.sell.resource(), padding_input_resource];
         let output_resources = [intent_resource, padding_output_resource];
-        // Create the input token vps
-        let input_token_vps = swap.sell.generate_input_token_vps(
+        // Create resource_logics for the input token
+        let input_token_resource_logics = swap.sell.generate_input_token_resource_logics(
             &mut rng,
             input_auth,
             input_auth_sk,
@@ -73,42 +73,49 @@ pub fn create_token_intent_ptx<R: RngCore>(
             output_resources,
         );
 
-        // Create the intent vps
-        let intent_vps = {
-            let intent_vp = PartialFulfillmentIntentValidityPredicateCircuit {
+        // Create resource_logics for the intent
+        let intent_resource_logics = {
+            let intent_resource_logic = PartialFulfillmentIntentResourceLogicCircuit {
                 owned_resource_id: intent_resource.commitment().inner(),
                 input_resources,
                 output_resources,
                 swap: swap.clone(),
             };
 
-            ResourceValidityPredicates::new(Box::new(intent_vp), vec![])
+            ResourceLogics::new(Box::new(intent_resource_logic), vec![])
         };
 
-        // Create the padding input vps
-        let padding_input_vps = ResourceValidityPredicates::create_input_padding_resource_vps(
-            &padding_input_resource,
-            input_resources,
-            output_resources,
-        );
+        // Create resource_logics for the padding input
+        let padding_input_resource_logics =
+            ResourceLogics::create_input_padding_resource_resource_logics(
+                &padding_input_resource,
+                input_resources,
+                output_resources,
+            );
 
-        // Create the padding output vps
-        let padding_output_vps = ResourceValidityPredicates::create_output_padding_resource_vps(
-            &padding_output_resource,
-            input_resources,
-            output_resources,
-        );
+        // Create resource_logics the padding output
+        let padding_output_resource_logics =
+            ResourceLogics::create_output_padding_resource_resource_logics(
+                &padding_output_resource,
+                input_resources,
+                output_resources,
+            );
 
         (
-            vec![input_token_vps, padding_input_vps],
-            vec![intent_vps, padding_output_vps],
+            vec![input_token_resource_logics, padding_input_resource_logics],
+            vec![intent_resource_logics, padding_output_resource_logics],
         )
     };
 
     // Create shielded partial tx
-    let ptx =
-        ShieldedPartialTransaction::build(compliances, input_vps, output_vps, vec![], &mut rng)
-            .unwrap();
+    let ptx = ShieldedPartialTransaction::build(
+        compliances,
+        input_resource_logics,
+        output_resource_logics,
+        vec![],
+        &mut rng,
+    )
+    .unwrap();
 
     (ptx, swap, intent_resource)
 }
@@ -152,46 +159,47 @@ pub fn consume_token_intent_ptx<R: RngCore>(
         vec![compliance_1, compliance_2]
     };
 
-    // Create VPs
-    let (input_vps, output_vps) = {
+    // Create resource logics
+    let (input_resource_logics, output_resource_logics) = {
         let output_resources = [bought_resource, returned_resource];
-        // Create intent vps
-        let intent_vps = {
-            let intent_vp = PartialFulfillmentIntentValidityPredicateCircuit {
+        // Create resource_logics for the intent
+        let intent_resource_logics = {
+            let intent_resource_logic = PartialFulfillmentIntentResourceLogicCircuit {
                 owned_resource_id: intent_resource.get_nf().unwrap().inner(),
                 input_resources,
                 output_resources,
                 swap: swap.clone(),
             };
 
-            ResourceValidityPredicates::new(Box::new(intent_vp), vec![])
+            ResourceLogics::new(Box::new(intent_resource_logic), vec![])
         };
 
-        // Create bought_resource_vps
-        let bought_resource_vps = TokenResource {
+        // Create resource_logics for the bought_resource
+        let bought_resource_resource_logics = TokenResource {
             token_name: swap.buy.name().clone(),
             resource: bought_resource,
         }
-        .generate_output_token_vps(
+        .generate_output_token_resource_logics(
             &mut rng,
             output_auth,
             input_resources,
             output_resources,
         );
 
-        // Create the padding input vps
-        let padding_input_vps = ResourceValidityPredicates::create_input_padding_resource_vps(
-            &padding_input_resource,
-            input_resources,
-            output_resources,
-        );
+        // Create resource_logics for the padding input
+        let padding_input_resource_logics =
+            ResourceLogics::create_input_padding_resource_resource_logics(
+                &padding_input_resource,
+                input_resources,
+                output_resources,
+            );
 
-        // Create returned_resource_vps
-        let returned_resource_vps = TokenResource {
+        // Create resource_logics for the returned_resource
+        let returned_resource_resource_logics = TokenResource {
             token_name: swap.sell.token_name().clone(),
             resource: returned_resource,
         }
-        .generate_output_token_vps(
+        .generate_output_token_resource_logics(
             &mut rng,
             output_auth,
             input_resources,
@@ -199,13 +207,23 @@ pub fn consume_token_intent_ptx<R: RngCore>(
         );
 
         (
-            vec![intent_vps, padding_input_vps],
-            vec![bought_resource_vps, returned_resource_vps],
+            vec![intent_resource_logics, padding_input_resource_logics],
+            vec![
+                bought_resource_resource_logics,
+                returned_resource_resource_logics,
+            ],
         )
     };
 
     // Create shielded partial tx
-    ShieldedPartialTransaction::build(compliances, input_vps, output_vps, vec![], &mut rng).unwrap()
+    ShieldedPartialTransaction::build(
+        compliances,
+        input_resource_logics,
+        output_resource_logics,
+        vec![],
+        &mut rng,
+    )
+    .unwrap()
 }
 
 pub fn create_token_swap_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {

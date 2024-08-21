@@ -1,6 +1,6 @@
 use crate::{
     circuit::{
-        blake2s::publicize_default_dynamic_vp_commitments,
+        blake2s::publicize_default_dynamic_resource_logic_commitments,
         blake2s::Blake2sConfig,
         gadgets::{
             add::{AddChip, AddConfig},
@@ -19,20 +19,23 @@ use crate::{
         vamp_ir_utils::{get_circuit_assignments, parse, VariableAssignmentError},
     },
     constant::{
-        TaigaFixedBases, NUM_RESOURCE, RESOURCE_ENCRYPTION_CIPHERTEXT_NUM, SETUP_PARAMS_MAP,
-        VP_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX, VP_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX,
-        VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX, VP_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX,
-        VP_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX, VP_CIRCUIT_PARAMS_SIZE,
-        VP_CIRCUIT_PUBLIC_INPUT_NUM, VP_CIRCUIT_RESOURCE_ENCRYPTION_PK_X_IDX,
-        VP_CIRCUIT_RESOURCE_ENCRYPTION_PK_Y_IDX,
-        VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
+        TaigaFixedBases, NUM_RESOURCE, RESOURCE_ENCRYPTION_CIPHERTEXT_NUM,
+        RESOURCE_LOGIC_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX,
+        RESOURCE_LOGIC_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX,
+        RESOURCE_LOGIC_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX,
+        RESOURCE_LOGIC_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX,
+        RESOURCE_LOGIC_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX,
+        RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE, RESOURCE_LOGIC_CIRCUIT_PUBLIC_INPUT_NUM,
+        RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PK_X_IDX,
+        RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PK_Y_IDX,
+        RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX, SETUP_PARAMS_MAP,
     },
     error::TransactionError,
     proof::Proof,
     resource::{RandomSeed, Resource, ResourceCommitment},
     resource_encryption::{ResourceCiphertext, SecretKey},
+    resource_logic_vk::ResourceLogicVerifyingKey,
     utils::mod_r_p,
-    vp_vk::ValidityPredicateVerifyingKey,
 };
 use dyn_clone::{clone_trait_object, DynClone};
 use group::cofactor::CofactorCurveAffine;
@@ -74,11 +77,11 @@ use rustler::types::atom;
 #[cfg(feature = "nif")]
 use rustler::{Decoder, Encoder, Env, NifResult, Term};
 
-pub type ValidityPredicate = dyn ValidityPredicateVerifyingInfo;
+pub type ResourceLogic = dyn ResourceLogicVerifyingInfoTrait;
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct VPVerifyingInfo {
+pub struct ResourceLogicVerifyingInfo {
     #[cfg_attr(
         feature = "serde",
         serde(
@@ -88,14 +91,14 @@ pub struct VPVerifyingInfo {
     )]
     pub vk: VerifyingKey<vesta::Affine>,
     pub proof: Proof,
-    pub public_inputs: ValidityPredicatePublicInputs,
+    pub public_inputs: ResourceLogicPublicInputs,
 }
 
 #[cfg(feature = "nif")]
 rustler::atoms! {verifying_info}
 
 #[cfg(feature = "nif")]
-impl Encoder for VPVerifyingInfo {
+impl Encoder for ResourceLogicVerifyingInfo {
     fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
         (
             verifying_info().encode(env),
@@ -108,20 +111,22 @@ impl Encoder for VPVerifyingInfo {
 }
 
 #[cfg(feature = "nif")]
-impl<'a> Decoder<'a> for VPVerifyingInfo {
+impl<'a> Decoder<'a> for ResourceLogicVerifyingInfo {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         let (term, vk, proof, public_inputs): (
             atom::Atom,
             Vec<u8>,
             Proof,
-            ValidityPredicatePublicInputs,
+            ResourceLogicPublicInputs,
         ) = term.decode()?;
         if term == verifying_info() {
-            use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
-            let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
-            let vk = VerifyingKey::from_bytes::<TrivialValidityPredicateCircuit>(&vk, params)
+            use crate::circuit::resource_logic_examples::TrivialResourceLogicCircuit;
+            let params = SETUP_PARAMS_MAP
+                .get(&RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE)
+                .unwrap();
+            let vk = VerifyingKey::from_bytes::<TrivialResourceLogicCircuit>(&vk, params)
                 .map_err(|_e| rustler::Error::Atom("failure to decode"))?;
-            Ok(VPVerifyingInfo {
+            Ok(ResourceLogicVerifyingInfo {
                 vk,
                 proof,
                 public_inputs,
@@ -134,26 +139,28 @@ impl<'a> Decoder<'a> for VPVerifyingInfo {
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ValidityPredicatePublicInputs([pallas::Base; VP_CIRCUIT_PUBLIC_INPUT_NUM]);
+pub struct ResourceLogicPublicInputs([pallas::Base; RESOURCE_LOGIC_CIRCUIT_PUBLIC_INPUT_NUM]);
 
 #[cfg(feature = "nif")]
-impl Encoder for ValidityPredicatePublicInputs {
+impl Encoder for ResourceLogicPublicInputs {
     fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
         self.0.to_vec().encode(env)
     }
 }
 
 #[cfg(feature = "nif")]
-impl<'a> Decoder<'a> for ValidityPredicatePublicInputs {
+impl<'a> Decoder<'a> for ResourceLogicPublicInputs {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         let val: Vec<pallas::Base> = Decoder::decode(term)?;
         Ok(val.into())
     }
 }
 
-impl VPVerifyingInfo {
+impl ResourceLogicVerifyingInfo {
     pub fn verify(&self) -> Result<(), Error> {
-        let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
+        let params = SETUP_PARAMS_MAP
+            .get(&RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE)
+            .unwrap();
         self.proof
             .verify(&self.vk, params, &[self.public_inputs.inner()])
     }
@@ -161,31 +168,31 @@ impl VPVerifyingInfo {
     pub fn get_nullifiers(&self) -> [pallas::Base; NUM_RESOURCE] {
         [
             self.public_inputs
-                .get_from_index(VP_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX),
+                .get_from_index(RESOURCE_LOGIC_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX),
             self.public_inputs
-                .get_from_index(VP_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX),
+                .get_from_index(RESOURCE_LOGIC_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX),
         ]
     }
 
     pub fn get_resource_commitments(&self) -> [ResourceCommitment; NUM_RESOURCE] {
         [
             self.public_inputs
-                .get_from_index(VP_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX)
+                .get_from_index(RESOURCE_LOGIC_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX)
                 .into(),
             self.public_inputs
-                .get_from_index(VP_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX)
+                .get_from_index(RESOURCE_LOGIC_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX)
                 .into(),
         ]
     }
 
     pub fn get_owned_resource_id(&self) -> pallas::Base {
         self.public_inputs
-            .get_from_index(VP_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX)
+            .get_from_index(RESOURCE_LOGIC_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX)
     }
 }
 
 #[cfg(feature = "borsh")]
-impl BorshSerialize for VPVerifyingInfo {
+impl BorshSerialize for ResourceLogicVerifyingInfo {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         use ff::PrimeField;
         // Write vk
@@ -201,20 +208,22 @@ impl BorshSerialize for VPVerifyingInfo {
 }
 
 #[cfg(feature = "borsh")]
-impl BorshDeserialize for VPVerifyingInfo {
+impl BorshDeserialize for ResourceLogicVerifyingInfo {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         // Read vk
-        use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
+        use crate::circuit::resource_logic_examples::TrivialResourceLogicCircuit;
         use crate::utils::read_base_field;
-        let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
-        let vk = VerifyingKey::read::<_, TrivialValidityPredicateCircuit>(reader, params)?;
+        let params = SETUP_PARAMS_MAP
+            .get(&RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE)
+            .unwrap();
+        let vk = VerifyingKey::read::<_, TrivialResourceLogicCircuit>(reader, params)?;
         // Read proof
         let proof = Proof::deserialize_reader(reader)?;
         // Read public inputs
-        let public_inputs: Vec<_> = (0..VP_CIRCUIT_PUBLIC_INPUT_NUM)
+        let public_inputs: Vec<_> = (0..RESOURCE_LOGIC_CIRCUIT_PUBLIC_INPUT_NUM)
             .map(|_| read_base_field(reader))
             .collect::<Result<_, _>>()?;
-        Ok(VPVerifyingInfo {
+        Ok(ResourceLogicVerifyingInfo {
             vk,
             proof,
             public_inputs: public_inputs.into(),
@@ -243,26 +252,28 @@ where
     use serde::de::Error;
     let buf: Vec<u8> = serde::Deserialize::deserialize(d)?;
 
-    use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
-    let params = SETUP_PARAMS_MAP.get(&VP_CIRCUIT_PARAMS_SIZE).unwrap();
-    let vk = VerifyingKey::read::<_, TrivialValidityPredicateCircuit>(&mut buf.as_slice(), params)
+    use crate::circuit::resource_logic_examples::TrivialResourceLogicCircuit;
+    let params = SETUP_PARAMS_MAP
+        .get(&RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE)
+        .unwrap();
+    let vk = VerifyingKey::read::<_, TrivialResourceLogicCircuit>(&mut buf.as_slice(), params)
         .map_err(|e| Error::custom(format!("Error reading VerifyingKey: {}", e)))?;
     Ok(vk)
 }
 
-impl ValidityPredicatePublicInputs {
-    pub fn inner(&self) -> &[pallas::Base; VP_CIRCUIT_PUBLIC_INPUT_NUM] {
+impl ResourceLogicPublicInputs {
+    pub fn inner(&self) -> &[pallas::Base; RESOURCE_LOGIC_CIRCUIT_PUBLIC_INPUT_NUM] {
         &self.0
     }
 
     pub fn get_from_index(&self, idx: usize) -> pallas::Base {
-        assert!(idx < VP_CIRCUIT_PUBLIC_INPUT_NUM);
+        assert!(idx < RESOURCE_LOGIC_CIRCUIT_PUBLIC_INPUT_NUM);
         self.0[idx]
     }
 
     pub fn get_public_input_padding(input_len: usize, rseed: &RandomSeed) -> Vec<pallas::Base> {
-        assert!(input_len < VP_CIRCUIT_PUBLIC_INPUT_NUM);
-        rseed.get_random_padding(VP_CIRCUIT_PUBLIC_INPUT_NUM - input_len)
+        assert!(input_len < RESOURCE_LOGIC_CIRCUIT_PUBLIC_INPUT_NUM);
+        rseed.get_random_padding(RESOURCE_LOGIC_CIRCUIT_PUBLIC_INPUT_NUM - input_len)
     }
 
     // Only pad the custom public inputs, then we can add the actual resource encryption public inputs.
@@ -270,8 +281,10 @@ impl ValidityPredicatePublicInputs {
         input_len: usize,
         rseed: &RandomSeed,
     ) -> Vec<pallas::Base> {
-        assert!(input_len < VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX);
-        rseed.get_random_padding(VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX - input_len)
+        assert!(input_len < RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX);
+        rseed.get_random_padding(
+            RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX - input_len,
+        )
     }
 
     pub fn to_vec(&self) -> Vec<pallas::Base> {
@@ -280,14 +293,14 @@ impl ValidityPredicatePublicInputs {
 
     pub fn decrypt(&self, sk: pallas::Base) -> Option<Vec<pallas::Base>> {
         let cipher: ResourceCiphertext = self.0
-            [VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX
-                ..VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX
+            [RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX
+                ..RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX
                     + RESOURCE_ENCRYPTION_CIPHERTEXT_NUM]
             .to_vec()
             .into();
         let sender_pk = pallas::Affine::from_xy(
-            self.get_from_index(VP_CIRCUIT_RESOURCE_ENCRYPTION_PK_X_IDX),
-            self.get_from_index(VP_CIRCUIT_RESOURCE_ENCRYPTION_PK_Y_IDX),
+            self.get_from_index(RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PK_X_IDX),
+            self.get_from_index(RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PK_Y_IDX),
         )
         .unwrap()
         .to_curve();
@@ -296,9 +309,9 @@ impl ValidityPredicatePublicInputs {
     }
 }
 
-impl From<Vec<pallas::Base>> for ValidityPredicatePublicInputs {
+impl From<Vec<pallas::Base>> for ResourceLogicPublicInputs {
     fn from(public_input_vec: Vec<pallas::Base>) -> Self {
-        ValidityPredicatePublicInputs(
+        ResourceLogicPublicInputs(
             public_input_vec
                 .try_into()
                 .expect("public input with incorrect length"),
@@ -307,7 +320,7 @@ impl From<Vec<pallas::Base>> for ValidityPredicatePublicInputs {
 }
 
 #[derive(Clone, Debug)]
-pub struct ValidityPredicateConfig {
+pub struct ResourceLogicConfig {
     pub advices: [Column<Advice>; 10],
     pub instances: Column<Instance>,
     pub table_idx: TableColumn,
@@ -325,7 +338,7 @@ pub struct ValidityPredicateConfig {
     pub resource_commit_config: ResourceCommitConfig,
 }
 
-impl ValidityPredicateConfig {
+impl ResourceLogicConfig {
     pub fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self {
         let instances = meta.instance_column();
         meta.enable_equality(instances);
@@ -421,22 +434,22 @@ impl ValidityPredicateConfig {
     }
 }
 
-pub trait ValidityPredicateVerifyingInfo: DynClone {
-    fn get_verifying_info(&self) -> VPVerifyingInfo;
-    fn verify_transparently(&self) -> Result<ValidityPredicatePublicInputs, TransactionError>;
-    fn get_vp_vk(&self) -> ValidityPredicateVerifyingKey;
+pub trait ResourceLogicVerifyingInfoTrait: DynClone {
+    fn get_verifying_info(&self) -> ResourceLogicVerifyingInfo;
+    fn verify_transparently(&self) -> Result<ResourceLogicPublicInputs, TransactionError>;
+    fn get_resource_logic_vk(&self) -> ResourceLogicVerifyingKey;
 }
 
-clone_trait_object!(ValidityPredicateVerifyingInfo);
+clone_trait_object!(ResourceLogicVerifyingInfoTrait);
 
-pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVerifyingInfo {
+pub trait ResourceLogicCircuit: Circuit<pallas::Base> + ResourceLogicVerifyingInfoTrait {
     // Default implementation, constrains the resources integrity.
-    // TODO: how to enforce the constraints in vp circuit?
+    // TODO: how to enforce the constraints in resource_logic circuit?
     fn basic_constraints(
         &self,
-        config: ValidityPredicateConfig,
+        config: ResourceLogicConfig,
         mut layouter: impl Layouter<pallas::Base>,
-    ) -> Result<BasicValidityPredicateVariables, Error> {
+    ) -> Result<BasicResourceLogicVariables, Error> {
         layouter.assign_table(
             || "table_idx",
             |mut table| {
@@ -496,29 +509,29 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVer
         layouter.constrain_instance(
             owned_resource_id.cell(),
             config.instances,
-            VP_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX,
+            RESOURCE_LOGIC_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX,
         )?;
 
-        Ok(BasicValidityPredicateVariables {
+        Ok(BasicResourceLogicVariables {
             owned_resource_id,
             input_resource_variables: input_resource_variables.try_into().unwrap(),
             output_resource_variables: output_resource_variables.try_into().unwrap(),
         })
     }
 
-    // VP designer need to implement the following functions.
+    // resource logic designer need to implement the following functions.
     // `get_input_resources` and `get_output_resources` will be used in `basic_constraints` to get the basic resource info.
 
     // Add custom constraints on basic resource variables and user-defined variables.
-    // It should at least contain the default vp commitment
+    // It should at least contain the default resource_logic commitment
     fn custom_constraints(
         &self,
-        config: ValidityPredicateConfig,
+        config: ResourceLogicConfig,
         mut layouter: impl Layouter<pallas::Base>,
-        _basic_variables: BasicValidityPredicateVariables,
+        _basic_variables: BasicResourceLogicVariables,
     ) -> Result<(), Error> {
-        // Publicize the dynamic vp commitments with default value
-        publicize_default_dynamic_vp_commitments(
+        // Publicize the dynamic resource_logic commitments with default value
+        publicize_default_dynamic_resource_logic_commitments(
             &mut layouter,
             config.advices[0],
             config.instances,
@@ -543,17 +556,17 @@ pub trait ValidityPredicateCircuit: Circuit<pallas::Base> + ValidityPredicateVer
     }
     fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE];
     fn get_output_resources(&self) -> &[Resource; NUM_RESOURCE];
-    fn get_public_inputs(&self, rng: impl RngCore) -> ValidityPredicatePublicInputs;
+    fn get_public_inputs(&self, rng: impl RngCore) -> ResourceLogicPublicInputs;
     // The owned_resource_id is the input_resource_nf or the output_resource_cm_x
     // The owned_resource_id is the key to look up the target variables and
-    // help determine whether the owned resource is the input resource or not in VP circuit.
+    // help determine whether the owned resource is the input resource or not in resource logic circuit.
     fn get_owned_resource_id(&self) -> pallas::Base;
 }
 
-/// BasicValidityPredicateVariables are generally constrained in ValidityPredicateCircuit::basic_constraints
-/// and will be used in ValidityPredicateCircuit::custom_constraints
+/// BasicResourceLogicVariables are generally constrained in ResourceLogicCircuit::basic_constraints
+/// and will be used in ResourceLogicCircuit::custom_constraints
 #[derive(Debug, Clone)]
-pub struct BasicValidityPredicateVariables {
+pub struct BasicResourceLogicVariables {
     pub owned_resource_id: AssignedCell<pallas::Base, pallas::Base>,
     pub input_resource_variables: [InputResourceVariables; NUM_RESOURCE],
     pub output_resource_variables: [OutputResourceVariables; NUM_RESOURCE],
@@ -594,7 +607,7 @@ pub struct ResourceSearchableVariablePair {
     pub target_variable: AssignedCell<pallas::Base, pallas::Base>,
 }
 
-impl BasicValidityPredicateVariables {
+impl BasicResourceLogicVariables {
     pub fn get_owned_resource_id(&self) -> AssignedCell<pallas::Base, pallas::Base> {
         self.owned_resource_id.clone()
     }
@@ -710,10 +723,10 @@ impl BasicValidityPredicateVariables {
 
 // Default Circuit trait implementation
 #[macro_export]
-macro_rules! vp_circuit_impl {
+macro_rules! resource_logic_circuit_impl {
     ($name:ident) => {
         impl Circuit<pallas::Base> for $name {
-            type Config = ValidityPredicateConfig;
+            type Config = ResourceLogicConfig;
             type FloorPlanner = floor_planner::V1;
 
             fn without_witnesses(&self) -> Self {
@@ -744,12 +757,12 @@ macro_rules! vp_circuit_impl {
     };
 }
 
-// Default ValidityPredicateVerifyingInfo trait implementation
+// Default ResourceLogicVerifyingInfoTrait trait implementation
 #[macro_export]
-macro_rules! vp_verifying_info_impl {
+macro_rules! resource_logic_verifying_info_impl {
     ($name:ident) => {
-        impl ValidityPredicateVerifyingInfo for $name {
-            fn get_verifying_info(&self) -> VPVerifyingInfo {
+        impl ResourceLogicVerifyingInfoTrait for $name {
+            fn get_verifying_info(&self) -> ResourceLogicVerifyingInfo {
                 let mut rng = OsRng;
                 let params = SETUP_PARAMS_MAP.get(&15).unwrap();
                 let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
@@ -763,16 +776,14 @@ macro_rules! vp_verifying_info_impl {
                     &mut rng,
                 )
                 .unwrap();
-                VPVerifyingInfo {
+                ResourceLogicVerifyingInfo {
                     vk,
                     proof,
                     public_inputs,
                 }
             }
 
-            fn verify_transparently(
-                &self,
-            ) -> Result<ValidityPredicatePublicInputs, TransactionError> {
+            fn verify_transparently(&self) -> Result<ResourceLogicPublicInputs, TransactionError> {
                 use halo2_proofs::dev::MockProver;
                 let mut rng = OsRng;
                 let public_inputs = self.get_public_inputs(&mut rng);
@@ -783,19 +794,19 @@ macro_rules! vp_verifying_info_impl {
                 Ok(public_inputs)
             }
 
-            fn get_vp_vk(&self) -> ValidityPredicateVerifyingKey {
+            fn get_resource_logic_vk(&self) -> ResourceLogicVerifyingKey {
                 let params = SETUP_PARAMS_MAP.get(&15).unwrap();
                 let vk = keygen_vk(params, self).expect("keygen_vk should not fail");
-                ValidityPredicateVerifyingKey::from_vk(vk)
+                ResourceLogicVerifyingKey::from_vk(vk)
             }
         }
     };
 }
 
 #[derive(Clone)]
-pub struct VampIRValidityPredicateCircuit {
+pub struct VampIRResourceLogicCircuit {
     // TODO: vamp_ir doesn't support to set the params size manually, add the params here temporarily.
-    // remove the params once we can set it as VP_CIRCUIT_PARAMS_SIZE in vamp_ir.
+    // remove the params once we can set it as RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE in vamp_ir.
     pub params: Params<vesta::Affine>,
     pub circuit: Halo2Module<pallas::Base>,
     pub public_inputs: Vec<pallas::Base>,
@@ -817,7 +828,7 @@ impl VampIRCircuitError {
     }
 }
 
-impl VampIRValidityPredicateCircuit {
+impl VampIRResourceLogicCircuit {
     pub fn from_vamp_ir_source(
         vamp_ir_source: &str,
         named_field_assignments: HashMap<String, Fp>,
@@ -890,8 +901,8 @@ impl VampIRValidityPredicateCircuit {
     }
 }
 
-impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
-    fn get_verifying_info(&self) -> VPVerifyingInfo {
+impl ResourceLogicVerifyingInfoTrait for VampIRResourceLogicCircuit {
+    fn get_verifying_info(&self) -> ResourceLogicVerifyingInfo {
         let mut rng = OsRng;
         let vk = keygen_vk(&self.params, &self.circuit).expect("keygen_vk should not fail");
         let pk =
@@ -899,7 +910,7 @@ impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
 
         let mut public_inputs = self.public_inputs.clone();
         let rseed = RandomSeed::random(&mut rng);
-        public_inputs.extend(ValidityPredicatePublicInputs::get_public_input_padding(
+        public_inputs.extend(ResourceLogicPublicInputs::get_public_input_padding(
             self.public_inputs.len(),
             &rseed,
         ));
@@ -912,19 +923,19 @@ impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
             &mut rng,
         )
         .unwrap();
-        VPVerifyingInfo {
+        ResourceLogicVerifyingInfo {
             vk,
             proof,
             public_inputs: public_inputs.into(),
         }
     }
 
-    fn verify_transparently(&self) -> Result<ValidityPredicatePublicInputs, TransactionError> {
+    fn verify_transparently(&self) -> Result<ResourceLogicPublicInputs, TransactionError> {
         use halo2_proofs::dev::MockProver;
         let mut rng = OsRng;
         let mut public_inputs = self.public_inputs.clone();
         let rseed = RandomSeed::random(&mut rng);
-        public_inputs.extend(ValidityPredicatePublicInputs::get_public_input_padding(
+        public_inputs.extend(ResourceLogicPublicInputs::get_public_input_padding(
             self.public_inputs.len(),
             &rseed,
         ));
@@ -932,19 +943,19 @@ impl ValidityPredicateVerifyingInfo for VampIRValidityPredicateCircuit {
             MockProver::<pallas::Base>::run(15, &self.circuit, vec![public_inputs.to_vec()])
                 .unwrap();
         prover.verify().unwrap();
-        Ok(ValidityPredicatePublicInputs::from(public_inputs))
+        Ok(ResourceLogicPublicInputs::from(public_inputs))
     }
 
-    fn get_vp_vk(&self) -> ValidityPredicateVerifyingKey {
+    fn get_resource_logic_vk(&self) -> ResourceLogicVerifyingKey {
         let vk = keygen_vk(&self.params, &self.circuit).expect("keygen_vk should not fail");
-        ValidityPredicateVerifyingKey::from_vk(vk)
+        ResourceLogicVerifyingKey::from_vk(vk)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::circuit::vp_circuit::{
-        ValidityPredicateVerifyingInfo, VampIRValidityPredicateCircuit,
+    use crate::circuit::resource_logic_circuit::{
+        ResourceLogicVerifyingInfoTrait, VampIRResourceLogicCircuit,
     };
     use num_bigint::BigInt;
     use std::collections::HashMap;
@@ -953,90 +964,89 @@ mod tests {
 
     #[ignore]
     #[test]
-    fn test_create_vp_from_vamp_ir_file() {
+    fn test_create_resource_logic_from_vamp_ir_file() {
         let vamp_ir_circuit_file = PathBuf::from("./src/circuit/vamp_ir_circuits/pyth.pir");
         let inputs_file = PathBuf::from("./src/circuit/vamp_ir_circuits/pyth.inputs");
-        let vp_circuit =
-            VampIRValidityPredicateCircuit::from_vamp_ir_file(&vamp_ir_circuit_file, &inputs_file);
+        let resource_logic_circuit =
+            VampIRResourceLogicCircuit::from_vamp_ir_file(&vamp_ir_circuit_file, &inputs_file);
 
         // generate proof and instance
-        let vp_info = vp_circuit.get_verifying_info();
+        let resource_logic_info = resource_logic_circuit.get_verifying_info();
 
         // verify the proof
-        // TODO: use the vp_info.verify() instead. vp_info.verify() doesn't work now because it uses the fixed VP_CIRCUIT_PARAMS_SIZE params.
-        vp_info
+        // TODO: use the resource_logic_info.verify() instead. resource_logic_info.verify() doesn't work now because it uses the fixed RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE params.
+        resource_logic_info
             .proof
             .verify(
-                &vp_info.vk,
-                &vp_circuit.params,
-                &[vp_info.public_inputs.inner()],
+                &resource_logic_info.vk,
+                &resource_logic_circuit.params,
+                &[resource_logic_info.public_inputs.inner()],
             )
             .unwrap();
     }
 
     #[test]
-    fn test_create_vp_from_invalid_vamp_ir_file() {
+    fn test_create_resource_logic_from_invalid_vamp_ir_file() {
         let invalid_vamp_ir_source =
-            VampIRValidityPredicateCircuit::from_vamp_ir_source("{aaxxx", HashMap::new());
+            VampIRResourceLogicCircuit::from_vamp_ir_source("{aaxxx", HashMap::new());
         assert!(invalid_vamp_ir_source.is_err());
     }
 
     #[test]
-    fn test_create_vp_with_missing_assignment() {
+    fn test_create_resource_logic_with_missing_assignment() {
         let missing_x_assignment =
-            VampIRValidityPredicateCircuit::from_vamp_ir_source("x = 1;", HashMap::new());
+            VampIRResourceLogicCircuit::from_vamp_ir_source("x = 1;", HashMap::new());
         assert!(missing_x_assignment.is_err());
     }
 
     #[test]
-    fn test_create_vp_with_no_assignment() {
-        let zero_constraint =
-            VampIRValidityPredicateCircuit::from_vamp_ir_source("0;", HashMap::new());
+    fn test_create_resource_logic_with_no_assignment() {
+        let zero_constraint = VampIRResourceLogicCircuit::from_vamp_ir_source("0;", HashMap::new());
         assert!(zero_constraint.is_ok());
     }
 
     #[ignore]
     #[test]
-    fn test_create_vp_with_valid_assignment() {
-        let x_assignment_circuit = VampIRValidityPredicateCircuit::from_vamp_ir_source(
+    fn test_create_resource_logic_with_valid_assignment() {
+        let x_assignment_circuit = VampIRResourceLogicCircuit::from_vamp_ir_source(
             "x = 1;",
             HashMap::from([(String::from("x"), make_constant(BigInt::from(1)))]),
         );
 
         assert!(x_assignment_circuit.is_ok());
 
-        let vp_circuit = x_assignment_circuit.unwrap();
-        let vp_info = vp_circuit.get_verifying_info();
+        let resource_logic_circuit = x_assignment_circuit.unwrap();
+        let resource_logic_info = resource_logic_circuit.get_verifying_info();
 
-        assert!(vp_info
+        assert!(resource_logic_info
             .proof
             .verify(
-                &vp_info.vk,
-                &vp_circuit.params,
-                &[vp_info.public_inputs.inner()]
+                &resource_logic_info.vk,
+                &resource_logic_circuit.params,
+                &[resource_logic_info.public_inputs.inner()]
             )
             .is_ok());
     }
 
     #[ignore]
     #[test]
-    fn test_create_vp_with_invalid_assignment() {
-        let x_assignment_circuit = VampIRValidityPredicateCircuit::from_vamp_ir_source(
+    fn test_create_resource_logic_with_invalid_assignment() {
+        let x_assignment_circuit = VampIRResourceLogicCircuit::from_vamp_ir_source(
             "x = 1;",
             HashMap::from([(String::from("x"), make_constant(BigInt::from(0)))]),
         );
 
         assert!(x_assignment_circuit.is_ok());
 
-        let vp_circuit = x_assignment_circuit.unwrap();
-        let vp_info = vp_circuit.get_verifying_info();
+        let resource_logic_circuit = x_assignment_circuit.unwrap();
+        let resource_logic_info = resource_logic_circuit.get_verifying_info();
 
-        assert!(vp_info
+        assert!(resource_logic_info
             .proof
             .verify(
-                &vp_info.vk,
-                &vp_circuit.params,
-                &[vp_info.public_inputs.inner()]
+                &resource_logic_info.vk,
+                &resource_logic_circuit.params,
+                &[resource_logic_info.public_inputs.inner()]
             )
             .is_err());
     }
@@ -1045,8 +1055,10 @@ mod tests {
     #[test]
     fn test_vk_serialize() {
         use crate::circuit::{
-            vp_circuit::{serde_deserialize_verifying_key, serde_serialize_verifying_key},
-            vp_examples::TrivialValidityPredicateCircuit,
+            resource_logic_circuit::{
+                serde_deserialize_verifying_key, serde_serialize_verifying_key,
+            },
+            resource_logic_examples::TrivialResourceLogicCircuit,
         };
         use halo2_proofs::plonk::VerifyingKey;
         use pasta_curves::vesta;
@@ -1061,7 +1073,7 @@ mod tests {
             vk: VerifyingKey<vesta::Affine>,
         }
 
-        let t = TrivialValidityPredicateCircuit::default().get_vp_vk();
+        let t = TrivialResourceLogicCircuit::default().get_resource_logic_vk();
 
         let a = TestStruct {
             vk: t.get_vk().unwrap(),

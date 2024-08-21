@@ -1,4 +1,4 @@
-use crate::constant::VP_COMMITMENT_PERSONALIZATION;
+use crate::constant::RESOURCE_LOGIC_COMMITMENT_PERSONALIZATION;
 use blake2s_simd::Params;
 use byteorder::{ByteOrder, LittleEndian};
 use ff::PrimeField;
@@ -10,15 +10,15 @@ use serde;
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "nif", derive(NifTuple))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ValidityPredicateCommitment(Vec<u8>);
+pub struct ResourceLogicCommitment(Vec<u8>);
 
-impl ValidityPredicateCommitment {
-    pub fn commit<F: PrimeField>(vp: &F, rcm: &F) -> Self {
+impl ResourceLogicCommitment {
+    pub fn commit<F: PrimeField>(resource_logic: &F, rcm: &F) -> Self {
         let hash = Params::new()
             .hash_length(32)
-            .personal(VP_COMMITMENT_PERSONALIZATION)
+            .personal(RESOURCE_LOGIC_COMMITMENT_PERSONALIZATION)
             .to_state()
-            .update(vp.to_repr().as_ref())
+            .update(resource_logic.to_repr().as_ref())
             .update(rcm.to_repr().as_ref())
             .finalize();
         Self(hash.as_bytes().to_vec())
@@ -46,8 +46,8 @@ impl ValidityPredicateCommitment {
     }
 }
 
-impl Default for ValidityPredicateCommitment {
-    fn default() -> ValidityPredicateCommitment {
-        ValidityPredicateCommitment([0u8; 32].to_vec())
+impl Default for ResourceLogicCommitment {
+    fn default() -> ResourceLogicCommitment {
+        ResourceLogicCommitment([0u8; 32].to_vec())
     }
 }

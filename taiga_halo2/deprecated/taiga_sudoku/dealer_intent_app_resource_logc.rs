@@ -21,22 +21,22 @@ use taiga_halo2::{
             },
         },
         resource_circuit::ResourceConfig,
-        vp_circuit::{
-            BasicValidityPredicateVariables, OutputResourceVariables, VPVerifyingInfo,
-            ValidityPredicateCircuit, ValidityPredicateConfig, ValidityPredicateInfo,
-            ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
+        resource_logic_circuit::{
+            BasicResourceLogicVariables, OutputResourceVariables, ResourceLogicVerifyingInfoTrait,
+            ResourceLogicCircuit, ResourceLogicConfig, ResourceLogicInfo,
+            ResourceLogicPublicInputs, ResourceLogicVerifyingInfo,
         },
     },
     constant::{NUM_RESOURCE, SETUP_PARAMS_MAP},
     resource::{Resource, RandomSeed},
     proof::Proof,
     utils::poseidon_hash,
-    vp_circuit_impl,
-    vp_vk::ValidityPredicateVerifyingKey,
+    resource_logic_circuit_impl,
+    resource_logic_vk::ResourceLogicVerifyingKey,
 };
 
 #[derive(Clone, Debug, Default)]
-struct DealerIntentValidityPredicateCircuit {
+struct DealerIntentResourceLogicCircuit {
     owned_resource_id: pallas::Base,
     input_resources: [Resource; NUM_RESOURCE],
     output_resources: [Resource; NUM_RESOURCE],
@@ -47,7 +47,7 @@ struct DealerIntentValidityPredicateCircuit {
 }
 
 #[derive(Clone, Debug)]
-struct IntentAppValidityPredicateConfig {
+struct IntentAppResourceLogicConfig {
     resource_config: ResourceConfig,
     advices: [Column<Advice>; 10],
     get_owned_resource_variable_config: GetOwnedResourceVariableConfig,
@@ -55,7 +55,7 @@ struct IntentAppValidityPredicateConfig {
     dealer_intent_check_config: DealerIntentCheckConfig,
 }
 
-impl ValidityPredicateConfig for IntentAppValidityPredicateConfig {
+impl ResourceLogicConfig for IntentAppResourceLogicConfig {
     fn get_resource_config(&self) -> ResourceConfig {
         self.resource_config.clone()
     }
@@ -85,7 +85,7 @@ impl ValidityPredicateConfig for IntentAppValidityPredicateConfig {
     }
 }
 
-impl DealerIntentValidityPredicateCircuit {
+impl DealerIntentResourceLogicCircuit {
     #![allow(dead_code)]
     pub fn compute_app_data_static(
         encoded_puzzle: pallas::Base,
@@ -96,7 +96,7 @@ impl DealerIntentValidityPredicateCircuit {
 
     fn dealer_intent_check(
         &self,
-        config: &IntentAppValidityPredicateConfig,
+        config: &IntentAppResourceLogicConfig,
         mut layouter: impl Layouter<pallas::Base>,
         is_input_resource: &AssignedCell<pallas::Base, pallas::Base>,
         encoded_puzzle: &AssignedCell<pallas::Base, pallas::Base>,
@@ -134,7 +134,7 @@ impl DealerIntentValidityPredicateCircuit {
     }
 }
 
-impl ValidityPredicateInfo for DealerIntentValidityPredicateCircuit {
+impl ResourceLogicInfo for DealerIntentResourceLogicCircuit {
     fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE] {
         &self.input_resources
     }
@@ -143,9 +143,9 @@ impl ValidityPredicateInfo for DealerIntentValidityPredicateCircuit {
         &self.output_resources
     }
 
-    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
+    fn get_public_inputs(&self, mut rng: impl RngCore) -> ResourceLogicPublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
-        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
+        let padding = ResourceLogicPublicInputs::get_public_input_padding(
             public_inputs.len(),
             &RandomSeed::random(&mut rng),
         );
@@ -158,14 +158,14 @@ impl ValidityPredicateInfo for DealerIntentValidityPredicateCircuit {
     }
 }
 
-impl ValidityPredicateCircuit for DealerIntentValidityPredicateCircuit {
-    type VPConfig = IntentAppValidityPredicateConfig;
+impl ResourceLogicCircuit for DealerIntentResourceLogicCircuit {
+    type ResourceLogicConfig = IntentAppResourceLogicConfig;
     // Add custom constraints
     fn custom_constraints(
         &self,
-        config: Self::VPConfig,
+        config: Self::ResourceLogicConfig,
         mut layouter: impl Layouter<pallas::Base>,
-        basic_variables: BasicValidityPredicateVariables,
+        basic_variables: BasicResourceLogicVariables,
     ) -> Result<(), Error> {
         let owned_resource_id = basic_variables.get_owned_resource_id();
         let is_input_resource = get_is_input_resource_flag(
@@ -221,7 +221,7 @@ impl ValidityPredicateCircuit for DealerIntentValidityPredicateCircuit {
     }
 }
 
-vp_circuit_impl!(DealerIntentValidityPredicateCircuit);
+resource_logic_circuit_impl!(DealerIntentResourceLogicCircuit);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DealerIntentCheckConfig {
@@ -352,8 +352,8 @@ impl DealerIntentCheckConfig {
 }
 
 #[test]
-fn test_halo2_dealer_intent_vp_circuit() {
-    use crate::app_vp::tests::{random_input_resource, random_output_resource};
+fn test_halo2_dealer_intent_resource_logic_circuit() {
+    use crate::app_resource_logic::tests::{random_input_resource, random_output_resource};
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
@@ -367,13 +367,13 @@ fn test_halo2_dealer_intent_vp_circuit() {
         let encoded_puzzle = pallas::Base::random(&mut rng);
         let sudoku_app_vk = pallas::Base::random(&mut rng);
         output_resources[0].kind.app_data_static =
-            DealerIntentValidityPredicateCircuit::compute_app_data_static(
+            DealerIntentResourceLogicCircuit::compute_app_data_static(
                 encoded_puzzle,
                 sudoku_app_vk,
             );
         let encoded_solution = pallas::Base::random(&mut rng);
         let owned_resource_id = output_resources[0].commitment().inner();
-        DealerIntentValidityPredicateCircuit {
+        DealerIntentResourceLogicCircuit {
             owned_resource_id,
             input_resources,
             output_resources: output_resources.try_into().unwrap(),

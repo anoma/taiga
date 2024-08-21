@@ -1,26 +1,26 @@
 use crate::{
     circuit::{
-        blake2s::publicize_default_dynamic_vp_commitments,
+        blake2s::publicize_default_dynamic_resource_logic_commitments,
         gadgets::{
             add::AddChip, assign_free_advice, poseidon_hash::poseidon_hash_gadget,
             target_resource_variable::get_owned_resource_variable,
         },
         resource_encryption_circuit::resource_encryption_gadget,
-        vp_bytecode::{ValidityPredicateByteCode, ValidityPredicateRepresentation},
-        vp_circuit::{
-            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
+        resource_logic_bytecode::{ResourceLogicByteCode, ResourceLogicRepresentation},
+        resource_logic_circuit::{
+            BasicResourceLogicVariables, ResourceLogicCircuit, ResourceLogicConfig,
+            ResourceLogicPublicInputs, ResourceLogicVerifyingInfo, ResourceLogicVerifyingInfoTrait,
         },
-        vp_examples::signature_verification::COMPRESSED_TOKEN_AUTH_VK,
+        resource_logic_examples::signature_verification::COMPRESSED_TOKEN_AUTH_VK,
     },
     constant::{GENERATOR, NUM_RESOURCE, SETUP_PARAMS_MAP},
     error::TransactionError,
     proof::Proof,
     resource::{RandomSeed, Resource},
     resource_encryption::{ResourceCiphertext, ResourcePlaintext, SecretKey},
+    resource_logic_commitment::ResourceLogicCommitment,
+    resource_logic_vk::ResourceLogicVerifyingKey,
     utils::{mod_r_p, read_base_field, read_point},
-    vp_commitment::ValidityPredicateCommitment,
-    vp_vk::ValidityPredicateVerifyingKey,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use group::{cofactor::CofactorCurveAffine, ff::PrimeField, Curve, Group, GroupEncoding};
@@ -38,27 +38,27 @@ use rand::RngCore;
 const CIPHER_LEN: usize = 9;
 
 lazy_static! {
-    pub static ref RECEIVER_VK: ValidityPredicateVerifyingKey =
-        ReceiverValidityPredicateCircuit::default().get_vp_vk();
+    pub static ref RECEIVER_VK: ResourceLogicVerifyingKey =
+        ReceiverResourceLogicCircuit::default().get_resource_logic_vk();
     pub static ref COMPRESSED_RECEIVER_VK: pallas::Base = RECEIVER_VK.get_compressed();
 }
 
-// ReceiverValidityPredicateCircuit is used in the token vp as dynamic vp and contains the resource encryption constraints.
+// ReceiverResourceLogicCircuit is used in the token resource_logic as dynamic resource_logic and contains the resource encryption constraints.
 #[derive(Clone, Debug)]
-pub struct ReceiverValidityPredicateCircuit {
+pub struct ReceiverResourceLogicCircuit {
     pub owned_resource_id: pallas::Base,
     pub input_resources: [Resource; NUM_RESOURCE],
     pub output_resources: [Resource; NUM_RESOURCE],
-    pub vp_vk: pallas::Base,
+    pub resource_logic_vk: pallas::Base,
     pub encrypt_nonce: pallas::Base,
     pub sk: pallas::Base,
     pub rcv_pk: pallas::Point,
-    pub auth_vp_vk: pallas::Base,
+    pub auth_resource_logic_vk: pallas::Base,
 }
 
-impl ReceiverValidityPredicateCircuit {
-    pub fn to_bytecode(&self) -> ValidityPredicateByteCode {
-        ValidityPredicateByteCode::new(ValidityPredicateRepresentation::Receiver, self.to_bytes())
+impl ReceiverResourceLogicCircuit {
+    pub fn to_bytecode(&self) -> ResourceLogicByteCode {
+        ResourceLogicByteCode::new(ResourceLogicRepresentation::Receiver, self.to_bytes())
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -70,28 +70,28 @@ impl ReceiverValidityPredicateCircuit {
     }
 }
 
-impl Default for ReceiverValidityPredicateCircuit {
+impl Default for ReceiverResourceLogicCircuit {
     fn default() -> Self {
         Self {
             owned_resource_id: pallas::Base::zero(),
             input_resources: [(); NUM_RESOURCE].map(|_| Resource::default()),
             output_resources: [(); NUM_RESOURCE].map(|_| Resource::default()),
-            vp_vk: pallas::Base::zero(),
+            resource_logic_vk: pallas::Base::zero(),
             encrypt_nonce: pallas::Base::zero(),
             sk: pallas::Base::zero(),
             rcv_pk: pallas::Point::generator(),
-            auth_vp_vk: pallas::Base::zero(),
+            auth_resource_logic_vk: pallas::Base::zero(),
         }
     }
 }
 
-impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
+impl ResourceLogicCircuit for ReceiverResourceLogicCircuit {
     // Add custom constraints
     fn custom_constraints(
         &self,
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
-        basic_variables: BasicValidityPredicateVariables,
+        basic_variables: BasicResourceLogicVariables,
     ) -> Result<(), Error> {
         let encrypt_nonce = assign_free_advice(
             layouter.namespace(|| "witness encrypt_nonce"),
@@ -122,15 +122,15 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             &basic_variables.get_value_searchable_pairs(),
         )?;
 
-        let auth_vp_vk = assign_free_advice(
-            layouter.namespace(|| "witness auth vp vk"),
+        let auth_resource_logic_vk = assign_free_advice(
+            layouter.namespace(|| "witness auth resource_logic vk"),
             config.advices[0],
             Value::known(*COMPRESSED_TOKEN_AUTH_VK),
         )?;
-        let receiver_vp_vk = assign_free_advice(
-            layouter.namespace(|| "witness receiver vp vk"),
+        let receiver_resource_logic_vk = assign_free_advice(
+            layouter.namespace(|| "witness receiver resource_logic vk"),
             config.advices[0],
-            Value::known(self.vp_vk),
+            Value::known(self.resource_logic_vk),
         )?;
 
         // Decode the value, and check the value encoding
@@ -140,8 +140,8 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             [
                 rcv_pk.inner().x(),
                 rcv_pk.inner().y(),
-                auth_vp_vk,
-                receiver_vp_vk,
+                auth_resource_logic_vk,
+                receiver_resource_logic_vk,
             ],
         )?;
 
@@ -229,8 +229,8 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
             &mut message,
         )?;
 
-        // Publicize the dynamic vp commitments with default value
-        publicize_default_dynamic_vp_commitments(
+        // Publicize the dynamic resource_logic commitments with default value
+        publicize_default_dynamic_resource_logic_commitments(
             &mut layouter,
             config.advices[0],
             config.instances,
@@ -247,14 +247,14 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
         &self.output_resources
     }
 
-    fn get_public_inputs(&self, rng: impl RngCore) -> ValidityPredicatePublicInputs {
+    fn get_public_inputs(&self, rng: impl RngCore) -> ResourceLogicPublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
-        let default_vp_cm: [pallas::Base; 2] =
-            ValidityPredicateCommitment::default().to_public_inputs();
-        public_inputs.extend(default_vp_cm);
-        public_inputs.extend(default_vp_cm);
+        let default_resource_logic_cm: [pallas::Base; 2] =
+            ResourceLogicCommitment::default().to_public_inputs();
+        public_inputs.extend(default_resource_logic_cm);
+        public_inputs.extend(default_resource_logic_cm);
         let custom_public_input_padding =
-            ValidityPredicatePublicInputs::get_custom_public_input_padding(
+            ResourceLogicPublicInputs::get_custom_public_input_padding(
                 public_inputs.len(),
                 &RandomSeed::random(rng),
             );
@@ -295,10 +295,10 @@ impl ValidityPredicateCircuit for ReceiverValidityPredicateCircuit {
     }
 }
 
-vp_circuit_impl!(ReceiverValidityPredicateCircuit);
-vp_verifying_info_impl!(ReceiverValidityPredicateCircuit);
+resource_logic_circuit_impl!(ReceiverResourceLogicCircuit);
+resource_logic_verifying_info_impl!(ReceiverResourceLogicCircuit);
 
-impl BorshSerialize for ReceiverValidityPredicateCircuit {
+impl BorshSerialize for ReceiverResourceLogicCircuit {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         writer.write_all(&self.owned_resource_id.to_repr())?;
         for input in self.input_resources.iter() {
@@ -309,17 +309,17 @@ impl BorshSerialize for ReceiverValidityPredicateCircuit {
             output.serialize(writer)?;
         }
 
-        writer.write_all(&self.vp_vk.to_repr())?;
+        writer.write_all(&self.resource_logic_vk.to_repr())?;
         writer.write_all(&self.encrypt_nonce.to_repr())?;
         writer.write_all(&self.sk.to_repr())?;
         writer.write_all(&self.rcv_pk.to_bytes())?;
-        writer.write_all(&self.auth_vp_vk.to_repr())?;
+        writer.write_all(&self.auth_resource_logic_vk.to_repr())?;
 
         Ok(())
     }
 }
 
-impl BorshDeserialize for ReceiverValidityPredicateCircuit {
+impl BorshDeserialize for ReceiverResourceLogicCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let owned_resource_id = read_base_field(reader)?;
         let input_resources: Vec<_> = (0..NUM_RESOURCE)
@@ -328,27 +328,27 @@ impl BorshDeserialize for ReceiverValidityPredicateCircuit {
         let output_resources: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
-        let vp_vk = read_base_field(reader)?;
+        let resource_logic_vk = read_base_field(reader)?;
         let encrypt_nonce = read_base_field(reader)?;
         let sk = read_base_field(reader)?;
         let rcv_pk = read_point(reader)?;
-        let auth_vp_vk = read_base_field(reader)?;
+        let auth_resource_logic_vk = read_base_field(reader)?;
         Ok(Self {
             owned_resource_id,
             input_resources: input_resources.try_into().unwrap(),
             output_resources: output_resources.try_into().unwrap(),
-            vp_vk,
+            resource_logic_vk,
             encrypt_nonce,
             sk,
             rcv_pk,
-            auth_vp_vk,
+            auth_resource_logic_vk,
         })
     }
 }
 
 #[test]
-fn test_halo2_receiver_vp_circuit() {
-    use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
+fn test_halo2_receiver_resource_logic_circuit() {
+    use crate::constant::RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE;
     use crate::{resource::tests::random_resource, utils::poseidon_hash_n};
     use ff::{Field, PrimeField};
     use halo2_proofs::dev::MockProver;
@@ -372,15 +372,15 @@ fn test_halo2_receiver_vp_circuit() {
         ]);
         let owned_resource_id = output_resources[0].commitment().inner();
         (
-            ReceiverValidityPredicateCircuit {
+            ReceiverResourceLogicCircuit {
                 owned_resource_id,
                 input_resources,
                 output_resources,
-                vp_vk: *COMPRESSED_RECEIVER_VK,
+                resource_logic_vk: *COMPRESSED_RECEIVER_VK,
                 encrypt_nonce,
                 sk,
                 rcv_pk,
-                auth_vp_vk: *COMPRESSED_TOKEN_AUTH_VK,
+                auth_resource_logic_vk: *COMPRESSED_TOKEN_AUTH_VK,
             },
             rcv_sk,
         )
@@ -389,13 +389,13 @@ fn test_halo2_receiver_vp_circuit() {
     // Test serialization
     let circuit = {
         let circuit_bytes = circuit.to_bytes();
-        ReceiverValidityPredicateCircuit::from_bytes(&circuit_bytes)
+        ReceiverResourceLogicCircuit::from_bytes(&circuit_bytes)
     };
 
     let public_inputs = circuit.get_public_inputs(&mut rng);
 
     let prover = MockProver::<pallas::Base>::run(
-        VP_CIRCUIT_PARAMS_SIZE,
+        RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE,
         &circuit,
         vec![public_inputs.to_vec()],
     )
