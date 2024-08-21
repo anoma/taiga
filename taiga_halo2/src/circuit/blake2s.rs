@@ -563,7 +563,7 @@ impl<F: PrimeField> Blake2sChip<F> {
         // |   v[14] := v[14] ^ 0xFF..FF   // Invert all bits.
         // END IF.
         let v_14 = if f {
-            Blake2sWord::from_constant_u32(IV[6] ^ u32::max_value(), layouter, self)?
+            Blake2sWord::from_constant_u32(IV[6] ^ u32::MAX, layouter, self)?
         } else {
             Blake2sWord::from_constant_u32(IV[6], layouter, self)?
         };

@@ -52,7 +52,6 @@ pub fn create_input_resource(
     )
 }
 
-///
 pub fn create_output_resource(
     logic: pallas::Base,
     label: pallas::Base,
