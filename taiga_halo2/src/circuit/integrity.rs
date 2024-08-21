@@ -2,7 +2,7 @@ use crate::circuit::{
     gadgets::{assign_free_advice, assign_free_constant, poseidon_hash::poseidon_hash_gadget},
     hash_to_curve::{hash_to_curve_circuit, HashToCurveConfig},
     resource_commitment::{resource_commit, ResourceCommitChip},
-    vp_circuit::{InputResourceVariables, OutputResourceVariables, ResourceVariables},
+    resource_logic_circuit::{InputResourceVariables, OutputResourceVariables, ResourceVariables},
 };
 use crate::constant::{
     TaigaFixedBases, TaigaFixedBasesFull, POSEIDON_TO_CURVE_INPUT_LEN,

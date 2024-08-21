@@ -5,7 +5,7 @@ use crate::circuit::{
         poseidon_hash::poseidon_hash_gadget,
         sub::{SubChip, SubInstructions},
     },
-    vp_circuit::BasicValidityPredicateVariables,
+    resource_logic_circuit::BasicResourceLogicVariables,
 };
 use halo2_gadgets::poseidon::Pow5Config as PoseidonConfig;
 use halo2_proofs::{
@@ -16,7 +16,7 @@ use pasta_curves::pallas;
 
 #[derive(Clone, Debug)]
 pub struct PartialFulfillmentIntentLabel {
-    pub token_vp_vk: AssignedCell<pallas::Base, pallas::Base>,
+    pub token_resource_logic_vk: AssignedCell<pallas::Base, pallas::Base>,
     pub sold_token: AssignedCell<pallas::Base, pallas::Base>,
     pub sold_token_quantity: AssignedCell<pallas::Base, pallas::Base>,
     pub bought_token: AssignedCell<pallas::Base, pallas::Base>,
@@ -40,7 +40,7 @@ impl PartialFulfillmentIntentLabel {
                 self.sold_token_quantity.clone(),
                 self.bought_token.clone(),
                 self.bought_token_quantity.clone(),
-                self.token_vp_vk.clone(),
+                self.token_resource_logic_vk.clone(),
                 self.receiver_npk.clone(),
                 self.receiver_value.clone(),
             ],
@@ -51,7 +51,7 @@ impl PartialFulfillmentIntentLabel {
     pub fn is_input_resource_checks(
         &self,
         is_input_resource: &AssignedCell<pallas::Base, pallas::Base>,
-        basic_variables: &BasicValidityPredicateVariables,
+        basic_variables: &BasicResourceLogicVariables,
         config: &ConditionalEqualConfig,
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<(), Error> {
@@ -60,7 +60,7 @@ impl PartialFulfillmentIntentLabel {
             |mut region| {
                 config.assign_region(
                     is_input_resource,
-                    &self.token_vp_vk,
+                    &self.token_resource_logic_vk,
                     &basic_variables.output_resource_variables[0]
                         .resource_variables
                         .logic,
@@ -124,16 +124,16 @@ impl PartialFulfillmentIntentLabel {
     pub fn is_output_resource_checks(
         &self,
         is_output_resource: &AssignedCell<pallas::Base, pallas::Base>,
-        basic_variables: &BasicValidityPredicateVariables,
+        basic_variables: &BasicResourceLogicVariables,
         config: &ConditionalEqualConfig,
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<(), Error> {
         layouter.assign_region(
-            || "conditional equal: check sold token vp_vk",
+            || "conditional equal: check sold token resource_logic_vk",
             |mut region| {
                 config.assign_region(
                     is_output_resource,
-                    &self.token_vp_vk,
+                    &self.token_resource_logic_vk,
                     &basic_variables.input_resource_variables[0]
                         .resource_variables
                         .logic,
@@ -180,7 +180,7 @@ impl PartialFulfillmentIntentLabel {
     pub fn is_partial_fulfillment_checks(
         &self,
         is_input_resource: &AssignedCell<pallas::Base, pallas::Base>,
-        basic_variables: &BasicValidityPredicateVariables,
+        basic_variables: &BasicResourceLogicVariables,
         config: &ConditionalEqualConfig,
         sub_chip: &SubChip<pallas::Base>,
         mul_chip: &MulChip<pallas::Base>,
@@ -210,7 +210,7 @@ impl PartialFulfillmentIntentLabel {
             |mut region| {
                 config.assign_region(
                     &is_partial_fulfillment,
-                    &self.token_vp_vk,
+                    &self.token_resource_logic_vk,
                     &basic_variables.output_resource_variables[1]
                         .resource_variables
                         .logic,

@@ -7,14 +7,14 @@ use pasta_curves::{
 use std::hash::Hash;
 
 #[derive(Debug, Clone)]
-pub enum ValidityPredicateVerifyingKey {
+pub enum ResourceLogicVerifyingKey {
     // VK.
     Uncompressed(VerifyingKey<vesta::Affine>),
     // Compress vk into one element.
     Compressed(pallas::Base),
 }
 
-impl ValidityPredicateVerifyingKey {
+impl ResourceLogicVerifyingKey {
     pub fn from_vk(vk: VerifyingKey<vesta::Affine>) -> Self {
         Self::Uncompressed(vk)
     }
@@ -25,14 +25,14 @@ impl ValidityPredicateVerifyingKey {
 
     pub fn get_vk(&self) -> Option<VerifyingKey<vesta::Affine>> {
         match self {
-            ValidityPredicateVerifyingKey::Uncompressed(vk) => Some(vk.clone()),
-            ValidityPredicateVerifyingKey::Compressed(_) => None,
+            ResourceLogicVerifyingKey::Uncompressed(vk) => Some(vk.clone()),
+            ResourceLogicVerifyingKey::Compressed(_) => None,
         }
     }
 
     pub fn get_compressed(&self) -> pallas::Base {
         match self {
-            ValidityPredicateVerifyingKey::Uncompressed(vk) => {
+            ResourceLogicVerifyingKey::Uncompressed(vk) => {
                 let mut hasher = Blake2bParams::new()
                     .hash_length(64)
                     .personal(b"Halo2-Verify-Key")
@@ -46,35 +46,35 @@ impl ValidityPredicateVerifyingKey {
                 // Hash in final Blake2bState
                 pallas::Base::from_uniform_bytes(hasher.finalize().as_array())
             }
-            ValidityPredicateVerifyingKey::Compressed(v) => *v,
+            ResourceLogicVerifyingKey::Compressed(v) => *v,
         }
     }
 }
 
-impl Default for ValidityPredicateVerifyingKey {
-    fn default() -> ValidityPredicateVerifyingKey {
-        ValidityPredicateVerifyingKey::Compressed(pallas::Base::one())
+impl Default for ResourceLogicVerifyingKey {
+    fn default() -> ResourceLogicVerifyingKey {
+        ResourceLogicVerifyingKey::Compressed(pallas::Base::one())
     }
 }
 
-impl Hash for ValidityPredicateVerifyingKey {
+impl Hash for ResourceLogicVerifyingKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         let compressed = self.get_compressed();
         compressed.to_repr().as_ref().hash(state);
     }
 }
 
-impl PartialEq for ValidityPredicateVerifyingKey {
+impl PartialEq for ResourceLogicVerifyingKey {
     fn eq(&self, other: &Self) -> bool {
         self.get_compressed() == other.get_compressed()
     }
 }
 
-impl Eq for ValidityPredicateVerifyingKey {}
+impl Eq for ResourceLogicVerifyingKey {}
 
 #[test]
-fn test_vpd_hashing() {
-    use crate::circuit::vp_examples::tests::random_trivial_vp_circuit;
+fn test_resource_logicd_hashing() {
+    use crate::circuit::resource_logic_examples::tests::random_trivial_resource_logic_circuit;
     use halo2_proofs::plonk;
     use rand::rngs::OsRng;
     use std::{collections::hash_map::DefaultHasher, hash::Hasher};
@@ -85,39 +85,45 @@ fn test_vpd_hashing() {
         s.finish()
     }
 
-    let circuit1 = random_trivial_vp_circuit(&mut OsRng);
-    let circuit2 = random_trivial_vp_circuit(&mut OsRng);
-    let circuit3 = random_trivial_vp_circuit(&mut OsRng);
+    let circuit1 = random_trivial_resource_logic_circuit(&mut OsRng);
+    let circuit2 = random_trivial_resource_logic_circuit(&mut OsRng);
+    let circuit3 = random_trivial_resource_logic_circuit(&mut OsRng);
 
     let params1 = halo2_proofs::poly::commitment::Params::new(12);
     let vk1 = plonk::keygen_vk(&params1, &circuit1).unwrap();
-    let vpd1 = ValidityPredicateVerifyingKey::from_vk(vk1.clone());
+    let resource_logicd1 = ResourceLogicVerifyingKey::from_vk(vk1.clone());
     let vk1s = format!("{:?}", vk1.pinned());
 
     let params2 = halo2_proofs::poly::commitment::Params::new(12);
     let vk2 = plonk::keygen_vk(&params2, &circuit2).unwrap();
-    let vpd2 = ValidityPredicateVerifyingKey::from_vk(vk2.clone());
+    let resource_logicd2 = ResourceLogicVerifyingKey::from_vk(vk2.clone());
     let vk2s = format!("{:?}", vk2.pinned());
 
     // Same circuit, same param => same key
     assert_eq!(vk1s, vk2s); // check that the keys are actually the same
-    assert_eq!(calculate_hash(&vpd1), calculate_hash(&vpd2)); // check that the hashes are the same
-    assert_eq!(vpd1, vpd2); // check that the vpd's are equal
+    assert_eq!(
+        calculate_hash(&resource_logicd1),
+        calculate_hash(&resource_logicd2)
+    ); // check that the hashes are the same
+    assert_eq!(resource_logicd1, resource_logicd2); // check that the resource_logicd's are equal
 
     let params3 = halo2_proofs::poly::commitment::Params::new(13); // different param => different key
     let vk3 = plonk::keygen_vk(&params3, &circuit3).unwrap();
-    let vpd3 = ValidityPredicateVerifyingKey::from_vk(vk3.clone());
+    let resource_logicd3 = ResourceLogicVerifyingKey::from_vk(vk3.clone());
     let vk3s = format!("{:?}", vk3.pinned());
 
     // Same circuit, different param => different key
     assert_ne!(vk1s, vk3s); // check that the keys are actually different
-    assert_ne!(calculate_hash(&vpd1), calculate_hash(&vpd3)); // check that the hashes are different
-    assert_ne!(vpd1, vpd3); // check that the vpd's are not equal
+    assert_ne!(
+        calculate_hash(&resource_logicd1),
+        calculate_hash(&resource_logicd3)
+    ); // check that the hashes are different
+    assert_ne!(resource_logicd1, resource_logicd3); // check that the resource_logicd's are not equal
 
     // test with actual hashset
     use std::collections::HashSet;
     let mut set = HashSet::new();
-    assert!(set.insert(vpd1));
-    assert!(!set.insert(vpd2));
-    assert!(set.insert(vpd3));
+    assert!(set.insert(resource_logicd1));
+    assert!(!set.insert(resource_logicd2));
+    assert!(set.insert(resource_logicd3));
 }

@@ -1,23 +1,23 @@
 use crate::{
     circuit::{
-        blake2s::publicize_default_dynamic_vp_commitments,
+        blake2s::publicize_default_dynamic_resource_logic_commitments,
         gadgets::{
             assign_free_advice, poseidon_hash::poseidon_hash_gadget,
             target_resource_variable::get_owned_resource_variable,
         },
-        vp_bytecode::{ValidityPredicateByteCode, ValidityPredicateRepresentation},
-        vp_circuit::{
-            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
+        resource_logic_bytecode::{ResourceLogicByteCode, ResourceLogicRepresentation},
+        resource_logic_circuit::{
+            BasicResourceLogicVariables, ResourceLogicCircuit, ResourceLogicConfig,
+            ResourceLogicPublicInputs, ResourceLogicVerifyingInfo, ResourceLogicVerifyingInfoTrait,
         },
     },
     constant::{TaigaFixedBasesFull, NUM_RESOURCE, SETUP_PARAMS_MAP},
     error::TransactionError,
     proof::Proof,
     resource::{RandomSeed, Resource},
+    resource_logic_commitment::ResourceLogicCommitment,
+    resource_logic_vk::ResourceLogicVerifyingKey,
     utils::{mod_r_p, poseidon_hash_n, read_base_field, read_point, read_scalar_field},
-    vp_commitment::ValidityPredicateCommitment,
-    vp_vk::ValidityPredicateVerifyingKey,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_gadgets::ecc::{chip::EccChip, FixedPoint, NonIdentityPoint, ScalarFixed, ScalarVar};
@@ -39,8 +39,8 @@ use rand::RngCore;
 const MESSAGE_LEN: usize = NUM_RESOURCE * 2;
 const POSEIDON_HASH_LEN: usize = MESSAGE_LEN + 4;
 lazy_static! {
-    pub static ref TOKEN_AUTH_VK: ValidityPredicateVerifyingKey =
-        SignatureVerificationValidityPredicateCircuit::default().get_vp_vk();
+    pub static ref TOKEN_AUTH_VK: ResourceLogicVerifyingKey =
+        SignatureVerificationResourceLogicCircuit::default().get_resource_logic_vk();
     pub static ref COMPRESSED_TOKEN_AUTH_VK: pallas::Base = TOKEN_AUTH_VK.get_compressed();
 }
 
@@ -91,33 +91,33 @@ impl SchnorrSignature {
     }
 }
 
-// SignatureVerificationValidityPredicateCircuit uses the schnorr signature.
+// SignatureVerificationResourceLogicCircuit uses the schnorr signature.
 #[derive(Clone, Debug, Default)]
-pub struct SignatureVerificationValidityPredicateCircuit {
+pub struct SignatureVerificationResourceLogicCircuit {
     pub owned_resource_id: pallas::Base,
     pub input_resources: [Resource; NUM_RESOURCE],
     pub output_resources: [Resource; NUM_RESOURCE],
-    pub vp_vk: pallas::Base,
+    pub resource_logic_vk: pallas::Base,
     pub signature: SchnorrSignature,
-    pub receiver_vp_vk: pallas::Base,
+    pub receiver_resource_logic_vk: pallas::Base,
 }
 
-impl SignatureVerificationValidityPredicateCircuit {
+impl SignatureVerificationResourceLogicCircuit {
     pub fn new(
         owned_resource_id: pallas::Base,
         input_resources: [Resource; NUM_RESOURCE],
         output_resources: [Resource; NUM_RESOURCE],
-        vp_vk: pallas::Base,
+        resource_logic_vk: pallas::Base,
         signature: SchnorrSignature,
-        receiver_vp_vk: pallas::Base,
+        receiver_resource_logic_vk: pallas::Base,
     ) -> Self {
         Self {
             owned_resource_id,
             input_resources,
             output_resources,
-            vp_vk,
+            resource_logic_vk,
             signature,
-            receiver_vp_vk,
+            receiver_resource_logic_vk,
         }
     }
 
@@ -126,9 +126,9 @@ impl SignatureVerificationValidityPredicateCircuit {
         owned_resource_id: pallas::Base,
         input_resources: [Resource; NUM_RESOURCE],
         output_resources: [Resource; NUM_RESOURCE],
-        vp_vk: pallas::Base,
+        resource_logic_vk: pallas::Base,
         sk: pallas::Scalar,
-        receiver_vp_vk: pallas::Base,
+        receiver_resource_logic_vk: pallas::Base,
     ) -> Self {
         assert_eq!(NUM_RESOURCE, 2);
         let mut message = vec![];
@@ -146,15 +146,15 @@ impl SignatureVerificationValidityPredicateCircuit {
             owned_resource_id,
             input_resources,
             output_resources,
-            vp_vk,
+            resource_logic_vk,
             signature,
-            receiver_vp_vk,
+            receiver_resource_logic_vk,
         }
     }
 
-    pub fn to_bytecode(&self) -> ValidityPredicateByteCode {
-        ValidityPredicateByteCode::new(
-            ValidityPredicateRepresentation::SignatureVerification,
+    pub fn to_bytecode(&self) -> ResourceLogicByteCode {
+        ResourceLogicByteCode::new(
+            ResourceLogicRepresentation::SignatureVerification,
             self.to_bytes(),
         )
     }
@@ -168,13 +168,13 @@ impl SignatureVerificationValidityPredicateCircuit {
     }
 }
 
-impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit {
+impl ResourceLogicCircuit for SignatureVerificationResourceLogicCircuit {
     // Add custom constraints
     fn custom_constraints(
         &self,
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
-        basic_variables: BasicValidityPredicateVariables,
+        basic_variables: BasicResourceLogicVariables,
     ) -> Result<(), Error> {
         // Construct an ECC chip
         let ecc_chip = EccChip::construct(config.ecc_config);
@@ -194,22 +194,27 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
             &basic_variables.get_value_searchable_pairs(),
         )?;
 
-        let auth_vp_vk = assign_free_advice(
-            layouter.namespace(|| "witness auth vp vk"),
+        let auth_resource_logic_vk = assign_free_advice(
+            layouter.namespace(|| "witness auth resource_logic vk"),
             config.advices[0],
-            Value::known(self.vp_vk),
+            Value::known(self.resource_logic_vk),
         )?;
-        let receiver_vp_vk = assign_free_advice(
-            layouter.namespace(|| "witness receiver vp vk"),
+        let receiver_resource_logic_vk = assign_free_advice(
+            layouter.namespace(|| "witness receiver resource_logic vk"),
             config.advices[0],
-            Value::known(self.receiver_vp_vk),
+            Value::known(self.receiver_resource_logic_vk),
         )?;
 
         // Decode the value, and check the value encoding
         let encoded_value = poseidon_hash_gadget(
             config.poseidon_config.clone(),
             layouter.namespace(|| "value encoding"),
-            [pk.inner().x(), pk.inner().y(), auth_vp_vk, receiver_vp_vk],
+            [
+                pk.inner().x(),
+                pk.inner().y(),
+                auth_resource_logic_vk,
+                receiver_resource_logic_vk,
+            ],
         )?;
 
         layouter.assign_region(
@@ -265,8 +270,8 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
 
         s_g.constrain_equal(layouter.namespace(|| "s*G = R + Hash(r||P||m)*P"), &rhs)?;
 
-        // Publicize the dynamic vp commitments with default value
-        publicize_default_dynamic_vp_commitments(
+        // Publicize the dynamic resource_logic commitments with default value
+        publicize_default_dynamic_resource_logic_commitments(
             &mut layouter,
             config.advices[0],
             config.instances,
@@ -283,13 +288,13 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
         &self.output_resources
     }
 
-    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
+    fn get_public_inputs(&self, mut rng: impl RngCore) -> ResourceLogicPublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
-        let default_vp_cm: [pallas::Base; 2] =
-            ValidityPredicateCommitment::default().to_public_inputs();
-        public_inputs.extend(default_vp_cm);
-        public_inputs.extend(default_vp_cm);
-        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
+        let default_resource_logic_cm: [pallas::Base; 2] =
+            ResourceLogicCommitment::default().to_public_inputs();
+        public_inputs.extend(default_resource_logic_cm);
+        public_inputs.extend(default_resource_logic_cm);
+        let padding = ResourceLogicPublicInputs::get_public_input_padding(
             public_inputs.len(),
             &RandomSeed::random(&mut rng),
         );
@@ -302,10 +307,10 @@ impl ValidityPredicateCircuit for SignatureVerificationValidityPredicateCircuit 
     }
 }
 
-vp_circuit_impl!(SignatureVerificationValidityPredicateCircuit);
-vp_verifying_info_impl!(SignatureVerificationValidityPredicateCircuit);
+resource_logic_circuit_impl!(SignatureVerificationResourceLogicCircuit);
+resource_logic_verifying_info_impl!(SignatureVerificationResourceLogicCircuit);
 
-impl BorshSerialize for SignatureVerificationValidityPredicateCircuit {
+impl BorshSerialize for SignatureVerificationResourceLogicCircuit {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         writer.write_all(&self.owned_resource_id.to_repr())?;
         for input in self.input_resources.iter() {
@@ -316,15 +321,15 @@ impl BorshSerialize for SignatureVerificationValidityPredicateCircuit {
             output.serialize(writer)?;
         }
 
-        writer.write_all(&self.vp_vk.to_repr())?;
+        writer.write_all(&self.resource_logic_vk.to_repr())?;
         self.signature.serialize(writer)?;
-        writer.write_all(&self.receiver_vp_vk.to_repr())?;
+        writer.write_all(&self.receiver_resource_logic_vk.to_repr())?;
 
         Ok(())
     }
 }
 
-impl BorshDeserialize for SignatureVerificationValidityPredicateCircuit {
+impl BorshDeserialize for SignatureVerificationResourceLogicCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let owned_resource_id = read_base_field(reader)?;
         let input_resources: Vec<_> = (0..NUM_RESOURCE)
@@ -333,16 +338,16 @@ impl BorshDeserialize for SignatureVerificationValidityPredicateCircuit {
         let output_resources: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
-        let vp_vk = read_base_field(reader)?;
+        let resource_logic_vk = read_base_field(reader)?;
         let signature = SchnorrSignature::deserialize_reader(reader)?;
-        let receiver_vp_vk = read_base_field(reader)?;
+        let receiver_resource_logic_vk = read_base_field(reader)?;
         Ok(Self {
             owned_resource_id,
             input_resources: input_resources.try_into().unwrap(),
             output_resources: output_resources.try_into().unwrap(),
-            vp_vk,
+            resource_logic_vk,
             signature,
-            receiver_vp_vk,
+            receiver_resource_logic_vk,
         })
     }
 }
@@ -367,11 +372,11 @@ impl BorshDeserialize for SchnorrSignature {
 }
 
 #[test]
-fn test_halo2_sig_verification_vp_circuit() {
-    use crate::circuit::vp_examples::{
-        receiver_vp::COMPRESSED_RECEIVER_VK, token::TokenAuthorization,
+fn test_halo2_sig_verification_resource_logic_circuit() {
+    use crate::circuit::resource_logic_examples::{
+        receiver_resource_logic::COMPRESSED_RECEIVER_VK, token::TokenAuthorization,
     };
-    use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
+    use crate::constant::RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE;
     use crate::resource::tests::random_resource;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
@@ -385,7 +390,7 @@ fn test_halo2_sig_verification_vp_circuit() {
         let auth = TokenAuthorization::from_sk_vk(&sk, &auth_vk);
         input_resources[0].value = auth.to_value();
         let owned_resource_id = input_resources[0].get_nf().unwrap().inner();
-        SignatureVerificationValidityPredicateCircuit::from_sk_and_sign(
+        SignatureVerificationResourceLogicCircuit::from_sk_and_sign(
             &mut rng,
             owned_resource_id,
             input_resources,
@@ -399,13 +404,13 @@ fn test_halo2_sig_verification_vp_circuit() {
     // Test serialization
     let circuit = {
         let circuit_bytes = circuit.to_bytes();
-        SignatureVerificationValidityPredicateCircuit::from_bytes(&circuit_bytes)
+        SignatureVerificationResourceLogicCircuit::from_bytes(&circuit_bytes)
     };
 
     let public_inputs = circuit.get_public_inputs(&mut rng);
 
     let prover = MockProver::<pallas::Base>::run(
-        VP_CIRCUIT_PARAMS_SIZE,
+        RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE,
         &circuit,
         vec![public_inputs.to_vec()],
     )

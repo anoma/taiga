@@ -10,11 +10,11 @@ pub enum TransactionError {
     InvalidBindingSignature,
     /// Binding signature is missing.
     MissingBindingSignatures,
-    /// Nullifier is not consistent between the compliance and the vp.
+    /// Nullifier is inconsistent between the compliance and the resource logic.
     InconsistentNullifier,
-    /// Output resource commitment is not consistent between the compliance and the vp.
+    /// Output resource commitment is inconsistent between the compliance and the resource logic.
     InconsistentOutputResourceCommitment,
-    /// Owned resource id is not consistent between the compliance and the vp.
+    /// Owned resource id is inconsistent between the compliance and the resource logic.
     InconsistentOwnedResourceID,
     /// IO error
     IoError(std::io::Error),
@@ -24,8 +24,8 @@ pub enum TransactionError {
     MissingTransparentResourceMerklePath,
     /// Shielded partial Tx binding signature r is missing
     MissingPartialTxBindingSignatureR,
-    /// ValidityPredicateRepresentation is not valid
-    InvalidValidityPredicateRepresentation,
+    /// ResourceLogicRepresentation is not valid
+    InvalidResourceLogicRepresentation,
 }
 
 impl Display for TransactionError {
@@ -36,13 +36,13 @@ impl Display for TransactionError {
             InvalidBindingSignature => f.write_str("Binding signature was invalid"),
             MissingBindingSignatures => f.write_str("Binding signature is missing"),
             InconsistentNullifier => {
-                f.write_str("Nullifier is not consistent between the compliance and the vp")
+                f.write_str("Nullifier is not consistent between the compliance and the resource logic")
             }
             InconsistentOutputResourceCommitment => f.write_str(
-                "Output resource commitment is not consistent between the compliance and the vp",
+                "Output resource commitment is not consistent between the compliance and the resource logic",
             ),
             InconsistentOwnedResourceID => {
-                f.write_str("Owned resource id is not consistent between the compliance and the vp")
+                f.write_str("Owned resource id is not consistent between the compliance and the resource logic")
             }
             IoError(e) => f.write_str(&format!("IoError error: {e}")),
             MissingTransparentResourceNullifierKey => {
@@ -54,8 +54,8 @@ impl Display for TransactionError {
             MissingPartialTxBindingSignatureR => {
                 f.write_str("Shielded partial Tx binding signature r is missing")
             }
-            InvalidValidityPredicateRepresentation => {
-                f.write_str("ValidityPredicateRepresentation is not valid, add borsh feature if using native vp examples ")
+            InvalidResourceLogicRepresentation => {
+                f.write_str("ResourceLogicRepresentation is not valid, add borsh feature if using native resource logic examples ")
             }
         }
     }

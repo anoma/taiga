@@ -1,4 +1,4 @@
-use crate::circuit::blake2s::{vp_commitment_gadget, Blake2sChip, Blake2sConfig};
+use crate::circuit::blake2s::{resource_logic_commitment_gadget, Blake2sChip, Blake2sConfig};
 use crate::circuit::gadgets::assign_free_advice;
 use crate::circuit::hash_to_curve::HashToCurveConfig;
 use crate::circuit::integrity::{
@@ -10,9 +10,9 @@ use crate::circuit::merkle_circuit::{
 use crate::constant::{
     TaigaFixedBases, COMPLIANCE_ANCHOR_PUBLIC_INPUT_ROW_IDX,
     COMPLIANCE_DELTA_CM_X_PUBLIC_INPUT_ROW_IDX, COMPLIANCE_DELTA_CM_Y_PUBLIC_INPUT_ROW_IDX,
-    COMPLIANCE_INPUT_VP_CM_1_ROW_IDX, COMPLIANCE_INPUT_VP_CM_2_ROW_IDX,
+    COMPLIANCE_INPUT_RESOURCE_LOGIC_CM_1_ROW_IDX, COMPLIANCE_INPUT_RESOURCE_LOGIC_CM_2_ROW_IDX,
     COMPLIANCE_NF_PUBLIC_INPUT_ROW_IDX, COMPLIANCE_OUTPUT_CM_PUBLIC_INPUT_ROW_IDX,
-    COMPLIANCE_OUTPUT_VP_CM_1_ROW_IDX, COMPLIANCE_OUTPUT_VP_CM_2_ROW_IDX,
+    COMPLIANCE_OUTPUT_RESOURCE_LOGIC_CM_1_ROW_IDX, COMPLIANCE_OUTPUT_RESOURCE_LOGIC_CM_2_ROW_IDX,
     TAIGA_COMMITMENT_TREE_DEPTH,
 };
 use crate::merkle_tree::LR;
@@ -60,10 +60,10 @@ pub struct ComplianceCircuit {
     pub output_resource: Resource,
     /// random scalar for delta commitment
     pub rcv: pallas::Scalar,
-    /// The randomness for input resource application vp commitment
-    pub input_vp_cm_r: pallas::Base,
-    /// The randomness for output resource application vp commitment
-    pub output_vp_cm_r: pallas::Base,
+    /// The randomness of input resource logic commitment
+    pub input_resource_logic_cm_r: pallas::Base,
+    /// The randomness of output resource logic commitment
+    pub output_resource_logic_cm_r: pallas::Base,
 }
 
 impl Circuit<pallas::Base> for ComplianceCircuit {
@@ -277,50 +277,50 @@ impl Circuit<pallas::Base> for ComplianceCircuit {
             },
         )?;
 
-        // Input resource application VP commitment
-        let input_vp_cm_r = assign_free_advice(
-            layouter.namespace(|| "witness input_vp_cm_r"),
+        // Input resource logic commitment
+        let input_resource_logic_cm_r = assign_free_advice(
+            layouter.namespace(|| "witness input_resource_logic_cm_r"),
             config.advices[0],
-            Value::known(self.input_vp_cm_r),
+            Value::known(self.input_resource_logic_cm_r),
         )?;
-        let input_vp_commitment = vp_commitment_gadget(
+        let input_resource_logic_commitment = resource_logic_commitment_gadget(
             &mut layouter,
             &blake2s_chip,
             input_resource_variables.resource_variables.logic.clone(),
-            input_vp_cm_r,
+            input_resource_logic_cm_r,
         )?;
         layouter.constrain_instance(
-            input_vp_commitment[0].cell(),
+            input_resource_logic_commitment[0].cell(),
             config.instances,
-            COMPLIANCE_INPUT_VP_CM_1_ROW_IDX,
+            COMPLIANCE_INPUT_RESOURCE_LOGIC_CM_1_ROW_IDX,
         )?;
         layouter.constrain_instance(
-            input_vp_commitment[1].cell(),
+            input_resource_logic_commitment[1].cell(),
             config.instances,
-            COMPLIANCE_INPUT_VP_CM_2_ROW_IDX,
+            COMPLIANCE_INPUT_RESOURCE_LOGIC_CM_2_ROW_IDX,
         )?;
 
-        // Output resource application VP commitment
-        let output_vp_cm_r = assign_free_advice(
-            layouter.namespace(|| "witness output_vp_cm_r"),
+        // Output resource logic commitment
+        let output_resource_logic_cm_r = assign_free_advice(
+            layouter.namespace(|| "witness output_resource_logic_cm_r"),
             config.advices[0],
-            Value::known(self.output_vp_cm_r),
+            Value::known(self.output_resource_logic_cm_r),
         )?;
-        let output_vp_commitment = vp_commitment_gadget(
+        let output_resource_logic_commitment = resource_logic_commitment_gadget(
             &mut layouter,
             &blake2s_chip,
             output_resource_vars.resource_variables.logic.clone(),
-            output_vp_cm_r,
+            output_resource_logic_cm_r,
         )?;
         layouter.constrain_instance(
-            output_vp_commitment[0].cell(),
+            output_resource_logic_commitment[0].cell(),
             config.instances,
-            COMPLIANCE_OUTPUT_VP_CM_1_ROW_IDX,
+            COMPLIANCE_OUTPUT_RESOURCE_LOGIC_CM_1_ROW_IDX,
         )?;
         layouter.constrain_instance(
-            output_vp_commitment[1].cell(),
+            output_resource_logic_commitment[1].cell(),
             config.instances,
-            COMPLIANCE_OUTPUT_VP_CM_2_ROW_IDX,
+            COMPLIANCE_OUTPUT_RESOURCE_LOGIC_CM_2_ROW_IDX,
         )?;
 
         Ok(())

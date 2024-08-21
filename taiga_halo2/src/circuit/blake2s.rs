@@ -1,11 +1,13 @@
 use super::gadgets::assign_free_advice;
 use crate::circuit::gadgets::assign_free_constant;
 use crate::constant::{
-    VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_1, VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_2,
-    VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_1, VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_2,
-    VP_COMMITMENT_PERSONALIZATION,
+    RESOURCE_LOGIC_CIRCUIT_FIRST_DYNAMIC_RESOURCE_LOGIC_CM_1,
+    RESOURCE_LOGIC_CIRCUIT_FIRST_DYNAMIC_RESOURCE_LOGIC_CM_2,
+    RESOURCE_LOGIC_CIRCUIT_SECOND_DYNAMIC_RESOURCE_LOGIC_CM_1,
+    RESOURCE_LOGIC_CIRCUIT_SECOND_DYNAMIC_RESOURCE_LOGIC_CM_2,
+    RESOURCE_LOGIC_COMMITMENT_PERSONALIZATION,
 };
-use crate::vp_commitment::ValidityPredicateCommitment;
+use crate::resource_logic_commitment::ResourceLogicCommitment;
 use byteorder::{ByteOrder, LittleEndian};
 use group::ff::PrimeField;
 use halo2_gadgets::utilities::bool_check;
@@ -18,37 +20,57 @@ use halo2_proofs::{
 };
 use std::{convert::TryInto, marker::PhantomData};
 
-pub fn vp_commitment_gadget<F: PrimeField>(
+pub fn resource_logic_commitment_gadget<F: PrimeField>(
     layouter: &mut impl Layouter<F>,
     blake2s_chip: &Blake2sChip<F>,
-    vp: AssignedCell<F, F>,
+    resource_logic: AssignedCell<F, F>,
     rcm: AssignedCell<F, F>,
 ) -> Result<[AssignedCell<F, F>; 2], Error> {
-    let hash = blake2s_chip.process(layouter, &[vp, rcm], VP_COMMITMENT_PERSONALIZATION)?;
+    let hash = blake2s_chip.process(
+        layouter,
+        &[resource_logic, rcm],
+        RESOURCE_LOGIC_COMMITMENT_PERSONALIZATION,
+    )?;
     blake2s_chip.encode_result(layouter, &hash)
 }
 
-pub fn publicize_default_dynamic_vp_commitments<F: PrimeField>(
+pub fn publicize_default_dynamic_resource_logic_commitments<F: PrimeField>(
     layouter: &mut impl Layouter<F>,
     advice: Column<Advice>,
     instances: Column<Instance>,
 ) -> Result<(), Error> {
-    let vp_cm_fields: [F; 2] = ValidityPredicateCommitment::default().to_public_inputs();
-    let vp_cm_1 = assign_free_advice(
-        layouter.namespace(|| "vp_cm 1"),
+    let resource_logic_cm_fields: [F; 2] = ResourceLogicCommitment::default().to_public_inputs();
+    let resource_logic_cm_1 = assign_free_advice(
+        layouter.namespace(|| "resource_logic_cm 1"),
         advice,
-        Value::known(vp_cm_fields[0]),
+        Value::known(resource_logic_cm_fields[0]),
     )?;
-    let vp_cm_2 = assign_free_advice(
-        layouter.namespace(|| "vp_cm 2"),
+    let resource_logic_cm_2 = assign_free_advice(
+        layouter.namespace(|| "resource_logic_cm 2"),
         advice,
-        Value::known(vp_cm_fields[1]),
+        Value::known(resource_logic_cm_fields[1]),
     )?;
 
-    layouter.constrain_instance(vp_cm_1.cell(), instances, VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_1)?;
-    layouter.constrain_instance(vp_cm_2.cell(), instances, VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_2)?;
-    layouter.constrain_instance(vp_cm_1.cell(), instances, VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_1)?;
-    layouter.constrain_instance(vp_cm_2.cell(), instances, VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_2)?;
+    layouter.constrain_instance(
+        resource_logic_cm_1.cell(),
+        instances,
+        RESOURCE_LOGIC_CIRCUIT_FIRST_DYNAMIC_RESOURCE_LOGIC_CM_1,
+    )?;
+    layouter.constrain_instance(
+        resource_logic_cm_2.cell(),
+        instances,
+        RESOURCE_LOGIC_CIRCUIT_FIRST_DYNAMIC_RESOURCE_LOGIC_CM_2,
+    )?;
+    layouter.constrain_instance(
+        resource_logic_cm_1.cell(),
+        instances,
+        RESOURCE_LOGIC_CIRCUIT_SECOND_DYNAMIC_RESOURCE_LOGIC_CM_1,
+    )?;
+    layouter.constrain_instance(
+        resource_logic_cm_2.cell(),
+        instances,
+        RESOURCE_LOGIC_CIRCUIT_SECOND_DYNAMIC_RESOURCE_LOGIC_CM_2,
+    )?;
 
     Ok(())
 }
@@ -541,7 +563,7 @@ impl<F: PrimeField> Blake2sChip<F> {
         // |   v[14] := v[14] ^ 0xFF..FF   // Invert all bits.
         // END IF.
         let v_14 = if f {
-            Blake2sWord::from_constant_u32(IV[6] ^ u32::max_value(), layouter, self)?
+            Blake2sWord::from_constant_u32(IV[6] ^ u32::MAX, layouter, self)?
         } else {
             Blake2sWord::from_constant_u32(IV[6], layouter, self)?
         };
@@ -1082,8 +1104,8 @@ impl<F: PrimeField> Blake2sWord<F> {
 #[test]
 fn test_blake2s_circuit() {
     use crate::{
-        circuit::gadgets::assign_free_advice, constant::VP_COMMITMENT_PERSONALIZATION,
-        vp_commitment::ValidityPredicateCommitment,
+        circuit::gadgets::assign_free_advice, constant::RESOURCE_LOGIC_COMMITMENT_PERSONALIZATION,
+        resource_logic_commitment::ResourceLogicCommitment,
     };
     use halo2_proofs::{
         circuit::{floor_planner, Layouter, Value},
@@ -1131,12 +1153,12 @@ fn test_blake2s_circuit() {
             config: Self::Config,
             mut layouter: impl Layouter<pallas::Base>,
         ) -> Result<(), Error> {
-            let vp = pallas::Base::one();
+            let resource_logic = pallas::Base::one();
             let rcm = pallas::Base::one();
-            let vp_var = assign_free_advice(
+            let resource_logic_var = assign_free_advice(
                 layouter.namespace(|| "message one"),
                 config.advices[0],
-                Value::known(vp),
+                Value::known(resource_logic),
             )?;
             let rcm_var = assign_free_advice(
                 layouter.namespace(|| "message two"),
@@ -1147,11 +1169,11 @@ fn test_blake2s_circuit() {
             let blake2s_chip = Blake2sChip::construct(config);
             let words_result = blake2s_chip.process(
                 &mut layouter,
-                &[vp_var, rcm_var],
-                VP_COMMITMENT_PERSONALIZATION,
+                &[resource_logic_var, rcm_var],
+                RESOURCE_LOGIC_COMMITMENT_PERSONALIZATION,
             )?;
 
-            let expect_ret = ValidityPredicateCommitment::commit(&vp, &rcm);
+            let expect_ret = ResourceLogicCommitment::commit(&resource_logic, &rcm);
             let expect_words_result: Vec<u32> = expect_ret
                 .to_bytes()
                 .chunks(4)

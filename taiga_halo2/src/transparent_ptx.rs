@@ -1,7 +1,8 @@
 use crate::{
-    circuit::vp_bytecode::ApplicationByteCode, compliance::ComplianceInfo, constant::NUM_RESOURCE,
-    delta_commitment::DeltaCommitment, error::TransactionError, executable::Executable,
-    merkle_tree::Anchor, nullifier::Nullifier, resource::ResourceCommitment,
+    circuit::resource_logic_bytecode::ApplicationByteCode, compliance::ComplianceInfo,
+    constant::NUM_RESOURCE, delta_commitment::DeltaCommitment, error::TransactionError,
+    executable::Executable, merkle_tree::Anchor, nullifier::Nullifier,
+    resource::ResourceCommitment,
 };
 
 use pasta_curves::pallas;
@@ -43,20 +44,22 @@ impl TransparentPartialTransaction {
 
 impl Executable for TransparentPartialTransaction {
     fn execute(&self) -> Result<(), TransactionError> {
-        // check VPs, nullifiers, and resource commitments
+        // check resource logics, nullifiers, and resource commitments
         let compliance_nfs = self.get_nullifiers();
         let compliance_cms = self.get_output_cms();
-        for (vp, nf) in self.input_resource_app.iter().zip(compliance_nfs.iter()) {
-            let owned_resource_id = vp.verify_transparently(&compliance_nfs, &compliance_cms)?;
-            // Check all resources are checked
+        for (resource_logic, nf) in self.input_resource_app.iter().zip(compliance_nfs.iter()) {
+            let owned_resource_id =
+                resource_logic.verify_transparently(&compliance_nfs, &compliance_cms)?;
+            // Make sure all resource logics are checked
             if owned_resource_id != nf.inner() {
                 return Err(TransactionError::InconsistentOwnedResourceID);
             }
         }
 
-        for (vp, cm) in self.output_resource_app.iter().zip(compliance_cms.iter()) {
-            let owned_resource_id = vp.verify_transparently(&compliance_nfs, &compliance_cms)?;
-            // Check all resources are checked
+        for (resource_logic, cm) in self.output_resource_app.iter().zip(compliance_cms.iter()) {
+            let owned_resource_id =
+                resource_logic.verify_transparently(&compliance_nfs, &compliance_cms)?;
+            // Make sure all resource logics are checked
             if owned_resource_id != cm.inner() {
                 return Err(TransactionError::InconsistentOwnedResourceID);
             }
@@ -102,7 +105,7 @@ impl Executable for TransparentPartialTransaction {
 #[cfg(feature = "borsh")]
 pub mod testing {
     use crate::{
-        circuit::vp_examples::TrivialValidityPredicateCircuit,
+        circuit::resource_logic_examples::TrivialResourceLogicCircuit,
         constant::TAIGA_COMMITMENT_TREE_DEPTH, merkle_tree::MerklePath,
         resource::tests::random_resource, transparent_ptx::*,
     };
@@ -145,43 +148,43 @@ pub mod testing {
 
         // construct applications
         let input_resource_1_app = {
-            let app_vp = TrivialValidityPredicateCircuit::new(
+            let app_resource_logic = TrivialResourceLogicCircuit::new(
                 input_resource_1.get_nf().unwrap().inner(),
                 [input_resource_1, input_resource_2],
                 [output_resource_1, output_resource_2],
             );
 
-            ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
+            ApplicationByteCode::new(app_resource_logic.to_bytecode(), vec![])
         };
 
         let input_resource_2_app = {
-            let app_vp = TrivialValidityPredicateCircuit::new(
+            let app_resource_logic = TrivialResourceLogicCircuit::new(
                 input_resource_2.get_nf().unwrap().inner(),
                 [input_resource_1, input_resource_2],
                 [output_resource_1, output_resource_2],
             );
 
-            ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
+            ApplicationByteCode::new(app_resource_logic.to_bytecode(), vec![])
         };
 
         let output_resource_1_app = {
-            let app_vp = TrivialValidityPredicateCircuit::new(
+            let app_resource_logic = TrivialResourceLogicCircuit::new(
                 output_resource_1.commitment().inner(),
                 [input_resource_1, input_resource_2],
                 [output_resource_1, output_resource_2],
             );
 
-            ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
+            ApplicationByteCode::new(app_resource_logic.to_bytecode(), vec![])
         };
 
         let output_resource_2_app = {
-            let app_vp = TrivialValidityPredicateCircuit::new(
+            let app_resource_logic = TrivialResourceLogicCircuit::new(
                 output_resource_2.commitment().inner(),
                 [input_resource_1, input_resource_2],
                 [output_resource_1, output_resource_2],
             );
 
-            ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
+            ApplicationByteCode::new(app_resource_logic.to_bytecode(), vec![])
         };
 
         TransparentPartialTransaction::new(

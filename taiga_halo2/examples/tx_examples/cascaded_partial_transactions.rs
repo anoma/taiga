@@ -5,15 +5,15 @@ use halo2_proofs::arithmetic::Field;
 use pasta_curves::pallas;
 use rand::{CryptoRng, RngCore};
 use taiga_halo2::{
-    circuit::vp_examples::{
-        cascade_intent::{create_intent_resource, CascadeIntentValidityPredicateCircuit},
+    circuit::resource_logic_examples::{
+        cascade_intent::{create_intent_resource, CascadeIntentResourceLogicCircuit},
         signature_verification::COMPRESSED_TOKEN_AUTH_VK,
         token::{Token, TokenAuthorization},
     },
     compliance::ComplianceInfo,
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
-    resource::ResourceValidityPredicates,
+    resource::ResourceLogics,
     shielded_ptx::ShieldedPartialTransaction,
     transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
 };
@@ -77,58 +77,70 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
             vec![compliance_1, compliance_2]
         };
 
-        // Create VPs
-        let (input_vps, output_vps) = {
+        // Create resource logics
+        let (input_resource_logics, output_resource_logics) = {
             let input_resources = [*input_resource_1.resource(), *input_resource_2.resource()];
             let output_resources = [*output_resource_1.resource(), cascade_intent_resource];
 
-            // Create the input resource_1 vps
-            let input_resource_1_vps = input_resource_1.generate_input_token_vps(
-                &mut rng,
-                alice_auth,
-                alice_auth_sk,
-                input_resources,
-                output_resources,
-            );
+            // Create resource logics for the input resource_1
+            let input_resource_1_resource_logics = input_resource_1
+                .generate_input_token_resource_logics(
+                    &mut rng,
+                    alice_auth,
+                    alice_auth_sk,
+                    input_resources,
+                    output_resources,
+                );
 
-            // Create the input resource_2 vps
-            let input_resource_2_vps = input_resource_2.generate_input_token_vps(
-                &mut rng,
-                alice_auth,
-                alice_auth_sk,
-                input_resources,
-                output_resources,
-            );
+            // Create resource logics for the input resource_2
+            let input_resource_2_resource_logics = input_resource_2
+                .generate_input_token_resource_logics(
+                    &mut rng,
+                    alice_auth,
+                    alice_auth_sk,
+                    input_resources,
+                    output_resources,
+                );
 
-            // Create the output resource_1 vps
-            let output_resource_1_vps = output_resource_1.generate_output_token_vps(
-                &mut rng,
-                bob_auth,
-                input_resources,
-                output_resources,
-            );
+            // Create resource logics for the output resource_1
+            let output_resource_1_resource_logics = output_resource_1
+                .generate_output_token_resource_logics(
+                    &mut rng,
+                    bob_auth,
+                    input_resources,
+                    output_resources,
+                );
 
-            // Create intent vps
-            let intent_vps = {
-                let intent_vp = CascadeIntentValidityPredicateCircuit {
+            // Create resource logics for the intent
+            let intent_resource_logics = {
+                let intent_resource_logic = CascadeIntentResourceLogicCircuit {
                     owned_resource_id: cascade_intent_resource.commitment().inner(),
                     input_resources,
                     output_resources,
                     cascade_resource_cm: cascade_intent_resource.get_label(),
                 };
 
-                ResourceValidityPredicates::new(Box::new(intent_vp), vec![])
+                ResourceLogics::new(Box::new(intent_resource_logic), vec![])
             };
 
             (
-                vec![input_resource_1_vps, input_resource_2_vps],
-                vec![output_resource_1_vps, intent_vps],
+                vec![
+                    input_resource_1_resource_logics,
+                    input_resource_2_resource_logics,
+                ],
+                vec![output_resource_1_resource_logics, intent_resource_logics],
             )
         };
 
         // Create shielded partial tx
-        ShieldedPartialTransaction::build(compliances, input_vps, output_vps, vec![], &mut rng)
-            .unwrap()
+        ShieldedPartialTransaction::build(
+            compliances,
+            input_resource_logics,
+            output_resource_logics,
+            vec![],
+            &mut rng,
+        )
+        .unwrap()
     };
 
     // The second partial transaction:
@@ -155,57 +167,69 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
             vec![compliance_1, compliance_2]
         };
 
-        // Create VPs
-        let (input_vps, output_vps) = {
+        // Create resource logics
+        let (input_resource_logics, output_resource_logics) = {
             let input_resources = [cascade_intent_resource, *input_resource_3.resource()];
             let output_resources = [*output_resource_2.resource(), *output_resource_3.resource()];
 
-            // Create intent vps
-            let intent_vps = {
-                let intent_vp = CascadeIntentValidityPredicateCircuit {
+            // Create resource_logics for the intent
+            let intent_resource_logics = {
+                let intent_resource_logic = CascadeIntentResourceLogicCircuit {
                     owned_resource_id: cascade_intent_resource.get_nf().unwrap().inner(),
                     input_resources,
                     output_resources,
                     cascade_resource_cm: cascade_intent_resource.get_label(),
                 };
 
-                ResourceValidityPredicates::new(Box::new(intent_vp), vec![])
+                ResourceLogics::new(Box::new(intent_resource_logic), vec![])
             };
 
-            // Create input resource_3 vps
-            let input_resource_3_vps = input_resource_3.generate_input_token_vps(
-                &mut rng,
-                alice_auth,
-                alice_auth_sk,
-                input_resources,
-                output_resources,
-            );
+            // Create resource logics for the input resource_3
+            let input_resource_3_resource_logics = input_resource_3
+                .generate_input_token_resource_logics(
+                    &mut rng,
+                    alice_auth,
+                    alice_auth_sk,
+                    input_resources,
+                    output_resources,
+                );
 
-            // Create output resource_2 vps
-            let output_resource_2_vps = output_resource_2.generate_output_token_vps(
-                &mut rng,
-                bob_auth,
-                input_resources,
-                output_resources,
-            );
+            // Create resource_logics for the output resource_2
+            let output_resource_2_resource_logics = output_resource_2
+                .generate_output_token_resource_logics(
+                    &mut rng,
+                    bob_auth,
+                    input_resources,
+                    output_resources,
+                );
 
-            // Create output resource_3 vps
-            let output_resource_3_vps = output_resource_3.generate_output_token_vps(
-                &mut rng,
-                bob_auth,
-                input_resources,
-                output_resources,
-            );
+            // Create resource_logics for the output resource_3
+            let output_resource_3_resource_logics = output_resource_3
+                .generate_output_token_resource_logics(
+                    &mut rng,
+                    bob_auth,
+                    input_resources,
+                    output_resources,
+                );
 
             (
-                vec![intent_vps, input_resource_3_vps],
-                vec![output_resource_2_vps, output_resource_3_vps],
+                vec![intent_resource_logics, input_resource_3_resource_logics],
+                vec![
+                    output_resource_2_resource_logics,
+                    output_resource_3_resource_logics,
+                ],
             )
         };
 
         // Create shielded partial tx
-        ShieldedPartialTransaction::build(compliances, input_vps, output_vps, vec![], &mut rng)
-            .unwrap()
+        ShieldedPartialTransaction::build(
+            compliances,
+            input_resource_logics,
+            output_resource_logics,
+            vec![],
+            &mut rng,
+        )
+        .unwrap()
     };
 
     // Create the final transaction

@@ -4,7 +4,8 @@ use crate::circuit::gadgets::{
 };
 use crate::constant::{
     BaseFieldGenerators, TaigaFixedBases, POSEIDON_RATE, POSEIDON_WIDTH,
-    RESOURCE_ENCRYPTION_PLAINTEXT_NUM, VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
+    RESOURCE_ENCRYPTION_PLAINTEXT_NUM,
+    RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
 };
 use ff::PrimeField;
 use halo2_gadgets::{
@@ -130,7 +131,7 @@ pub fn resource_encryption_gadget(
         layouter.constrain_instance(
             ele.cell(),
             instances,
-            VP_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX + i,
+            RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX + i,
         )?;
     }
 

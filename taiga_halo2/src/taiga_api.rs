@@ -1,6 +1,6 @@
 #[cfg(feature = "borsh")]
 use crate::{
-    circuit::vp_bytecode::ApplicationByteCode, compliance::ComplianceInfo,
+    circuit::resource_logic_bytecode::ApplicationByteCode, compliance::ComplianceInfo,
     transaction::TransactionResult,
 };
 use crate::{
@@ -52,7 +52,6 @@ pub fn create_input_resource(
     )
 }
 
-///
 pub fn create_output_resource(
     logic: pallas::Base,
     label: pallas::Base,
@@ -108,22 +107,22 @@ pub fn resource_deserialize(bytes: Vec<u8>) -> std::io::Result<Resource> {
 /// | Parameters                        | type                  | size(bytes)   |
 /// |       -                           |       -               |   -           |
 /// | 2 compliance proofs               | ComplianceVerifyingInfo| 4676 * 2      |
-/// | input1 static vp proof            | VPVerifyingInfo       | 158216        |
-/// | input1 dynamic vp num(by borsh)   | u32                   | 4             |
-/// | input1 dynamic vp proof           | VPVerifyingInfo       | 158216 * num  |
-/// | input2 static vp proof            | VPVerifyingInfo       | 158216        |
-/// | input2 dynamic vp num(by borsh)   | u32                   | 4             |
-/// | input2 dynamic vp proof           | VPVerifyingInfo       | 158216 * num  |
-/// | output1 static vp proof           | VPVerifyingInfo       | 158216        |
-/// | output1 dynamic vp num(by borsh)  | u32                   | 4             |
-/// | output1 dynamic vp proofs         | VPVerifyingInfo       | 158216 * num  |
-/// | output2 static vp proof           | VPVerifyingInfo       | 158216        |
-/// | output2 dynamic vp num(by borsh)  | u32                   | 4             |
-/// | output2 dynamic vp proofs         | VPVerifyingInfo       | 158216 * num  |
+/// | input1 static resource_logic proof            | ResourceLogicVerifyingInfo       | 158216        |
+/// | input1 dynamic resource_logic num(by borsh)   | u32                   | 4             |
+/// | input1 dynamic resource_logic proof           | ResourceLogicVerifyingInfo       | 158216 * num  |
+/// | input2 static resource_logic proof            | ResourceLogicVerifyingInfo       | 158216        |
+/// | input2 dynamic resource_logic num(by borsh)   | u32                   | 4             |
+/// | input2 dynamic resource_logic proof           | ResourceLogicVerifyingInfo       | 158216 * num  |
+/// | output1 static resource_logic proof           | ResourceLogicVerifyingInfo       | 158216        |
+/// | output1 dynamic resource_logic num(by borsh)  | u32                   | 4             |
+/// | output1 dynamic resource_logic proofs         | ResourceLogicVerifyingInfo       | 158216 * num  |
+/// | output2 static resource_logic proof           | ResourceLogicVerifyingInfo       | 158216        |
+/// | output2 dynamic resource_logic num(by borsh)  | u32                   | 4             |
+/// | output2 dynamic resource_logic proofs         | ResourceLogicVerifyingInfo       | 158216 * num  |
 /// | binding_sig_r                     | Option<pallas::Scalar>| 1 or (1 + 32) |
 /// | hints                             | Vec<u8>               | -             |
 ///
-/// Resource: Ultimately, vp proofs won't go to the ptx. It's verifier proofs instead.
+/// Resource: Ultimately, resource_logic proofs won't go to the ptx. It's verifier proofs instead.
 /// The verifier proof may have a much smaller size since the verifier verifying-key
 /// is a constant and can be cached.
 #[cfg(feature = "borsh")]
@@ -160,7 +159,7 @@ pub fn transaction_deserialize(bytes: Vec<u8>) -> std::io::Result<Transaction> {
     BorshDeserialize::deserialize(&mut bytes.as_ref())
 }
 
-/// Create a shielded partial transaction from vp bytecode
+/// Create a shielded partial transaction from resource_logic bytecode
 #[cfg(feature = "borsh")]
 pub fn create_shielded_partial_transaction(
     compliances: Vec<ComplianceInfo>,
@@ -255,7 +254,7 @@ pub mod tests {
     // #[ignore]
     #[test]
     fn ptx_example_test() {
-        use crate::circuit::vp_examples::TrivialValidityPredicateCircuit;
+        use crate::circuit::resource_logic_examples::TrivialResourceLogicCircuit;
         use crate::compliance::ComplianceInfo;
         use crate::constant::TAIGA_COMMITMENT_TREE_DEPTH;
         use crate::merkle_tree::MerklePath;
@@ -290,43 +289,43 @@ pub mod tests {
 
         // construct applications
         let input_resource_1_app = {
-            let app_vp = TrivialValidityPredicateCircuit::new(
+            let app_resource_logic = TrivialResourceLogicCircuit::new(
                 input_resource_1_nf.inner(),
                 [input_resource_1, input_resource_2],
                 [output_resource_1, output_resource_2],
             );
 
-            ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
+            ApplicationByteCode::new(app_resource_logic.to_bytecode(), vec![])
         };
 
         let input_resource_2_app = {
-            let app_vp = TrivialValidityPredicateCircuit::new(
+            let app_resource_logic = TrivialResourceLogicCircuit::new(
                 input_resource_2_nf.inner(),
                 [input_resource_1, input_resource_2],
                 [output_resource_1, output_resource_2],
             );
 
-            ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
+            ApplicationByteCode::new(app_resource_logic.to_bytecode(), vec![])
         };
 
         let output_resource_1_app = {
-            let app_vp = TrivialValidityPredicateCircuit::new(
+            let app_resource_logic = TrivialResourceLogicCircuit::new(
                 output_resource_1.commitment().inner(),
                 [input_resource_1, input_resource_2],
                 [output_resource_1, output_resource_2],
             );
 
-            ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
+            ApplicationByteCode::new(app_resource_logic.to_bytecode(), vec![])
         };
 
         let output_resource_2_app = {
-            let app_vp = TrivialValidityPredicateCircuit::new(
+            let app_resource_logic = TrivialResourceLogicCircuit::new(
                 output_resource_2.commitment().inner(),
                 [input_resource_1, input_resource_2],
                 [output_resource_1, output_resource_2],
             );
 
-            ApplicationByteCode::new(app_vp.to_bytecode(), vec![])
+            ApplicationByteCode::new(app_resource_logic.to_bytecode(), vec![])
         };
 
         // construct ptx

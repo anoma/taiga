@@ -1,33 +1,37 @@
 use crate::{
     circuit::{
-        blake2s::{vp_commitment_gadget, Blake2sChip},
+        blake2s::{resource_logic_commitment_gadget, Blake2sChip},
         gadgets::{
             assign_free_advice, assign_free_constant,
             poseidon_hash::poseidon_hash_gadget,
             target_resource_variable::{get_is_input_resource_flag, get_owned_resource_variable},
         },
-        vp_bytecode::{ValidityPredicateByteCode, ValidityPredicateRepresentation},
-        vp_circuit::{
-            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
+        resource_logic_bytecode::{ResourceLogicByteCode, ResourceLogicRepresentation},
+        resource_logic_circuit::{
+            BasicResourceLogicVariables, ResourceLogicCircuit, ResourceLogicConfig,
+            ResourceLogicPublicInputs, ResourceLogicVerifyingInfo, ResourceLogicVerifyingInfoTrait,
         },
-        vp_examples::receiver_vp::{ReceiverValidityPredicateCircuit, COMPRESSED_RECEIVER_VK},
-        vp_examples::signature_verification::{
-            SignatureVerificationValidityPredicateCircuit, COMPRESSED_TOKEN_AUTH_VK,
+        resource_logic_examples::receiver_resource_logic::{
+            ReceiverResourceLogicCircuit, COMPRESSED_RECEIVER_VK,
+        },
+        resource_logic_examples::signature_verification::{
+            SignatureVerificationResourceLogicCircuit, COMPRESSED_TOKEN_AUTH_VK,
         },
     },
     constant::{
-        NUM_RESOURCE, PRF_EXPAND_DYNAMIC_VP_1_CM_R, SETUP_PARAMS_MAP,
-        VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_1, VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_2,
-        VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_1, VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_2,
+        NUM_RESOURCE, PRF_EXPAND_DYNAMIC_RESOURCE_LOGIC_1_CM_R,
+        RESOURCE_LOGIC_CIRCUIT_FIRST_DYNAMIC_RESOURCE_LOGIC_CM_1,
+        RESOURCE_LOGIC_CIRCUIT_FIRST_DYNAMIC_RESOURCE_LOGIC_CM_2,
+        RESOURCE_LOGIC_CIRCUIT_SECOND_DYNAMIC_RESOURCE_LOGIC_CM_1,
+        RESOURCE_LOGIC_CIRCUIT_SECOND_DYNAMIC_RESOURCE_LOGIC_CM_2, SETUP_PARAMS_MAP,
     },
     error::TransactionError,
     nullifier::Nullifier,
     proof::Proof,
-    resource::{RandomSeed, Resource, ResourceValidityPredicates},
+    resource::{RandomSeed, Resource, ResourceLogics},
+    resource_logic_commitment::ResourceLogicCommitment,
+    resource_logic_vk::ResourceLogicVerifyingKey,
     utils::{poseidon_hash_n, read_base_field, read_point},
-    vp_commitment::ValidityPredicateCommitment,
-    vp_vk::ValidityPredicateVerifyingKey,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use ff::Field;
@@ -43,8 +47,8 @@ use pasta_curves::{group::ff::PrimeField, pallas};
 use rand::{rngs::OsRng, Rng, RngCore};
 
 lazy_static! {
-    pub static ref TOKEN_VK: ValidityPredicateVerifyingKey =
-        TokenValidityPredicateCircuit::default().get_vp_vk();
+    pub static ref TOKEN_VK: ResourceLogicVerifyingKey =
+        TokenResourceLogicCircuit::default().get_resource_logic_vk();
     pub static ref COMPRESSED_TOKEN_VK: pallas::Base = TOKEN_VK.get_compressed();
 }
 
@@ -178,32 +182,32 @@ impl TokenResource {
         &self.resource
     }
 
-    pub fn generate_input_token_vps<R: RngCore>(
+    pub fn generate_input_token_resource_logics<R: RngCore>(
         &self,
         mut rng: R,
         auth: TokenAuthorization,
         auth_sk: pallas::Scalar,
         input_resources: [Resource; NUM_RESOURCE],
         output_resources: [Resource; NUM_RESOURCE],
-    ) -> ResourceValidityPredicates {
+    ) -> ResourceLogics {
         let TokenResource {
             token_name,
             resource,
         } = self;
-        // token VP
+        // token resource logic
         let nf = resource.get_nf().unwrap().inner();
-        let token_vp = TokenValidityPredicateCircuit {
+        let token_resource_logic = TokenResourceLogicCircuit {
             owned_resource_id: nf,
             input_resources,
             output_resources,
             token_name: token_name.clone(),
             auth,
-            receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
+            receiver_resource_logic_vk: *COMPRESSED_RECEIVER_VK,
             rseed: RandomSeed::random(&mut rng),
         };
 
-        // token auth VP
-        let token_auth_vp = SignatureVerificationValidityPredicateCircuit::from_sk_and_sign(
+        // token auth resource logic
+        let token_auth_resource_logic = SignatureVerificationResourceLogicCircuit::from_sk_and_sign(
             &mut rng,
             nf,
             input_resources,
@@ -213,52 +217,58 @@ impl TokenResource {
             *COMPRESSED_RECEIVER_VK,
         );
 
-        ResourceValidityPredicates::new(Box::new(token_vp), vec![Box::new(token_auth_vp)])
+        ResourceLogics::new(
+            Box::new(token_resource_logic),
+            vec![Box::new(token_auth_resource_logic)],
+        )
     }
 
-    pub fn generate_output_token_vps<R: RngCore>(
+    pub fn generate_output_token_resource_logics<R: RngCore>(
         &self,
         mut rng: R,
         auth: TokenAuthorization,
         input_resources: [Resource; NUM_RESOURCE],
         output_resources: [Resource; NUM_RESOURCE],
-    ) -> ResourceValidityPredicates {
+    ) -> ResourceLogics {
         let TokenResource {
             token_name,
             resource,
         } = self;
 
         let owned_resource_id = resource.commitment().inner();
-        // token VP
-        let token_vp = TokenValidityPredicateCircuit {
+        // token resource logic
+        let token_resource_logic = TokenResourceLogicCircuit {
             owned_resource_id,
             input_resources,
             output_resources,
             token_name: token_name.clone(),
             auth,
-            receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
+            receiver_resource_logic_vk: *COMPRESSED_RECEIVER_VK,
             rseed: RandomSeed::random(&mut rng),
         };
 
-        // receiver VP
-        let receiver_vp = ReceiverValidityPredicateCircuit {
+        // receiver resource logic
+        let receiver_resource_logic = ReceiverResourceLogicCircuit {
             owned_resource_id,
             input_resources,
             output_resources,
-            vp_vk: *COMPRESSED_RECEIVER_VK,
+            resource_logic_vk: *COMPRESSED_RECEIVER_VK,
             encrypt_nonce: pallas::Base::from_u128(rng.gen()),
             sk: pallas::Base::random(&mut rng),
             rcv_pk: auth.pk,
-            auth_vp_vk: *COMPRESSED_TOKEN_AUTH_VK,
+            auth_resource_logic_vk: *COMPRESSED_TOKEN_AUTH_VK,
         };
 
-        ResourceValidityPredicates::new(Box::new(token_vp), vec![Box::new(receiver_vp)])
+        ResourceLogics::new(
+            Box::new(token_resource_logic),
+            vec![Box::new(receiver_resource_logic)],
+        )
     }
 }
 
-// TokenValidityPredicateCircuit
+// TokenResourceLogicCircuit
 #[derive(Clone, Debug)]
-pub struct TokenValidityPredicateCircuit {
+pub struct TokenResourceLogicCircuit {
     pub owned_resource_id: pallas::Base,
     pub input_resources: [Resource; NUM_RESOURCE],
     pub output_resources: [Resource; NUM_RESOURCE],
@@ -266,8 +276,8 @@ pub struct TokenValidityPredicateCircuit {
     pub token_name: TokenName,
     // The auth goes to value and defines how to consume and create the resource.
     pub auth: TokenAuthorization,
-    pub receiver_vp_vk: pallas::Base,
-    // rseed is to generate the randomness for vp commitment
+    pub receiver_resource_logic_vk: pallas::Base,
+    // rseed is to generate the randomness for resource_logic commitment
     pub rseed: RandomSeed,
 }
 
@@ -286,9 +296,9 @@ impl Default for TokenAuthorization {
     }
 }
 
-impl TokenValidityPredicateCircuit {
-    pub fn to_bytecode(&self) -> ValidityPredicateByteCode {
-        ValidityPredicateByteCode::new(ValidityPredicateRepresentation::Token, self.to_bytes())
+impl TokenResourceLogicCircuit {
+    pub fn to_bytecode(&self) -> ResourceLogicByteCode {
+        ResourceLogicByteCode::new(ResourceLogicRepresentation::Token, self.to_bytes())
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -300,7 +310,7 @@ impl TokenValidityPredicateCircuit {
     }
 }
 
-impl Default for TokenValidityPredicateCircuit {
+impl Default for TokenResourceLogicCircuit {
     fn default() -> Self {
         Self {
             owned_resource_id: pallas::Base::zero(),
@@ -308,19 +318,19 @@ impl Default for TokenValidityPredicateCircuit {
             output_resources: [(); NUM_RESOURCE].map(|_| Resource::default()),
             token_name: TokenName("Token_name".to_string()),
             auth: TokenAuthorization::default(),
-            receiver_vp_vk: pallas::Base::zero(),
+            receiver_resource_logic_vk: pallas::Base::zero(),
             rseed: RandomSeed::default(),
         }
     }
 }
 
-impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
+impl ResourceLogicCircuit for TokenResourceLogicCircuit {
     // Add custom constraints
     fn custom_constraints(
         &self,
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
-        basic_variables: BasicValidityPredicateVariables,
+        basic_variables: BasicResourceLogicVariables,
     ) -> Result<(), Error> {
         let owned_resource_id = basic_variables.get_owned_resource_id();
 
@@ -355,8 +365,8 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             Value::known(self.auth.pk.to_affine()),
         )?;
 
-        let auth_vp_vk = assign_free_advice(
-            layouter.namespace(|| "witness auth vp vk"),
+        let auth_resource_logic_vk = assign_free_advice(
+            layouter.namespace(|| "witness auth resource_logic vk"),
             config.advices[0],
             Value::known(self.auth.vk),
         )?;
@@ -369,10 +379,10 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             &basic_variables.get_value_searchable_pairs(),
         )?;
 
-        let receiver_vp_vk = assign_free_advice(
-            layouter.namespace(|| "witness receiver vp vk"),
+        let receiver_resource_logic_vk = assign_free_advice(
+            layouter.namespace(|| "witness receiver resource_logic vk"),
             config.advices[0],
-            Value::known(self.receiver_vp_vk),
+            Value::known(self.receiver_resource_logic_vk),
         )?;
 
         // Decode the value, and check the value encoding
@@ -382,8 +392,8 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             [
                 pk.inner().x(),
                 pk.inner().y(),
-                auth_vp_vk.clone(),
-                receiver_vp_vk.clone(),
+                auth_resource_logic_vk.clone(),
+                receiver_resource_logic_vk.clone(),
             ],
         )?;
 
@@ -409,10 +419,10 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
             |mut region| region.constrain_equal(is_ephemeral.cell(), constant_zero.cell()),
         )?;
 
-        // VP Commitment
-        // Commt the sender(authorization method included) vp if it's an input resource;
-        // Commit the receiver(resource encryption constraints included) vp if it's an output resource.
-        let first_dynamic_vp = {
+        // Resource Logic Commitment
+        // Commt the sender(authorization method included) resource_logic if it's an input resource;
+        // Commit the receiver(resource encryption constraints included) resource_logic if it's an output resource.
+        let first_dynamic_resource_logic = {
             let is_input_resource = get_is_input_resource_flag(
                 config.get_is_input_resource_flag_config,
                 layouter.namespace(|| "get is_input_resource_flag"),
@@ -425,8 +435,8 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
                 |mut region| {
                     config.conditional_select_config.assign_region(
                         &is_input_resource,
-                        &auth_vp_vk,
-                        &receiver_vp_vk,
+                        &auth_resource_logic_vk,
+                        &receiver_resource_logic_vk,
                         0,
                         &mut region,
                     )
@@ -436,48 +446,55 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
 
         // Construct a blake2s chip
         let blake2s_chip = Blake2sChip::construct(config.blake2s_config);
-        let vp_cm_r = assign_free_advice(
-            layouter.namespace(|| "vp_cm_r"),
+        let resource_logic_cm_r = assign_free_advice(
+            layouter.namespace(|| "resource_logic_cm_r"),
             config.advices[0],
-            Value::known(self.rseed.get_vp_cm_r(PRF_EXPAND_DYNAMIC_VP_1_CM_R)),
+            Value::known(
+                self.rseed
+                    .get_resource_logic_cm_r(PRF_EXPAND_DYNAMIC_RESOURCE_LOGIC_1_CM_R),
+            ),
         )?;
-        let first_dynamic_vp_cm =
-            vp_commitment_gadget(&mut layouter, &blake2s_chip, first_dynamic_vp, vp_cm_r)?;
-
-        layouter.constrain_instance(
-            first_dynamic_vp_cm[0].cell(),
-            config.instances,
-            VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_1,
-        )?;
-        layouter.constrain_instance(
-            first_dynamic_vp_cm[1].cell(),
-            config.instances,
-            VP_CIRCUIT_FIRST_DYNAMIC_VP_CM_2,
-        )?;
-
-        // Publicize the second dynamic vp commitment with default value
-        let vp_cm_fields: [pallas::Base; 2] =
-            ValidityPredicateCommitment::default().to_public_inputs();
-        let vp_cm_1 = assign_free_advice(
-            layouter.namespace(|| "vp_cm 1"),
-            config.advices[0],
-            Value::known(vp_cm_fields[0]),
-        )?;
-        let vp_cm_2 = assign_free_advice(
-            layouter.namespace(|| "vp_cm 2"),
-            config.advices[0],
-            Value::known(vp_cm_fields[1]),
+        let first_dynamic_resource_logic_cm = resource_logic_commitment_gadget(
+            &mut layouter,
+            &blake2s_chip,
+            first_dynamic_resource_logic,
+            resource_logic_cm_r,
         )?;
 
         layouter.constrain_instance(
-            vp_cm_1.cell(),
+            first_dynamic_resource_logic_cm[0].cell(),
             config.instances,
-            VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_1,
+            RESOURCE_LOGIC_CIRCUIT_FIRST_DYNAMIC_RESOURCE_LOGIC_CM_1,
         )?;
         layouter.constrain_instance(
-            vp_cm_2.cell(),
+            first_dynamic_resource_logic_cm[1].cell(),
             config.instances,
-            VP_CIRCUIT_SECOND_DYNAMIC_VP_CM_2,
+            RESOURCE_LOGIC_CIRCUIT_FIRST_DYNAMIC_RESOURCE_LOGIC_CM_2,
+        )?;
+
+        // Publicize the second dynamic resource_logic commitment with default value
+        let resource_logic_cm_fields: [pallas::Base; 2] =
+            ResourceLogicCommitment::default().to_public_inputs();
+        let resource_logic_cm_1 = assign_free_advice(
+            layouter.namespace(|| "resource_logic_cm 1"),
+            config.advices[0],
+            Value::known(resource_logic_cm_fields[0]),
+        )?;
+        let resource_logic_cm_2 = assign_free_advice(
+            layouter.namespace(|| "resource_logic_cm 2"),
+            config.advices[0],
+            Value::known(resource_logic_cm_fields[1]),
+        )?;
+
+        layouter.constrain_instance(
+            resource_logic_cm_1.cell(),
+            config.instances,
+            RESOURCE_LOGIC_CIRCUIT_SECOND_DYNAMIC_RESOURCE_LOGIC_CM_1,
+        )?;
+        layouter.constrain_instance(
+            resource_logic_cm_2.cell(),
+            config.instances,
+            RESOURCE_LOGIC_CIRCUIT_SECOND_DYNAMIC_RESOURCE_LOGIC_CM_2,
         )?;
 
         Ok(())
@@ -491,25 +508,29 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
         &self.output_resources
     }
 
-    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
+    fn get_public_inputs(&self, mut rng: impl RngCore) -> ResourceLogicPublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
-        let dynamic_vp = if self.owned_resource_id == self.output_resources[0].commitment().inner()
+        let dynamic_resource_logic = if self.owned_resource_id
+            == self.output_resources[0].commitment().inner()
             || self.owned_resource_id == self.output_resources[1].commitment().inner()
         {
-            self.receiver_vp_vk
+            self.receiver_resource_logic_vk
         } else {
             self.auth.vk
         };
 
-        let vp_com_r = self.rseed.get_vp_cm_r(PRF_EXPAND_DYNAMIC_VP_1_CM_R);
-        let vp_com: [pallas::Base; 2] =
-            ValidityPredicateCommitment::commit(&dynamic_vp, &vp_com_r).to_public_inputs();
+        let resource_logic_com_r = self
+            .rseed
+            .get_resource_logic_cm_r(PRF_EXPAND_DYNAMIC_RESOURCE_LOGIC_1_CM_R);
+        let resource_logic_com: [pallas::Base; 2] =
+            ResourceLogicCommitment::commit(&dynamic_resource_logic, &resource_logic_com_r)
+                .to_public_inputs();
 
-        public_inputs.extend(vp_com);
-        let default_vp_cm: [pallas::Base; 2] =
-            ValidityPredicateCommitment::default().to_public_inputs();
-        public_inputs.extend(default_vp_cm);
-        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
+        public_inputs.extend(resource_logic_com);
+        let default_resource_logic_cm: [pallas::Base; 2] =
+            ResourceLogicCommitment::default().to_public_inputs();
+        public_inputs.extend(default_resource_logic_cm);
+        let padding = ResourceLogicPublicInputs::get_public_input_padding(
             public_inputs.len(),
             &RandomSeed::random(&mut rng),
         );
@@ -522,10 +543,10 @@ impl ValidityPredicateCircuit for TokenValidityPredicateCircuit {
     }
 }
 
-vp_circuit_impl!(TokenValidityPredicateCircuit);
-vp_verifying_info_impl!(TokenValidityPredicateCircuit);
+resource_logic_circuit_impl!(TokenResourceLogicCircuit);
+resource_logic_verifying_info_impl!(TokenResourceLogicCircuit);
 
-impl BorshSerialize for TokenValidityPredicateCircuit {
+impl BorshSerialize for TokenResourceLogicCircuit {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         writer.write_all(&self.owned_resource_id.to_repr())?;
         for input in self.input_resources.iter() {
@@ -538,14 +559,14 @@ impl BorshSerialize for TokenValidityPredicateCircuit {
 
         self.token_name.serialize(writer)?;
         self.auth.serialize(writer)?;
-        writer.write_all(&self.receiver_vp_vk.to_repr())?;
+        writer.write_all(&self.receiver_resource_logic_vk.to_repr())?;
         self.rseed.serialize(writer)?;
 
         Ok(())
     }
 }
 
-impl BorshDeserialize for TokenValidityPredicateCircuit {
+impl BorshDeserialize for TokenResourceLogicCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let owned_resource_id = read_base_field(reader)?;
         let input_resources: Vec<_> = (0..NUM_RESOURCE)
@@ -556,7 +577,7 @@ impl BorshDeserialize for TokenValidityPredicateCircuit {
             .collect::<Result<_, _>>()?;
         let token_name = TokenName::deserialize_reader(reader)?;
         let auth = TokenAuthorization::deserialize_reader(reader)?;
-        let receiver_vp_vk = read_base_field(reader)?;
+        let receiver_resource_logic_vk = read_base_field(reader)?;
         let rseed = RandomSeed::deserialize_reader(reader)?;
         Ok(Self {
             owned_resource_id,
@@ -564,7 +585,7 @@ impl BorshDeserialize for TokenValidityPredicateCircuit {
             output_resources: output_resources.try_into().unwrap(),
             token_name,
             auth,
-            receiver_vp_vk,
+            receiver_resource_logic_vk,
             rseed,
         })
     }
@@ -617,8 +638,8 @@ impl TokenAuthorization {
 }
 
 #[test]
-fn test_halo2_token_vp_circuit() {
-    use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
+fn test_halo2_token_resource_logic_circuit() {
+    use crate::constant::RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE;
     use crate::resource::tests::random_resource;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
@@ -631,13 +652,13 @@ fn test_halo2_token_vp_circuit() {
         let auth = TokenAuthorization::random(&mut rng);
         input_resources[0].kind.label = token_name.encode();
         input_resources[0].value = auth.to_value();
-        TokenValidityPredicateCircuit {
+        TokenResourceLogicCircuit {
             owned_resource_id: input_resources[0].get_nf().unwrap().inner(),
             input_resources,
             output_resources,
             token_name,
             auth,
-            receiver_vp_vk: *COMPRESSED_RECEIVER_VK,
+            receiver_resource_logic_vk: *COMPRESSED_RECEIVER_VK,
             rseed: RandomSeed::random(&mut rng),
         }
     };
@@ -645,13 +666,13 @@ fn test_halo2_token_vp_circuit() {
     // Test serialization
     let circuit = {
         let circuit_bytes = circuit.to_bytes();
-        TokenValidityPredicateCircuit::from_bytes(&circuit_bytes)
+        TokenResourceLogicCircuit::from_bytes(&circuit_bytes)
     };
 
     let public_inputs = circuit.get_public_inputs(&mut rng);
 
     let prover = MockProver::<pallas::Base>::run(
-        VP_CIRCUIT_PARAMS_SIZE,
+        RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE,
         &circuit,
         vec![public_inputs.to_vec()],
     )

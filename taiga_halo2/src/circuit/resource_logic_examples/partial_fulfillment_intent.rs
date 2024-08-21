@@ -1,29 +1,28 @@
-/// The intent can be partially fulfilled.
-/// For example, Alice has 5 BTC and wants 10 ETH.
-/// Alice utilizes this intent to do a partial swap in proportion. She can exchange 2 BTC for 4 ETH and get 3 BTC back.
-///
+/// The intent can be "partially fulfilled". For instance, Alice has 5 BTC and
+/// wants 10 ETH. Alice utilizes this intent to swap a portion proportionally,
+/// exchanging 2 BTC for 4 ETH and receiving back 3 BTC.
 use crate::{
     circuit::{
-        blake2s::publicize_default_dynamic_vp_commitments,
+        blake2s::publicize_default_dynamic_resource_logic_commitments,
         gadgets::{
             assign_free_constant,
             mul::MulChip,
             sub::{SubChip, SubInstructions},
             target_resource_variable::{get_is_input_resource_flag, get_owned_resource_variable},
         },
-        vp_bytecode::{ValidityPredicateByteCode, ValidityPredicateRepresentation},
-        vp_circuit::{
-            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
+        resource_logic_bytecode::{ResourceLogicByteCode, ResourceLogicRepresentation},
+        resource_logic_circuit::{
+            BasicResourceLogicVariables, ResourceLogicCircuit, ResourceLogicConfig,
+            ResourceLogicPublicInputs, ResourceLogicVerifyingInfo, ResourceLogicVerifyingInfoTrait,
         },
     },
     constant::{NUM_RESOURCE, SETUP_PARAMS_MAP},
     error::TransactionError,
     proof::Proof,
     resource::{RandomSeed, Resource},
+    resource_logic_commitment::ResourceLogicCommitment,
+    resource_logic_vk::ResourceLogicVerifyingKey,
     utils::read_base_field,
-    vp_commitment::ValidityPredicateCommitment,
-    vp_vk::ValidityPredicateVerifyingKey,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_proofs::{
@@ -42,25 +41,25 @@ mod label;
 use label::PartialFulfillmentIntentLabel;
 
 lazy_static! {
-    pub static ref PARTIAL_FULFILLMENT_INTENT_VK: ValidityPredicateVerifyingKey =
-        PartialFulfillmentIntentValidityPredicateCircuit::default().get_vp_vk();
+    pub static ref PARTIAL_FULFILLMENT_INTENT_VK: ResourceLogicVerifyingKey =
+        PartialFulfillmentIntentResourceLogicCircuit::default().get_resource_logic_vk();
     pub static ref COMPRESSED_PARTIAL_FULFILLMENT_INTENT_VK: pallas::Base =
         PARTIAL_FULFILLMENT_INTENT_VK.get_compressed();
 }
 
-// PartialFulfillmentIntentValidityPredicateCircuit
+// PartialFulfillmentIntentResourceLogicCircuit
 #[derive(Clone, Debug, Default)]
-pub struct PartialFulfillmentIntentValidityPredicateCircuit {
+pub struct PartialFulfillmentIntentResourceLogicCircuit {
     pub owned_resource_id: pallas::Base,
     pub input_resources: [Resource; NUM_RESOURCE],
     pub output_resources: [Resource; NUM_RESOURCE],
     pub swap: Swap,
 }
 
-impl PartialFulfillmentIntentValidityPredicateCircuit {
-    pub fn to_bytecode(&self) -> ValidityPredicateByteCode {
-        ValidityPredicateByteCode::new(
-            ValidityPredicateRepresentation::PartialFulfillmentIntent,
+impl PartialFulfillmentIntentResourceLogicCircuit {
+    pub fn to_bytecode(&self) -> ResourceLogicByteCode {
+        ResourceLogicByteCode::new(
+            ResourceLogicRepresentation::PartialFulfillmentIntent,
             self.to_bytes(),
         )
     }
@@ -74,13 +73,13 @@ impl PartialFulfillmentIntentValidityPredicateCircuit {
     }
 }
 
-impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircuit {
+impl ResourceLogicCircuit for PartialFulfillmentIntentResourceLogicCircuit {
     // Add custom constraints
     fn custom_constraints(
         &self,
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
-        basic_variables: BasicValidityPredicateVariables,
+        basic_variables: BasicResourceLogicVariables,
     ) -> Result<(), Error> {
         let sub_chip = SubChip::construct(config.sub_config.clone(), ());
         let mul_chip = MulChip::construct(config.mul_config.clone());
@@ -158,8 +157,8 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
             layouter.namespace(|| "is_partial_fulfillment checks"),
         )?;
 
-        // Publicize the dynamic vp commitments with default value
-        publicize_default_dynamic_vp_commitments(
+        // Publicize the dynamic resource_logic commitments with default value
+        publicize_default_dynamic_resource_logic_commitments(
             &mut layouter,
             config.advices[0],
             config.instances,
@@ -176,13 +175,13 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
         &self.output_resources
     }
 
-    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
+    fn get_public_inputs(&self, mut rng: impl RngCore) -> ResourceLogicPublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
-        let default_vp_cm: [pallas::Base; 2] =
-            ValidityPredicateCommitment::default().to_public_inputs();
-        public_inputs.extend(default_vp_cm);
-        public_inputs.extend(default_vp_cm);
-        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
+        let default_resource_logic_cm: [pallas::Base; 2] =
+            ResourceLogicCommitment::default().to_public_inputs();
+        public_inputs.extend(default_resource_logic_cm);
+        public_inputs.extend(default_resource_logic_cm);
+        let padding = ResourceLogicPublicInputs::get_public_input_padding(
             public_inputs.len(),
             &RandomSeed::random(&mut rng),
         );
@@ -195,10 +194,10 @@ impl ValidityPredicateCircuit for PartialFulfillmentIntentValidityPredicateCircu
     }
 }
 
-vp_circuit_impl!(PartialFulfillmentIntentValidityPredicateCircuit);
-vp_verifying_info_impl!(PartialFulfillmentIntentValidityPredicateCircuit);
+resource_logic_circuit_impl!(PartialFulfillmentIntentResourceLogicCircuit);
+resource_logic_verifying_info_impl!(PartialFulfillmentIntentResourceLogicCircuit);
 
-impl BorshSerialize for PartialFulfillmentIntentValidityPredicateCircuit {
+impl BorshSerialize for PartialFulfillmentIntentResourceLogicCircuit {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         writer.write_all(&self.owned_resource_id.to_repr())?;
         for input in self.input_resources.iter() {
@@ -215,7 +214,7 @@ impl BorshSerialize for PartialFulfillmentIntentValidityPredicateCircuit {
     }
 }
 
-impl BorshDeserialize for PartialFulfillmentIntentValidityPredicateCircuit {
+impl BorshDeserialize for PartialFulfillmentIntentResourceLogicCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let owned_resource_id = read_base_field(reader)?;
         let input_resources: Vec<_> = (0..NUM_RESOURCE)
@@ -237,11 +236,11 @@ impl BorshDeserialize for PartialFulfillmentIntentValidityPredicateCircuit {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::circuit::vp_examples::{
+    use crate::circuit::resource_logic_examples::{
         signature_verification::COMPRESSED_TOKEN_AUTH_VK,
         token::{Token, TokenAuthorization},
     };
-    use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
+    use crate::constant::RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE;
     use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
@@ -270,7 +269,7 @@ mod tests {
         let input_resources = [*swap.sell.resource(), input_padding_resource];
         let output_resources = [intent_resource, output_padding_resource];
 
-        let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
+        let circuit = PartialFulfillmentIntentResourceLogicCircuit {
             owned_resource_id: intent_resource.commitment().inner(),
             input_resources,
             output_resources,
@@ -279,7 +278,7 @@ mod tests {
         let public_inputs = circuit.get_public_inputs(&mut rng);
 
         let prover = MockProver::<pallas::Base>::run(
-            VP_CIRCUIT_PARAMS_SIZE,
+            RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE,
             &circuit,
             vec![public_inputs.to_vec()],
         )
@@ -299,7 +298,7 @@ mod tests {
         let bob_sell = swap.buy.clone();
         let (input_resources, output_resources) = swap.fill(&mut rng, intent_resource, bob_sell);
 
-        let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
+        let circuit = PartialFulfillmentIntentResourceLogicCircuit {
             owned_resource_id: intent_resource.get_nf().unwrap().inner(),
             input_resources,
             output_resources,
@@ -308,7 +307,7 @@ mod tests {
         let public_inputs = circuit.get_public_inputs(&mut rng);
 
         let prover = MockProver::<pallas::Base>::run(
-            VP_CIRCUIT_PARAMS_SIZE,
+            RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE,
             &circuit,
             vec![public_inputs.to_vec()],
         )
@@ -328,7 +327,7 @@ mod tests {
         let bob_sell = Token::new(swap.buy.name().inner().to_string(), 2u64);
         let (input_resources, output_resources) = swap.fill(&mut rng, intent_resource, bob_sell);
 
-        let circuit = PartialFulfillmentIntentValidityPredicateCircuit {
+        let circuit = PartialFulfillmentIntentResourceLogicCircuit {
             owned_resource_id: intent_resource.get_nf().unwrap().inner(),
             input_resources,
             output_resources,
@@ -338,13 +337,13 @@ mod tests {
         // Test serialization
         let circuit = {
             let circuit_bytes = circuit.to_bytes();
-            PartialFulfillmentIntentValidityPredicateCircuit::from_bytes(&circuit_bytes)
+            PartialFulfillmentIntentResourceLogicCircuit::from_bytes(&circuit_bytes)
         };
 
         let public_inputs = circuit.get_public_inputs(&mut rng);
 
         let prover = MockProver::<pallas::Base>::run(
-            VP_CIRCUIT_PARAMS_SIZE,
+            RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE,
             &circuit,
             vec![public_inputs.to_vec()],
         )

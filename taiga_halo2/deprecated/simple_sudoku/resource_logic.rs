@@ -8,47 +8,47 @@ extern crate taiga_halo2;
 use taiga_halo2::{
     circuit::{
         resource_circuit::ResourceConfig,
-        vp_circuit::{
-            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicateInfo, ValidityPredicatePublicInputs,
-            ValidityPredicateVerifyingInfo,
+        resource_logic_circuit::{
+            BasicResourceLogicVariables, ResourceLogicVerifyingInfoTrait, ResourceLogicCircuit,
+            ResourceLogicConfig, ResourceLogicInfo, ResourceLogicPublicInputs,
+            ResourceLogicVerifyingInfo,
         },
     },
     constant::{NUM_RESOURCE, SETUP_PARAMS_MAP},
     resource::{Resource, RandomSeed},
     proof::Proof,
-    vp_circuit_impl,
-    vp_vk::ValidityPredicateVerifyingKey,
+    resource_logic_circuit_impl,
+    resource_logic_vk::ResourceLogicVerifyingKey,
 };
 
 use crate::circuit::{SudokuCircuit, SudokuConfig};
 use rand::{rngs::OsRng, RngCore};
 
 #[derive(Clone, Debug)]
-pub struct SudokuVPConfig {
+pub struct SudokuResourceLogicConfig {
     resource_config: ResourceConfig,
     sudoku_config: SudokuConfig,
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct SudokuVP {
+pub struct SudokuResourceLogic {
     pub sudoku: SudokuCircuit,
     input_resources: [Resource; NUM_RESOURCE],
     output_resources: [Resource; NUM_RESOURCE],
 }
 
-impl ValidityPredicateCircuit for SudokuVP {
+impl ResourceLogicCircuit for SudokuResourceLogic {
     fn custom_constraints(
         &self,
-        config: ValidityPredicateConfig,
+        config: ResourceLogicConfig,
         layouter: impl Layouter<pallas::Base>,
-        _basic_variables: BasicValidityPredicateVariables,
+        _basic_variables: BasicResourceLogicVariables,
     ) -> Result<(), plonk::Error> {
         self.sudoku.synthesize(config.sudoku_config, layouter)
     }
 }
 
-impl ValidityPredicateInfo for SudokuVP {
+impl ResourceLogicInfo for SudokuResourceLogic {
     fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE] {
         &self.input_resources
     }
@@ -57,9 +57,9 @@ impl ValidityPredicateInfo for SudokuVP {
         &self.output_resources
     }
 
-    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
+    fn get_public_inputs(&self, mut rng: impl RngCore) -> ResourceLogicPublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
-        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
+        let padding = ResourceLogicPublicInputs::get_public_input_padding(
             public_inputs.len(),
             &RandomSeed::random(&mut rng),
         );
@@ -72,7 +72,7 @@ impl ValidityPredicateInfo for SudokuVP {
     }
 }
 
-impl SudokuVP {
+impl SudokuResourceLogic {
     pub fn new(
         sudoku: SudokuCircuit,
         input_resources: [Resource; NUM_RESOURCE],
@@ -86,7 +86,7 @@ impl SudokuVP {
     }
 }
 
-vp_circuit_impl!(SudokuVP);
+resource_logic_circuit_impl!(SudokuResourceLogic);
 
 #[cfg(test)]
 mod tests {
@@ -94,7 +94,7 @@ mod tests {
         constant::NUM_RESOURCE,
         resource::{Resource, RandomSeed},
         nullifier::{Nullifier, NullifierKeyContainer},
-        vp_vk::ValidityPredicateVerifyingKey,
+        resource_logic_vk::ResourceLogicVerifyingKey,
     };
 
     use ff::Field;
@@ -103,10 +103,10 @@ mod tests {
 
     use halo2_proofs::{plonk, poly::commitment::Params};
 
-    use crate::{circuit::SudokuCircuit, vp::SudokuVP};
+    use crate::{circuit::SudokuCircuit, resource_logic::SudokuResourceLogic};
 
     #[test]
-    fn test_vp() {
+    fn test_resource_logic() {
         let mut rng = OsRng;
         let input_resources = [(); NUM_RESOURCE].map(|_| Resource::dummy(&mut rng));
         let output_resources = [(); NUM_RESOURCE].map(|_| Resource::dummy(&mut rng));
@@ -129,9 +129,9 @@ mod tests {
 
         let vk = plonk::keygen_vk(&params, &sudoku).unwrap();
 
-        let mut _vp = SudokuVP::new(sudoku, input_resources, output_resources);
+        let mut _resource_logic = SudokuResourceLogic::new(sudoku, input_resources, output_resources);
 
-        let vp_vk = ValidityPredicateVerifyingKey::from_vk(vk);
+        let resource_logic_vk = ResourceLogicVerifyingKey::from_vk(vk);
 
         let app_data_static = pallas::Base::zero();
         let app_data_dynamic = pallas::Base::zero();
@@ -141,7 +141,7 @@ mod tests {
         let rseed = RandomSeed::random(&mut rng);
         let rho = Nullifier::from(pallas::Base::random(&mut rng));
         Resource::new(
-            vp_vk,
+            resource_logic_vk,
             app_data_static,
             app_data_dynamic,
             quantity,

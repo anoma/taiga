@@ -5,12 +5,12 @@
 /// other required proofs
 use crate::{
     circuit::compliance_circuit::ComplianceCircuit,
-    constant::{PRF_EXPAND_INPUT_VP_CM_R, PRF_EXPAND_OUTPUT_VP_CM_R},
+    constant::{PRF_EXPAND_INPUT_RESOURCE_LOGIC_CM_R, PRF_EXPAND_OUTPUT_RESOURCE_LOGIC_CM_R},
     delta_commitment::DeltaCommitment,
     merkle_tree::{Anchor, MerklePath},
     nullifier::Nullifier,
     resource::{RandomSeed, Resource, ResourceCommitment},
-    vp_commitment::ValidityPredicateCommitment,
+    resource_logic_commitment::ResourceLogicCommitment,
 };
 use pasta_curves::pallas;
 use rand::RngCore;
@@ -38,10 +38,10 @@ pub struct CompliancePublicInputs {
     pub cm: ResourceCommitment,
     /// Resource delta is used to reason about total quantities of different kinds of resources.
     pub delta: DeltaCommitment,
-    /// The commitment to input resource application(static) vp
-    pub input_vp_commitment: ValidityPredicateCommitment,
-    /// The commitment to output resource application(static) vp
-    pub output_vp_commitment: ValidityPredicateCommitment,
+    /// The commitment to input resource logic
+    pub input_resource_logic_commitment: ResourceLogicCommitment,
+    /// The commitment to output resource logic
+    pub output_resource_logic_commitment: ResourceLogicCommitment,
 }
 
 /// The information to build CompliancePublicInputs and ComplianceCircuit.
@@ -53,24 +53,27 @@ pub struct ComplianceInfo {
     input_merkle_path: MerklePath,
     input_anchor: Anchor,
     output_resource: Resource,
-    // rseed is to generate the randomness of the delta commitment and vp commitments
+    // rseed is to generate the randomness of the delta commitment and resource
+    // logic commitments
     rseed: RandomSeed,
 }
 
 impl CompliancePublicInputs {
     pub fn to_instance(&self) -> Vec<pallas::Base> {
-        let input_vp_commitment = self.input_vp_commitment.to_public_inputs();
-        let output_vp_commitment = self.output_vp_commitment.to_public_inputs();
+        let input_resource_logic_commitment =
+            self.input_resource_logic_commitment.to_public_inputs();
+        let output_resource_logic_commitment =
+            self.output_resource_logic_commitment.to_public_inputs();
         vec![
             self.nf.inner(),
             self.anchor.inner(),
             self.cm.inner(),
             self.delta.get_x(),
             self.delta.get_y(),
-            input_vp_commitment[0],
-            input_vp_commitment[1],
-            output_vp_commitment[0],
-            output_vp_commitment[1],
+            input_resource_logic_commitment[0],
+            input_resource_logic_commitment[1],
+            output_resource_logic_commitment[0],
+            output_resource_logic_commitment[1],
         ]
     }
 }
@@ -82,8 +85,8 @@ impl BorshSerialize for CompliancePublicInputs {
         writer.write_all(&self.nf.to_bytes())?;
         writer.write_all(&self.cm.to_bytes())?;
         writer.write_all(&self.delta.to_bytes())?;
-        writer.write_all(&self.input_vp_commitment.to_bytes())?;
-        writer.write_all(&self.output_vp_commitment.to_bytes())?;
+        writer.write_all(&self.input_resource_logic_commitment.to_bytes())?;
+        writer.write_all(&self.output_resource_logic_commitment.to_bytes())?;
         Ok(())
     }
 }
@@ -104,20 +107,20 @@ impl BorshDeserialize for CompliancePublicInputs {
         let detla_bytes = <[u8; 32]>::deserialize_reader(reader)?;
         let delta = Option::from(DeltaCommitment::from_bytes(detla_bytes))
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "delta not in field"))?;
-        let input_vp_commitment_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let input_vp_commitment =
-            ValidityPredicateCommitment::from_bytes(input_vp_commitment_bytes);
-        let output_vp_commitment_bytes = <[u8; 32]>::deserialize_reader(reader)?;
-        let output_vp_commitment =
-            ValidityPredicateCommitment::from_bytes(output_vp_commitment_bytes);
+        let input_resource_logic_commitment_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let input_resource_logic_commitment =
+            ResourceLogicCommitment::from_bytes(input_resource_logic_commitment_bytes);
+        let output_resource_logic_commitment_bytes = <[u8; 32]>::deserialize_reader(reader)?;
+        let output_resource_logic_commitment =
+            ResourceLogicCommitment::from_bytes(output_resource_logic_commitment_bytes);
 
         Ok(CompliancePublicInputs {
             anchor,
             nf,
             cm,
             delta,
-            input_vp_commitment,
-            output_vp_commitment,
+            input_resource_logic_commitment,
+            output_resource_logic_commitment,
         })
     }
 }
@@ -154,14 +157,16 @@ impl ComplianceInfo {
         self.rseed.get_rcv()
     }
 
-    // Get the randomness of input resource application vp commitment
-    pub fn get_input_vp_com_r(&self) -> pallas::Base {
-        self.rseed.get_vp_cm_r(PRF_EXPAND_INPUT_VP_CM_R)
+    // Get the randomness of input resource application resource logic commitment
+    pub fn get_input_resource_logic_com_r(&self) -> pallas::Base {
+        self.rseed
+            .get_resource_logic_cm_r(PRF_EXPAND_INPUT_RESOURCE_LOGIC_CM_R)
     }
 
-    // Get the randomness of output resource application vp commitment
-    pub fn get_output_vp_com_r(&self) -> pallas::Base {
-        self.rseed.get_vp_cm_r(PRF_EXPAND_OUTPUT_VP_CM_R)
+    // Get the randomness of output resource application resource logic commitment
+    pub fn get_output_resource_logic_com_r(&self) -> pallas::Base {
+        self.rseed
+            .get_resource_logic_cm_r(PRF_EXPAND_OUTPUT_RESOURCE_LOGIC_CM_R)
     }
 
     // Only used in transparent scenario: the anchor is untrusted, recalculate root when executing it transparently.
@@ -194,21 +199,25 @@ impl ComplianceInfo {
         let rcv = self.get_rcv();
         let delta = self.get_delta_commitment(&rcv);
 
-        let input_vp_cm_r = self.get_input_vp_com_r();
-        let input_vp_commitment =
-            ValidityPredicateCommitment::commit(&self.input_resource.get_logic(), &input_vp_cm_r);
+        let input_resource_logic_cm_r = self.get_input_resource_logic_com_r();
+        let input_resource_logic_commitment = ResourceLogicCommitment::commit(
+            &self.input_resource.get_logic(),
+            &input_resource_logic_cm_r,
+        );
 
-        let output_vp_cm_r = self.get_output_vp_com_r();
-        let output_vp_commitment =
-            ValidityPredicateCommitment::commit(&self.output_resource.get_logic(), &output_vp_cm_r);
+        let output_resource_logic_cm_r = self.get_output_resource_logic_com_r();
+        let output_resource_logic_commitment = ResourceLogicCommitment::commit(
+            &self.output_resource.get_logic(),
+            &output_resource_logic_cm_r,
+        );
 
         let compliance = CompliancePublicInputs {
             nf,
             cm,
             anchor: self.input_anchor,
             delta,
-            input_vp_commitment,
-            output_vp_commitment,
+            input_resource_logic_commitment,
+            output_resource_logic_commitment,
         };
 
         let compliance_circuit = ComplianceCircuit {
@@ -216,8 +225,8 @@ impl ComplianceInfo {
             merkle_path: self.input_merkle_path.get_path().try_into().unwrap(),
             output_resource: self.output_resource,
             rcv,
-            input_vp_cm_r,
-            output_vp_cm_r,
+            input_resource_logic_cm_r,
+            output_resource_logic_cm_r,
         };
 
         (compliance, compliance_circuit)

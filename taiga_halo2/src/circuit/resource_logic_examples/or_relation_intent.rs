@@ -1,31 +1,31 @@
-/// The intent can be satisfied with two conditions.
-/// For example, Alice has 5 BTC and wants 1 Dolphin or 2 Monkeys.
-/// Then Alice creates an intent with the "or relaiton".
+/// The intent can be satisfied with two conditions. For instance, Alice has 5
+/// BTC and desires either 1 Dolphin or 2 Monkeys. Then Alice creates an intent
+/// using the "or relation".
 ///
 use crate::{
     circuit::{
-        blake2s::publicize_default_dynamic_vp_commitments,
+        blake2s::publicize_default_dynamic_resource_logic_commitments,
         gadgets::{
             assign_free_advice,
             poseidon_hash::poseidon_hash_gadget,
             target_resource_variable::{get_is_input_resource_flag, get_owned_resource_variable},
         },
-        vp_bytecode::{ValidityPredicateByteCode, ValidityPredicateRepresentation},
-        vp_circuit::{
-            BasicValidityPredicateVariables, VPVerifyingInfo, ValidityPredicateCircuit,
-            ValidityPredicateConfig, ValidityPredicatePublicInputs, ValidityPredicateVerifyingInfo,
+        resource_logic_bytecode::{ResourceLogicByteCode, ResourceLogicRepresentation},
+        resource_logic_circuit::{
+            BasicResourceLogicVariables, ResourceLogicCircuit, ResourceLogicConfig,
+            ResourceLogicPublicInputs, ResourceLogicVerifyingInfo, ResourceLogicVerifyingInfoTrait,
         },
-        vp_examples::token::{Token, TOKEN_VK},
+        resource_logic_examples::token::{Token, TOKEN_VK},
     },
     constant::{NUM_RESOURCE, SETUP_PARAMS_MAP},
     error::TransactionError,
     nullifier::Nullifier,
     proof::Proof,
     resource::{RandomSeed, Resource},
+    resource_logic_commitment::ResourceLogicCommitment,
+    resource_logic_vk::ResourceLogicVerifyingKey,
     utils::poseidon_hash_n,
     utils::read_base_field,
-    vp_commitment::ValidityPredicateCommitment,
-    vp_vk::ValidityPredicateVerifyingKey,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_proofs::arithmetic::Field;
@@ -39,15 +39,15 @@ use rand::rngs::OsRng;
 use rand::RngCore;
 
 lazy_static! {
-    pub static ref OR_RELATION_INTENT_VK: ValidityPredicateVerifyingKey =
-        OrRelationIntentValidityPredicateCircuit::default().get_vp_vk();
+    pub static ref OR_RELATION_INTENT_VK: ResourceLogicVerifyingKey =
+        OrRelationIntentResourceLogicCircuit::default().get_resource_logic_vk();
     pub static ref COMPRESSED_OR_RELATION_INTENT_VK: pallas::Base =
         OR_RELATION_INTENT_VK.get_compressed();
 }
 
-// OrRelationIntentValidityPredicateCircuit
+// OrRelationIntentResourceLogicCircuit
 #[derive(Clone, Debug, Default)]
-pub struct OrRelationIntentValidityPredicateCircuit {
+pub struct OrRelationIntentResourceLogicCircuit {
     pub owned_resource_id: pallas::Base,
     pub input_resources: [Resource; NUM_RESOURCE],
     pub output_resources: [Resource; NUM_RESOURCE],
@@ -57,7 +57,7 @@ pub struct OrRelationIntentValidityPredicateCircuit {
     pub receiver_value: pallas::Base,
 }
 
-impl OrRelationIntentValidityPredicateCircuit {
+impl OrRelationIntentResourceLogicCircuit {
     pub fn encode_label(
         token_1: &Token,
         token_2: &Token,
@@ -79,9 +79,9 @@ impl OrRelationIntentValidityPredicateCircuit {
         ])
     }
 
-    pub fn to_bytecode(&self) -> ValidityPredicateByteCode {
-        ValidityPredicateByteCode::new(
-            ValidityPredicateRepresentation::OrRelationIntent,
+    pub fn to_bytecode(&self) -> ResourceLogicByteCode {
+        ResourceLogicByteCode::new(
+            ResourceLogicRepresentation::OrRelationIntent,
             self.to_bytes(),
         )
     }
@@ -95,13 +95,13 @@ impl OrRelationIntentValidityPredicateCircuit {
     }
 }
 
-impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
+impl ResourceLogicCircuit for OrRelationIntentResourceLogicCircuit {
     // Add custom constraints
     fn custom_constraints(
         &self,
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
-        basic_variables: BasicValidityPredicateVariables,
+        basic_variables: BasicResourceLogicVariables,
     ) -> Result<(), Error> {
         let owned_resource_id = basic_variables.get_owned_resource_id();
         let is_input_resource = get_is_input_resource_flag(
@@ -112,8 +112,8 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
             &basic_variables.get_output_resource_cms(),
         )?;
 
-        let token_vp_vk = assign_free_advice(
-            layouter.namespace(|| "witness token vp vk"),
+        let token_resource_logic_vk = assign_free_advice(
+            layouter.namespace(|| "witness token resource_logic vk"),
             config.advices[0],
             Value::known(TOKEN_VK.get_compressed()),
         )?;
@@ -163,7 +163,7 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
                 token_quantity_1.clone(),
                 token_property_2.clone(),
                 token_quantity_2.clone(),
-                token_vp_vk.clone(),
+                token_resource_logic_vk.clone(),
                 receiver_npk.clone(),
                 receiver_value.clone(),
             ],
@@ -183,13 +183,13 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
             |mut region| region.constrain_equal(encoded_label.cell(), label.cell()),
         )?;
 
-        // check the vp vk of output resource
+        // check the resource_logic vk of output resource
         layouter.assign_region(
-            || "conditional equal: check vp vk",
+            || "conditional equal: check resource_logic vk",
             |mut region| {
                 config.conditional_equal_config.assign_region(
                     &is_input_resource,
-                    &token_vp_vk,
+                    &token_resource_logic_vk,
                     &basic_variables.output_resource_variables[0]
                         .resource_variables
                         .logic,
@@ -255,8 +255,8 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
             },
         )?;
 
-        // Publicize the dynamic vp commitments with default value
-        publicize_default_dynamic_vp_commitments(
+        // Publicize the dynamic resource_logic commitments with default value
+        publicize_default_dynamic_resource_logic_commitments(
             &mut layouter,
             config.advices[0],
             config.instances,
@@ -273,13 +273,13 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
         &self.output_resources
     }
 
-    fn get_public_inputs(&self, mut rng: impl RngCore) -> ValidityPredicatePublicInputs {
+    fn get_public_inputs(&self, mut rng: impl RngCore) -> ResourceLogicPublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
-        let default_vp_cm: [pallas::Base; 2] =
-            ValidityPredicateCommitment::default().to_public_inputs();
-        public_inputs.extend(default_vp_cm);
-        public_inputs.extend(default_vp_cm);
-        let padding = ValidityPredicatePublicInputs::get_public_input_padding(
+        let default_resource_logic_cm: [pallas::Base; 2] =
+            ResourceLogicCommitment::default().to_public_inputs();
+        public_inputs.extend(default_resource_logic_cm);
+        public_inputs.extend(default_resource_logic_cm);
+        let padding = ResourceLogicPublicInputs::get_public_input_padding(
             public_inputs.len(),
             &RandomSeed::random(&mut rng),
         );
@@ -292,10 +292,10 @@ impl ValidityPredicateCircuit for OrRelationIntentValidityPredicateCircuit {
     }
 }
 
-vp_circuit_impl!(OrRelationIntentValidityPredicateCircuit);
-vp_verifying_info_impl!(OrRelationIntentValidityPredicateCircuit);
+resource_logic_circuit_impl!(OrRelationIntentResourceLogicCircuit);
+resource_logic_verifying_info_impl!(OrRelationIntentResourceLogicCircuit);
 
-impl BorshSerialize for OrRelationIntentValidityPredicateCircuit {
+impl BorshSerialize for OrRelationIntentResourceLogicCircuit {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         writer.write_all(&self.owned_resource_id.to_repr())?;
         for input in self.input_resources.iter() {
@@ -316,7 +316,7 @@ impl BorshSerialize for OrRelationIntentValidityPredicateCircuit {
     }
 }
 
-impl BorshDeserialize for OrRelationIntentValidityPredicateCircuit {
+impl BorshDeserialize for OrRelationIntentResourceLogicCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let owned_resource_id = read_base_field(reader)?;
         let input_resources: Vec<_> = (0..NUM_RESOURCE)
@@ -349,7 +349,7 @@ pub fn create_intent_resource<R: RngCore>(
     receiver_value: pallas::Base,
     nk: pallas::Base,
 ) -> Resource {
-    let label = OrRelationIntentValidityPredicateCircuit::encode_label(
+    let label = OrRelationIntentResourceLogicCircuit::encode_label(
         token_1,
         token_2,
         receiver_npk,
@@ -370,10 +370,11 @@ pub fn create_intent_resource<R: RngCore>(
 }
 
 #[test]
-fn test_halo2_or_relation_intent_vp_circuit() {
-    use crate::constant::VP_CIRCUIT_PARAMS_SIZE;
+fn test_halo2_or_relation_intent_resource_logic_circuit() {
+    use crate::constant::RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE;
     use crate::{
-        circuit::vp_examples::token::COMPRESSED_TOKEN_VK, resource::tests::random_resource,
+        circuit::resource_logic_examples::token::COMPRESSED_TOKEN_VK,
+        resource::tests::random_resource,
     };
     use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
@@ -400,7 +401,7 @@ fn test_halo2_or_relation_intent_vp_circuit() {
         );
         let padding_input_resource = Resource::random_padding_resource(&mut rng);
         let input_resources = [intent_resource, padding_input_resource];
-        OrRelationIntentValidityPredicateCircuit {
+        OrRelationIntentResourceLogicCircuit {
             owned_resource_id: input_resources[0].get_nf().unwrap().inner(),
             input_resources,
             output_resources,
@@ -414,13 +415,13 @@ fn test_halo2_or_relation_intent_vp_circuit() {
     // Test serialization
     let circuit = {
         let circuit_bytes = circuit.to_bytes();
-        OrRelationIntentValidityPredicateCircuit::from_bytes(&circuit_bytes)
+        OrRelationIntentResourceLogicCircuit::from_bytes(&circuit_bytes)
     };
 
     let public_inputs = circuit.get_public_inputs(&mut rng);
 
     let prover = MockProver::<pallas::Base>::run(
-        VP_CIRCUIT_PARAMS_SIZE,
+        RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE,
         &circuit,
         vec![public_inputs.to_vec()],
     )
