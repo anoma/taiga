@@ -6,9 +6,7 @@ use crate::circuit::{
     hash_to_curve::{hash_to_curve_circuit, HashToCurveConfig},
     merkle_circuit::{merkle_poseidon_gadget, MerklePoseidonChip},
     resource_commitment::{resource_commit, ResourceCommitChip},
-    resource_logic_circuit::{
-        InputResourceVariables, OutputResourceVariables, ResourceStatus, ResourceVariables,
-    },
+    resource_logic_circuit::{InputResourceVariables, ResourceStatus, ResourceVariables},
 };
 use crate::constant::{
     TaigaFixedBases, TaigaFixedBasesFull, POSEIDON_TO_CURVE_INPUT_LEN,
@@ -200,7 +198,7 @@ pub fn check_output_resource(
     output_resource: Resource,
     old_nf: AssignedCell<pallas::Base, pallas::Base>,
     cm_row_idx: usize,
-) -> Result<OutputResourceVariables, Error> {
+) -> Result<ResourceVariables, Error> {
     // Witness npk
     let npk = assign_free_advice(
         layouter.namespace(|| "witness npk"),
@@ -314,7 +312,7 @@ pub fn check_output_resource(
     // Public cm
     layouter.constrain_instance(cm.cell(), instances, cm_row_idx)?;
 
-    let resource_variables = ResourceVariables {
+    Ok(ResourceVariables {
         logic,
         label,
         quantity,
@@ -323,11 +321,6 @@ pub fn check_output_resource(
         nonce: old_nf,
         npk,
         rseed,
-    };
-
-    Ok(OutputResourceVariables {
-        resource_variables,
-        cm,
     })
 }
 
@@ -496,7 +489,7 @@ pub fn load_resource(
         layouter.namespace(|| "poseidon merkle"),
         merkle_chip,
         self_id.clone(),
-        &merkle_path.inner(),
+        &merkle_path,
     )?;
 
     let resource_variables = ResourceVariables {

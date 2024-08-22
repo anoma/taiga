@@ -5,12 +5,13 @@ use crate::{
         ResourceLogicCircuit, ResourceLogicConfig, ResourceLogicPublicInputs,
         ResourceLogicVerifyingInfo, ResourceLogicVerifyingInfoTrait,
     },
-    constant::{NUM_RESOURCE, RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE, SETUP_PARAMS_MAP},
+    constant::{RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE, SETUP_PARAMS_MAP},
     error::TransactionError,
     proof::Proof,
     resource::{RandomSeed, Resource},
     resource_logic_commitment::ResourceLogicCommitment,
     resource_logic_vk::ResourceLogicVerifyingKey,
+    resource_tree::ResourceExistenceWitness,
 };
 #[cfg(feature = "borsh")]
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -68,32 +69,12 @@ lazy_static! {
 // TrivialResourceLogicCircuit with empty custom constraints.
 #[derive(Clone, Debug, Default)]
 pub struct TrivialResourceLogicCircuit {
-    pub owned_resource_id: pallas::Base,
-    pub input_resources: [Resource; NUM_RESOURCE],
-    pub output_resources: [Resource; NUM_RESOURCE],
-}
-
-// I only exist to allow trivial derivation of the nifstruct
-#[derive(Clone, Debug, Default)]
-#[cfg_attr(feature = "nif", derive(NifStruct))]
-#[cfg_attr(feature = "nif", module = "Taiga.ResourceLogic.Trivial")]
-struct TrivialResourceLogicCircuitProxy {
-    owned_resource_id: pallas::Base,
-    input_resources: Vec<Resource>,
-    output_resources: Vec<Resource>,
+    self_resource: ResourceExistenceWitness,
 }
 
 impl TrivialResourceLogicCircuit {
-    pub fn new(
-        owned_resource_id: pallas::Base,
-        input_resources: [Resource; NUM_RESOURCE],
-        output_resources: [Resource; NUM_RESOURCE],
-    ) -> Self {
-        Self {
-            owned_resource_id,
-            input_resources,
-            output_resources,
-        }
+    pub fn new(self_resource: ResourceExistenceWitness) -> Self {
+        Self { self_resource }
     }
 
     // Only for test
@@ -112,14 +93,6 @@ impl TrivialResourceLogicCircuit {
     #[cfg(feature = "borsh")]
     pub fn from_bytes(bytes: &Vec<u8>) -> Self {
         BorshDeserialize::deserialize(&mut bytes.as_ref()).unwrap()
-    }
-
-    fn to_proxy(&self) -> TrivialResourceLogicCircuitProxy {
-        TrivialResourceLogicCircuitProxy {
-            owned_resource_id: self.owned_resource_id,
-            input_resources: self.input_resources.to_vec(),
-            output_resources: self.output_resources.to_vec(),
-        }
     }
 }
 
@@ -157,42 +130,7 @@ impl BorshDeserialize for TrivialResourceLogicCircuit {
     }
 }
 
-impl TrivialResourceLogicCircuitProxy {
-    fn to_concrete(&self) -> Option<TrivialResourceLogicCircuit> {
-        let input_resources = self.input_resources.clone().try_into().ok()?;
-        let output_resources = self.output_resources.clone().try_into().ok()?;
-        let owned_resource_id = self.owned_resource_id;
-        Some(TrivialResourceLogicCircuit {
-            owned_resource_id,
-            input_resources,
-            output_resources,
-        })
-    }
-}
-#[cfg(feature = "nif")]
-impl Encoder for TrivialResourceLogicCircuit {
-    fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
-        self.to_proxy().encode(env)
-    }
-}
-#[cfg(feature = "nif")]
-impl<'a> Decoder<'a> for TrivialResourceLogicCircuit {
-    fn decode(term: Term<'a>) -> NifResult<Self> {
-        let val: TrivialResourceLogicCircuitProxy = Decoder::decode(term)?;
-        val.to_concrete()
-            .ok_or(rustler::Error::RaiseAtom("Could not decode proxy"))
-    }
-}
-
 impl ResourceLogicCircuit for TrivialResourceLogicCircuit {
-    fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE] {
-        &self.input_resources
-    }
-
-    fn get_output_resources(&self) -> &[Resource; NUM_RESOURCE] {
-        &self.output_resources
-    }
-
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ResourceLogicPublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
         let default_resource_logic_cm: [pallas::Base; 2] =
@@ -207,8 +145,8 @@ impl ResourceLogicCircuit for TrivialResourceLogicCircuit {
         public_inputs.into()
     }
 
-    fn get_owned_resource_id(&self) -> pallas::Base {
-        self.owned_resource_id
+    fn get_self_resource(&self) -> ResourceExistenceWitness {
+        self.self_resource
     }
 }
 
@@ -252,18 +190,7 @@ impl ResourceLogicVerifyingInfoTrait for TrivialResourceLogicCircuit {
 #[cfg(test)]
 pub mod tests {
     use super::TrivialResourceLogicCircuit;
-    use crate::{constant::NUM_RESOURCE, resource::tests::random_resource};
-    use ff::Field;
     use pasta_curves::pallas;
-    use rand::RngCore;
-    pub fn random_trivial_resource_logic_circuit<R: RngCore>(
-        mut rng: R,
-    ) -> TrivialResourceLogicCircuit {
-        let owned_resource_id = pallas::Base::random(&mut rng);
-        let input_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
-        let output_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
-        TrivialResourceLogicCircuit::new(owned_resource_id, input_resources, output_resources)
-    }
 
     #[test]
     fn test_halo2_trivial_resource_logic_circuit() {
@@ -273,7 +200,7 @@ pub mod tests {
         use rand::rngs::OsRng;
 
         let mut rng = OsRng;
-        let circuit = random_trivial_resource_logic_circuit(&mut rng);
+        let circuit = TrivialResourceLogicCircuit::default();
         let public_inputs = circuit.get_public_inputs(&mut rng);
 
         let prover = MockProver::<pallas::Base>::run(

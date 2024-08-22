@@ -241,9 +241,9 @@ impl Circuit<pallas::Base> for ComplianceCircuit {
             input_resource_variables.resource_variables.logic.clone(),
             input_resource_variables.resource_variables.label.clone(),
             input_resource_variables.resource_variables.quantity.clone(),
-            output_resource_vars.resource_variables.logic.clone(),
-            output_resource_vars.resource_variables.label.clone(),
-            output_resource_vars.resource_variables.quantity,
+            output_resource_vars.logic.clone(),
+            output_resource_vars.label.clone(),
+            output_resource_vars.quantity,
             self.rcv,
         )?;
         layouter.constrain_instance(
@@ -309,7 +309,7 @@ impl Circuit<pallas::Base> for ComplianceCircuit {
         let output_resource_logic_commitment = resource_logic_commitment_gadget(
             &mut layouter,
             &blake2s_chip,
-            output_resource_vars.resource_variables.logic.clone(),
+            output_resource_vars.logic.clone(),
             output_resource_logic_cm_r,
         )?;
         layouter.constrain_instance(

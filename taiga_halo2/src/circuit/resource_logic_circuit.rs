@@ -9,9 +9,6 @@ use crate::{
             extended_or_relation::ExtendedOrRelationConfig,
             mul::{MulChip, MulConfig},
             sub::{SubChip, SubConfig},
-            target_resource_variable::{
-                GetIsInputResourceFlagConfig, GetOwnedResourceVariableConfig,
-            },
         },
         integrity::load_resource,
         merkle_circuit::{MerklePoseidonChip, MerklePoseidonConfig},
@@ -29,11 +26,12 @@ use crate::{
         RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PK_X_IDX,
         RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PK_Y_IDX,
         RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
-        RESOURCE_LOGIC_CIRCUIT_RESOURCE_MERKLE_ROOT_IDX, SETUP_PARAMS_MAP,
+        RESOURCE_LOGIC_CIRCUIT_RESOURCE_MERKLE_ROOT_IDX,
+        RESOURCE_LOGIC_CIRCUIT_SELF_RESOURCE_ID_IDX, SETUP_PARAMS_MAP,
     },
     error::TransactionError,
     proof::Proof,
-    resource::{RandomSeed, Resource, ResourceCommitment},
+    resource::{RandomSeed, ResourceCommitment},
     resource_encryption::{ResourceCiphertext, SecretKey},
     resource_logic_vk::ResourceLogicVerifyingKey,
     resource_tree::ResourceExistenceWitness,
@@ -329,8 +327,6 @@ pub struct ResourceLogicConfig {
     pub ecc_config: EccConfig<TaigaFixedBases>,
     pub poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
     pub merkle_config: MerklePoseidonConfig,
-    pub get_is_input_resource_flag_config: GetIsInputResourceFlagConfig,
-    pub get_owned_resource_variable_config: GetOwnedResourceVariableConfig,
     pub conditional_equal_config: ConditionalEqualConfig,
     pub conditional_select_config: ConditionalSelectConfig,
     pub extended_or_relation_config: ExtendedOrRelationConfig,
@@ -390,15 +386,6 @@ impl ResourceLogicConfig {
             lagrange_coeffs[5..8].try_into().unwrap(),
         );
 
-        let get_owned_resource_variable_config = GetOwnedResourceVariableConfig::configure(
-            meta,
-            advices[0],
-            [advices[1], advices[2], advices[3], advices[4]],
-        );
-
-        let get_is_input_resource_flag_config =
-            GetIsInputResourceFlagConfig::configure(meta, advices[0], advices[1], advices[2]);
-
         let conditional_equal_config =
             ConditionalEqualConfig::configure(meta, [advices[0], advices[1], advices[2]]);
         let conditional_select_config =
@@ -431,8 +418,6 @@ impl ResourceLogicConfig {
             ecc_config,
             poseidon_config,
             merkle_config,
-            get_is_input_resource_flag_config,
-            get_owned_resource_variable_config,
             conditional_equal_config,
             conditional_select_config,
             extended_or_relation_config,
@@ -503,7 +488,7 @@ pub trait ResourceLogicCircuit: Circuit<pallas::Base> + ResourceLogicVerifyingIn
         layouter.constrain_instance(
             self_resource_status.identity.cell(),
             config.instances,
-            RESOURCE_LOGIC_CIRCUIT_RESOURCE_MERKLE_ROOT_IDX,
+            RESOURCE_LOGIC_CIRCUIT_SELF_RESOURCE_ID_IDX,
         )?;
 
         Ok(self_resource_status)
@@ -528,36 +513,15 @@ pub trait ResourceLogicCircuit: Circuit<pallas::Base> + ResourceLogicVerifyingIn
     }
 
     fn get_mandatory_public_inputs(&self) -> Vec<pallas::Base> {
-        let mut public_inputs = vec![];
-        self.get_input_resources()
-            .iter()
-            .zip(self.get_output_resources().iter())
-            .for_each(|(input_resource, output_resource)| {
-                let nf = input_resource.get_nf().unwrap().inner();
-                public_inputs.push(nf);
-                let cm = output_resource.commitment();
-                public_inputs.push(cm.inner());
-            });
-        public_inputs.push(self.get_owned_resource_id());
-        public_inputs
+        let resource_witness = self.get_self_resource();
+        let root = resource_witness.get_root();
+        let id = resource_witness.get_identity();
+        vec![root, id]
     }
-    fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE];
-    fn get_output_resources(&self) -> &[Resource; NUM_RESOURCE];
-    fn get_public_inputs(&self, rng: impl RngCore) -> ResourceLogicPublicInputs;
-    // The owned_resource_id is the input_resource_nf or the output_resource_cm_x
-    // The owned_resource_id is the key to look up the target variables and
-    // help determine whether the owned resource is the input resource or not in resource logic circuit.
-    fn get_owned_resource_id(&self) -> pallas::Base;
-    fn get_self_resource(&self) -> ResourceExistenceWitness;
-}
 
-/// BasicResourceLogicVariables are generally constrained in ResourceLogicCircuit::basic_constraints
-/// and will be used in ResourceLogicCircuit::custom_constraints
-#[derive(Debug, Clone)]
-pub struct BasicResourceLogicVariables {
-    pub owned_resource_id: AssignedCell<pallas::Base, pallas::Base>,
-    pub input_resource_variables: [InputResourceVariables; NUM_RESOURCE],
-    pub output_resource_variables: [OutputResourceVariables; NUM_RESOURCE],
+    fn get_public_inputs(&self, rng: impl RngCore) -> ResourceLogicPublicInputs;
+
+    fn get_self_resource(&self) -> ResourceExistenceWitness;
 }
 
 #[derive(Debug, Clone)]
@@ -586,135 +550,6 @@ pub struct InputResourceVariables {
     pub nf: AssignedCell<pallas::Base, pallas::Base>,
     pub cm: AssignedCell<pallas::Base, pallas::Base>,
     pub resource_variables: ResourceVariables,
-}
-
-// Variables in the out resource
-#[derive(Debug, Clone)]
-pub struct OutputResourceVariables {
-    pub cm: AssignedCell<pallas::Base, pallas::Base>,
-    pub resource_variables: ResourceVariables,
-}
-
-#[derive(Debug, Clone)]
-pub struct ResourceSearchableVariablePair {
-    // src_variable is the input_resource_nf or the output_resource_cm_x
-    pub src_variable: AssignedCell<pallas::Base, pallas::Base>,
-    // target_variable is one of the parameter in the ResourceVariables
-    pub target_variable: AssignedCell<pallas::Base, pallas::Base>,
-}
-
-impl BasicResourceLogicVariables {
-    pub fn get_owned_resource_id(&self) -> AssignedCell<pallas::Base, pallas::Base> {
-        self.owned_resource_id.clone()
-    }
-
-    pub fn get_input_resource_nfs(
-        &self,
-    ) -> [AssignedCell<pallas::Base, pallas::Base>; NUM_RESOURCE] {
-        let ret: Vec<_> = self
-            .input_resource_variables
-            .iter()
-            .map(|variables| variables.nf.clone())
-            .collect();
-        ret.try_into().unwrap()
-    }
-
-    pub fn get_output_resource_cms(
-        &self,
-    ) -> [AssignedCell<pallas::Base, pallas::Base>; NUM_RESOURCE] {
-        let ret: Vec<_> = self
-            .output_resource_variables
-            .iter()
-            .map(|variables| variables.cm.clone())
-            .collect();
-        ret.try_into().unwrap()
-    }
-
-    fn get_variable_searchable_pairs(
-        &self,
-        input_target_variable: impl Fn(
-            &InputResourceVariables,
-        ) -> AssignedCell<pallas::Base, pallas::Base>,
-        output_target_variable: impl Fn(
-            &OutputResourceVariables,
-        ) -> AssignedCell<pallas::Base, pallas::Base>,
-    ) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
-        self.input_resource_variables
-            .iter()
-            .map(|variables| ResourceSearchableVariablePair {
-                src_variable: variables.nf.clone(),
-                target_variable: input_target_variable(variables),
-            })
-            .chain(self.output_resource_variables.iter().map(|variables| {
-                ResourceSearchableVariablePair {
-                    src_variable: variables.cm.clone(),
-                    target_variable: output_target_variable(variables),
-                }
-            }))
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap()
-    }
-
-    pub fn get_logic_searchable_pairs(&self) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
-        self.get_variable_searchable_pairs(
-            |variables| variables.resource_variables.logic.clone(),
-            |variables| variables.resource_variables.logic.clone(),
-        )
-    }
-
-    pub fn get_label_searchable_pairs(&self) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
-        self.get_variable_searchable_pairs(
-            |variables| variables.resource_variables.label.clone(),
-            |variables| variables.resource_variables.label.clone(),
-        )
-    }
-
-    pub fn get_quantity_searchable_pairs(
-        &self,
-    ) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
-        self.get_variable_searchable_pairs(
-            |variables| variables.resource_variables.quantity.clone(),
-            |variables| variables.resource_variables.quantity.clone(),
-        )
-    }
-
-    pub fn get_is_ephemeral_searchable_pairs(
-        &self,
-    ) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
-        self.get_variable_searchable_pairs(
-            |variables| variables.resource_variables.is_ephemeral.clone(),
-            |variables| variables.resource_variables.is_ephemeral.clone(),
-        )
-    }
-
-    pub fn get_value_searchable_pairs(&self) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
-        self.get_variable_searchable_pairs(
-            |variables| variables.resource_variables.value.clone(),
-            |variables| variables.resource_variables.value.clone(),
-        )
-    }
-
-    pub fn get_nonce_searchable_pairs(&self) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
-        self.get_variable_searchable_pairs(
-            |variables| variables.resource_variables.nonce.clone(),
-            |variables| variables.resource_variables.nonce.clone(),
-        )
-    }
-
-    pub fn get_npk_searchable_pairs(&self) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
-        self.get_variable_searchable_pairs(
-            |variables| variables.resource_variables.npk.clone(),
-            |variables| variables.resource_variables.npk.clone(),
-        )
-    }
-
-    pub fn get_rseed_searchable_pairs(&self) -> [ResourceSearchableVariablePair; NUM_RESOURCE * 2] {
-        self.get_variable_searchable_pairs(
-            |variables| variables.resource_variables.rseed.clone(),
-            |variables| variables.resource_variables.rseed.clone(),
-        )
-    }
 }
 
 // Default Circuit trait implementation

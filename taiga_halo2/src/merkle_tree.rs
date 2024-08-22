@@ -3,7 +3,10 @@ use std::hash::{Hash, Hasher};
 use crate::merkle_tree::LR::{L, R};
 use crate::resource::ResourceCommitment;
 use crate::utils::poseidon_hash;
-use crate::{constant::TAIGA_COMMITMENT_TREE_DEPTH, resource::Resource};
+use crate::{
+    constant::{TAIGA_COMMITMENT_TREE_DEPTH, TAIGA_RESOURCE_TREE_DEPTH},
+    resource::Resource,
+};
 use ff::PrimeField;
 use halo2_proofs::arithmetic::Field;
 use pasta_curves::pallas;
@@ -148,6 +151,16 @@ impl Default for MerklePath {
             .map(|_| (Node::from(pallas::Base::one()), L))
             .collect();
         Self::from_path(merkle_path)
+    }
+}
+
+impl From<[(pallas::Base, LR); TAIGA_RESOURCE_TREE_DEPTH]> for MerklePath {
+    fn from(path: [(pallas::Base, LR); TAIGA_RESOURCE_TREE_DEPTH]) -> Self {
+        let merkle_path = path
+            .into_iter()
+            .map(|(value, b)| (Node::from(value), b))
+            .collect();
+        MerklePath { merkle_path }
     }
 }
 

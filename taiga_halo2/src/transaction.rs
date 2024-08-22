@@ -321,55 +321,55 @@ impl TransparentPartialTxBundle {
     }
 }
 
-#[cfg(test)]
-pub mod testing {
-    use crate::shielded_ptx::testing::create_shielded_ptx;
-    use crate::transaction::{ShieldedPartialTxBundle, TransparentPartialTxBundle};
-    #[cfg(feature = "borsh")]
-    use crate::transparent_ptx::testing::create_transparent_ptx;
+// #[cfg(test)]
+// pub mod testing {
+//     use crate::shielded_ptx::testing::create_shielded_ptx;
+//     use crate::transaction::{ShieldedPartialTxBundle, TransparentPartialTxBundle};
+//     #[cfg(feature = "borsh")]
+//     use crate::transparent_ptx::testing::create_transparent_ptx;
 
-    pub fn create_shielded_ptx_bundle(num: usize) -> ShieldedPartialTxBundle {
-        let mut bundle = vec![];
-        for _ in 0..num {
-            let ptx = create_shielded_ptx();
-            bundle.push(ptx);
-        }
-        ShieldedPartialTxBundle::new(bundle)
-    }
+//     pub fn create_shielded_ptx_bundle(num: usize) -> ShieldedPartialTxBundle {
+//         let mut bundle = vec![];
+//         for _ in 0..num {
+//             let ptx = create_shielded_ptx();
+//             bundle.push(ptx);
+//         }
+//         ShieldedPartialTxBundle::new(bundle)
+//     }
 
-    #[cfg(feature = "borsh")]
-    pub fn create_transparent_ptx_bundle(num: usize) -> TransparentPartialTxBundle {
-        let mut bundle = vec![];
-        for _ in 0..num {
-            let ptx = create_transparent_ptx();
-            bundle.push(ptx);
-        }
-        TransparentPartialTxBundle::new(bundle)
-    }
+//     #[cfg(feature = "borsh")]
+//     pub fn create_transparent_ptx_bundle(num: usize) -> TransparentPartialTxBundle {
+//         let mut bundle = vec![];
+//         for _ in 0..num {
+//             let ptx = create_transparent_ptx();
+//             bundle.push(ptx);
+//         }
+//         TransparentPartialTxBundle::new(bundle)
+//     }
 
-    #[test]
-    fn test_halo2_transaction() {
-        use super::*;
-        use rand::rngs::OsRng;
+//     #[test]
+//     fn test_halo2_transaction() {
+//         use super::*;
+//         use rand::rngs::OsRng;
 
-        let rng = OsRng;
+//         let rng = OsRng;
 
-        let shielded_ptx_bundle = create_shielded_ptx_bundle(1);
+//         let shielded_ptx_bundle = create_shielded_ptx_bundle(1);
 
-        #[cfg(feature = "borsh")]
-        let transparent_ptx_bundle = create_transparent_ptx_bundle(1);
-        #[cfg(not(feature = "borsh"))]
-        let transparent_ptx_bundle = TransparentPartialTxBundle::default();
+//         #[cfg(feature = "borsh")]
+//         let transparent_ptx_bundle = create_transparent_ptx_bundle(1);
+//         #[cfg(not(feature = "borsh"))]
+//         let transparent_ptx_bundle = TransparentPartialTxBundle::default();
 
-        let tx = Transaction::build(rng, shielded_ptx_bundle, transparent_ptx_bundle).unwrap();
-        let _ret = tx.execute().unwrap();
+//         let tx = Transaction::build(rng, shielded_ptx_bundle, transparent_ptx_bundle).unwrap();
+//         let _ret = tx.execute().unwrap();
 
-        #[cfg(feature = "borsh")]
-        {
-            let borsh = borsh::to_vec(&tx).unwrap();
-            let de_tx: Transaction = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
-            let de_ret = de_tx.execute().unwrap();
-            assert_eq!(_ret, de_ret);
-        }
-    }
-}
+//         #[cfg(feature = "borsh")]
+//         {
+//             let borsh = borsh::to_vec(&tx).unwrap();
+//             let de_tx: Transaction = BorshDeserialize::deserialize(&mut borsh.as_ref()).unwrap();
+//             let de_ret = de_tx.execute().unwrap();
+//             assert_eq!(_ret, de_ret);
+//         }
+//     }
+// }

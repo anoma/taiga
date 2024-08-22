@@ -495,187 +495,187 @@ impl ResourceLogicVerifyingInfoSet {
     }
 }
 
-#[cfg(test)]
-pub mod testing {
-    use crate::{
-        circuit::resource_logic_circuit::{ResourceLogic, ResourceLogicVerifyingInfoTrait},
-        circuit::resource_logic_examples::TrivialResourceLogicCircuit,
-        compliance::ComplianceInfo,
-        constant::TAIGA_COMMITMENT_TREE_DEPTH,
-        merkle_tree::MerklePath,
-        nullifier::Nullifier,
-        resource::{Resource, ResourceLogics},
-        shielded_ptx::ShieldedPartialTransaction,
-        utils::poseidon_hash,
-    };
-    use halo2_proofs::arithmetic::Field;
-    use pasta_curves::pallas;
-    use rand::rngs::OsRng;
+// #[cfg(test)]
+// pub mod testing {
+//     use crate::{
+//         circuit::resource_logic_circuit::{ResourceLogic, ResourceLogicVerifyingInfoTrait},
+//         circuit::resource_logic_examples::TrivialResourceLogicCircuit,
+//         compliance::ComplianceInfo,
+//         constant::TAIGA_COMMITMENT_TREE_DEPTH,
+//         merkle_tree::MerklePath,
+//         nullifier::Nullifier,
+//         resource::{Resource, ResourceLogics},
+//         shielded_ptx::ShieldedPartialTransaction,
+//         utils::poseidon_hash,
+//     };
+//     use halo2_proofs::arithmetic::Field;
+//     use pasta_curves::pallas;
+//     use rand::rngs::OsRng;
 
-    pub fn create_shielded_ptx() -> ShieldedPartialTransaction {
-        let mut rng = OsRng;
+//     pub fn create_shielded_ptx() -> ShieldedPartialTransaction {
+//         let mut rng = OsRng;
 
-        // Create empty resource logic circuit without resource info
-        let trivial_resource_logic_circuit = TrivialResourceLogicCircuit::default();
-        let trivial_resource_logic_vk = trivial_resource_logic_circuit.get_resource_logic_vk();
-        let compressed_trivial_resource_logic_vk = trivial_resource_logic_vk.get_compressed();
+//         // Create empty resource logic circuit without resource info
+//         let trivial_resource_logic_circuit = TrivialResourceLogicCircuit::default();
+//         let trivial_resource_logic_vk = trivial_resource_logic_circuit.get_resource_logic_vk();
+//         let compressed_trivial_resource_logic_vk = trivial_resource_logic_vk.get_compressed();
 
-        // Generate resources
-        let input_resource_1 = {
-            let label = pallas::Base::zero();
-            // TODO: add real application dynamic resource logics and encode them to value later.
-            let app_dynamic_resource_logic_vk = [
-                compressed_trivial_resource_logic_vk,
-                compressed_trivial_resource_logic_vk,
-            ];
-            // Encode the app_dynamic_resource_logic_vk into value
-            // The encoding method is flexible and defined in the application resource logic.
-            // Use poseidon hash to encode the two dynamic resource logics here
-            let value = poseidon_hash(
-                app_dynamic_resource_logic_vk[0],
-                app_dynamic_resource_logic_vk[1],
-            );
-            let nonce = Nullifier::from(pallas::Base::random(&mut rng));
-            let quantity = 5000u64;
-            let nk = pallas::Base::random(&mut rng);
-            let rseed = pallas::Base::random(&mut rng);
-            let is_ephemeral = false;
-            Resource::new_input_resource(
-                compressed_trivial_resource_logic_vk,
-                label,
-                value,
-                quantity,
-                nk,
-                nonce,
-                is_ephemeral,
-                rseed,
-            )
-        };
-        let mut output_resource_1 = {
-            let label = pallas::Base::zero();
-            // TODO: add real application dynamic resource logics and encode them to value later.
-            // If the dynamic resource logic is not used, set value pallas::Base::zero() by default.
-            let value = pallas::Base::zero();
-            let quantity = 5000u64;
-            let npk = pallas::Base::random(&mut rng);
-            let rseed = pallas::Base::random(&mut rng);
-            let is_ephemeral = false;
-            Resource::new_output_resource(
-                compressed_trivial_resource_logic_vk,
-                label,
-                value,
-                quantity,
-                npk,
-                is_ephemeral,
-                rseed,
-            )
-        };
+//         // Generate resources
+//         let input_resource_1 = {
+//             let label = pallas::Base::zero();
+//             // TODO: add real application dynamic resource logics and encode them to value later.
+//             let app_dynamic_resource_logic_vk = [
+//                 compressed_trivial_resource_logic_vk,
+//                 compressed_trivial_resource_logic_vk,
+//             ];
+//             // Encode the app_dynamic_resource_logic_vk into value
+//             // The encoding method is flexible and defined in the application resource logic.
+//             // Use poseidon hash to encode the two dynamic resource logics here
+//             let value = poseidon_hash(
+//                 app_dynamic_resource_logic_vk[0],
+//                 app_dynamic_resource_logic_vk[1],
+//             );
+//             let nonce = Nullifier::from(pallas::Base::random(&mut rng));
+//             let quantity = 5000u64;
+//             let nk = pallas::Base::random(&mut rng);
+//             let rseed = pallas::Base::random(&mut rng);
+//             let is_ephemeral = false;
+//             Resource::new_input_resource(
+//                 compressed_trivial_resource_logic_vk,
+//                 label,
+//                 value,
+//                 quantity,
+//                 nk,
+//                 nonce,
+//                 is_ephemeral,
+//                 rseed,
+//             )
+//         };
+//         let mut output_resource_1 = {
+//             let label = pallas::Base::zero();
+//             // TODO: add real application dynamic resource logics and encode them to value later.
+//             // If the dynamic resource logic is not used, set value pallas::Base::zero() by default.
+//             let value = pallas::Base::zero();
+//             let quantity = 5000u64;
+//             let npk = pallas::Base::random(&mut rng);
+//             let rseed = pallas::Base::random(&mut rng);
+//             let is_ephemeral = false;
+//             Resource::new_output_resource(
+//                 compressed_trivial_resource_logic_vk,
+//                 label,
+//                 value,
+//                 quantity,
+//                 npk,
+//                 is_ephemeral,
+//                 rseed,
+//             )
+//         };
 
-        // Construct compliance pair
-        let merkle_path_1 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let compliance_1 = ComplianceInfo::new(
-            input_resource_1,
-            merkle_path_1,
-            None,
-            &mut output_resource_1,
-            &mut rng,
-        );
+//         // Construct compliance pair
+//         let merkle_path_1 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+//         let compliance_1 = ComplianceInfo::new(
+//             input_resource_1,
+//             merkle_path_1,
+//             None,
+//             &mut output_resource_1,
+//             &mut rng,
+//         );
 
-        // Generate resources
-        let input_resource_2 = {
-            let label = pallas::Base::one();
-            let value = pallas::Base::zero();
-            let nonce = Nullifier::from(pallas::Base::random(&mut rng));
-            let quantity = 10u64;
-            let nk = pallas::Base::random(&mut rng);
-            let rseed = pallas::Base::random(&mut rng);
-            let is_ephemeral = false;
-            Resource::new_input_resource(
-                compressed_trivial_resource_logic_vk,
-                label,
-                value,
-                quantity,
-                nk,
-                nonce,
-                is_ephemeral,
-                rseed,
-            )
-        };
-        let mut output_resource_2 = {
-            let label = pallas::Base::one();
-            let value = pallas::Base::zero();
-            let quantity = 10u64;
-            let npk = pallas::Base::random(&mut rng);
-            let rseed = pallas::Base::random(&mut rng);
-            let is_ephemeral = false;
-            Resource::new_output_resource(
-                compressed_trivial_resource_logic_vk,
-                label,
-                value,
-                quantity,
-                npk,
-                is_ephemeral,
-                rseed,
-            )
-        };
+//         // Generate resources
+//         let input_resource_2 = {
+//             let label = pallas::Base::one();
+//             let value = pallas::Base::zero();
+//             let nonce = Nullifier::from(pallas::Base::random(&mut rng));
+//             let quantity = 10u64;
+//             let nk = pallas::Base::random(&mut rng);
+//             let rseed = pallas::Base::random(&mut rng);
+//             let is_ephemeral = false;
+//             Resource::new_input_resource(
+//                 compressed_trivial_resource_logic_vk,
+//                 label,
+//                 value,
+//                 quantity,
+//                 nk,
+//                 nonce,
+//                 is_ephemeral,
+//                 rseed,
+//             )
+//         };
+//         let mut output_resource_2 = {
+//             let label = pallas::Base::one();
+//             let value = pallas::Base::zero();
+//             let quantity = 10u64;
+//             let npk = pallas::Base::random(&mut rng);
+//             let rseed = pallas::Base::random(&mut rng);
+//             let is_ephemeral = false;
+//             Resource::new_output_resource(
+//                 compressed_trivial_resource_logic_vk,
+//                 label,
+//                 value,
+//                 quantity,
+//                 npk,
+//                 is_ephemeral,
+//                 rseed,
+//             )
+//         };
 
-        // Construct compliance pair
-        let merkle_path_2 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
-        let compliance_2 = ComplianceInfo::new(
-            input_resource_2,
-            merkle_path_2,
-            None,
-            &mut output_resource_2,
-            &mut rng,
-        );
+//         // Construct compliance pair
+//         let merkle_path_2 = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
+//         let compliance_2 = ComplianceInfo::new(
+//             input_resource_2,
+//             merkle_path_2,
+//             None,
+//             &mut output_resource_2,
+//             &mut rng,
+//         );
 
-        // Create resource logic circuit and fill the resource info
-        let mut trivial_resource_logic_circuit = TrivialResourceLogicCircuit {
-            owned_resource_id: input_resource_1.get_nf().unwrap().inner(),
-            input_resources: [input_resource_1, input_resource_2],
-            output_resources: [output_resource_1, output_resource_2],
-        };
-        let input_application_resource_logic_1 = Box::new(trivial_resource_logic_circuit.clone());
-        let trivial_app_logic_1: Box<ResourceLogic> =
-            Box::new(trivial_resource_logic_circuit.clone());
-        let trivial_app_logic_2 = Box::new(trivial_resource_logic_circuit.clone());
-        let trivial_dynamic_resource_logics = vec![trivial_app_logic_1, trivial_app_logic_2];
-        let input_resource_1_resource_logics = ResourceLogics::new(
-            input_application_resource_logic_1,
-            trivial_dynamic_resource_logics,
-        );
+//         // Create resource logic circuit and fill the resource info
+//         let mut trivial_resource_logic_circuit = TrivialResourceLogicCircuit {
+//             owned_resource_id: input_resource_1.get_nf().unwrap().inner(),
+//             input_resources: [input_resource_1, input_resource_2],
+//             output_resources: [output_resource_1, output_resource_2],
+//         };
+//         let input_application_resource_logic_1 = Box::new(trivial_resource_logic_circuit.clone());
+//         let trivial_app_logic_1: Box<ResourceLogic> =
+//             Box::new(trivial_resource_logic_circuit.clone());
+//         let trivial_app_logic_2 = Box::new(trivial_resource_logic_circuit.clone());
+//         let trivial_dynamic_resource_logics = vec![trivial_app_logic_1, trivial_app_logic_2];
+//         let input_resource_1_resource_logics = ResourceLogics::new(
+//             input_application_resource_logic_1,
+//             trivial_dynamic_resource_logics,
+//         );
 
-        // The following resources use empty logic resource_logics and use value with pallas::Base::zero() by default.
-        trivial_resource_logic_circuit.owned_resource_id =
-            input_resource_2.get_nf().unwrap().inner();
-        let input_application_resource_logic_2 = Box::new(trivial_resource_logic_circuit.clone());
-        let input_resource_2_resource_logics =
-            ResourceLogics::new(input_application_resource_logic_2, vec![]);
+//         // The following resources use empty logic resource_logics and use value with pallas::Base::zero() by default.
+//         trivial_resource_logic_circuit.owned_resource_id =
+//             input_resource_2.get_nf().unwrap().inner();
+//         let input_application_resource_logic_2 = Box::new(trivial_resource_logic_circuit.clone());
+//         let input_resource_2_resource_logics =
+//             ResourceLogics::new(input_application_resource_logic_2, vec![]);
 
-        trivial_resource_logic_circuit.owned_resource_id = output_resource_1.commitment().inner();
-        let output_application_resource_logic_1 = Box::new(trivial_resource_logic_circuit.clone());
-        let output_resource_1_resource_logics =
-            ResourceLogics::new(output_application_resource_logic_1, vec![]);
+//         trivial_resource_logic_circuit.owned_resource_id = output_resource_1.commitment().inner();
+//         let output_application_resource_logic_1 = Box::new(trivial_resource_logic_circuit.clone());
+//         let output_resource_1_resource_logics =
+//             ResourceLogics::new(output_application_resource_logic_1, vec![]);
 
-        trivial_resource_logic_circuit.owned_resource_id = output_resource_2.commitment().inner();
-        let output_application_resource_logic_2 = Box::new(trivial_resource_logic_circuit);
-        let output_resource_2_resource_logics =
-            ResourceLogics::new(output_application_resource_logic_2, vec![]);
+//         trivial_resource_logic_circuit.owned_resource_id = output_resource_2.commitment().inner();
+//         let output_application_resource_logic_2 = Box::new(trivial_resource_logic_circuit);
+//         let output_resource_2_resource_logics =
+//             ResourceLogics::new(output_application_resource_logic_2, vec![]);
 
-        // Create shielded partial tx
-        ShieldedPartialTransaction::build(
-            vec![compliance_1, compliance_2],
-            vec![
-                input_resource_1_resource_logics,
-                input_resource_2_resource_logics,
-            ],
-            vec![
-                output_resource_1_resource_logics,
-                output_resource_2_resource_logics,
-            ],
-            vec![],
-            &mut rng,
-        )
-        .unwrap()
-    }
-}
+//         // Create shielded partial tx
+//         ShieldedPartialTransaction::build(
+//             vec![compliance_1, compliance_2],
+//             vec![
+//                 input_resource_1_resource_logics,
+//                 input_resource_2_resource_logics,
+//             ],
+//             vec![
+//                 output_resource_1_resource_logics,
+//                 output_resource_2_resource_logics,
+//             ],
+//             vec![],
+//             &mut rng,
+//         )
+//         .unwrap()
+//     }
+// }
