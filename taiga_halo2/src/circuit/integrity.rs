@@ -1,14 +1,21 @@
 use crate::circuit::{
-    gadgets::{assign_free_advice, assign_free_constant, poseidon_hash::poseidon_hash_gadget},
+    gadgets::{
+        assign_free_advice, assign_free_constant, conditional_select::ConditionalSelectConfig,
+        poseidon_hash::poseidon_hash_gadget,
+    },
     hash_to_curve::{hash_to_curve_circuit, HashToCurveConfig},
+    merkle_circuit::{merkle_poseidon_gadget, MerklePoseidonChip},
     resource_commitment::{resource_commit, ResourceCommitChip},
-    resource_logic_circuit::{InputResourceVariables, OutputResourceVariables, ResourceVariables},
+    resource_logic_circuit::{
+        InputResourceVariables, OutputResourceVariables, ResourceStatus, ResourceVariables,
+    },
 };
 use crate::constant::{
     TaigaFixedBases, TaigaFixedBasesFull, POSEIDON_TO_CURVE_INPUT_LEN,
     PRF_EXPAND_PERSONALIZATION_TO_FIELD, PRF_EXPAND_PSI, PRF_EXPAND_RCM,
 };
 use crate::resource::Resource;
+use crate::resource_tree::ResourceExistenceWitness;
 use crate::utils::poseidon_to_curve;
 use halo2_gadgets::{
     ecc::{chip::EccChip, FixedPoint, NonIdentityPoint, Point, ScalarFixed, ScalarVar},
@@ -321,6 +328,193 @@ pub fn check_output_resource(
     Ok(OutputResourceVariables {
         resource_variables,
         cm,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn load_resource(
+    mut layouter: impl Layouter<pallas::Base>,
+    advices: [Column<Advice>; 10],
+    resource_commit_chip: ResourceCommitChip,
+    conditional_select_config: ConditionalSelectConfig,
+    merkle_chip: MerklePoseidonChip,
+    resource_witness: &ResourceExistenceWitness,
+) -> Result<ResourceStatus, Error> {
+    let resource = resource_witness.get_resource();
+    let merkle_path = resource_witness.get_path();
+    let is_input = resource_witness.is_input();
+
+    // Witness is_input
+    let is_input_var = assign_free_advice(
+        layouter.namespace(|| "witness is_input"),
+        advices[0],
+        Value::known(pallas::Base::from(is_input)),
+    )?;
+
+    // Witness nk or npk
+    let nk_or_npk = if is_input {
+        resource.get_nk().unwrap()
+    } else {
+        resource.get_npk()
+    };
+
+    let nk_or_npk_var = assign_free_advice(
+        layouter.namespace(|| "witness nk_or_npk"),
+        advices[0],
+        Value::known(nk_or_npk),
+    )?;
+
+    let zero_constant = assign_free_constant(
+        layouter.namespace(|| "constant zero"),
+        advices[0],
+        pallas::Base::zero(),
+    )?;
+
+    // npk = Com_r(nk, zero)
+    let input_npk = poseidon_hash_gadget(
+        resource_commit_chip.get_poseidon_config(),
+        layouter.namespace(|| "npk encoding"),
+        [nk_or_npk_var.clone(), zero_constant],
+    )?;
+
+    let npk = layouter.assign_region(
+        || "conditional select: npk",
+        |mut region| {
+            conditional_select_config.assign_region(
+                &is_input_var,
+                &input_npk,
+                &nk_or_npk_var,
+                0,
+                &mut region,
+            )
+        },
+    )?;
+
+    // Witness value
+    let value = assign_free_advice(
+        layouter.namespace(|| "witness value"),
+        advices[0],
+        Value::known(resource.value),
+    )?;
+
+    // Witness logic
+    let logic = assign_free_advice(
+        layouter.namespace(|| "witness logic"),
+        advices[0],
+        Value::known(resource.get_logic()),
+    )?;
+
+    // Witness label
+    let label = assign_free_advice(
+        layouter.namespace(|| "witness label"),
+        advices[0],
+        Value::known(resource.get_label()),
+    )?;
+
+    // Witness and range check the quantity(u64)
+    let quantity = quantity_range_check(
+        layouter.namespace(|| "quantity range check"),
+        resource_commit_chip.get_lookup_config(),
+        resource.quantity,
+    )?;
+
+    // Witness nonce
+    let nonce = assign_free_advice(
+        layouter.namespace(|| "witness nonce"),
+        advices[0],
+        Value::known(resource.nonce.inner()),
+    )?;
+
+    // Witness rseed
+    let rseed = assign_free_advice(
+        layouter.namespace(|| "witness rseed"),
+        advices[0],
+        Value::known(resource.rseed),
+    )?;
+
+    // We don't need the constraints on psi and rcm derivation for input resource.
+    // If the psi and rcm are not correct, the existence checking would fail.
+    // Witness psi
+    let psi = assign_free_advice(
+        layouter.namespace(|| "witness psi_input"),
+        advices[0],
+        Value::known(resource.get_psi()),
+    )?;
+
+    // Witness rcm
+    let rcm = assign_free_advice(
+        layouter.namespace(|| "witness rcm"),
+        advices[0],
+        Value::known(resource.get_rcm()),
+    )?;
+
+    // Witness is_ephemeral
+    // is_ephemeral will be boolean-constrained in the resource_commit.
+    let is_ephemeral = assign_free_advice(
+        layouter.namespace(|| "witness is_ephemeral"),
+        advices[0],
+        Value::known(pallas::Base::from(resource.is_ephemeral)),
+    )?;
+
+    // Check resource commitment
+    let cm = resource_commit(
+        layouter.namespace(|| "resource commitment"),
+        resource_commit_chip.clone(),
+        logic.clone(),
+        label.clone(),
+        value.clone(),
+        npk.clone(),
+        nonce.clone(),
+        psi.clone(),
+        quantity.clone(),
+        is_ephemeral.clone(),
+        rcm.clone(),
+    )?;
+
+    // Generate the nullifier if the resource is an input
+    let nf = nullifier_circuit(
+        layouter.namespace(|| "Generate nullifier"),
+        resource_commit_chip.get_poseidon_config(),
+        nk_or_npk_var,
+        nonce.clone(),
+        psi.clone(),
+        cm.clone(),
+    )?;
+
+    // The self_id is the nullifier if the resource is an input, otherwise it's
+    // the commitment
+    let self_id = layouter.assign_region(
+        || "conditional select: nullifier or commitment",
+        |mut region| {
+            conditional_select_config.assign_region(&is_input_var, &nf, &cm, 0, &mut region)
+        },
+    )?;
+
+    // Check resource existence(merkle path)
+    // TODO: constrain the first LR(is_input)
+    let root = merkle_poseidon_gadget(
+        layouter.namespace(|| "poseidon merkle"),
+        merkle_chip,
+        self_id.clone(),
+        &merkle_path.inner(),
+    )?;
+
+    let resource_variables = ResourceVariables {
+        logic,
+        quantity,
+        label,
+        is_ephemeral,
+        value,
+        nonce,
+        npk,
+        rseed,
+    };
+
+    Ok(ResourceStatus {
+        resource_merkle_root: root,
+        is_input: is_input_var,
+        identity: self_id,
+        resource: resource_variables,
     })
 }
 

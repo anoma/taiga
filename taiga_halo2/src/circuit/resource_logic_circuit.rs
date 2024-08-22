@@ -4,7 +4,6 @@ use crate::{
         blake2s::Blake2sConfig,
         gadgets::{
             add::{AddChip, AddConfig},
-            assign_free_advice,
             conditional_equal::ConditionalEqualConfig,
             conditional_select::ConditionalSelectConfig,
             extended_or_relation::ExtendedOrRelationConfig,
@@ -14,7 +13,8 @@ use crate::{
                 GetIsInputResourceFlagConfig, GetOwnedResourceVariableConfig,
             },
         },
-        integrity::{check_input_resource, check_output_resource},
+        integrity::load_resource,
+        merkle_circuit::{MerklePoseidonChip, MerklePoseidonConfig},
         resource_commitment::{ResourceCommitChip, ResourceCommitConfig},
         vamp_ir_utils::{get_circuit_assignments, parse, VariableAssignmentError},
     },
@@ -28,13 +28,15 @@ use crate::{
         RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE, RESOURCE_LOGIC_CIRCUIT_PUBLIC_INPUT_NUM,
         RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PK_X_IDX,
         RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PK_Y_IDX,
-        RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX, SETUP_PARAMS_MAP,
+        RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
+        RESOURCE_LOGIC_CIRCUIT_RESOURCE_MERKLE_ROOT_IDX, SETUP_PARAMS_MAP,
     },
     error::TransactionError,
     proof::Proof,
     resource::{RandomSeed, Resource, ResourceCommitment},
     resource_encryption::{ResourceCiphertext, SecretKey},
     resource_logic_vk::ResourceLogicVerifyingKey,
+    resource_tree::ResourceExistenceWitness,
     utils::mod_r_p,
 };
 use dyn_clone::{clone_trait_object, DynClone};
@@ -326,6 +328,7 @@ pub struct ResourceLogicConfig {
     pub table_idx: TableColumn,
     pub ecc_config: EccConfig<TaigaFixedBases>,
     pub poseidon_config: PoseidonConfig<pallas::Base, 3, 2>,
+    pub merkle_config: MerklePoseidonConfig,
     pub get_is_input_resource_flag_config: GetIsInputResourceFlagConfig,
     pub get_owned_resource_variable_config: GetOwnedResourceVariableConfig,
     pub conditional_equal_config: ConditionalEqualConfig,
@@ -414,12 +417,20 @@ impl ResourceLogicConfig {
             poseidon_config.clone(),
             range_check,
         );
+
+        let merkle_config = MerklePoseidonChip::configure(
+            meta,
+            advices[..5].try_into().unwrap(),
+            poseidon_config.clone(),
+        );
+
         Self {
             advices,
             instances,
             table_idx,
             ecc_config,
             poseidon_config,
+            merkle_config,
             get_is_input_resource_flag_config,
             get_owned_resource_variable_config,
             conditional_equal_config,
@@ -443,13 +454,13 @@ pub trait ResourceLogicVerifyingInfoTrait: DynClone {
 clone_trait_object!(ResourceLogicVerifyingInfoTrait);
 
 pub trait ResourceLogicCircuit: Circuit<pallas::Base> + ResourceLogicVerifyingInfoTrait {
-    // Default implementation, constrains the resources integrity.
+    // Load self resource and return self_resource and resource_merkle_root
     // TODO: how to enforce the constraints in resource_logic circuit?
     fn basic_constraints(
         &self,
         config: ResourceLogicConfig,
         mut layouter: impl Layouter<pallas::Base>,
-    ) -> Result<BasicResourceLogicVariables, Error> {
+    ) -> Result<ResourceStatus, Error> {
         layouter.assign_table(
             || "table_idx",
             |mut table| {
@@ -465,62 +476,38 @@ pub trait ResourceLogicCircuit: Circuit<pallas::Base> + ResourceLogicVerifyingIn
             },
         )?;
 
+        // Construct a merkle chip
+        let merkle_chip = MerklePoseidonChip::construct(config.merkle_config);
         // Construct a resource_commit chip
         let resource_commit_chip =
             ResourceCommitChip::construct(config.resource_commit_config.clone());
 
-        let input_resources = self.get_input_resources();
-        let output_resources = self.get_output_resources();
-        let mut input_resource_variables = vec![];
-        let mut output_resource_variables = vec![];
-        for i in 0..NUM_RESOURCE {
-            input_resource_variables.push(check_input_resource(
-                layouter.namespace(|| "check input resource"),
-                config.advices,
-                config.instances,
-                resource_commit_chip.clone(),
-                input_resources[i],
-                i * 2,
-            )?);
-
-            // The old_nf may not be from above input resource
-            let old_nf = assign_free_advice(
-                layouter.namespace(|| "old nf"),
-                config.advices[0],
-                Value::known(output_resources[i].nonce.inner()),
-            )?;
-            output_resource_variables.push(check_output_resource(
-                layouter.namespace(|| "check output resource"),
-                config.advices,
-                config.instances,
-                resource_commit_chip.clone(),
-                output_resources[i],
-                old_nf,
-                i * 2 + 1,
-            )?);
-        }
-
-        // Publicize the owned_resource_id
-        let owned_resource_id = assign_free_advice(
-            layouter.namespace(|| "owned_resource_id"),
-            config.advices[0],
-            Value::known(self.get_owned_resource_id()),
+        // Load self_resource
+        let self_resource_status = load_resource(
+            layouter.namespace(|| "load self resource"),
+            config.advices,
+            resource_commit_chip,
+            config.conditional_select_config,
+            merkle_chip,
+            &self.get_self_resource(),
         )?;
+
+        // Publicize the resource_merkle_root
         layouter.constrain_instance(
-            owned_resource_id.cell(),
+            self_resource_status.resource_merkle_root.cell(),
             config.instances,
-            RESOURCE_LOGIC_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX,
+            RESOURCE_LOGIC_CIRCUIT_RESOURCE_MERKLE_ROOT_IDX,
         )?;
 
-        Ok(BasicResourceLogicVariables {
-            owned_resource_id,
-            input_resource_variables: input_resource_variables.try_into().unwrap(),
-            output_resource_variables: output_resource_variables.try_into().unwrap(),
-        })
-    }
+        // Publicize the self resource id
+        layouter.constrain_instance(
+            self_resource_status.identity.cell(),
+            config.instances,
+            RESOURCE_LOGIC_CIRCUIT_RESOURCE_MERKLE_ROOT_IDX,
+        )?;
 
-    // resource logic designer need to implement the following functions.
-    // `get_input_resources` and `get_output_resources` will be used in `basic_constraints` to get the basic resource info.
+        Ok(self_resource_status)
+    }
 
     // Add custom constraints on basic resource variables and user-defined variables.
     // It should at least contain the default resource_logic commitment
@@ -528,7 +515,7 @@ pub trait ResourceLogicCircuit: Circuit<pallas::Base> + ResourceLogicVerifyingIn
         &self,
         config: ResourceLogicConfig,
         mut layouter: impl Layouter<pallas::Base>,
-        _basic_variables: BasicResourceLogicVariables,
+        _self_resource: ResourceStatus,
     ) -> Result<(), Error> {
         // Publicize the dynamic resource_logic commitments with default value
         publicize_default_dynamic_resource_logic_commitments(
@@ -561,6 +548,7 @@ pub trait ResourceLogicCircuit: Circuit<pallas::Base> + ResourceLogicVerifyingIn
     // The owned_resource_id is the key to look up the target variables and
     // help determine whether the owned resource is the input resource or not in resource logic circuit.
     fn get_owned_resource_id(&self) -> pallas::Base;
+    fn get_self_resource(&self) -> ResourceExistenceWitness;
 }
 
 /// BasicResourceLogicVariables are generally constrained in ResourceLogicCircuit::basic_constraints
@@ -570,6 +558,14 @@ pub struct BasicResourceLogicVariables {
     pub owned_resource_id: AssignedCell<pallas::Base, pallas::Base>,
     pub input_resource_variables: [InputResourceVariables; NUM_RESOURCE],
     pub output_resource_variables: [OutputResourceVariables; NUM_RESOURCE],
+}
+
+#[derive(Debug, Clone)]
+pub struct ResourceStatus {
+    pub resource_merkle_root: AssignedCell<pallas::Base, pallas::Base>,
+    pub is_input: AssignedCell<pallas::Base, pallas::Base>,
+    pub identity: AssignedCell<pallas::Base, pallas::Base>, // nf or cm
+    pub resource: ResourceVariables,
 }
 
 #[derive(Debug, Clone)]
@@ -742,14 +738,14 @@ macro_rules! resource_logic_circuit_impl {
                 config: Self::Config,
                 mut layouter: impl Layouter<pallas::Base>,
             ) -> Result<(), Error> {
-                let basic_variables = self.basic_constraints(
+                let self_resource = self.basic_constraints(
                     config.clone(),
                     layouter.namespace(|| "basic constraints"),
                 )?;
                 self.custom_constraints(
                     config,
                     layouter.namespace(|| "custom constraints"),
-                    basic_variables,
+                    self_resource,
                 )?;
                 Ok(())
             }
