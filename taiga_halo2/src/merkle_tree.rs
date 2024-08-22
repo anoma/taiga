@@ -82,17 +82,12 @@ pub enum LR {
     L,
 }
 
-pub fn is_right(p: LR) -> bool {
-    match p {
-        R => true,
-        L => false,
-    }
-}
-
-pub fn is_left(p: LR) -> bool {
-    match p {
-        R => false,
-        L => true,
+impl LR {
+    pub fn is_left(&self) -> bool {
+        match self {
+            R => false,
+            L => true,
+        }
     }
 }
 
@@ -139,7 +134,7 @@ impl MerklePath {
     }
 
     /// Returns the input parameters for merkle tree gadget.
-    pub fn get_path(&self) -> Vec<(pallas::Base, LR)> {
+    pub fn inner(&self) -> Vec<(pallas::Base, LR)> {
         self.merkle_path
             .iter()
             .map(|(node, b)| (node.inner(), *b))

@@ -222,7 +222,7 @@ impl ComplianceInfo {
 
         let compliance_circuit = ComplianceCircuit {
             input_resource: self.input_resource,
-            merkle_path: self.input_merkle_path.get_path().try_into().unwrap(),
+            merkle_path: self.input_merkle_path.inner().try_into().unwrap(),
             output_resource: self.output_resource,
             rcv,
             input_resource_logic_cm_r,

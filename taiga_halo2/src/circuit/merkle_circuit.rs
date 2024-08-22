@@ -1,5 +1,5 @@
 use crate::circuit::gadgets::poseidon_hash::poseidon_hash_gadget;
-use crate::merkle_tree::{is_left, LR};
+use crate::merkle_tree::LR;
 use halo2_gadgets::{
     poseidon::Pow5Config as PoseidonConfig,
     utilities::cond_swap::{CondSwapChip, CondSwapConfig, CondSwapInstructions},
@@ -91,7 +91,7 @@ pub fn merkle_poseidon_gadget(
                 &chip,
                 layouter.namespace(|| "merkle swap"),
                 pair,
-                Value::known(is_left(e.1)),
+                Value::known(e.1.is_left()),
             )?
         };
 
@@ -184,7 +184,7 @@ fn test_halo2_merkle_circuit() {
                 layouter.namespace(|| "poseidon merkle"),
                 merkle_chip,
                 leaf,
-                &self.merkle_path.get_path(),
+                &self.merkle_path.inner(),
             )?;
 
             let expected_root = {
