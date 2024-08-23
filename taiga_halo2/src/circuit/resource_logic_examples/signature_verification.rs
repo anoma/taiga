@@ -94,7 +94,7 @@ impl SchnorrSignature {
 // SignatureVerificationResourceLogicCircuit uses the schnorr signature.
 #[derive(Clone, Debug, Default)]
 pub struct SignatureVerificationResourceLogicCircuit {
-    pub owned_resource_id: pallas::Base,
+    pub self_resource_id: pallas::Base,
     pub input_resources: [Resource; NUM_RESOURCE],
     pub output_resources: [Resource; NUM_RESOURCE],
     pub resource_logic_vk: pallas::Base,
@@ -104,7 +104,7 @@ pub struct SignatureVerificationResourceLogicCircuit {
 
 impl SignatureVerificationResourceLogicCircuit {
     pub fn new(
-        owned_resource_id: pallas::Base,
+        self_resource_id: pallas::Base,
         input_resources: [Resource; NUM_RESOURCE],
         output_resources: [Resource; NUM_RESOURCE],
         resource_logic_vk: pallas::Base,
@@ -112,7 +112,7 @@ impl SignatureVerificationResourceLogicCircuit {
         receiver_resource_logic_vk: pallas::Base,
     ) -> Self {
         Self {
-            owned_resource_id,
+            self_resource_id,
             input_resources,
             output_resources,
             resource_logic_vk,
@@ -123,7 +123,7 @@ impl SignatureVerificationResourceLogicCircuit {
 
     pub fn from_sk_and_sign<R: RngCore>(
         mut rng: R,
-        owned_resource_id: pallas::Base,
+        self_resource_id: pallas::Base,
         input_resources: [Resource; NUM_RESOURCE],
         output_resources: [Resource; NUM_RESOURCE],
         resource_logic_vk: pallas::Base,
@@ -143,7 +143,7 @@ impl SignatureVerificationResourceLogicCircuit {
             });
         let signature = SchnorrSignature::sign(&mut rng, sk, message);
         Self {
-            owned_resource_id,
+            self_resource_id,
             input_resources,
             output_resources,
             resource_logic_vk,
@@ -186,11 +186,11 @@ impl ResourceLogicCircuit for SignatureVerificationResourceLogicCircuit {
         )?;
 
         // search target resource and get the value
-        let owned_resource_id = basic_variables.get_owned_resource_id();
+        let self_resource_id = basic_variables.get_self_resource_id();
         let value = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
             layouter.namespace(|| "get owned resource value"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_value_searchable_pairs(),
         )?;
 
@@ -302,8 +302,8 @@ impl ResourceLogicCircuit for SignatureVerificationResourceLogicCircuit {
         public_inputs.into()
     }
 
-    fn get_owned_resource_id(&self) -> pallas::Base {
-        self.owned_resource_id
+    fn get_self_resource_id(&self) -> pallas::Base {
+        self.self_resource_id
     }
 }
 
@@ -312,7 +312,7 @@ resource_logic_verifying_info_impl!(SignatureVerificationResourceLogicCircuit);
 
 impl BorshSerialize for SignatureVerificationResourceLogicCircuit {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        writer.write_all(&self.owned_resource_id.to_repr())?;
+        writer.write_all(&self.self_resource_id.to_repr())?;
         for input in self.input_resources.iter() {
             input.serialize(writer)?;
         }
@@ -331,7 +331,7 @@ impl BorshSerialize for SignatureVerificationResourceLogicCircuit {
 
 impl BorshDeserialize for SignatureVerificationResourceLogicCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let owned_resource_id = read_base_field(reader)?;
+        let self_resource_id = read_base_field(reader)?;
         let input_resources: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
@@ -342,7 +342,7 @@ impl BorshDeserialize for SignatureVerificationResourceLogicCircuit {
         let signature = SchnorrSignature::deserialize_reader(reader)?;
         let receiver_resource_logic_vk = read_base_field(reader)?;
         Ok(Self {
-            owned_resource_id,
+            self_resource_id,
             input_resources: input_resources.try_into().unwrap(),
             output_resources: output_resources.try_into().unwrap(),
             resource_logic_vk,
@@ -389,10 +389,10 @@ fn test_halo2_sig_verification_resource_logic_circuit() {
         let auth_vk = pallas::Base::random(&mut rng);
         let auth = TokenAuthorization::from_sk_vk(&sk, &auth_vk);
         input_resources[0].value = auth.to_value();
-        let owned_resource_id = input_resources[0].get_nf().unwrap().inner();
+        let self_resource_id = input_resources[0].get_nf().unwrap().inner();
         SignatureVerificationResourceLogicCircuit::from_sk_and_sign(
             &mut rng,
-            owned_resource_id,
+            self_resource_id,
             input_resources,
             output_resources,
             auth_vk,

@@ -481,9 +481,9 @@ impl ResourceLogics {
     //     input_resources: [Resource; NUM_RESOURCE],
     //     output_resources: [Resource; NUM_RESOURCE],
     // ) -> Self {
-    //     let owned_resource_id = resource.get_nf().unwrap().inner();
+    //     let self_resource_id = resource.get_nf().unwrap().inner();
     //     let application_resource_logic = Box::new(TrivialResourceLogicCircuit::new(
-    //         owned_resource_id,
+    //         self_resource_id,
     //         input_resources,
     //         output_resources,
     //     ));
@@ -499,9 +499,9 @@ impl ResourceLogics {
     //     input_resources: [Resource; NUM_RESOURCE],
     //     output_resources: [Resource; NUM_RESOURCE],
     // ) -> Self {
-    //     let owned_resource_id = resource.commitment().inner();
+    //     let self_resource_id = resource.commitment().inner();
     //     let application_resource_logic = Box::new(TrivialResourceLogicCircuit::new(
-    //         owned_resource_id,
+    //         self_resource_id,
     //         input_resources,
     //         output_resources,
     //     ));

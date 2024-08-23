@@ -76,7 +76,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
         // Create resource_logics for the intent
         let intent_resource_logics = {
             let intent_resource_logic = PartialFulfillmentIntentResourceLogicCircuit {
-                owned_resource_id: intent_resource.commitment().inner(),
+                self_resource_id: intent_resource.commitment().inner(),
                 input_resources,
                 output_resources,
                 swap: swap.clone(),
@@ -165,7 +165,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
         // Create resource_logics for the intent
         let intent_resource_logics = {
             let intent_resource_logic = PartialFulfillmentIntentResourceLogicCircuit {
-                owned_resource_id: intent_resource.get_nf().unwrap().inner(),
+                self_resource_id: intent_resource.get_nf().unwrap().inner(),
                 input_resources,
                 output_resources,
                 swap: swap.clone(),

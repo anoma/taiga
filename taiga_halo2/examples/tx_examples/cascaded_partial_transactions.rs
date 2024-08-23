@@ -114,7 +114,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
             // Create resource logics for the intent
             let intent_resource_logics = {
                 let intent_resource_logic = CascadeIntentResourceLogicCircuit {
-                    owned_resource_id: cascade_intent_resource.commitment().inner(),
+                    self_resource_id: cascade_intent_resource.commitment().inner(),
                     input_resources,
                     output_resources,
                     cascade_resource_cm: cascade_intent_resource.get_label(),
@@ -175,7 +175,7 @@ pub fn create_transaction<R: RngCore + CryptoRng>(mut rng: R) -> Transaction {
             // Create resource_logics for the intent
             let intent_resource_logics = {
                 let intent_resource_logic = CascadeIntentResourceLogicCircuit {
-                    owned_resource_id: cascade_intent_resource.get_nf().unwrap().inner(),
+                    self_resource_id: cascade_intent_resource.get_nf().unwrap().inner(),
                     input_resources,
                     output_resources,
                     cascade_resource_cm: cascade_intent_resource.get_label(),

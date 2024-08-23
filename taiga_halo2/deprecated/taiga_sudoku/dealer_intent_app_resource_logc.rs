@@ -37,7 +37,7 @@ use taiga_halo2::{
 
 #[derive(Clone, Debug, Default)]
 struct DealerIntentResourceLogicCircuit {
-    owned_resource_id: pallas::Base,
+    self_resource_id: pallas::Base,
     input_resources: [Resource; NUM_RESOURCE],
     output_resources: [Resource; NUM_RESOURCE],
     encoded_puzzle: pallas::Base,
@@ -153,8 +153,8 @@ impl ResourceLogicInfo for DealerIntentResourceLogicCircuit {
         public_inputs.into()
     }
 
-    fn get_owned_resource_id(&self) -> pallas::Base {
-        self.owned_resource_id
+    fn get_self_resource_id(&self) -> pallas::Base {
+        self.self_resource_id
     }
 }
 
@@ -167,11 +167,11 @@ impl ResourceLogicCircuit for DealerIntentResourceLogicCircuit {
         mut layouter: impl Layouter<pallas::Base>,
         basic_variables: BasicResourceLogicVariables,
     ) -> Result<(), Error> {
-        let owned_resource_id = basic_variables.get_owned_resource_id();
+        let self_resource_id = basic_variables.get_self_resource_id();
         let is_input_resource = get_is_input_resource_flag(
             config.get_is_input_resource_flag_config,
             layouter.namespace(|| "get is_input_resource_flag"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_input_resource_nfs(),
             &basic_variables.get_output_resource_cms(),
         )?;
@@ -180,7 +180,7 @@ impl ResourceLogicCircuit for DealerIntentResourceLogicCircuit {
         let app_data_static = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
             layouter.namespace(|| "get owned resource app_static_data"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_app_data_static_searchable_pairs(),
         )?;
 
@@ -372,9 +372,9 @@ fn test_halo2_dealer_intent_resource_logic_circuit() {
                 sudoku_app_vk,
             );
         let encoded_solution = pallas::Base::random(&mut rng);
-        let owned_resource_id = output_resources[0].commitment().inner();
+        let self_resource_id = output_resources[0].commitment().inner();
         DealerIntentResourceLogicCircuit {
-            owned_resource_id,
+            self_resource_id,
             input_resources,
             output_resources: output_resources.try_into().unwrap(),
             encoded_puzzle,

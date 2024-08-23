@@ -20,7 +20,7 @@ use crate::{
         RESOURCE_LOGIC_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX,
         RESOURCE_LOGIC_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX,
         RESOURCE_LOGIC_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX,
-        RESOURCE_LOGIC_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX,
+        RESOURCE_LOGIC_CIRCUIT_SELF_RESOURCE_ID_IDX,
     },
     nullifier::Nullifier,
     resource::ResourceCommitment,
@@ -128,7 +128,7 @@ impl ResourceLogicByteCode {
         }
     }
 
-    // Verify resource_logic circuit transparently and return owned resource PubID for further checking
+    // Verify resource_logic circuit transparently and return self resource id for further checking
     pub fn verify_transparently(
         &self,
         compliance_nfs: &[Nullifier],
@@ -218,7 +218,7 @@ impl ResourceLogicByteCode {
             return Err(TransactionError::InconsistentOutputResourceCommitment);
         }
 
-        Ok(public_inputs.get_from_index(RESOURCE_LOGIC_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX))
+        Ok(public_inputs.get_from_index(RESOURCE_LOGIC_CIRCUIT_SELF_RESOURCE_ID_IDX))
     }
 }
 
@@ -254,16 +254,16 @@ impl ApplicationByteCode {
         compliance_nfs: &[Nullifier],
         compliance_cms: &[ResourceCommitment],
     ) -> Result<pallas::Base, TransactionError> {
-        let owned_resource_id = self
+        let self_resource_id = self
             .app_resource_logic_bytecode
             .verify_transparently(compliance_nfs, compliance_cms)?;
         for dynamic_resource_logic in self.dynamic_resource_logic_bytecode.iter() {
             let id = dynamic_resource_logic.verify_transparently(compliance_nfs, compliance_cms)?;
             // check: the app_resource_logic and dynamic_resource_logics belong to the resource
-            if id != owned_resource_id {
+            if id != self_resource_id {
                 return Err(TransactionError::InconsistentSelfResourceID);
             }
         }
-        Ok(owned_resource_id)
+        Ok(self_resource_id)
     }
 }

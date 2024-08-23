@@ -102,7 +102,7 @@ impl TrivialResourceLogicCircuit {
 impl BorshSerialize for TrivialResourceLogicCircuit {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         use ff::PrimeField;
-        writer.write_all(&self.owned_resource_id.to_repr())?;
+        writer.write_all(&self.self_resource_id.to_repr())?;
         for input in self.input_resources.iter() {
             input.serialize(writer)?;
         }
@@ -117,7 +117,7 @@ impl BorshSerialize for TrivialResourceLogicCircuit {
 #[cfg(feature = "borsh")]
 impl BorshDeserialize for TrivialResourceLogicCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let owned_resource_id = crate::utils::read_base_field(reader)?;
+        let self_resource_id = crate::utils::read_base_field(reader)?;
         let input_resources: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
@@ -125,7 +125,7 @@ impl BorshDeserialize for TrivialResourceLogicCircuit {
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
         Ok(Self {
-            owned_resource_id,
+            self_resource_id,
             input_resources: input_resources.try_into().unwrap(),
             output_resources: output_resources.try_into().unwrap(),
         })

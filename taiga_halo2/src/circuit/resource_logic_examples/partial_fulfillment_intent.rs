@@ -50,7 +50,7 @@ lazy_static! {
 // PartialFulfillmentIntentResourceLogicCircuit
 #[derive(Clone, Debug, Default)]
 pub struct PartialFulfillmentIntentResourceLogicCircuit {
-    pub owned_resource_id: pallas::Base,
+    pub self_resource_id: pallas::Base,
     pub input_resources: [Resource; NUM_RESOURCE],
     pub output_resources: [Resource; NUM_RESOURCE],
     pub swap: Swap,
@@ -84,7 +84,7 @@ impl ResourceLogicCircuit for PartialFulfillmentIntentResourceLogicCircuit {
         let sub_chip = SubChip::construct(config.sub_config.clone(), ());
         let mul_chip = MulChip::construct(config.mul_config.clone());
 
-        let owned_resource_id = basic_variables.get_owned_resource_id();
+        let self_resource_id = basic_variables.get_self_resource_id();
 
         let label = self
             .swap
@@ -98,7 +98,7 @@ impl ResourceLogicCircuit for PartialFulfillmentIntentResourceLogicCircuit {
         let owned_resource_label = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
             layouter.namespace(|| "get owned resource label"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_label_searchable_pairs(),
         )?;
 
@@ -113,7 +113,7 @@ impl ResourceLogicCircuit for PartialFulfillmentIntentResourceLogicCircuit {
         let is_input_resource = get_is_input_resource_flag(
             config.get_is_input_resource_flag_config,
             layouter.namespace(|| "get is_input_resource_flag"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_input_resource_nfs(),
             &basic_variables.get_output_resource_cms(),
         )?;
@@ -189,8 +189,8 @@ impl ResourceLogicCircuit for PartialFulfillmentIntentResourceLogicCircuit {
         public_inputs.into()
     }
 
-    fn get_owned_resource_id(&self) -> pallas::Base {
-        self.owned_resource_id
+    fn get_self_resource_id(&self) -> pallas::Base {
+        self.self_resource_id
     }
 }
 
@@ -199,7 +199,7 @@ resource_logic_verifying_info_impl!(PartialFulfillmentIntentResourceLogicCircuit
 
 impl BorshSerialize for PartialFulfillmentIntentResourceLogicCircuit {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        writer.write_all(&self.owned_resource_id.to_repr())?;
+        writer.write_all(&self.self_resource_id.to_repr())?;
         for input in self.input_resources.iter() {
             input.serialize(writer)?;
         }
@@ -216,7 +216,7 @@ impl BorshSerialize for PartialFulfillmentIntentResourceLogicCircuit {
 
 impl BorshDeserialize for PartialFulfillmentIntentResourceLogicCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let owned_resource_id = read_base_field(reader)?;
+        let self_resource_id = read_base_field(reader)?;
         let input_resources: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
@@ -225,7 +225,7 @@ impl BorshDeserialize for PartialFulfillmentIntentResourceLogicCircuit {
             .collect::<Result<_, _>>()?;
         let swap = Swap::deserialize_reader(reader)?;
         Ok(Self {
-            owned_resource_id,
+            self_resource_id,
             input_resources: input_resources.try_into().unwrap(),
             output_resources: output_resources.try_into().unwrap(),
             swap,
@@ -270,7 +270,7 @@ mod tests {
         let output_resources = [intent_resource, output_padding_resource];
 
         let circuit = PartialFulfillmentIntentResourceLogicCircuit {
-            owned_resource_id: intent_resource.commitment().inner(),
+            self_resource_id: intent_resource.commitment().inner(),
             input_resources,
             output_resources,
             swap,
@@ -299,7 +299,7 @@ mod tests {
         let (input_resources, output_resources) = swap.fill(&mut rng, intent_resource, bob_sell);
 
         let circuit = PartialFulfillmentIntentResourceLogicCircuit {
-            owned_resource_id: intent_resource.get_nf().unwrap().inner(),
+            self_resource_id: intent_resource.get_nf().unwrap().inner(),
             input_resources,
             output_resources,
             swap,
@@ -328,7 +328,7 @@ mod tests {
         let (input_resources, output_resources) = swap.fill(&mut rng, intent_resource, bob_sell);
 
         let circuit = PartialFulfillmentIntentResourceLogicCircuit {
-            owned_resource_id: intent_resource.get_nf().unwrap().inner(),
+            self_resource_id: intent_resource.get_nf().unwrap().inner(),
             input_resources,
             output_resources,
             swap,

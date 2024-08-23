@@ -48,7 +48,7 @@ lazy_static! {
 // OrRelationIntentResourceLogicCircuit
 #[derive(Clone, Debug, Default)]
 pub struct OrRelationIntentResourceLogicCircuit {
-    pub owned_resource_id: pallas::Base,
+    pub self_resource_id: pallas::Base,
     pub input_resources: [Resource; NUM_RESOURCE],
     pub output_resources: [Resource; NUM_RESOURCE],
     pub token_1: Token,
@@ -103,11 +103,11 @@ impl ResourceLogicCircuit for OrRelationIntentResourceLogicCircuit {
         mut layouter: impl Layouter<pallas::Base>,
         basic_variables: BasicResourceLogicVariables,
     ) -> Result<(), Error> {
-        let owned_resource_id = basic_variables.get_owned_resource_id();
+        let self_resource_id = basic_variables.get_self_resource_id();
         let is_input_resource = get_is_input_resource_flag(
             config.get_is_input_resource_flag_config,
             layouter.namespace(|| "get is_input_resource_flag"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_input_resource_nfs(),
             &basic_variables.get_output_resource_cms(),
         )?;
@@ -173,7 +173,7 @@ impl ResourceLogicCircuit for OrRelationIntentResourceLogicCircuit {
         let label = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
             layouter.namespace(|| "get owned resource label"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_label_searchable_pairs(),
         )?;
 
@@ -287,8 +287,8 @@ impl ResourceLogicCircuit for OrRelationIntentResourceLogicCircuit {
         public_inputs.into()
     }
 
-    fn get_owned_resource_id(&self) -> pallas::Base {
-        self.owned_resource_id
+    fn get_self_resource_id(&self) -> pallas::Base {
+        self.self_resource_id
     }
 }
 
@@ -297,7 +297,7 @@ resource_logic_verifying_info_impl!(OrRelationIntentResourceLogicCircuit);
 
 impl BorshSerialize for OrRelationIntentResourceLogicCircuit {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        writer.write_all(&self.owned_resource_id.to_repr())?;
+        writer.write_all(&self.self_resource_id.to_repr())?;
         for input in self.input_resources.iter() {
             input.serialize(writer)?;
         }
@@ -318,7 +318,7 @@ impl BorshSerialize for OrRelationIntentResourceLogicCircuit {
 
 impl BorshDeserialize for OrRelationIntentResourceLogicCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let owned_resource_id = read_base_field(reader)?;
+        let self_resource_id = read_base_field(reader)?;
         let input_resources: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
@@ -330,7 +330,7 @@ impl BorshDeserialize for OrRelationIntentResourceLogicCircuit {
         let receiver_npk = read_base_field(reader)?;
         let receiver_value = read_base_field(reader)?;
         Ok(Self {
-            owned_resource_id,
+            self_resource_id,
             input_resources: input_resources.try_into().unwrap(),
             output_resources: output_resources.try_into().unwrap(),
             token_1,
@@ -402,7 +402,7 @@ fn test_halo2_or_relation_intent_resource_logic_circuit() {
         let padding_input_resource = Resource::random_padding_resource(&mut rng);
         let input_resources = [intent_resource, padding_input_resource];
         OrRelationIntentResourceLogicCircuit {
-            owned_resource_id: input_resources[0].get_nf().unwrap().inner(),
+            self_resource_id: input_resources[0].get_nf().unwrap().inner(),
             input_resources,
             output_resources,
             token_1,

@@ -97,7 +97,7 @@ pub fn create_token_intent_ptx<R: RngCore>(
         // Create resource logics for the intent resource
         let intent_resource_resource_logics = {
             let intent_resource_logic = OrRelationIntentResourceLogicCircuit {
-                owned_resource_id: intent_resource.commitment().inner(),
+                self_resource_id: intent_resource.commitment().inner(),
                 input_resources,
                 output_resources,
                 token_1,
@@ -214,7 +214,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
         // Create resource_logics for the intent
         let intent_resource_logics = {
             let intent_resource_logic = OrRelationIntentResourceLogicCircuit {
-                owned_resource_id: input_resource_nf.inner(),
+                self_resource_id: input_resource_nf.inner(),
                 input_resources,
                 output_resources,
                 token_1,

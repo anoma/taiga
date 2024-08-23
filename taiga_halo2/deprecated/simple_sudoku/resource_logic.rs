@@ -67,7 +67,7 @@ impl ResourceLogicInfo for SudokuResourceLogic {
         public_inputs.into()
     }
 
-    fn get_owned_resource_id(&self) -> pallas::Base {
+    fn get_self_resource_id(&self) -> pallas::Base {
         pallas::Base::zero()
     }
 }

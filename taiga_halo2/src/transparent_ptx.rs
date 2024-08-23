@@ -48,19 +48,19 @@ impl Executable for TransparentPartialTransaction {
         let compliance_nfs = self.get_nullifiers();
         let compliance_cms = self.get_output_cms();
         for (resource_logic, nf) in self.input_resource_app.iter().zip(compliance_nfs.iter()) {
-            let owned_resource_id =
+            let self_resource_id =
                 resource_logic.verify_transparently(&compliance_nfs, &compliance_cms)?;
             // Make sure all resource logics are checked
-            if owned_resource_id != nf.inner() {
+            if self_resource_id != nf.inner() {
                 return Err(TransactionError::InconsistentSelfResourceID);
             }
         }
 
         for (resource_logic, cm) in self.output_resource_app.iter().zip(compliance_cms.iter()) {
-            let owned_resource_id =
+            let self_resource_id =
                 resource_logic.verify_transparently(&compliance_nfs, &compliance_cms)?;
             // Make sure all resource logics are checked
-            if owned_resource_id != cm.inner() {
+            if self_resource_id != cm.inner() {
                 return Err(TransactionError::InconsistentSelfResourceID);
             }
         }

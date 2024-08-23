@@ -197,7 +197,7 @@ impl TokenResource {
         // token resource logic
         let nf = resource.get_nf().unwrap().inner();
         let token_resource_logic = TokenResourceLogicCircuit {
-            owned_resource_id: nf,
+            self_resource_id: nf,
             input_resources,
             output_resources,
             token_name: token_name.clone(),
@@ -235,10 +235,10 @@ impl TokenResource {
             resource,
         } = self;
 
-        let owned_resource_id = resource.commitment().inner();
+        let self_resource_id = resource.commitment().inner();
         // token resource logic
         let token_resource_logic = TokenResourceLogicCircuit {
-            owned_resource_id,
+            self_resource_id,
             input_resources,
             output_resources,
             token_name: token_name.clone(),
@@ -249,7 +249,7 @@ impl TokenResource {
 
         // receiver resource logic
         let receiver_resource_logic = ReceiverResourceLogicCircuit {
-            owned_resource_id,
+            self_resource_id,
             input_resources,
             output_resources,
             resource_logic_vk: *COMPRESSED_RECEIVER_VK,
@@ -269,7 +269,7 @@ impl TokenResource {
 // TokenResourceLogicCircuit
 #[derive(Clone, Debug)]
 pub struct TokenResourceLogicCircuit {
-    pub owned_resource_id: pallas::Base,
+    pub self_resource_id: pallas::Base,
     pub input_resources: [Resource; NUM_RESOURCE],
     pub output_resources: [Resource; NUM_RESOURCE],
     // The token_name goes to label. It can be extended to a list and embedded to label.
@@ -313,7 +313,7 @@ impl TokenResourceLogicCircuit {
 impl Default for TokenResourceLogicCircuit {
     fn default() -> Self {
         Self {
-            owned_resource_id: pallas::Base::zero(),
+            self_resource_id: pallas::Base::zero(),
             input_resources: [(); NUM_RESOURCE].map(|_| Resource::default()),
             output_resources: [(); NUM_RESOURCE].map(|_| Resource::default()),
             token_name: TokenName("Token_name".to_string()),
@@ -332,7 +332,7 @@ impl ResourceLogicCircuit for TokenResourceLogicCircuit {
         mut layouter: impl Layouter<pallas::Base>,
         basic_variables: BasicResourceLogicVariables,
     ) -> Result<(), Error> {
-        let owned_resource_id = basic_variables.get_owned_resource_id();
+        let self_resource_id = basic_variables.get_self_resource_id();
 
         let token_property = assign_free_advice(
             layouter.namespace(|| "witness token_property"),
@@ -346,7 +346,7 @@ impl ResourceLogicCircuit for TokenResourceLogicCircuit {
         let label = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
             layouter.namespace(|| "get owned resource label"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_label_searchable_pairs(),
         )?;
 
@@ -375,7 +375,7 @@ impl ResourceLogicCircuit for TokenResourceLogicCircuit {
         let value = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
             layouter.namespace(|| "get owned resource value"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_value_searchable_pairs(),
         )?;
 
@@ -406,7 +406,7 @@ impl ResourceLogicCircuit for TokenResourceLogicCircuit {
         let is_ephemeral = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
             layouter.namespace(|| "get is_ephemeral"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_is_ephemeral_searchable_pairs(),
         )?;
         let constant_zero = assign_free_constant(
@@ -426,7 +426,7 @@ impl ResourceLogicCircuit for TokenResourceLogicCircuit {
             let is_input_resource = get_is_input_resource_flag(
                 config.get_is_input_resource_flag_config,
                 layouter.namespace(|| "get is_input_resource_flag"),
-                &owned_resource_id,
+                &self_resource_id,
                 &basic_variables.get_input_resource_nfs(),
                 &basic_variables.get_output_resource_cms(),
             )?;
@@ -510,9 +510,9 @@ impl ResourceLogicCircuit for TokenResourceLogicCircuit {
 
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ResourceLogicPublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
-        let dynamic_resource_logic = if self.owned_resource_id
+        let dynamic_resource_logic = if self.self_resource_id
             == self.output_resources[0].commitment().inner()
-            || self.owned_resource_id == self.output_resources[1].commitment().inner()
+            || self.self_resource_id == self.output_resources[1].commitment().inner()
         {
             self.receiver_resource_logic_vk
         } else {
@@ -538,8 +538,8 @@ impl ResourceLogicCircuit for TokenResourceLogicCircuit {
         public_inputs.into()
     }
 
-    fn get_owned_resource_id(&self) -> pallas::Base {
-        self.owned_resource_id
+    fn get_self_resource_id(&self) -> pallas::Base {
+        self.self_resource_id
     }
 }
 
@@ -548,7 +548,7 @@ resource_logic_verifying_info_impl!(TokenResourceLogicCircuit);
 
 impl BorshSerialize for TokenResourceLogicCircuit {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        writer.write_all(&self.owned_resource_id.to_repr())?;
+        writer.write_all(&self.self_resource_id.to_repr())?;
         for input in self.input_resources.iter() {
             input.serialize(writer)?;
         }
@@ -568,7 +568,7 @@ impl BorshSerialize for TokenResourceLogicCircuit {
 
 impl BorshDeserialize for TokenResourceLogicCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let owned_resource_id = read_base_field(reader)?;
+        let self_resource_id = read_base_field(reader)?;
         let input_resources: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
@@ -580,7 +580,7 @@ impl BorshDeserialize for TokenResourceLogicCircuit {
         let receiver_resource_logic_vk = read_base_field(reader)?;
         let rseed = RandomSeed::deserialize_reader(reader)?;
         Ok(Self {
-            owned_resource_id,
+            self_resource_id,
             input_resources: input_resources.try_into().unwrap(),
             output_resources: output_resources.try_into().unwrap(),
             token_name,
@@ -653,7 +653,7 @@ fn test_halo2_token_resource_logic_circuit() {
         input_resources[0].kind.label = token_name.encode();
         input_resources[0].value = auth.to_value();
         TokenResourceLogicCircuit {
-            owned_resource_id: input_resources[0].get_nf().unwrap().inner(),
+            self_resource_id: input_resources[0].get_nf().unwrap().inner(),
             input_resources,
             output_resources,
             token_name,

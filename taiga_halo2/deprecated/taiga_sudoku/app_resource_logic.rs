@@ -107,7 +107,7 @@ impl Default for SudokuState {
 
 #[derive(Clone, Debug, Default)]
 struct SudokuAppResourceLogicCircuit {
-    owned_resource_id: pallas::Base,
+    self_resource_id: pallas::Base,
     input_resources: [Resource; NUM_RESOURCE],
     output_resources: [Resource; NUM_RESOURCE],
     // Initial puzzle encoded in a single field
@@ -453,8 +453,8 @@ impl ResourceLogicInfo for SudokuAppResourceLogicCircuit {
         public_inputs.into()
     }
 
-    fn get_owned_resource_id(&self) -> pallas::Base {
-        self.owned_resource_id
+    fn get_self_resource_id(&self) -> pallas::Base {
+        self.self_resource_id
     }
 }
 
@@ -467,11 +467,11 @@ impl ResourceLogicCircuit for SudokuAppResourceLogicCircuit {
         mut layouter: impl Layouter<pallas::Base>,
         basic_variables: BasicResourceLogicVariables,
     ) -> Result<(), Error> {
-        let owned_resource_id = basic_variables.get_owned_resource_id();
+        let self_resource_id = basic_variables.get_self_resource_id();
         let is_input_resource = get_is_input_resource_flag(
             config.get_is_input_resource_flag_config,
             layouter.namespace(|| "get is_input_resource_flag"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_input_resource_nfs(),
             &basic_variables.get_output_resource_cms(),
         )?;
@@ -666,9 +666,9 @@ fn test_halo2_sudoku_app_resource_logic_circuit_init() {
         output_resources[0].kind.app_data_static =
             poseidon_hash(encoded_init_state, current_state.encode());
         output_resources[0].quantity = 1u64;
-        let owned_resource_id = output_resources[0].commitment().inner();
+        let self_resource_id = output_resources[0].commitment().inner();
         SudokuAppResourceLogicCircuit {
-            owned_resource_id,
+            self_resource_id,
             input_resources,
             output_resources: output_resources.try_into().unwrap(),
             encoded_init_state,
@@ -745,7 +745,7 @@ fn test_halo2_sudoku_app_resource_logic_circuit_update() {
         output_resources[0].quantity = 1u64;
         output_resources[0].kind.app_vk = input_resources[0].kind.app_vk;
         SudokuAppResourceLogicCircuit {
-            owned_resource_id: input_resources[0].get_nf().unwrap().inner(),
+            self_resource_id: input_resources[0].get_nf().unwrap().inner(),
             input_resources,
             output_resources: output_resources.try_into().unwrap(),
             encoded_init_state,
@@ -821,7 +821,7 @@ fn halo2_sudoku_app_resource_logic_circuit_final() {
         output_resources[0].quantity = 0u64;
         output_resources[0].kind.app_vk = input_resources[0].kind.app_vk;
         SudokuAppResourceLogicCircuit {
-            owned_resource_id: input_resources[0].get_nf().unwrap().inner(),
+            self_resource_id: input_resources[0].get_nf().unwrap().inner(),
             input_resources,
             output_resources: output_resources.try_into().unwrap(),
             encoded_init_state,

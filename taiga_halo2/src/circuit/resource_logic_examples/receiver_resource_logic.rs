@@ -46,7 +46,7 @@ lazy_static! {
 // ReceiverResourceLogicCircuit is used in the token resource_logic as dynamic resource_logic and contains the resource encryption constraints.
 #[derive(Clone, Debug)]
 pub struct ReceiverResourceLogicCircuit {
-    pub owned_resource_id: pallas::Base,
+    pub self_resource_id: pallas::Base,
     pub input_resources: [Resource; NUM_RESOURCE],
     pub output_resources: [Resource; NUM_RESOURCE],
     pub resource_logic_vk: pallas::Base,
@@ -73,7 +73,7 @@ impl ReceiverResourceLogicCircuit {
 impl Default for ReceiverResourceLogicCircuit {
     fn default() -> Self {
         Self {
-            owned_resource_id: pallas::Base::zero(),
+            self_resource_id: pallas::Base::zero(),
             input_resources: [(); NUM_RESOURCE].map(|_| Resource::default()),
             output_resources: [(); NUM_RESOURCE].map(|_| Resource::default()),
             resource_logic_vk: pallas::Base::zero(),
@@ -114,11 +114,11 @@ impl ResourceLogicCircuit for ReceiverResourceLogicCircuit {
             Value::known(self.rcv_pk.to_affine()),
         )?;
 
-        let owned_resource_id = basic_variables.get_owned_resource_id();
+        let self_resource_id = basic_variables.get_self_resource_id();
         let value = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
             layouter.namespace(|| "get owned resource value"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_value_searchable_pairs(),
         )?;
 
@@ -154,7 +154,7 @@ impl ResourceLogicCircuit for ReceiverResourceLogicCircuit {
         let label = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
             layouter.namespace(|| "get owned resource label"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_label_searchable_pairs(),
         )?;
 
@@ -162,7 +162,7 @@ impl ResourceLogicCircuit for ReceiverResourceLogicCircuit {
         let logic = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
             layouter.namespace(|| "get owned resource logic"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_logic_searchable_pairs(),
         )?;
 
@@ -170,35 +170,35 @@ impl ResourceLogicCircuit for ReceiverResourceLogicCircuit {
         let quantity = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
             layouter.namespace(|| "get owned resource quantity"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_quantity_searchable_pairs(),
         )?;
 
         let nonce = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
             layouter.namespace(|| "get owned resource nonce"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_nonce_searchable_pairs(),
         )?;
 
         let npk = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
             layouter.namespace(|| "get owned resource npk"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_npk_searchable_pairs(),
         )?;
 
         let is_ephemeral = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
             layouter.namespace(|| "get owned resource is_ephemeral"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_is_ephemeral_searchable_pairs(),
         )?;
 
         let rseed = get_owned_resource_variable(
             config.get_owned_resource_variable_config,
             layouter.namespace(|| "get owned resource rseed"),
-            &owned_resource_id,
+            &self_resource_id,
             &basic_variables.get_rseed_searchable_pairs(),
         )?;
 
@@ -260,13 +260,12 @@ impl ResourceLogicCircuit for ReceiverResourceLogicCircuit {
             );
         public_inputs.extend(custom_public_input_padding.iter());
         assert_eq!(NUM_RESOURCE, 2);
-        let target_resource = if self.get_owned_resource_id()
-            == self.get_output_resources()[0].commitment().inner()
-        {
-            self.get_output_resources()[0]
-        } else {
-            self.get_output_resources()[1]
-        };
+        let target_resource =
+            if self.get_self_resource_id() == self.get_output_resources()[0].commitment().inner() {
+                self.get_output_resources()[0]
+            } else {
+                self.get_output_resources()[1]
+            };
         let message = vec![
             target_resource.kind.logic,
             target_resource.kind.label,
@@ -290,8 +289,8 @@ impl ResourceLogicCircuit for ReceiverResourceLogicCircuit {
         public_inputs.into()
     }
 
-    fn get_owned_resource_id(&self) -> pallas::Base {
-        self.owned_resource_id
+    fn get_self_resource_id(&self) -> pallas::Base {
+        self.self_resource_id
     }
 }
 
@@ -300,7 +299,7 @@ resource_logic_verifying_info_impl!(ReceiverResourceLogicCircuit);
 
 impl BorshSerialize for ReceiverResourceLogicCircuit {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        writer.write_all(&self.owned_resource_id.to_repr())?;
+        writer.write_all(&self.self_resource_id.to_repr())?;
         for input in self.input_resources.iter() {
             input.serialize(writer)?;
         }
@@ -321,7 +320,7 @@ impl BorshSerialize for ReceiverResourceLogicCircuit {
 
 impl BorshDeserialize for ReceiverResourceLogicCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let owned_resource_id = read_base_field(reader)?;
+        let self_resource_id = read_base_field(reader)?;
         let input_resources: Vec<_> = (0..NUM_RESOURCE)
             .map(|_| Resource::deserialize_reader(reader))
             .collect::<Result<_, _>>()?;
@@ -334,7 +333,7 @@ impl BorshDeserialize for ReceiverResourceLogicCircuit {
         let rcv_pk = read_point(reader)?;
         let auth_resource_logic_vk = read_base_field(reader)?;
         Ok(Self {
-            owned_resource_id,
+            self_resource_id,
             input_resources: input_resources.try_into().unwrap(),
             output_resources: output_resources.try_into().unwrap(),
             resource_logic_vk,
@@ -370,10 +369,10 @@ fn test_halo2_receiver_resource_logic_circuit() {
             *COMPRESSED_TOKEN_AUTH_VK,
             *COMPRESSED_RECEIVER_VK,
         ]);
-        let owned_resource_id = output_resources[0].commitment().inner();
+        let self_resource_id = output_resources[0].commitment().inner();
         (
             ReceiverResourceLogicCircuit {
-                owned_resource_id,
+                self_resource_id,
                 input_resources,
                 output_resources,
                 resource_logic_vk: *COMPRESSED_RECEIVER_VK,

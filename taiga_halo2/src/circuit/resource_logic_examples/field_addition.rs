@@ -30,7 +30,7 @@ use rand::RngCore;
 // FieldAdditionResourceLogicCircuit with a trivial constraint a + b = c.
 #[derive(Clone, Debug, Default)]
 struct FieldAdditionResourceLogicCircuit {
-    owned_resource_id: pallas::Base,
+    self_resource_id: pallas::Base,
     input_resources: [Resource; NUM_RESOURCE],
     output_resources: [Resource; NUM_RESOURCE],
     a: pallas::Base,
@@ -102,8 +102,8 @@ impl ResourceLogicCircuit for FieldAdditionResourceLogicCircuit {
         public_inputs.into()
     }
 
-    fn get_owned_resource_id(&self) -> pallas::Base {
-        self.owned_resource_id
+    fn get_self_resource_id(&self) -> pallas::Base {
+        self.self_resource_id
     }
 }
 
@@ -124,9 +124,9 @@ fn test_halo2_addition_resource_logic_circuit() {
         let output_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
         let a = pallas::Base::random(&mut rng);
         let b = pallas::Base::random(&mut rng);
-        let owned_resource_id = pallas::Base::random(&mut rng);
+        let self_resource_id = pallas::Base::random(&mut rng);
         FieldAdditionResourceLogicCircuit {
-            owned_resource_id,
+            self_resource_id,
             input_resources,
             output_resources,
             a,
