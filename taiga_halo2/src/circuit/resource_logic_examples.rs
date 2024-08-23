@@ -5,8 +5,9 @@ use crate::{
         ResourceLogicCircuit, ResourceLogicConfig, ResourceLogicPublicInputs,
         ResourceLogicVerifyingInfo, ResourceLogicVerifyingInfoTrait,
     },
-    constant::{RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE, SETUP_PARAMS_MAP},
+    constant::{RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE, SETUP_PARAMS_MAP, TAIGA_RESOURCE_TREE_DEPTH},
     error::TransactionError,
+    merkle_tree::LR,
     proof::Proof,
     resource::{RandomSeed, Resource},
     resource_logic_commitment::ResourceLogicCommitment,
@@ -73,7 +74,8 @@ pub struct TrivialResourceLogicCircuit {
 }
 
 impl TrivialResourceLogicCircuit {
-    pub fn new(self_resource: ResourceExistenceWitness) -> Self {
+    pub fn new(resource: Resource, path: [(pallas::Base, LR); TAIGA_RESOURCE_TREE_DEPTH]) -> Self {
+        let self_resource = ResourceExistenceWitness::new(resource, path);
         Self { self_resource }
     }
 

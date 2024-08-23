@@ -1,3 +1,5 @@
+use pasta_curves::pallas;
+
 use crate::{
     delta_commitment::DeltaCommitment, error::TransactionError, merkle_tree::Anchor,
     nullifier::Nullifier, resource::ResourceCommitment,
@@ -10,4 +12,5 @@ pub trait Executable {
     fn get_output_cms(&self) -> Vec<ResourceCommitment>;
     fn get_delta_commitments(&self) -> Vec<DeltaCommitment>;
     fn get_anchors(&self) -> Vec<Anchor>;
+    fn get_resource_merkle_root(&self) -> pallas::Base;
 }

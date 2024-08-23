@@ -16,13 +16,8 @@ use crate::{
         vamp_ir_utils::{get_circuit_assignments, parse, VariableAssignmentError},
     },
     constant::{
-        TaigaFixedBases, NUM_RESOURCE, RESOURCE_ENCRYPTION_CIPHERTEXT_NUM,
-        RESOURCE_LOGIC_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX,
-        RESOURCE_LOGIC_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX,
-        RESOURCE_LOGIC_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX,
-        RESOURCE_LOGIC_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX,
-        RESOURCE_LOGIC_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX,
-        RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE, RESOURCE_LOGIC_CIRCUIT_PUBLIC_INPUT_NUM,
+        TaigaFixedBases, RESOURCE_ENCRYPTION_CIPHERTEXT_NUM, RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE,
+        RESOURCE_LOGIC_CIRCUIT_PUBLIC_INPUT_NUM,
         RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PK_X_IDX,
         RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PK_Y_IDX,
         RESOURCE_LOGIC_CIRCUIT_RESOURCE_ENCRYPTION_PUBLIC_INPUT_BEGIN_IDX,
@@ -31,7 +26,7 @@ use crate::{
     },
     error::TransactionError,
     proof::Proof,
-    resource::{RandomSeed, ResourceCommitment},
+    resource::RandomSeed,
     resource_encryption::{ResourceCiphertext, SecretKey},
     resource_logic_vk::ResourceLogicVerifyingKey,
     resource_tree::ResourceExistenceWitness,
@@ -165,29 +160,14 @@ impl ResourceLogicVerifyingInfo {
             .verify(&self.vk, params, &[self.public_inputs.inner()])
     }
 
-    pub fn get_nullifiers(&self) -> [pallas::Base; NUM_RESOURCE] {
-        [
-            self.public_inputs
-                .get_from_index(RESOURCE_LOGIC_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX),
-            self.public_inputs
-                .get_from_index(RESOURCE_LOGIC_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX),
-        ]
-    }
-
-    pub fn get_resource_commitments(&self) -> [ResourceCommitment; NUM_RESOURCE] {
-        [
-            self.public_inputs
-                .get_from_index(RESOURCE_LOGIC_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX)
-                .into(),
-            self.public_inputs
-                .get_from_index(RESOURCE_LOGIC_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX)
-                .into(),
-        ]
-    }
-
-    pub fn get_owned_resource_id(&self) -> pallas::Base {
+    pub fn get_resource_merkle_root(&self) -> pallas::Base {
         self.public_inputs
-            .get_from_index(RESOURCE_LOGIC_CIRCUIT_OWNED_RESOURCE_ID_PUBLIC_INPUT_IDX)
+            .get_from_index(RESOURCE_LOGIC_CIRCUIT_RESOURCE_MERKLE_ROOT_IDX)
+    }
+
+    pub fn get_self_resource_id(&self) -> pallas::Base {
+        self.public_inputs
+            .get_from_index(RESOURCE_LOGIC_CIRCUIT_SELF_RESOURCE_ID_IDX)
     }
 }
 

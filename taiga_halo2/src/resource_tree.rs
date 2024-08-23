@@ -16,6 +16,16 @@ pub struct ResourceExistenceWitness {
 pub struct ResourceMerkleTreeLeaves(Vec<pallas::Base>);
 
 impl ResourceExistenceWitness {
+    pub fn new(
+        resource: Resource,
+        merkle_path: [(pallas::Base, LR); TAIGA_RESOURCE_TREE_DEPTH],
+    ) -> Self {
+        Self {
+            resource,
+            merkle_path,
+        }
+    }
+
     pub fn get_resource(&self) -> Resource {
         self.resource
     }
@@ -26,7 +36,7 @@ impl ResourceExistenceWitness {
     }
 
     pub fn is_input(&self) -> bool {
-        self.merkle_path[0].1.is_left()
+        !self.merkle_path[0].1.is_left()
     }
 
     // get input nf or output cm
@@ -56,6 +66,18 @@ impl ResourceMerkleTreeLeaves {
 
     pub fn insert(&mut self, value: pallas::Base) {
         self.0.push(value)
+    }
+
+    pub fn root(&self) -> pallas::Base {
+        let mut cur_layer = self.0.clone();
+        cur_layer.resize(TAIGA_RESOURCE_TREE_LEAVES_NUM, pallas::Base::zero());
+        while cur_layer.len() > 1 {
+            cur_layer = cur_layer
+                .chunks(2)
+                .map(|pair| poseidon_hash(pair[0], pair[1]))
+                .collect();
+        }
+        cur_layer[0]
     }
 
     // Generate the merkle path for the current leave
@@ -101,11 +123,12 @@ impl ResourceMerkleTreeLeaves {
 
 #[test]
 fn test_resource_merkle_leave() {
+    use crate::merkle_tree::{MerklePath, Node};
+
+    let target_leave = pallas::Base::one();
     let resource_merkle_tree =
-        ResourceMerkleTreeLeaves::new(vec![pallas::Base::zero(), pallas::Base::one()]);
-    let merkle_path = resource_merkle_tree
-        .generate_path(pallas::Base::one())
-        .unwrap();
+        ResourceMerkleTreeLeaves::new(vec![pallas::Base::zero(), target_leave]);
+    let merkle_path = resource_merkle_tree.generate_path(target_leave).unwrap();
 
     let mut expected_merkle_path = vec![(pallas::Base::zero(), LR::L)];
     let mut cur_node = pallas::Base::zero();
@@ -115,4 +138,11 @@ fn test_resource_merkle_leave() {
     });
 
     assert_eq!(merkle_path.to_vec(), expected_merkle_path);
+
+    let merkle_root = resource_merkle_tree.root();
+    let path = MerklePath::from(merkle_path);
+    let target_node = Node::from(target_leave);
+    let expected_root = path.root(target_node);
+
+    assert_eq!(merkle_root, expected_root.inner());
 }

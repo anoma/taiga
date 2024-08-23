@@ -1,12 +1,10 @@
 use crate::{
     circuit::{
         resource_logic_circuit::ResourceLogic,
-        resource_logic_examples::{
-            TrivialResourceLogicCircuit, COMPRESSED_TRIVIAL_RESOURCE_LOGIC_VK,
-        },
+        resource_logic_examples::COMPRESSED_TRIVIAL_RESOURCE_LOGIC_VK,
     },
     constant::{
-        NUM_RESOURCE, POSEIDON_TO_CURVE_INPUT_LEN, PRF_EXPAND_PERSONALIZATION,
+        POSEIDON_TO_CURVE_INPUT_LEN, PRF_EXPAND_PERSONALIZATION,
         PRF_EXPAND_PERSONALIZATION_TO_FIELD, PRF_EXPAND_PSI, PRF_EXPAND_PUBLIC_INPUT_PADDING,
         PRF_EXPAND_RCM, PRF_EXPAND_VCM_R,
     },

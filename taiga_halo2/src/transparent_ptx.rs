@@ -52,7 +52,7 @@ impl Executable for TransparentPartialTransaction {
                 resource_logic.verify_transparently(&compliance_nfs, &compliance_cms)?;
             // Make sure all resource logics are checked
             if owned_resource_id != nf.inner() {
-                return Err(TransactionError::InconsistentOwnedResourceID);
+                return Err(TransactionError::InconsistentSelfResourceID);
             }
         }
 
@@ -61,7 +61,7 @@ impl Executable for TransparentPartialTransaction {
                 resource_logic.verify_transparently(&compliance_nfs, &compliance_cms)?;
             // Make sure all resource logics are checked
             if owned_resource_id != cm.inner() {
-                return Err(TransactionError::InconsistentOwnedResourceID);
+                return Err(TransactionError::InconsistentSelfResourceID);
             }
         }
 
@@ -98,6 +98,11 @@ impl Executable for TransparentPartialTransaction {
             .iter()
             .map(|compliance| compliance.calculate_root())
             .collect()
+    }
+
+    // We don't need it for transparent ptxs
+    fn get_resource_merkle_root(&self) -> pallas::Base {
+        unimplemented!()
     }
 }
 

@@ -261,7 +261,7 @@ impl ApplicationByteCode {
             let id = dynamic_resource_logic.verify_transparently(compliance_nfs, compliance_cms)?;
             // check: the app_resource_logic and dynamic_resource_logics belong to the resource
             if id != owned_resource_id {
-                return Err(TransactionError::InconsistentOwnedResourceID);
+                return Err(TransactionError::InconsistentSelfResourceID);
             }
         }
         Ok(owned_resource_id)
