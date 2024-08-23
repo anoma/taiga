@@ -46,6 +46,8 @@ pub const TAIGA_COMMITMENT_TREE_DEPTH: usize = 32;
 
 /// resource merkle tree depth
 pub const TAIGA_RESOURCE_TREE_DEPTH: usize = 4;
+/// resource merkle tree leaves num
+pub const TAIGA_RESOURCE_TREE_LEAVES_NUM: usize = 1 << TAIGA_RESOURCE_TREE_DEPTH;
 
 pub const BASE_BITS_NUM: usize = 255;
 

@@ -94,6 +94,16 @@ impl LR {
     }
 }
 
+impl From<bool> for LR {
+    fn from(b: bool) -> Self {
+        if b {
+            LR::L
+        } else {
+            LR::R
+        }
+    }
+}
+
 impl Distribution<LR> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> LR {
         if rng.gen_bool(0.5) {

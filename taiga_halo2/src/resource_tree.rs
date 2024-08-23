@@ -1,7 +1,8 @@
 use crate::{
-    constant::TAIGA_RESOURCE_TREE_DEPTH,
+    constant::{TAIGA_RESOURCE_TREE_DEPTH, TAIGA_RESOURCE_TREE_LEAVES_NUM},
     merkle_tree::{MerklePath, Node, LR},
     resource::Resource,
+    utils::poseidon_hash,
 };
 use pasta_curves::pallas;
 
@@ -10,6 +11,9 @@ pub struct ResourceExistenceWitness {
     resource: Resource,
     merkle_path: [(pallas::Base, LR); TAIGA_RESOURCE_TREE_DEPTH],
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourceMerkleTreeLeaves(Vec<pallas::Base>);
 
 impl ResourceExistenceWitness {
     pub fn get_resource(&self) -> Resource {
@@ -39,4 +43,76 @@ impl ResourceExistenceWitness {
         let node = Node::from(id);
         MerklePath::from(self.get_path()).root(node).inner()
     }
+}
+
+impl ResourceMerkleTreeLeaves {
+    pub fn new(leaves: Vec<pallas::Base>) -> Self {
+        assert!(
+            leaves.len() <= TAIGA_RESOURCE_TREE_LEAVES_NUM,
+            "The number of leaves exceeds the TAIGA_RESOURCE_TREE_LEAVES_NUM"
+        );
+        ResourceMerkleTreeLeaves(leaves)
+    }
+
+    pub fn insert(&mut self, value: pallas::Base) {
+        self.0.push(value)
+    }
+
+    // Generate the merkle path for the current leave
+    pub fn generate_path(
+        &self,
+        cur_leave: pallas::Base,
+    ) -> Option<[(pallas::Base, LR); TAIGA_RESOURCE_TREE_DEPTH]> {
+        let mut cur_layer = self.0.clone();
+        cur_layer.resize(TAIGA_RESOURCE_TREE_LEAVES_NUM, pallas::Base::zero());
+        if let Some(position) = cur_layer.iter().position(|&v| v == cur_leave) {
+            let mut merkle_path = Vec::new();
+            fn build_merkle_path_inner(
+                cur_layer: Vec<pallas::Base>,
+                position: usize,
+                path: &mut Vec<(pallas::Base, LR)>,
+            ) {
+                if cur_layer.len() > 1 {
+                    let sibling = {
+                        let sibling_lr = LR::from(position % 2 != 0);
+                        let sibling_value = match sibling_lr {
+                            LR::L => cur_layer[position - 1],
+                            LR::R => cur_layer[position + 1],
+                        };
+                        (sibling_value, sibling_lr)
+                    };
+                    path.push(sibling);
+
+                    let prev_layer = cur_layer
+                        .chunks(2)
+                        .map(|pair| poseidon_hash(pair[0], pair[1]))
+                        .collect();
+
+                    build_merkle_path_inner(prev_layer, position / 2, path);
+                }
+            }
+            build_merkle_path_inner(cur_layer, position, &mut merkle_path);
+            Some(merkle_path.try_into().unwrap())
+        } else {
+            None
+        }
+    }
+}
+
+#[test]
+fn test_resource_merkle_leave() {
+    let resource_merkle_tree =
+        ResourceMerkleTreeLeaves::new(vec![pallas::Base::zero(), pallas::Base::one()]);
+    let merkle_path = resource_merkle_tree
+        .generate_path(pallas::Base::one())
+        .unwrap();
+
+    let mut expected_merkle_path = vec![(pallas::Base::zero(), LR::L)];
+    let mut cur_node = pallas::Base::zero();
+    (1..TAIGA_RESOURCE_TREE_DEPTH).for_each(|_| {
+        cur_node = poseidon_hash(cur_node, cur_node);
+        expected_merkle_path.push((cur_node, LR::R));
+    });
+
+    assert_eq!(merkle_path.to_vec(), expected_merkle_path);
 }
