@@ -69,6 +69,7 @@ lazy_static! {
 
 // TrivialResourceLogicCircuit with empty custom constraints.
 #[derive(Clone, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TrivialResourceLogicCircuit {
     self_resource: ResourceExistenceWitness,
 }
@@ -85,50 +86,12 @@ impl TrivialResourceLogicCircuit {
         ResourceLogicByteCode::new(ResourceLogicRepresentation::Trivial, self.to_bytes())
     }
 
-    // Only for test
-    #[cfg(feature = "borsh")]
     pub fn to_bytes(&self) -> Vec<u8> {
-        borsh::to_vec(&self).unwrap()
+        bincode::serialize(&self).unwrap()
     }
 
-    // Only for test
-    #[cfg(feature = "borsh")]
     pub fn from_bytes(bytes: &Vec<u8>) -> Self {
-        BorshDeserialize::deserialize(&mut bytes.as_ref()).unwrap()
-    }
-}
-
-#[cfg(feature = "borsh")]
-impl BorshSerialize for TrivialResourceLogicCircuit {
-    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        use ff::PrimeField;
-        writer.write_all(&self.self_resource_id.to_repr())?;
-        for input in self.input_resources.iter() {
-            input.serialize(writer)?;
-        }
-
-        for output in self.output_resources.iter() {
-            output.serialize(writer)?;
-        }
-        Ok(())
-    }
-}
-
-#[cfg(feature = "borsh")]
-impl BorshDeserialize for TrivialResourceLogicCircuit {
-    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let self_resource_id = crate::utils::read_base_field(reader)?;
-        let input_resources: Vec<_> = (0..NUM_RESOURCE)
-            .map(|_| Resource::deserialize_reader(reader))
-            .collect::<Result<_, _>>()?;
-        let output_resources: Vec<_> = (0..NUM_RESOURCE)
-            .map(|_| Resource::deserialize_reader(reader))
-            .collect::<Result<_, _>>()?;
-        Ok(Self {
-            self_resource_id,
-            input_resources: input_resources.try_into().unwrap(),
-            output_resources: output_resources.try_into().unwrap(),
-        })
+        bincode::deserialize(bytes).unwrap()
     }
 }
 

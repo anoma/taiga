@@ -7,6 +7,7 @@ use crate::{
 use pasta_curves::pallas;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ResourceExistenceWitness {
     resource: Resource,
     merkle_path: [(pallas::Base, LR); TAIGA_RESOURCE_TREE_DEPTH],

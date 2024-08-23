@@ -11,7 +11,6 @@ use crate::merkle_tree::Anchor;
 use crate::nullifier::Nullifier;
 use crate::proof::Proof;
 use crate::resource::{ResourceCommitment, ResourceLogics};
-use crate::resource_tree::ResourceMerkleTreeLeaves;
 use halo2_proofs::plonk::Error;
 use pasta_curves::pallas;
 use rand::RngCore;
@@ -302,19 +301,6 @@ impl Executable for ShieldedPartialTransaction {
             .iter()
             .map(|compliance| compliance.compliance_instance.anchor)
             .collect()
-    }
-
-    fn get_resource_merkle_root(&self) -> pallas::Base {
-        let mut leaves = vec![];
-        self.get_nullifiers()
-            .iter()
-            .zip(self.get_output_cms())
-            .for_each(|(nf, cm)| {
-                leaves.push(nf.inner());
-                leaves.push(cm.inner());
-            });
-        let tree = ResourceMerkleTreeLeaves::new(leaves);
-        tree.root()
     }
 }
 

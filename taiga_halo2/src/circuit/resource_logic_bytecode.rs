@@ -16,14 +16,9 @@ use crate::{
         ResourceLogicVerifyingInfo, ResourceLogicVerifyingInfoTrait, VampIRResourceLogicCircuit,
     },
     constant::{
-        RESOURCE_LOGIC_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX,
-        RESOURCE_LOGIC_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX,
-        RESOURCE_LOGIC_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX,
-        RESOURCE_LOGIC_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX,
+        RESOURCE_LOGIC_CIRCUIT_RESOURCE_MERKLE_ROOT_IDX,
         RESOURCE_LOGIC_CIRCUIT_SELF_RESOURCE_ID_IDX,
     },
-    nullifier::Nullifier,
-    resource::ResourceCommitment,
 };
 
 #[cfg(feature = "borsh")]
@@ -131,8 +126,7 @@ impl ResourceLogicByteCode {
     // Verify resource_logic circuit transparently and return self resource id for further checking
     pub fn verify_transparently(
         &self,
-        compliance_nfs: &[Nullifier],
-        compliance_cms: &[ResourceCommitment],
+        compliance_resource_merkle_root: &pallas::Base,
     ) -> Result<pallas::Base, TransactionError> {
         // check resource logic transparently
         let public_inputs = match &self.circuit {
@@ -189,33 +183,12 @@ impl ResourceLogicByteCode {
             _ => return Err(TransactionError::InvalidResourceLogicRepresentation),
         };
 
-        // check nullifiers
-        // Check the resource_logic actually uses the input resources from compliance circuits.
-        let resource_logic_nfs = [
-            public_inputs.get_from_index(RESOURCE_LOGIC_CIRCUIT_NULLIFIER_ONE_PUBLIC_INPUT_IDX),
-            public_inputs.get_from_index(RESOURCE_LOGIC_CIRCUIT_NULLIFIER_TWO_PUBLIC_INPUT_IDX),
-        ];
+        // check resource merkle root
+        let logic_resource_merkle_root =
+            public_inputs.get_from_index(RESOURCE_LOGIC_CIRCUIT_RESOURCE_MERKLE_ROOT_IDX);
 
-        if !((compliance_nfs[0].inner() == resource_logic_nfs[0]
-            && compliance_nfs[1].inner() == resource_logic_nfs[1])
-            || (compliance_nfs[0].inner() == resource_logic_nfs[1]
-                && compliance_nfs[1].inner() == resource_logic_nfs[0]))
-        {
-            return Err(TransactionError::InconsistentNullifier);
-        }
-
-        // check resource_commitments
-        // Check the resource_logic actually uses the output resources from compliance circuits.
-        let resource_logic_cms = [
-            public_inputs.get_from_index(RESOURCE_LOGIC_CIRCUIT_OUTPUT_CM_ONE_PUBLIC_INPUT_IDX),
-            public_inputs.get_from_index(RESOURCE_LOGIC_CIRCUIT_OUTPUT_CM_TWO_PUBLIC_INPUT_IDX),
-        ];
-        if !((compliance_cms[0].inner() == resource_logic_cms[0]
-            && compliance_cms[1].inner() == resource_logic_cms[1])
-            || (compliance_cms[0].inner() == resource_logic_cms[1]
-                && compliance_cms[1].inner() == resource_logic_cms[0]))
-        {
-            return Err(TransactionError::InconsistentOutputResourceCommitment);
+        if logic_resource_merkle_root != *compliance_resource_merkle_root {
+            return Err(TransactionError::InconsistentResourceMerkleRoot);
         }
 
         Ok(public_inputs.get_from_index(RESOURCE_LOGIC_CIRCUIT_SELF_RESOURCE_ID_IDX))
@@ -251,14 +224,13 @@ impl ApplicationByteCode {
     // Verify resource_logic circuits transparently and return owned resource PubID for further checking
     pub fn verify_transparently(
         &self,
-        compliance_nfs: &[Nullifier],
-        compliance_cms: &[ResourceCommitment],
+        compliance_root: &pallas::Base,
     ) -> Result<pallas::Base, TransactionError> {
         let self_resource_id = self
             .app_resource_logic_bytecode
-            .verify_transparently(compliance_nfs, compliance_cms)?;
+            .verify_transparently(compliance_root)?;
         for dynamic_resource_logic in self.dynamic_resource_logic_bytecode.iter() {
-            let id = dynamic_resource_logic.verify_transparently(compliance_nfs, compliance_cms)?;
+            let id = dynamic_resource_logic.verify_transparently(compliance_root)?;
             // check: the app_resource_logic and dynamic_resource_logics belong to the resource
             if id != self_resource_id {
                 return Err(TransactionError::InconsistentSelfResourceID);
