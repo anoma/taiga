@@ -13,7 +13,7 @@ use crate::{
     constant::{RESOURCE_LOGIC_CIRCUIT_CUSTOM_PUBLIC_INPUT_BEGIN_IDX, SETUP_PARAMS_MAP},
     error::TransactionError,
     proof::Proof,
-    resource::{RandomSeed, Resource},
+    resource::RandomSeed,
     resource_logic_commitment::ResourceLogicCommitment,
     resource_logic_vk::ResourceLogicVerifyingKey,
     resource_tree::ResourceExistenceWitness,

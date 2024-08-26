@@ -33,11 +33,11 @@ mod field_addition;
 // pub mod or_relation_intent;
 // #[cfg(feature = "examples")]
 // pub mod partial_fulfillment_intent;
-// #[cfg(feature = "examples")]
-// pub mod receiver_resource_logic;
-// #[cfg(feature = "examples")]
-// pub mod signature_verification;
-// #[cfg(feature = "examples")]
+#[cfg(feature = "examples")]
+pub mod receiver_resource_logic;
+#[cfg(feature = "examples")]
+pub mod signature_verification;
+#[cfg(feature = "examples")]
 pub mod token;
 
 lazy_static! {

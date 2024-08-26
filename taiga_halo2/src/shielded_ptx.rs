@@ -2,7 +2,7 @@ use crate::circuit::resource_logic_circuit::{ResourceLogic, ResourceLogicVerifyi
 use crate::compliance::{ComplianceInfo, CompliancePublicInputs};
 use crate::constant::{
     COMPLIANCE_CIRCUIT_PARAMS_SIZE, COMPLIANCE_PROVING_KEY, COMPLIANCE_VERIFYING_KEY,
-    MAX_DYNAMIC_RESOURCE_LOGIC_NUM, NUM_RESOURCE, SETUP_PARAMS_MAP,
+    MAX_DYNAMIC_RESOURCE_LOGIC_NUM, SETUP_PARAMS_MAP,
 };
 use crate::delta_commitment::DeltaCommitment;
 use crate::error::TransactionError;
@@ -29,10 +29,12 @@ use ff::PrimeField;
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "nif", derive(NifStruct))]
+#[cfg_attr(feature = "nif", module = "Taiga.Shielded.PTX")]
 pub struct ShieldedPartialTransaction {
-    compliances: [ComplianceVerifyingInfo; NUM_RESOURCE],
-    inputs: [ResourceLogicVerifyingInfoSet; NUM_RESOURCE],
-    outputs: [ResourceLogicVerifyingInfoSet; NUM_RESOURCE],
+    compliances: Vec<ComplianceVerifyingInfo>,
+    inputs: Vec<ResourceLogicVerifyingInfoSet>,
+    outputs: Vec<ResourceLogicVerifyingInfoSet>,
     binding_sig_r: Option<pallas::Scalar>,
     hints: Vec<u8>,
 }
@@ -57,18 +59,6 @@ pub struct ResourceLogicVerifyingInfoSet {
     app_dynamic_resource_logic_verifying_info: Vec<ResourceLogicVerifyingInfo>,
     // TODO function privacy: add verifier proof and the corresponding public inputs.
     // When the verifier proof is added, we may need to reconsider the structure of `ResourceLogicVerifyingInfo`
-}
-
-// Is easier to derive traits for
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "nif", derive(NifStruct))]
-#[cfg_attr(feature = "nif", module = "Taiga.Shielded.PTX")]
-struct ShieldedPartialTransactionProxy {
-    compliances: Vec<ComplianceVerifyingInfo>,
-    inputs: Vec<ResourceLogicVerifyingInfoSet>,
-    outputs: Vec<ResourceLogicVerifyingInfoSet>,
-    binding_sig_r: Option<pallas::Scalar>,
-    hints: Vec<u8>,
 }
 
 impl ShieldedPartialTransaction {
@@ -135,9 +125,9 @@ impl ShieldedPartialTransaction {
             .collect();
 
         Ok(Self {
-            compliances: compliances.try_into().unwrap(),
-            inputs: inputs.try_into().unwrap(),
-            outputs: outputs.try_into().unwrap(),
+            compliances,
+            inputs,
+            outputs,
             binding_sig_r: Some(rcv_sum),
             hints,
         })
@@ -226,17 +216,6 @@ impl ShieldedPartialTransaction {
         Ok(())
     }
 
-    // Conversion to the generic length proxy
-    fn to_proxy(&self) -> ShieldedPartialTransactionProxy {
-        ShieldedPartialTransactionProxy {
-            compliances: self.compliances.to_vec(),
-            inputs: self.inputs.to_vec(),
-            outputs: self.outputs.to_vec(),
-            binding_sig_r: self.binding_sig_r,
-            hints: self.hints.clone(),
-        }
-    }
-
     pub fn get_binding_sig_r(&self) -> Option<pallas::Scalar> {
         self.binding_sig_r
     }
@@ -248,21 +227,6 @@ impl ShieldedPartialTransaction {
     pub fn clean_private_info(&mut self) {
         self.binding_sig_r = None;
         self.hints = vec![];
-    }
-}
-
-impl ShieldedPartialTransactionProxy {
-    fn to_concrete(&self) -> Option<ShieldedPartialTransaction> {
-        let compliances = self.compliances.clone().try_into().ok()?;
-        let inputs = self.inputs.clone().try_into().ok()?;
-        let outputs = self.outputs.clone().try_into().ok()?;
-        Some(ShieldedPartialTransaction {
-            compliances,
-            inputs,
-            outputs,
-            binding_sig_r: self.binding_sig_r,
-            hints: self.hints.clone(),
-        })
     }
 }
 
@@ -308,17 +272,9 @@ impl Executable for ShieldedPartialTransaction {
 impl BorshSerialize for ShieldedPartialTransaction {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         use byteorder::WriteBytesExt;
-        for compliance in self.compliances.iter() {
-            compliance.serialize(writer)?;
-        }
-
-        for input in self.inputs.iter() {
-            input.serialize(writer)?;
-        }
-
-        for output in self.outputs.iter() {
-            output.serialize(writer)?;
-        }
+        self.compliances.serialize(writer)?;
+        self.inputs.serialize(writer)?;
+        self.outputs.serialize(writer)?;
 
         // Write binding_sig_r
         match self.binding_sig_r {
@@ -341,15 +297,9 @@ impl BorshSerialize for ShieldedPartialTransaction {
 impl BorshDeserialize for ShieldedPartialTransaction {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         use byteorder::ReadBytesExt;
-        let compliances: Vec<_> = (0..NUM_RESOURCE)
-            .map(|_| ComplianceVerifyingInfo::deserialize_reader(reader))
-            .collect::<Result<_, _>>()?;
-        let inputs: Vec<_> = (0..NUM_RESOURCE)
-            .map(|_| ResourceLogicVerifyingInfoSet::deserialize_reader(reader))
-            .collect::<Result<_, _>>()?;
-        let outputs: Vec<_> = (0..NUM_RESOURCE)
-            .map(|_| ResourceLogicVerifyingInfoSet::deserialize_reader(reader))
-            .collect::<Result<_, _>>()?;
+        let compliances = Vec::<ComplianceVerifyingInfo>::deserialize_reader(reader)?;
+        let inputs = Vec::<ResourceLogicVerifyingInfoSet>::deserialize_reader(reader)?;
+        let outputs = Vec::<ResourceLogicVerifyingInfoSet>::deserialize_reader(reader)?;
         let binding_sig_r_type = reader.read_u8()?;
         let binding_sig_r = if binding_sig_r_type == 0 {
             None
@@ -360,28 +310,12 @@ impl BorshDeserialize for ShieldedPartialTransaction {
 
         let hints = Vec::<u8>::deserialize_reader(reader)?;
         Ok(ShieldedPartialTransaction {
-            compliances: compliances.try_into().unwrap(),
-            inputs: inputs.try_into().unwrap(),
-            outputs: outputs.try_into().unwrap(),
+            compliances,
+            inputs,
+            outputs,
             binding_sig_r,
             hints,
         })
-    }
-}
-
-#[cfg(feature = "nif")]
-impl Encoder for ShieldedPartialTransaction {
-    fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
-        self.to_proxy().encode(env)
-    }
-}
-
-#[cfg(feature = "nif")]
-impl<'a> Decoder<'a> for ShieldedPartialTransaction {
-    fn decode(term: Term<'a>) -> NifResult<Self> {
-        let val: ShieldedPartialTransactionProxy = Decoder::decode(term)?;
-        val.to_concrete()
-            .ok_or(rustler::Error::RaiseAtom("Could not decode proxy"))
     }
 }
 

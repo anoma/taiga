@@ -4,6 +4,8 @@ use crate::{
     resource::Resource,
     utils::poseidon_hash,
 };
+#[cfg(feature = "borsh")]
+use borsh::{BorshDeserialize, BorshSerialize};
 use pasta_curves::pallas;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -53,6 +55,51 @@ impl ResourceExistenceWitness {
         let id = self.get_identity();
         let node = Node::from(id);
         MerklePath::from(self.get_path()).root(node).inner()
+    }
+
+    // TODO: handle the error
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bincode::serialize(&self).unwrap()
+    }
+
+    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+        bincode::deserialize(bytes).unwrap()
+    }
+}
+
+#[cfg(feature = "borsh")]
+impl BorshSerialize for ResourceExistenceWitness {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        use byteorder::WriteBytesExt;
+        use ff::PrimeField;
+        self.resource.serialize(writer)?;
+        for node in self.merkle_path {
+            writer.write_all(&node.0.to_repr())?;
+            writer.write_u8(if node.1.is_left() { 1 } else { 0 })?;
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(feature = "borsh")]
+impl BorshDeserialize for ResourceExistenceWitness {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        use crate::utils::read_base_field;
+        use byteorder::ReadBytesExt;
+        let resource = Resource::deserialize_reader(reader)?;
+        let mut path = vec![];
+        for _ in 0..TAIGA_RESOURCE_TREE_DEPTH {
+            let v = read_base_field(reader)?;
+            let byte = reader.read_u8()?;
+            let b = if byte == 0x01 { LR::L } else { LR::R };
+            path.push((v, b));
+        }
+
+        Ok(Self {
+            resource,
+            merkle_path: path.try_into().unwrap(),
+        })
     }
 }
 

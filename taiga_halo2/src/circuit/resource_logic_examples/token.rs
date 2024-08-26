@@ -1,15 +1,11 @@
 use crate::{
     circuit::{
         blake2s::{resource_logic_commitment_gadget, Blake2sChip},
-        gadgets::{
-            assign_free_advice, assign_free_constant,
-            poseidon_hash::poseidon_hash_gadget,
-            target_resource_variable::{get_is_input_resource_flag, get_owned_resource_variable},
-        },
+        gadgets::{assign_free_advice, assign_free_constant, poseidon_hash::poseidon_hash_gadget},
         resource_logic_bytecode::{ResourceLogicByteCode, ResourceLogicRepresentation},
         resource_logic_circuit::{
-            BasicResourceLogicVariables, ResourceLogicCircuit, ResourceLogicConfig,
-            ResourceLogicPublicInputs, ResourceLogicVerifyingInfo, ResourceLogicVerifyingInfoTrait,
+            ResourceLogicCircuit, ResourceLogicConfig, ResourceLogicPublicInputs,
+            ResourceLogicVerifyingInfo, ResourceLogicVerifyingInfoTrait, ResourceStatus,
         },
         resource_logic_examples::receiver_resource_logic::{
             ReceiverResourceLogicCircuit, COMPRESSED_RECEIVER_VK,
@@ -19,18 +15,21 @@ use crate::{
         },
     },
     constant::{
-        NUM_RESOURCE, PRF_EXPAND_DYNAMIC_RESOURCE_LOGIC_1_CM_R,
+        PRF_EXPAND_DYNAMIC_RESOURCE_LOGIC_1_CM_R,
         RESOURCE_LOGIC_CIRCUIT_FIRST_DYNAMIC_RESOURCE_LOGIC_CM_1,
         RESOURCE_LOGIC_CIRCUIT_FIRST_DYNAMIC_RESOURCE_LOGIC_CM_2,
         RESOURCE_LOGIC_CIRCUIT_SECOND_DYNAMIC_RESOURCE_LOGIC_CM_1,
         RESOURCE_LOGIC_CIRCUIT_SECOND_DYNAMIC_RESOURCE_LOGIC_CM_2, SETUP_PARAMS_MAP,
+        TAIGA_RESOURCE_TREE_DEPTH,
     },
     error::TransactionError,
+    merkle_tree::LR,
     nullifier::Nullifier,
     proof::Proof,
     resource::{RandomSeed, Resource, ResourceLogics},
     resource_logic_commitment::ResourceLogicCommitment,
     resource_logic_vk::ResourceLogicVerifyingKey,
+    resource_tree::ResourceExistenceWitness,
     utils::{poseidon_hash_n, read_base_field, read_point},
 };
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -187,20 +186,13 @@ impl TokenResource {
         mut rng: R,
         auth: TokenAuthorization,
         auth_sk: pallas::Scalar,
-        input_resources: [Resource; NUM_RESOURCE],
-        output_resources: [Resource; NUM_RESOURCE],
+        merkle_path: [(pallas::Base, LR); TAIGA_RESOURCE_TREE_DEPTH],
     ) -> ResourceLogics {
-        let TokenResource {
-            token_name,
-            resource,
-        } = self;
         // token resource logic
-        let nf = resource.get_nf().unwrap().inner();
+        let self_resource = ResourceExistenceWitness::new(self.resource, merkle_path);
         let token_resource_logic = TokenResourceLogicCircuit {
-            self_resource_id: nf,
-            input_resources,
-            output_resources,
-            token_name: token_name.clone(),
+            self_resource,
+            token_name: self.token_name.clone(),
             auth,
             receiver_resource_logic_vk: *COMPRESSED_RECEIVER_VK,
             rseed: RandomSeed::random(&mut rng),
@@ -209,9 +201,7 @@ impl TokenResource {
         // token auth resource logic
         let token_auth_resource_logic = SignatureVerificationResourceLogicCircuit::from_sk_and_sign(
             &mut rng,
-            nf,
-            input_resources,
-            output_resources,
+            self_resource,
             auth.vk,
             auth_sk,
             *COMPRESSED_RECEIVER_VK,
@@ -227,21 +217,12 @@ impl TokenResource {
         &self,
         mut rng: R,
         auth: TokenAuthorization,
-        input_resources: [Resource; NUM_RESOURCE],
-        output_resources: [Resource; NUM_RESOURCE],
+        merkle_path: [(pallas::Base, LR); TAIGA_RESOURCE_TREE_DEPTH],
     ) -> ResourceLogics {
-        let TokenResource {
-            token_name,
-            resource,
-        } = self;
-
-        let self_resource_id = resource.commitment().inner();
-        // token resource logic
+        let self_resource = ResourceExistenceWitness::new(self.resource, merkle_path);
         let token_resource_logic = TokenResourceLogicCircuit {
-            self_resource_id,
-            input_resources,
-            output_resources,
-            token_name: token_name.clone(),
+            self_resource,
+            token_name: self.token_name.clone(),
             auth,
             receiver_resource_logic_vk: *COMPRESSED_RECEIVER_VK,
             rseed: RandomSeed::random(&mut rng),
@@ -249,9 +230,7 @@ impl TokenResource {
 
         // receiver resource logic
         let receiver_resource_logic = ReceiverResourceLogicCircuit {
-            self_resource_id,
-            input_resources,
-            output_resources,
+            self_resource,
             resource_logic_vk: *COMPRESSED_RECEIVER_VK,
             encrypt_nonce: pallas::Base::from_u128(rng.gen()),
             sk: pallas::Base::random(&mut rng),
@@ -269,9 +248,7 @@ impl TokenResource {
 // TokenResourceLogicCircuit
 #[derive(Clone, Debug)]
 pub struct TokenResourceLogicCircuit {
-    pub self_resource_id: pallas::Base,
-    pub input_resources: [Resource; NUM_RESOURCE],
-    pub output_resources: [Resource; NUM_RESOURCE],
+    self_resource: ResourceExistenceWitness,
     // The token_name goes to label. It can be extended to a list and embedded to label.
     pub token_name: TokenName,
     // The auth goes to value and defines how to consume and create the resource.
@@ -313,9 +290,7 @@ impl TokenResourceLogicCircuit {
 impl Default for TokenResourceLogicCircuit {
     fn default() -> Self {
         Self {
-            self_resource_id: pallas::Base::zero(),
-            input_resources: [(); NUM_RESOURCE].map(|_| Resource::default()),
-            output_resources: [(); NUM_RESOURCE].map(|_| Resource::default()),
+            self_resource: ResourceExistenceWitness::default(),
             token_name: TokenName("Token_name".to_string()),
             auth: TokenAuthorization::default(),
             receiver_resource_logic_vk: pallas::Base::zero(),
@@ -330,10 +305,8 @@ impl ResourceLogicCircuit for TokenResourceLogicCircuit {
         &self,
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
-        basic_variables: BasicResourceLogicVariables,
+        self_resource: ResourceStatus,
     ) -> Result<(), Error> {
-        let self_resource_id = basic_variables.get_self_resource_id();
-
         let token_property = assign_free_advice(
             layouter.namespace(|| "witness token_property"),
             config.advices[0],
@@ -342,18 +315,12 @@ impl ResourceLogicCircuit for TokenResourceLogicCircuit {
 
         // We can add more constraints on token_property or extend the token_properties.
 
-        // search target resource and get the label
-        let label = get_owned_resource_variable(
-            config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource label"),
-            &self_resource_id,
-            &basic_variables.get_label_searchable_pairs(),
-        )?;
-
         // check label
         layouter.assign_region(
             || "check label",
-            |mut region| region.constrain_equal(token_property.cell(), label.cell()),
+            |mut region| {
+                region.constrain_equal(token_property.cell(), self_resource.resource.label.cell())
+            },
         )?;
 
         // Construct an ECC chip
@@ -369,14 +336,6 @@ impl ResourceLogicCircuit for TokenResourceLogicCircuit {
             layouter.namespace(|| "witness auth resource_logic vk"),
             config.advices[0],
             Value::known(self.auth.vk),
-        )?;
-
-        // search target resource and get the value
-        let value = get_owned_resource_variable(
-            config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource value"),
-            &self_resource_id,
-            &basic_variables.get_value_searchable_pairs(),
         )?;
 
         let receiver_resource_logic_vk = assign_free_advice(
@@ -399,16 +358,12 @@ impl ResourceLogicCircuit for TokenResourceLogicCircuit {
 
         layouter.assign_region(
             || "check value encoding",
-            |mut region| region.constrain_equal(encoded_value.cell(), value.cell()),
+            |mut region| {
+                region.constrain_equal(encoded_value.cell(), self_resource.resource.value.cell())
+            },
         )?;
 
         // check the is_ephemeral flag
-        let is_ephemeral = get_owned_resource_variable(
-            config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get is_ephemeral"),
-            &self_resource_id,
-            &basic_variables.get_is_ephemeral_searchable_pairs(),
-        )?;
         let constant_zero = assign_free_constant(
             layouter.namespace(|| "zero"),
             config.advices[0],
@@ -416,25 +371,23 @@ impl ResourceLogicCircuit for TokenResourceLogicCircuit {
         )?;
         layouter.assign_region(
             || "check is_ephemeral",
-            |mut region| region.constrain_equal(is_ephemeral.cell(), constant_zero.cell()),
+            |mut region| {
+                region.constrain_equal(
+                    self_resource.resource.is_ephemeral.cell(),
+                    constant_zero.cell(),
+                )
+            },
         )?;
 
         // Resource Logic Commitment
         // Commt the sender(authorization method included) resource_logic if it's an input resource;
         // Commit the receiver(resource encryption constraints included) resource_logic if it's an output resource.
         let first_dynamic_resource_logic = {
-            let is_input_resource = get_is_input_resource_flag(
-                config.get_is_input_resource_flag_config,
-                layouter.namespace(|| "get is_input_resource_flag"),
-                &self_resource_id,
-                &basic_variables.get_input_resource_nfs(),
-                &basic_variables.get_output_resource_cms(),
-            )?;
             layouter.assign_region(
                 || "conditional select: ",
                 |mut region| {
                     config.conditional_select_config.assign_region(
-                        &is_input_resource,
+                        &self_resource.is_input,
                         &auth_resource_logic_vk,
                         &receiver_resource_logic_vk,
                         0,
@@ -500,23 +453,12 @@ impl ResourceLogicCircuit for TokenResourceLogicCircuit {
         Ok(())
     }
 
-    fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE] {
-        &self.input_resources
-    }
-
-    fn get_output_resources(&self) -> &[Resource; NUM_RESOURCE] {
-        &self.output_resources
-    }
-
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ResourceLogicPublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
-        let dynamic_resource_logic = if self.self_resource_id
-            == self.output_resources[0].commitment().inner()
-            || self.self_resource_id == self.output_resources[1].commitment().inner()
-        {
-            self.receiver_resource_logic_vk
-        } else {
+        let dynamic_resource_logic = if self.get_self_resource().is_input() {
             self.auth.vk
+        } else {
+            self.receiver_resource_logic_vk
         };
 
         let resource_logic_com_r = self
@@ -538,8 +480,8 @@ impl ResourceLogicCircuit for TokenResourceLogicCircuit {
         public_inputs.into()
     }
 
-    fn get_self_resource_id(&self) -> pallas::Base {
-        self.self_resource_id
+    fn get_self_resource(&self) -> ResourceExistenceWitness {
+        self.self_resource
     }
 }
 
@@ -548,15 +490,7 @@ resource_logic_verifying_info_impl!(TokenResourceLogicCircuit);
 
 impl BorshSerialize for TokenResourceLogicCircuit {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        writer.write_all(&self.self_resource_id.to_repr())?;
-        for input in self.input_resources.iter() {
-            input.serialize(writer)?;
-        }
-
-        for output in self.output_resources.iter() {
-            output.serialize(writer)?;
-        }
-
+        self.self_resource.serialize(writer)?;
         self.token_name.serialize(writer)?;
         self.auth.serialize(writer)?;
         writer.write_all(&self.receiver_resource_logic_vk.to_repr())?;
@@ -568,21 +502,13 @@ impl BorshSerialize for TokenResourceLogicCircuit {
 
 impl BorshDeserialize for TokenResourceLogicCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let self_resource_id = read_base_field(reader)?;
-        let input_resources: Vec<_> = (0..NUM_RESOURCE)
-            .map(|_| Resource::deserialize_reader(reader))
-            .collect::<Result<_, _>>()?;
-        let output_resources: Vec<_> = (0..NUM_RESOURCE)
-            .map(|_| Resource::deserialize_reader(reader))
-            .collect::<Result<_, _>>()?;
+        let self_resource = ResourceExistenceWitness::deserialize_reader(reader)?;
         let token_name = TokenName::deserialize_reader(reader)?;
         let auth = TokenAuthorization::deserialize_reader(reader)?;
         let receiver_resource_logic_vk = read_base_field(reader)?;
         let rseed = RandomSeed::deserialize_reader(reader)?;
         Ok(Self {
-            self_resource_id,
-            input_resources: input_resources.try_into().unwrap(),
-            output_resources: output_resources.try_into().unwrap(),
+            self_resource,
             token_name,
             auth,
             receiver_resource_logic_vk,
@@ -646,16 +572,16 @@ fn test_halo2_token_resource_logic_circuit() {
 
     let mut rng = OsRng;
     let circuit = {
-        let mut input_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
-        let output_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
+        // Create an input resource
+        let mut resource = random_resource(&mut rng);
         let token_name = TokenName("Token_name".to_string());
         let auth = TokenAuthorization::random(&mut rng);
-        input_resources[0].kind.label = token_name.encode();
-        input_resources[0].value = auth.to_value();
+        resource.kind.label = token_name.encode();
+        resource.value = auth.to_value();
+        let merkle_path = [(pallas::Base::zero(), LR::R); TAIGA_RESOURCE_TREE_DEPTH];
+        let self_resource = ResourceExistenceWitness::new(resource, merkle_path);
         TokenResourceLogicCircuit {
-            self_resource_id: input_resources[0].get_nf().unwrap().inner(),
-            input_resources,
-            output_resources,
+            self_resource,
             token_name,
             auth,
             receiver_resource_logic_vk: *COMPRESSED_RECEIVER_VK,

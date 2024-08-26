@@ -2,8 +2,8 @@
 use crate::circuit::resource_logic_examples::TrivialResourceLogicCircuit;
 #[cfg(feature = "examples")]
 use crate::circuit::resource_logic_examples::{
-    or_relation_intent::OrRelationIntentResourceLogicCircuit,
-    partial_fulfillment_intent::PartialFulfillmentIntentResourceLogicCircuit,
+    // or_relation_intent::OrRelationIntentResourceLogicCircuit,
+    // partial_fulfillment_intent::PartialFulfillmentIntentResourceLogicCircuit,
     receiver_resource_logic::ReceiverResourceLogicCircuit,
     signature_verification::SignatureVerificationResourceLogicCircuit,
     token::TokenResourceLogicCircuit,
@@ -101,17 +101,17 @@ impl ResourceLogicByteCode {
                 let resource_logic = ReceiverResourceLogicCircuit::from_bytes(&self.inputs);
                 Ok(resource_logic.get_verifying_info())
             }
-            #[cfg(feature = "examples")]
-            ResourceLogicRepresentation::PartialFulfillmentIntent => {
-                let resource_logic =
-                    PartialFulfillmentIntentResourceLogicCircuit::from_bytes(&self.inputs);
-                Ok(resource_logic.get_verifying_info())
-            }
-            #[cfg(feature = "examples")]
-            ResourceLogicRepresentation::OrRelationIntent => {
-                let resource_logic = OrRelationIntentResourceLogicCircuit::from_bytes(&self.inputs);
-                Ok(resource_logic.get_verifying_info())
-            }
+            // #[cfg(feature = "examples")]
+            // ResourceLogicRepresentation::PartialFulfillmentIntent => {
+            //     let resource_logic =
+            //         PartialFulfillmentIntentResourceLogicCircuit::from_bytes(&self.inputs);
+            //     Ok(resource_logic.get_verifying_info())
+            // }
+            // #[cfg(feature = "examples")]
+            // ResourceLogicRepresentation::OrRelationIntent => {
+            //     let resource_logic = OrRelationIntentResourceLogicCircuit::from_bytes(&self.inputs);
+            //     Ok(resource_logic.get_verifying_info())
+            // }
             #[allow(unreachable_patterns)]
             _ => Err(TransactionError::InvalidResourceLogicRepresentation),
         }
@@ -157,17 +157,17 @@ impl ResourceLogicByteCode {
                 let resource_logic = ReceiverResourceLogicCircuit::from_bytes(&self.inputs);
                 resource_logic.verify_transparently()?
             }
-            #[cfg(feature = "examples")]
-            ResourceLogicRepresentation::PartialFulfillmentIntent => {
-                let resource_logic =
-                    PartialFulfillmentIntentResourceLogicCircuit::from_bytes(&self.inputs);
-                resource_logic.verify_transparently()?
-            }
-            #[cfg(feature = "examples")]
-            ResourceLogicRepresentation::OrRelationIntent => {
-                let resource_logic = OrRelationIntentResourceLogicCircuit::from_bytes(&self.inputs);
-                resource_logic.verify_transparently()?
-            }
+            // #[cfg(feature = "examples")]
+            // ResourceLogicRepresentation::PartialFulfillmentIntent => {
+            //     let resource_logic =
+            //         PartialFulfillmentIntentResourceLogicCircuit::from_bytes(&self.inputs);
+            //     resource_logic.verify_transparently()?
+            // }
+            // #[cfg(feature = "examples")]
+            // ResourceLogicRepresentation::OrRelationIntent => {
+            //     let resource_logic = OrRelationIntentResourceLogicCircuit::from_bytes(&self.inputs);
+            //     resource_logic.verify_transparently()?
+            // }
             #[allow(unreachable_patterns)]
             _ => return Err(TransactionError::InvalidResourceLogicRepresentation),
         };

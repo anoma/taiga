@@ -1,25 +1,23 @@
 use crate::{
     circuit::{
         blake2s::publicize_default_dynamic_resource_logic_commitments,
-        gadgets::{
-            add::AddChip, assign_free_advice, poseidon_hash::poseidon_hash_gadget,
-            target_resource_variable::get_owned_resource_variable,
-        },
+        gadgets::{add::AddChip, assign_free_advice, poseidon_hash::poseidon_hash_gadget},
         resource_encryption_circuit::resource_encryption_gadget,
         resource_logic_bytecode::{ResourceLogicByteCode, ResourceLogicRepresentation},
         resource_logic_circuit::{
-            BasicResourceLogicVariables, ResourceLogicCircuit, ResourceLogicConfig,
-            ResourceLogicPublicInputs, ResourceLogicVerifyingInfo, ResourceLogicVerifyingInfoTrait,
+            ResourceLogicCircuit, ResourceLogicConfig, ResourceLogicPublicInputs,
+            ResourceLogicVerifyingInfo, ResourceLogicVerifyingInfoTrait, ResourceStatus,
         },
         resource_logic_examples::signature_verification::COMPRESSED_TOKEN_AUTH_VK,
     },
-    constant::{GENERATOR, NUM_RESOURCE, SETUP_PARAMS_MAP},
+    constant::{GENERATOR, SETUP_PARAMS_MAP},
     error::TransactionError,
     proof::Proof,
-    resource::{RandomSeed, Resource},
+    resource::RandomSeed,
     resource_encryption::{ResourceCiphertext, ResourcePlaintext, SecretKey},
     resource_logic_commitment::ResourceLogicCommitment,
     resource_logic_vk::ResourceLogicVerifyingKey,
+    resource_tree::ResourceExistenceWitness,
     utils::{mod_r_p, read_base_field, read_point},
 };
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -46,9 +44,7 @@ lazy_static! {
 // ReceiverResourceLogicCircuit is used in the token resource_logic as dynamic resource_logic and contains the resource encryption constraints.
 #[derive(Clone, Debug)]
 pub struct ReceiverResourceLogicCircuit {
-    pub self_resource_id: pallas::Base,
-    pub input_resources: [Resource; NUM_RESOURCE],
-    pub output_resources: [Resource; NUM_RESOURCE],
+    pub self_resource: ResourceExistenceWitness,
     pub resource_logic_vk: pallas::Base,
     pub encrypt_nonce: pallas::Base,
     pub sk: pallas::Base,
@@ -73,9 +69,7 @@ impl ReceiverResourceLogicCircuit {
 impl Default for ReceiverResourceLogicCircuit {
     fn default() -> Self {
         Self {
-            self_resource_id: pallas::Base::zero(),
-            input_resources: [(); NUM_RESOURCE].map(|_| Resource::default()),
-            output_resources: [(); NUM_RESOURCE].map(|_| Resource::default()),
+            self_resource: ResourceExistenceWitness::default(),
             resource_logic_vk: pallas::Base::zero(),
             encrypt_nonce: pallas::Base::zero(),
             sk: pallas::Base::zero(),
@@ -91,7 +85,7 @@ impl ResourceLogicCircuit for ReceiverResourceLogicCircuit {
         &self,
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
-        basic_variables: BasicResourceLogicVariables,
+        self_resource: ResourceStatus,
     ) -> Result<(), Error> {
         let encrypt_nonce = assign_free_advice(
             layouter.namespace(|| "witness encrypt_nonce"),
@@ -112,14 +106,6 @@ impl ResourceLogicCircuit for ReceiverResourceLogicCircuit {
             ecc_chip.clone(),
             layouter.namespace(|| "witness rcv_pk"),
             Value::known(self.rcv_pk.to_affine()),
-        )?;
-
-        let self_resource_id = basic_variables.get_self_resource_id();
-        let value = get_owned_resource_variable(
-            config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource value"),
-            &self_resource_id,
-            &basic_variables.get_value_searchable_pairs(),
         )?;
 
         let auth_resource_logic_vk = assign_free_advice(
@@ -147,70 +133,20 @@ impl ResourceLogicCircuit for ReceiverResourceLogicCircuit {
 
         layouter.assign_region(
             || "check value encoding",
-            |mut region| region.constrain_equal(encoded_value.cell(), value.cell()),
-        )?;
-
-        // search target resource and get the label
-        let label = get_owned_resource_variable(
-            config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource label"),
-            &self_resource_id,
-            &basic_variables.get_label_searchable_pairs(),
-        )?;
-
-        // search target resource and get the logic
-        let logic = get_owned_resource_variable(
-            config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource logic"),
-            &self_resource_id,
-            &basic_variables.get_logic_searchable_pairs(),
-        )?;
-
-        // search target resource and get the quantity
-        let quantity = get_owned_resource_variable(
-            config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource quantity"),
-            &self_resource_id,
-            &basic_variables.get_quantity_searchable_pairs(),
-        )?;
-
-        let nonce = get_owned_resource_variable(
-            config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource nonce"),
-            &self_resource_id,
-            &basic_variables.get_nonce_searchable_pairs(),
-        )?;
-
-        let npk = get_owned_resource_variable(
-            config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource npk"),
-            &self_resource_id,
-            &basic_variables.get_npk_searchable_pairs(),
-        )?;
-
-        let is_ephemeral = get_owned_resource_variable(
-            config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource is_ephemeral"),
-            &self_resource_id,
-            &basic_variables.get_is_ephemeral_searchable_pairs(),
-        )?;
-
-        let rseed = get_owned_resource_variable(
-            config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource rseed"),
-            &self_resource_id,
-            &basic_variables.get_rseed_searchable_pairs(),
+            |mut region| {
+                region.constrain_equal(encoded_value.cell(), self_resource.resource.value.cell())
+            },
         )?;
 
         let mut message = vec![
-            logic,
-            label,
-            value,
-            quantity,
-            nonce,
-            npk,
-            is_ephemeral,
-            rseed,
+            self_resource.resource.logic,
+            self_resource.resource.label,
+            self_resource.resource.value,
+            self_resource.resource.quantity,
+            self_resource.resource.nonce,
+            self_resource.resource.npk,
+            self_resource.resource.is_ephemeral,
+            self_resource.resource.rseed,
         ];
 
         let add_chip = AddChip::<pallas::Base>::construct(config.add_config.clone(), ());
@@ -239,14 +175,6 @@ impl ResourceLogicCircuit for ReceiverResourceLogicCircuit {
         Ok(())
     }
 
-    fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE] {
-        &self.input_resources
-    }
-
-    fn get_output_resources(&self) -> &[Resource; NUM_RESOURCE] {
-        &self.output_resources
-    }
-
     fn get_public_inputs(&self, rng: impl RngCore) -> ResourceLogicPublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
         let default_resource_logic_cm: [pallas::Base; 2] =
@@ -259,22 +187,17 @@ impl ResourceLogicCircuit for ReceiverResourceLogicCircuit {
                 &RandomSeed::random(rng),
             );
         public_inputs.extend(custom_public_input_padding.iter());
-        assert_eq!(NUM_RESOURCE, 2);
-        let target_resource =
-            if self.get_self_resource_id() == self.get_output_resources()[0].commitment().inner() {
-                self.get_output_resources()[0]
-            } else {
-                self.get_output_resources()[1]
-            };
+
+        let self_resource = self.self_resource.get_resource();
         let message = vec![
-            target_resource.kind.logic,
-            target_resource.kind.label,
-            target_resource.value,
-            pallas::Base::from(target_resource.quantity),
-            target_resource.nonce.inner(),
-            target_resource.get_npk(),
-            pallas::Base::from(target_resource.is_ephemeral as u64),
-            target_resource.rseed,
+            self_resource.kind.logic,
+            self_resource.kind.label,
+            self_resource.value,
+            pallas::Base::from(self_resource.quantity),
+            self_resource.nonce.inner(),
+            self_resource.get_npk(),
+            pallas::Base::from(self_resource.is_ephemeral as u64),
+            self_resource.rseed,
         ];
         let plaintext = ResourcePlaintext::padding(&message);
         let key = SecretKey::from_dh_exchange(&self.rcv_pk, &mod_r_p(self.sk));
@@ -289,8 +212,8 @@ impl ResourceLogicCircuit for ReceiverResourceLogicCircuit {
         public_inputs.into()
     }
 
-    fn get_self_resource_id(&self) -> pallas::Base {
-        self.self_resource_id
+    fn get_self_resource(&self) -> ResourceExistenceWitness {
+        self.self_resource
     }
 }
 
@@ -299,15 +222,7 @@ resource_logic_verifying_info_impl!(ReceiverResourceLogicCircuit);
 
 impl BorshSerialize for ReceiverResourceLogicCircuit {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        writer.write_all(&self.self_resource_id.to_repr())?;
-        for input in self.input_resources.iter() {
-            input.serialize(writer)?;
-        }
-
-        for output in self.output_resources.iter() {
-            output.serialize(writer)?;
-        }
-
+        self.self_resource.serialize(writer)?;
         writer.write_all(&self.resource_logic_vk.to_repr())?;
         writer.write_all(&self.encrypt_nonce.to_repr())?;
         writer.write_all(&self.sk.to_repr())?;
@@ -320,22 +235,14 @@ impl BorshSerialize for ReceiverResourceLogicCircuit {
 
 impl BorshDeserialize for ReceiverResourceLogicCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let self_resource_id = read_base_field(reader)?;
-        let input_resources: Vec<_> = (0..NUM_RESOURCE)
-            .map(|_| Resource::deserialize_reader(reader))
-            .collect::<Result<_, _>>()?;
-        let output_resources: Vec<_> = (0..NUM_RESOURCE)
-            .map(|_| Resource::deserialize_reader(reader))
-            .collect::<Result<_, _>>()?;
+        let self_resource = ResourceExistenceWitness::deserialize_reader(reader)?;
         let resource_logic_vk = read_base_field(reader)?;
         let encrypt_nonce = read_base_field(reader)?;
         let sk = read_base_field(reader)?;
         let rcv_pk = read_point(reader)?;
         let auth_resource_logic_vk = read_base_field(reader)?;
         Ok(Self {
-            self_resource_id,
-            input_resources: input_resources.try_into().unwrap(),
-            output_resources: output_resources.try_into().unwrap(),
+            self_resource,
             resource_logic_vk,
             encrypt_nonce,
             sk,
@@ -347,7 +254,8 @@ impl BorshDeserialize for ReceiverResourceLogicCircuit {
 
 #[test]
 fn test_halo2_receiver_resource_logic_circuit() {
-    use crate::constant::RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE;
+    use crate::constant::{RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE, TAIGA_RESOURCE_TREE_DEPTH};
+    use crate::merkle_tree::LR;
     use crate::{resource::tests::random_resource, utils::poseidon_hash_n};
     use ff::{Field, PrimeField};
     use halo2_proofs::dev::MockProver;
@@ -355,26 +263,25 @@ fn test_halo2_receiver_resource_logic_circuit() {
 
     let mut rng = OsRng;
     let (circuit, rcv_sk) = {
-        let input_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
-        let mut output_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
+        // Create an output resource
+        let mut resource = random_resource(&mut rng);
         let encrypt_nonce = pallas::Base::from_u128(23333u128);
         let sk = pallas::Base::random(&mut rng);
         let rcv_sk = pallas::Base::random(&mut rng);
         let generator = GENERATOR.to_curve();
         let rcv_pk = generator * mod_r_p(rcv_sk);
         let rcv_pk_coord = rcv_pk.to_affine().coordinates().unwrap();
-        output_resources[0].value = poseidon_hash_n([
+        resource.value = poseidon_hash_n([
             *rcv_pk_coord.x(),
             *rcv_pk_coord.y(),
             *COMPRESSED_TOKEN_AUTH_VK,
             *COMPRESSED_RECEIVER_VK,
         ]);
-        let self_resource_id = output_resources[0].commitment().inner();
+        let merkle_path = [(pallas::Base::zero(), LR::L); TAIGA_RESOURCE_TREE_DEPTH];
+        let self_resource = ResourceExistenceWitness::new(resource, merkle_path);
         (
             ReceiverResourceLogicCircuit {
-                self_resource_id,
-                input_resources,
-                output_resources,
+                self_resource,
                 resource_logic_vk: *COMPRESSED_RECEIVER_VK,
                 encrypt_nonce,
                 sk,
@@ -402,18 +309,16 @@ fn test_halo2_receiver_resource_logic_circuit() {
     assert_eq!(prover.verify(), Ok(()));
 
     let de_cipher = public_inputs.decrypt(rcv_sk).unwrap();
-    assert_eq!(de_cipher[0], circuit.output_resources[0].get_logic());
-    assert_eq!(de_cipher[1], circuit.output_resources[0].get_label());
-    assert_eq!(de_cipher[2], circuit.output_resources[0].value);
-    assert_eq!(
-        de_cipher[3],
-        pallas::Base::from(circuit.output_resources[0].quantity)
-    );
-    assert_eq!(de_cipher[4], circuit.output_resources[0].nonce.inner());
-    assert_eq!(de_cipher[5], circuit.output_resources[0].get_npk());
+    let original_resource = circuit.self_resource.get_resource();
+    assert_eq!(de_cipher[0], original_resource.get_logic());
+    assert_eq!(de_cipher[1], original_resource.get_label());
+    assert_eq!(de_cipher[2], original_resource.value);
+    assert_eq!(de_cipher[3], pallas::Base::from(original_resource.quantity));
+    assert_eq!(de_cipher[4], original_resource.nonce.inner());
+    assert_eq!(de_cipher[5], original_resource.get_npk());
     assert_eq!(
         de_cipher[6],
-        pallas::Base::from(circuit.output_resources[0].is_ephemeral)
+        pallas::Base::from(original_resource.is_ephemeral)
     );
-    assert_eq!(de_cipher[7], circuit.output_resources[0].rseed);
+    assert_eq!(de_cipher[7], original_resource.rseed);
 }

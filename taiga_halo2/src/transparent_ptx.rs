@@ -1,8 +1,7 @@
 use crate::{
     circuit::resource_logic_bytecode::ApplicationByteCode, compliance::ComplianceInfo,
-    constant::NUM_RESOURCE, delta_commitment::DeltaCommitment, error::TransactionError,
-    executable::Executable, merkle_tree::Anchor, nullifier::Nullifier,
-    resource::ResourceCommitment,
+    delta_commitment::DeltaCommitment, error::TransactionError, executable::Executable,
+    merkle_tree::Anchor, nullifier::Nullifier, resource::ResourceCommitment,
 };
 
 use pasta_curves::pallas;
@@ -29,10 +28,6 @@ impl TransparentPartialTransaction {
         output_resource_app: Vec<ApplicationByteCode>,
         hints: Vec<u8>,
     ) -> Self {
-        assert_eq!(compliances.len(), NUM_RESOURCE);
-        assert_eq!(input_resource_app.len(), NUM_RESOURCE);
-        assert_eq!(output_resource_app.len(), NUM_RESOURCE);
-
         Self {
             compliances,
             input_resource_app,
