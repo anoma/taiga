@@ -62,7 +62,7 @@ impl ResourceExistenceWitness {
         bincode::serialize(&self).unwrap()
     }
 
-    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+    pub fn from_bytes(bytes: &[u8]) -> Self {
         bincode::deserialize(bytes).unwrap()
     }
 }

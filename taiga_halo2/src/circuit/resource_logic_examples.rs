@@ -14,8 +14,8 @@ use crate::{
     resource_logic_vk::ResourceLogicVerifyingKey,
     resource_tree::ResourceExistenceWitness,
 };
-#[cfg(feature = "borsh")]
-use borsh::{BorshDeserialize, BorshSerialize};
+// #[cfg(feature = "borsh")]
+// use borsh::{BorshDeserialize, BorshSerialize};
 use halo2_proofs::plonk::{keygen_pk, keygen_vk, ProvingKey};
 use halo2_proofs::{
     circuit::{floor_planner, Layouter},
@@ -24,13 +24,11 @@ use halo2_proofs::{
 use lazy_static::lazy_static;
 use pasta_curves::{pallas, vesta};
 use rand::{rngs::OsRng, RngCore};
-#[cfg(feature = "nif")]
-use rustler::{Decoder, Encoder, Env, NifResult, NifStruct, Term};
 
 #[cfg(feature = "examples")]
 mod field_addition;
-// #[cfg(feature = "examples")]
-// pub mod or_relation_intent;
+#[cfg(feature = "examples")]
+pub mod or_relation_intent;
 // #[cfg(feature = "examples")]
 // pub mod partial_fulfillment_intent;
 #[cfg(feature = "examples")]
@@ -88,7 +86,7 @@ impl TrivialResourceLogicCircuit {
         bincode::serialize(&self).unwrap()
     }
 
-    pub fn from_bytes(bytes: &Vec<u8>) -> Self {
+    pub fn from_bytes(bytes: &[u8]) -> Self {
         bincode::deserialize(bytes).unwrap()
     }
 }

@@ -16,7 +16,7 @@ use pasta_curves::pallas;
 use rand::RngCore;
 
 #[cfg(feature = "nif")]
-use rustler::{Decoder, Encoder, Env, NifResult, NifStruct, Term};
+use rustler::NifStruct;
 
 #[cfg(feature = "serde")]
 use serde;
@@ -87,9 +87,9 @@ impl ShieldedPartialTransaction {
             .collect();
 
         Ok(Self {
-            compliances: compliances.try_into().unwrap(),
-            inputs: inputs?.try_into().unwrap(),
-            outputs: outputs?.try_into().unwrap(),
+            compliances,
+            inputs: inputs?,
+            outputs: outputs?,
             binding_sig_r: Some(rcv_sum),
             hints,
         })
