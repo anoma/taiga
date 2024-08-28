@@ -19,6 +19,7 @@ use taiga_halo2::{
     merkle_tree::{Anchor, MerklePath},
     nullifier::NullifierKeyContainer,
     resource::{Resource, ResourceLogics},
+    resource_tree::{ResourceExistenceWitness, ResourceMerkleTreeLeaves},
     shielded_ptx::ShieldedPartialTransaction,
     transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
 };
@@ -33,9 +34,6 @@ pub fn create_token_intent_ptx<R: RngCore>(
     let swap = Swap::random(&mut rng, sell, buy, input_auth);
     let mut intent_resource = swap.create_intent_resource(&mut rng);
 
-    // padding the zero resources
-    let padding_input_resource = Resource::random_padding_resource(&mut rng);
-    let mut padding_output_resource = Resource::random_padding_resource(&mut rng);
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
     // Create compliance pairs
@@ -48,70 +46,54 @@ pub fn create_token_intent_ptx<R: RngCore>(
             &mut rng,
         );
 
-        // Fetch a valid anchor for dummy resources
-        let anchor = Anchor::from(pallas::Base::random(&mut rng));
-        let compliance_2 = ComplianceInfo::new(
-            padding_input_resource,
-            merkle_path,
-            Some(anchor),
-            &mut padding_output_resource,
-            &mut rng,
-        );
-        vec![compliance_1, compliance_2]
+        vec![compliance_1]
     };
 
-    // Create resource logics
-    let (input_resource_logics, output_resource_logics) = {
-        let input_resources = [*swap.sell.resource(), padding_input_resource];
-        let output_resources = [intent_resource, padding_output_resource];
-        // Create resource_logics for the input token
-        let input_token_resource_logics = swap.sell.generate_input_token_resource_logics(
-            &mut rng,
-            input_auth,
-            input_auth_sk,
-            input_resources,
-            output_resources,
-        );
+    // Collect resource merkle leaves
+    let input_resource_nf = swap.sell.resource().get_nf().unwrap().inner();
+    let output_resource_cm = intent_resource.commitment().inner();
+    let resource_merkle_tree =
+        ResourceMerkleTreeLeaves::new(vec![input_resource_nf, output_resource_cm]);
 
-        // Create resource_logics for the intent
-        let intent_resource_logics = {
-            let intent_resource_logic = PartialFulfillmentIntentResourceLogicCircuit {
-                self_resource_id: intent_resource.commitment().inner(),
-                input_resources,
-                output_resources,
-                swap: swap.clone(),
-            };
+    // Create input resource logics
+    let input_merkle_path = resource_merkle_tree
+        .generate_path(input_resource_nf)
+        .unwrap();
+    let input_resource_logics = swap.sell.generate_input_token_resource_logics(
+        &mut rng,
+        input_auth,
+        input_auth_sk,
+        input_merkle_path,
+    );
 
-            ResourceLogics::new(Box::new(intent_resource_logic), vec![])
+    // Create intent resource logics
+    let intent_resource_logics = {
+        let sell_resource_witness =
+            ResourceExistenceWitness::new(*swap.sell.resource(), input_merkle_path);
+
+        let intent_resource_witness = {
+            let merkle_path = resource_merkle_tree
+                .generate_path(output_resource_cm)
+                .unwrap();
+            ResourceExistenceWitness::new(intent_resource, merkle_path)
         };
 
-        // Create resource_logics for the padding input
-        let padding_input_resource_logics =
-            ResourceLogics::create_input_padding_resource_resource_logics(
-                &padding_input_resource,
-                input_resources,
-                output_resources,
-            );
+        let intent_circuit = PartialFulfillmentIntentResourceLogicCircuit {
+            self_resource: intent_resource_witness,
+            sell_resource: sell_resource_witness,
+            offer_resource: ResourceExistenceWitness::default(), // a dummy resource
+            returned_resource: ResourceExistenceWitness::default(), // a dummy resource
+            swap: swap.clone(),
+        };
 
-        // Create resource_logics the padding output
-        let padding_output_resource_logics =
-            ResourceLogics::create_output_padding_resource_resource_logics(
-                &padding_output_resource,
-                input_resources,
-                output_resources,
-            );
-
-        (
-            vec![input_token_resource_logics, padding_input_resource_logics],
-            vec![intent_resource_logics, padding_output_resource_logics],
-        )
+        ResourceLogics::new(Box::new(intent_circuit), vec![])
     };
 
     // Create shielded partial tx
     let ptx = ShieldedPartialTransaction::build(
         compliances,
-        input_resource_logics,
-        output_resource_logics,
+        vec![input_resource_logics],
+        vec![intent_resource_logics],
         vec![],
         &mut rng,
     )
@@ -128,9 +110,8 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     offer: Token,
     output_auth_pk: pallas::Point,
 ) -> ShieldedPartialTransaction {
-    let (input_resources, [mut bought_resource, mut returned_resource]) =
-        swap.fill(&mut rng, intent_resource, offer);
-    let [intent_resource, padding_input_resource] = input_resources;
+    let (mut offer_resource, mut returned_resource) = swap.fill(&mut rng, offer);
+    let padding_input_resource = Resource::random_padding_resource(&mut rng);
 
     // output resources
     let output_auth = TokenAuthorization::new(output_auth_pk, *COMPRESSED_TOKEN_AUTH_VK);
@@ -145,7 +126,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
             intent_resource,
             merkle_path.clone(),
             Some(anchor),
-            &mut bought_resource,
+            &mut offer_resource,
             &mut rng,
         );
 
@@ -159,40 +140,64 @@ pub fn consume_token_intent_ptx<R: RngCore>(
         vec![compliance_1, compliance_2]
     };
 
+    let intent_nf = intent_resource.get_nf().unwrap().inner();
+    let offer_cm = offer_resource.commitment().inner();
+    let padding_nf = padding_input_resource.get_nf().unwrap().inner();
+    let returned_cm = returned_resource.commitment().inner();
+    let resource_merkle_tree =
+        ResourceMerkleTreeLeaves::new(vec![intent_nf, offer_cm, padding_nf, returned_cm]);
+
     // Create resource logics
     let (input_resource_logics, output_resource_logics) = {
-        let output_resources = [bought_resource, returned_resource];
+        let intent_resource_witness = {
+            let merkle_path = resource_merkle_tree.generate_path(intent_nf).unwrap();
+            ResourceExistenceWitness::new(intent_resource, merkle_path)
+        };
+
+        let offer_resource_witness = {
+            let merkle_path = resource_merkle_tree.generate_path(offer_cm).unwrap();
+            ResourceExistenceWitness::new(offer_resource, merkle_path)
+        };
+
+        let padding_resource_witness = {
+            let merkle_path = resource_merkle_tree.generate_path(padding_nf).unwrap();
+            ResourceExistenceWitness::new(padding_input_resource, merkle_path)
+        };
+
+        let returned_resource_witness = {
+            let merkle_path = resource_merkle_tree.generate_path(returned_cm).unwrap();
+            ResourceExistenceWitness::new(returned_resource, merkle_path)
+        };
+
         // Create resource_logics for the intent
         let intent_resource_logics = {
             let intent_resource_logic = PartialFulfillmentIntentResourceLogicCircuit {
-                self_resource_id: intent_resource.get_nf().unwrap().inner(),
-                input_resources,
-                output_resources,
+                self_resource: intent_resource_witness,
+                sell_resource: padding_resource_witness, // a dummy one
+                offer_resource: offer_resource_witness,
+                returned_resource: returned_resource_witness,
                 swap: swap.clone(),
             };
 
             ResourceLogics::new(Box::new(intent_resource_logic), vec![])
         };
 
-        // Create resource_logics for the bought_resource
+        // Create resource_logics for the offer_resource
         let bought_resource_resource_logics = TokenResource {
             token_name: swap.buy.name().clone(),
-            resource: bought_resource,
+            resource: offer_resource,
         }
         .generate_output_token_resource_logics(
             &mut rng,
             output_auth,
-            input_resources,
-            output_resources,
+            offer_resource_witness.get_path(),
         );
 
         // Create resource_logics for the padding input
-        let padding_input_resource_logics =
-            ResourceLogics::create_input_padding_resource_resource_logics(
-                &padding_input_resource,
-                input_resources,
-                output_resources,
-            );
+        let padding_input_resource_logics = ResourceLogics::create_padding_resource_resource_logics(
+            padding_input_resource,
+            padding_resource_witness.get_path(),
+        );
 
         // Create resource_logics for the returned_resource
         let returned_resource_resource_logics = TokenResource {
@@ -202,8 +207,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
         .generate_output_token_resource_logics(
             &mut rng,
             output_auth,
-            input_resources,
-            output_resources,
+            returned_resource_witness.get_path(),
         );
 
         (

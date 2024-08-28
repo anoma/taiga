@@ -1,14 +1,15 @@
 use crate::{
     circuit::{
         resource_logic_circuit::ResourceLogic,
+        resource_logic_examples::TrivialResourceLogicCircuit,
         resource_logic_examples::COMPRESSED_TRIVIAL_RESOURCE_LOGIC_VK,
     },
     constant::{
         POSEIDON_TO_CURVE_INPUT_LEN, PRF_EXPAND_PERSONALIZATION,
         PRF_EXPAND_PERSONALIZATION_TO_FIELD, PRF_EXPAND_PSI, PRF_EXPAND_PUBLIC_INPUT_PADDING,
-        PRF_EXPAND_RCM, PRF_EXPAND_VCM_R,
+        PRF_EXPAND_RCM, PRF_EXPAND_VCM_R, TAIGA_RESOURCE_TREE_DEPTH,
     },
-    merkle_tree::{Anchor, MerklePath, Node},
+    merkle_tree::{Anchor, MerklePath, Node, LR},
     nullifier::{Nullifier, NullifierKeyContainer},
     shielded_ptx::ResourceLogicVerifyingInfoSet,
     utils::{poseidon_hash_n, poseidon_to_curve},
@@ -475,41 +476,18 @@ impl ResourceLogics {
         )
     }
 
-    // // Create resource logics for an input padding resource
-    // pub fn create_input_padding_resource_resource_logics(
-    //     resource: &Resource,
-    //     input_resources: [Resource; NUM_RESOURCE],
-    //     output_resources: [Resource; NUM_RESOURCE],
-    // ) -> Self {
-    //     let self_resource_id = resource.get_nf().unwrap().inner();
-    //     let application_resource_logic = Box::new(TrivialResourceLogicCircuit::new(
-    //         self_resource_id,
-    //         input_resources,
-    //         output_resources,
-    //     ));
-    //     Self {
-    //         application_resource_logic,
-    //         dynamic_resource_logics: vec![],
-    //     }
-    // }
-
-    // // Create resource logics for an output padding resource
-    // pub fn create_output_padding_resource_resource_logics(
-    //     resource: &Resource,
-    //     input_resources: [Resource; NUM_RESOURCE],
-    //     output_resources: [Resource; NUM_RESOURCE],
-    // ) -> Self {
-    //     let self_resource_id = resource.commitment().inner();
-    //     let application_resource_logic = Box::new(TrivialResourceLogicCircuit::new(
-    //         self_resource_id,
-    //         input_resources,
-    //         output_resources,
-    //     ));
-    //     Self {
-    //         application_resource_logic,
-    //         dynamic_resource_logics: vec![],
-    //     }
-    // }
+    // Create resource logics for a padding resource
+    pub fn create_padding_resource_resource_logics(
+        resource: Resource,
+        merkle_path: [(pallas::Base, LR); TAIGA_RESOURCE_TREE_DEPTH],
+    ) -> Self {
+        let application_resource_logic =
+            Box::new(TrivialResourceLogicCircuit::new(resource, merkle_path));
+        Self {
+            application_resource_logic,
+            dynamic_resource_logics: vec![],
+        }
+    }
 }
 
 #[cfg(test)]

@@ -29,8 +29,8 @@ use rand::{rngs::OsRng, RngCore};
 mod field_addition;
 #[cfg(feature = "examples")]
 pub mod or_relation_intent;
-// #[cfg(feature = "examples")]
-// pub mod partial_fulfillment_intent;
+#[cfg(feature = "examples")]
+pub mod partial_fulfillment_intent;
 #[cfg(feature = "examples")]
 pub mod receiver_resource_logic;
 #[cfg(feature = "examples")]
