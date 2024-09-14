@@ -151,7 +151,7 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     // Fetch a valid anchor for dummy resources
     let anchor = Anchor::from(pallas::Base::random(&mut rng));
 
-    // Create compliance pairs
+    // Create compliance proof
     let compliance = ComplianceInfo::new(
         intent_resource,
         merkle_path.clone(),

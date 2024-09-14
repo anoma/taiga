@@ -33,7 +33,6 @@ impl ResourceExistenceWitness {
         self.resource
     }
 
-    // TODO: fix the depth
     pub fn get_path(&self) -> [(pallas::Base, LR); TAIGA_RESOURCE_TREE_DEPTH] {
         self.merkle_path
     }
