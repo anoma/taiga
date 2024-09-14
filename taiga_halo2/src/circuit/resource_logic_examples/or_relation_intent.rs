@@ -5,25 +5,25 @@
 use crate::{
     circuit::{
         blake2s::publicize_default_dynamic_resource_logic_commitments,
-        gadgets::{
-            assign_free_advice,
-            poseidon_hash::poseidon_hash_gadget,
-            target_resource_variable::{get_is_input_resource_flag, get_owned_resource_variable},
-        },
+        gadgets::{assign_free_advice, assign_free_constant, poseidon_hash::poseidon_hash_gadget},
+        integrity::load_resource,
+        merkle_circuit::MerklePoseidonChip,
+        resource_commitment::ResourceCommitChip,
         resource_logic_bytecode::{ResourceLogicByteCode, ResourceLogicRepresentation},
         resource_logic_circuit::{
-            BasicResourceLogicVariables, ResourceLogicCircuit, ResourceLogicConfig,
-            ResourceLogicPublicInputs, ResourceLogicVerifyingInfo, ResourceLogicVerifyingInfoTrait,
+            ResourceLogicCircuit, ResourceLogicConfig, ResourceLogicPublicInputs,
+            ResourceLogicVerifyingInfo, ResourceLogicVerifyingInfoTrait, ResourceStatus,
         },
         resource_logic_examples::token::{Token, TOKEN_VK},
     },
-    constant::{NUM_RESOURCE, SETUP_PARAMS_MAP},
+    constant::SETUP_PARAMS_MAP,
     error::TransactionError,
     nullifier::Nullifier,
     proof::Proof,
     resource::{RandomSeed, Resource},
     resource_logic_commitment::ResourceLogicCommitment,
     resource_logic_vk::ResourceLogicVerifyingKey,
+    resource_tree::ResourceExistenceWitness,
     utils::poseidon_hash_n,
     utils::read_base_field,
 };
@@ -48,9 +48,10 @@ lazy_static! {
 // OrRelationIntentResourceLogicCircuit
 #[derive(Clone, Debug, Default)]
 pub struct OrRelationIntentResourceLogicCircuit {
-    pub owned_resource_id: pallas::Base,
-    pub input_resources: [Resource; NUM_RESOURCE],
-    pub output_resources: [Resource; NUM_RESOURCE],
+    // self_resource is the intent resource
+    pub self_resource: ResourceExistenceWitness,
+    // If the self_resource(intent) is an output resource, a dummy desired resource is needed.
+    pub desired_resource: ResourceExistenceWitness,
     pub token_1: Token,
     pub token_2: Token,
     pub receiver_npk: pallas::Base,
@@ -101,15 +102,53 @@ impl ResourceLogicCircuit for OrRelationIntentResourceLogicCircuit {
         &self,
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
-        basic_variables: BasicResourceLogicVariables,
+        self_resource: ResourceStatus,
     ) -> Result<(), Error> {
-        let owned_resource_id = basic_variables.get_owned_resource_id();
-        let is_input_resource = get_is_input_resource_flag(
-            config.get_is_input_resource_flag_config,
-            layouter.namespace(|| "get is_input_resource_flag"),
-            &owned_resource_id,
-            &basic_variables.get_input_resource_nfs(),
-            &basic_variables.get_output_resource_cms(),
+        // check
+        {
+            let one = assign_free_constant(
+                layouter.namespace(|| "constant one"),
+                config.advices[0],
+                pallas::Base::one(),
+            )?;
+            layouter.assign_region(
+                || "check label",
+                |mut region| {
+                    region.constrain_equal(one.cell(), self_resource.resource.is_ephemeral.cell())
+                },
+            )?;
+        }
+        // load the desired resource
+        let desired_resource = {
+            // Construct a merkle chip
+            let merkle_chip = MerklePoseidonChip::construct(config.merkle_config);
+
+            // Construct a resource_commit chip
+            let resource_commit_chip =
+                ResourceCommitChip::construct(config.resource_commit_config.clone());
+
+            load_resource(
+                layouter.namespace(|| "load the desired resource"),
+                config.advices,
+                resource_commit_chip,
+                config.conditional_select_config,
+                merkle_chip,
+                &self.desired_resource,
+            )?
+        };
+
+        // check self_resource and desired_resource are on the same tree
+        layouter.assign_region(
+            || "conditional equal: check root",
+            |mut region| {
+                config.conditional_equal_config.assign_region(
+                    &self_resource.is_input,
+                    &self_resource.resource_merkle_root,
+                    &desired_resource.resource_merkle_root,
+                    0,
+                    &mut region,
+                )
+            },
         )?;
 
         let token_resource_logic_vk = assign_free_advice(
@@ -169,18 +208,12 @@ impl ResourceLogicCircuit for OrRelationIntentResourceLogicCircuit {
             ],
         )?;
 
-        // search target resource and get the intent label
-        let label = get_owned_resource_variable(
-            config.get_owned_resource_variable_config,
-            layouter.namespace(|| "get owned resource label"),
-            &owned_resource_id,
-            &basic_variables.get_label_searchable_pairs(),
-        )?;
-
         // check the label of intent resource
         layouter.assign_region(
             || "check label",
-            |mut region| region.constrain_equal(encoded_label.cell(), label.cell()),
+            |mut region| {
+                region.constrain_equal(encoded_label.cell(), self_resource.resource.label.cell())
+            },
         )?;
 
         // check the resource_logic vk of output resource
@@ -188,11 +221,9 @@ impl ResourceLogicCircuit for OrRelationIntentResourceLogicCircuit {
             || "conditional equal: check resource_logic vk",
             |mut region| {
                 config.conditional_equal_config.assign_region(
-                    &is_input_resource,
+                    &self_resource.is_input,
                     &token_resource_logic_vk,
-                    &basic_variables.output_resource_variables[0]
-                        .resource_variables
-                        .logic,
+                    &desired_resource.resource.logic,
                     0,
                     &mut region,
                 )
@@ -204,11 +235,9 @@ impl ResourceLogicCircuit for OrRelationIntentResourceLogicCircuit {
             || "conditional equal: check npk",
             |mut region| {
                 config.conditional_equal_config.assign_region(
-                    &is_input_resource,
+                    &self_resource.is_input,
                     &receiver_npk,
-                    &basic_variables.output_resource_variables[0]
-                        .resource_variables
-                        .npk,
+                    &desired_resource.resource.npk,
                     0,
                     &mut region,
                 )
@@ -220,34 +249,48 @@ impl ResourceLogicCircuit for OrRelationIntentResourceLogicCircuit {
             || "conditional equal: check value",
             |mut region| {
                 config.conditional_equal_config.assign_region(
-                    &is_input_resource,
+                    &self_resource.is_input,
                     &receiver_value,
-                    &basic_variables.output_resource_variables[0]
-                        .resource_variables
-                        .value,
+                    &desired_resource.resource.value,
                     0,
                     &mut region,
                 )
             },
         )?;
 
+        // check the desired_resource is an output
+        {
+            let zero_constant = assign_free_constant(
+                layouter.namespace(|| "constant zero"),
+                config.advices[0],
+                pallas::Base::zero(),
+            )?;
+
+            layouter.assign_region(
+                || "conditional equal: check desired_resource is_input",
+                |mut region| {
+                    config.conditional_equal_config.assign_region(
+                        &self_resource.is_input,
+                        &zero_constant,
+                        &desired_resource.is_input,
+                        0,
+                        &mut region,
+                    )
+                },
+            )?;
+        }
+
         // check the token_property and token_quantity in conditions
-        let output_resource_token_property = &basic_variables.output_resource_variables[0]
-            .resource_variables
-            .label;
-        let output_resource_token_quantity = &basic_variables.output_resource_variables[0]
-            .resource_variables
-            .quantity;
         layouter.assign_region(
             || "extended or relatioin",
             |mut region| {
                 config.extended_or_relation_config.assign_region(
-                    &is_input_resource,
+                    &self_resource.is_input,
                     (&token_property_1, &token_quantity_1),
                     (&token_property_2, &token_quantity_2),
                     (
-                        output_resource_token_property,
-                        output_resource_token_quantity,
+                        &desired_resource.resource.label,
+                        &desired_resource.resource.quantity,
                     ),
                     0,
                     &mut region,
@@ -265,14 +308,6 @@ impl ResourceLogicCircuit for OrRelationIntentResourceLogicCircuit {
         Ok(())
     }
 
-    fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE] {
-        &self.input_resources
-    }
-
-    fn get_output_resources(&self) -> &[Resource; NUM_RESOURCE] {
-        &self.output_resources
-    }
-
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ResourceLogicPublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
         let default_resource_logic_cm: [pallas::Base; 2] =
@@ -287,8 +322,8 @@ impl ResourceLogicCircuit for OrRelationIntentResourceLogicCircuit {
         public_inputs.into()
     }
 
-    fn get_owned_resource_id(&self) -> pallas::Base {
-        self.owned_resource_id
+    fn get_self_resource(&self) -> ResourceExistenceWitness {
+        self.self_resource
     }
 }
 
@@ -297,14 +332,8 @@ resource_logic_verifying_info_impl!(OrRelationIntentResourceLogicCircuit);
 
 impl BorshSerialize for OrRelationIntentResourceLogicCircuit {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        writer.write_all(&self.owned_resource_id.to_repr())?;
-        for input in self.input_resources.iter() {
-            input.serialize(writer)?;
-        }
-
-        for output in self.output_resources.iter() {
-            output.serialize(writer)?;
-        }
+        self.self_resource.serialize(writer)?;
+        self.desired_resource.serialize(writer)?;
 
         self.token_1.serialize(writer)?;
         self.token_2.serialize(writer)?;
@@ -318,21 +347,15 @@ impl BorshSerialize for OrRelationIntentResourceLogicCircuit {
 
 impl BorshDeserialize for OrRelationIntentResourceLogicCircuit {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let owned_resource_id = read_base_field(reader)?;
-        let input_resources: Vec<_> = (0..NUM_RESOURCE)
-            .map(|_| Resource::deserialize_reader(reader))
-            .collect::<Result<_, _>>()?;
-        let output_resources: Vec<_> = (0..NUM_RESOURCE)
-            .map(|_| Resource::deserialize_reader(reader))
-            .collect::<Result<_, _>>()?;
+        let self_resource = ResourceExistenceWitness::deserialize_reader(reader)?;
+        let desired_resource = ResourceExistenceWitness::deserialize_reader(reader)?;
         let token_1 = Token::deserialize_reader(reader)?;
         let token_2 = Token::deserialize_reader(reader)?;
         let receiver_npk = read_base_field(reader)?;
         let receiver_value = read_base_field(reader)?;
         Ok(Self {
-            owned_resource_id,
-            input_resources: input_resources.try_into().unwrap(),
-            output_resources: output_resources.try_into().unwrap(),
+            self_resource,
+            desired_resource,
             token_1,
             token_2,
             receiver_npk,
@@ -374,7 +397,7 @@ fn test_halo2_or_relation_intent_resource_logic_circuit() {
     use crate::constant::RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE;
     use crate::{
         circuit::resource_logic_examples::token::COMPRESSED_TOKEN_VK,
-        resource::tests::random_resource,
+        resource::tests::random_resource, resource_tree::ResourceMerkleTreeLeaves,
     };
     use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
@@ -382,33 +405,52 @@ fn test_halo2_or_relation_intent_resource_logic_circuit() {
 
     let mut rng = OsRng;
     let circuit = {
-        let mut output_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
         let token_1 = Token::new("token1".to_string(), 1u64);
         let token_2 = Token::new("token2".to_string(), 2u64);
-        output_resources[0].kind.logic = *COMPRESSED_TOKEN_VK;
-        output_resources[0].kind.label = token_1.encode_name();
-        output_resources[0].quantity = token_1.quantity();
+
+        // Create an output desired resource
+        let mut desired_resource = random_resource(&mut rng);
+        desired_resource.kind.logic = *COMPRESSED_TOKEN_VK;
+        desired_resource.kind.label = token_1.encode_name();
+        desired_resource.quantity = token_1.quantity();
 
         let nk = pallas::Base::random(&mut rng);
-        let npk = output_resources[0].get_npk();
         let intent_resource = create_intent_resource(
             &mut rng,
             &token_1,
             &token_2,
-            npk,
-            output_resources[0].value,
+            desired_resource.get_npk(),
+            desired_resource.value,
             nk,
         );
-        let padding_input_resource = Resource::random_padding_resource(&mut rng);
-        let input_resources = [intent_resource, padding_input_resource];
+
+        // Collect resource merkle leaves
+        let input_resource_nf_1 = intent_resource.get_nf().unwrap().inner();
+        let output_resource_cm_1 = desired_resource.commitment().inner();
+        let resource_merkle_tree =
+            ResourceMerkleTreeLeaves::new(vec![input_resource_nf_1, output_resource_cm_1]);
+
+        let intent_resource_witness = {
+            let merkle_path = resource_merkle_tree
+                .generate_path(input_resource_nf_1)
+                .unwrap();
+            ResourceExistenceWitness::new(intent_resource, merkle_path)
+        };
+
+        let desired_resource_witness = {
+            let merkle_path = resource_merkle_tree
+                .generate_path(output_resource_cm_1)
+                .unwrap();
+            ResourceExistenceWitness::new(desired_resource, merkle_path)
+        };
+
         OrRelationIntentResourceLogicCircuit {
-            owned_resource_id: input_resources[0].get_nf().unwrap().inner(),
-            input_resources,
-            output_resources,
+            self_resource: intent_resource_witness,
+            desired_resource: desired_resource_witness,
             token_1,
             token_2,
-            receiver_npk: npk,
-            receiver_value: output_resources[0].value,
+            receiver_npk: desired_resource.get_npk(),
+            receiver_value: desired_resource.value,
         }
     };
 

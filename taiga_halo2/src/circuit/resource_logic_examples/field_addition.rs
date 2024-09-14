@@ -6,18 +6,17 @@ use crate::{
             assign_free_advice,
         },
         resource_logic_circuit::{
-            BasicResourceLogicVariables, ResourceLogicCircuit, ResourceLogicConfig,
-            ResourceLogicPublicInputs, ResourceLogicVerifyingInfo, ResourceLogicVerifyingInfoTrait,
+            ResourceLogicCircuit, ResourceLogicConfig, ResourceLogicPublicInputs,
+            ResourceLogicVerifyingInfo, ResourceLogicVerifyingInfoTrait, ResourceStatus,
         },
     },
-    constant::{
-        NUM_RESOURCE, RESOURCE_LOGIC_CIRCUIT_CUSTOM_PUBLIC_INPUT_BEGIN_IDX, SETUP_PARAMS_MAP,
-    },
+    constant::{RESOURCE_LOGIC_CIRCUIT_CUSTOM_PUBLIC_INPUT_BEGIN_IDX, SETUP_PARAMS_MAP},
     error::TransactionError,
     proof::Proof,
-    resource::{RandomSeed, Resource},
+    resource::RandomSeed,
     resource_logic_commitment::ResourceLogicCommitment,
     resource_logic_vk::ResourceLogicVerifyingKey,
+    resource_tree::ResourceExistenceWitness,
 };
 use halo2_proofs::{
     circuit::{floor_planner, Layouter, Value},
@@ -30,9 +29,7 @@ use rand::RngCore;
 // FieldAdditionResourceLogicCircuit with a trivial constraint a + b = c.
 #[derive(Clone, Debug, Default)]
 struct FieldAdditionResourceLogicCircuit {
-    owned_resource_id: pallas::Base,
-    input_resources: [Resource; NUM_RESOURCE],
-    output_resources: [Resource; NUM_RESOURCE],
+    self_resource: ResourceExistenceWitness,
     a: pallas::Base,
     b: pallas::Base,
 }
@@ -44,7 +41,7 @@ impl ResourceLogicCircuit for FieldAdditionResourceLogicCircuit {
         &self,
         config: Self::Config,
         mut layouter: impl Layouter<pallas::Base>,
-        _basic_variables: BasicResourceLogicVariables,
+        _self_resource: ResourceStatus,
     ) -> Result<(), Error> {
         let a = assign_free_advice(
             layouter.namespace(|| "witness a"),
@@ -79,14 +76,6 @@ impl ResourceLogicCircuit for FieldAdditionResourceLogicCircuit {
         Ok(())
     }
 
-    fn get_input_resources(&self) -> &[Resource; NUM_RESOURCE] {
-        &self.input_resources
-    }
-
-    fn get_output_resources(&self) -> &[Resource; NUM_RESOURCE] {
-        &self.output_resources
-    }
-
     fn get_public_inputs(&self, mut rng: impl RngCore) -> ResourceLogicPublicInputs {
         let mut public_inputs = self.get_mandatory_public_inputs();
         let default_resource_logic_cm: [pallas::Base; 2] =
@@ -102,8 +91,8 @@ impl ResourceLogicCircuit for FieldAdditionResourceLogicCircuit {
         public_inputs.into()
     }
 
-    fn get_owned_resource_id(&self) -> pallas::Base {
-        self.owned_resource_id
+    fn get_self_resource(&self) -> ResourceExistenceWitness {
+        self.self_resource
     }
 }
 
@@ -113,22 +102,17 @@ resource_logic_verifying_info_impl!(FieldAdditionResourceLogicCircuit);
 #[test]
 fn test_halo2_addition_resource_logic_circuit() {
     use crate::constant::RESOURCE_LOGIC_CIRCUIT_PARAMS_SIZE;
-    use crate::resource::tests::random_resource;
     use halo2_proofs::arithmetic::Field;
     use halo2_proofs::dev::MockProver;
     use rand::rngs::OsRng;
 
     let mut rng = OsRng;
     let circuit = {
-        let input_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
-        let output_resources = [(); NUM_RESOURCE].map(|_| random_resource(&mut rng));
+        let self_resource_witness = ResourceExistenceWitness::default();
         let a = pallas::Base::random(&mut rng);
         let b = pallas::Base::random(&mut rng);
-        let owned_resource_id = pallas::Base::random(&mut rng);
         FieldAdditionResourceLogicCircuit {
-            owned_resource_id,
-            input_resources,
-            output_resources,
+            self_resource: self_resource_witness,
             a,
             b,
         }

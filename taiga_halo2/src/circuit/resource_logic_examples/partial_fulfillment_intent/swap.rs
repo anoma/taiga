@@ -4,7 +4,6 @@ use crate::{
         gadgets::assign_free_advice,
         resource_logic_examples::token::{Token, TokenAuthorization, TokenResource, TOKEN_VK},
     },
-    constant::NUM_RESOURCE,
     resource::Resource,
     utils::poseidon_hash_n,
 };
@@ -45,12 +44,7 @@ impl Swap {
     /// - completely fills the swap using a single `TokenResource`, or
     /// - partially fills the swap, producing a `TokenResource` and a
     ///   returned resource.
-    pub fn fill(
-        &self,
-        mut rng: impl RngCore,
-        intent_resource: Resource,
-        offer: Token,
-    ) -> ([Resource; NUM_RESOURCE], [Resource; NUM_RESOURCE]) {
+    pub fn fill(&self, mut rng: impl RngCore, offer: Token) -> (Resource, Resource) {
         assert_eq!(offer.name(), self.buy.name());
 
         let ratio = self.buy.quantity() / self.sell.quantity;
@@ -61,8 +55,6 @@ impl Swap {
             self.sell.resource().nk_container.get_npk(),
             &self.auth,
         );
-
-        let input_padding_resource = Resource::random_padding_resource(&mut rng);
 
         let returned_resource = if offer.quantity() < self.buy.quantity() {
             let filled_quantity = offer.quantity() / ratio;
@@ -82,10 +74,7 @@ impl Swap {
             Resource::random_padding_resource(&mut rng)
         };
 
-        let input_resources = [intent_resource, input_padding_resource];
-        let output_resources = [*offer_resource.resource(), returned_resource];
-
-        (input_resources, output_resources)
+        (*offer_resource, returned_resource)
     }
 
     pub fn encode_label(&self) -> pallas::Base {

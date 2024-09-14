@@ -1,4 +1,3 @@
-mod cascaded_partial_transactions;
 mod partial_fulfillment_token_swap;
 mod token;
 mod token_swap_with_intent;
@@ -14,8 +13,5 @@ fn main() {
     tx.execute().unwrap();
 
     let tx = partial_fulfillment_token_swap::create_token_swap_transaction(rng);
-    tx.execute().unwrap();
-
-    let tx = cascaded_partial_transactions::create_transaction(rng);
     tx.execute().unwrap();
 }

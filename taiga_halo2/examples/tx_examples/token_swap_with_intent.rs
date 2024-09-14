@@ -18,7 +18,8 @@ use taiga_halo2::{
     constant::TAIGA_COMMITMENT_TREE_DEPTH,
     merkle_tree::{Anchor, MerklePath},
     nullifier::NullifierKeyContainer,
-    resource::{Resource, ResourceLogics},
+    resource::ResourceLogics,
+    resource_tree::{ResourceExistenceWitness, ResourceMerkleTreeLeaves},
     shielded_ptx::ShieldedPartialTransaction,
     transaction::{ShieldedPartialTxBundle, Transaction, TransparentPartialTxBundle},
 };
@@ -53,10 +54,6 @@ pub fn create_token_intent_ptx<R: RngCore>(
         input_nk,
     );
 
-    // padding the zero resources
-    let padding_input_resource = Resource::random_padding_resource(&mut rng);
-    let mut padding_output_resource = Resource::random_padding_resource(&mut rng);
-
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
     // Create compliance pairs
@@ -69,79 +66,51 @@ pub fn create_token_intent_ptx<R: RngCore>(
             &mut rng,
         );
 
-        // Fetch a valid anchor for padding input resources
-        let anchor = Anchor::from(pallas::Base::random(&mut rng));
-        let compliance_2 = ComplianceInfo::new(
-            padding_input_resource,
-            merkle_path,
-            Some(anchor),
-            &mut padding_output_resource,
-            &mut rng,
-        );
-        vec![compliance_1, compliance_2]
+        vec![compliance_1]
     };
 
-    // Create resource logics
-    let (input_resource_logics, output_resource_logics) = {
-        let input_resources = [*input_resource.resource(), padding_input_resource];
-        let output_resources = [intent_resource, padding_output_resource];
-        // Create resource_logics for the input resource
-        let input_resource_resource_logics = input_resource.generate_input_token_resource_logics(
+    // Collect resource merkle leaves
+    let input_resource_nf = input_resource.get_nf().unwrap().inner();
+    let output_resource_cm = intent_resource.commitment().inner();
+    let resource_merkle_tree =
+        ResourceMerkleTreeLeaves::new(vec![input_resource_nf, output_resource_cm]);
+
+    // Create resource logics for the input resource
+    let input_resource_resource_logics = {
+        let merkle_path = resource_merkle_tree
+            .generate_path(input_resource_nf)
+            .unwrap();
+        input_resource.generate_input_token_resource_logics(
             &mut rng,
             input_auth,
             input_auth_sk,
-            input_resources,
-            output_resources,
-        );
-
-        // Create resource logics for the intent resource
-        let intent_resource_resource_logics = {
-            let intent_resource_logic = OrRelationIntentResourceLogicCircuit {
-                owned_resource_id: intent_resource.commitment().inner(),
-                input_resources,
-                output_resources,
-                token_1,
-                token_2,
-                receiver_npk: input_resource_npk,
-                receiver_value: input_resource.value,
-            };
-
-            ResourceLogics::new(Box::new(intent_resource_logic), vec![])
-        };
-
-        // Create resource logics for the padding input
-        let padding_input_resource_logics =
-            ResourceLogics::create_input_padding_resource_resource_logics(
-                &padding_input_resource,
-                input_resources,
-                output_resources,
-            );
-
-        // Create resource_logics for the padding output
-        let padding_output_resource_logics =
-            ResourceLogics::create_output_padding_resource_resource_logics(
-                &padding_output_resource,
-                input_resources,
-                output_resources,
-            );
-
-        (
-            vec![
-                input_resource_resource_logics,
-                padding_input_resource_logics,
-            ],
-            vec![
-                intent_resource_resource_logics,
-                padding_output_resource_logics,
-            ],
+            merkle_path,
         )
+    };
+
+    // Create resource logics for the intent(output) resource
+    let output_resource_resource_logics = {
+        let merkle_path = resource_merkle_tree
+            .generate_path(output_resource_cm)
+            .unwrap();
+        let intent_resource_witness = ResourceExistenceWitness::new(intent_resource, merkle_path);
+        let circuit = OrRelationIntentResourceLogicCircuit {
+            self_resource: intent_resource_witness,
+            // the desired resource won't be checked.
+            desired_resource: intent_resource_witness,
+            token_1,
+            token_2,
+            receiver_npk: input_resource_npk,
+            receiver_value: input_resource.value,
+        };
+        ResourceLogics::new(Box::new(circuit), vec![])
     };
 
     // Create shielded partial tx
     let ptx = ShieldedPartialTransaction::build(
         compliances,
-        input_resource_logics,
-        output_resource_logics,
+        vec![input_resource_resource_logics],
+        vec![output_resource_resource_logics],
         vec![],
         &mut rng,
     )
@@ -172,95 +141,65 @@ pub fn consume_token_intent_ptx<R: RngCore>(
     );
 
     // output resource
-    let input_resource_nf = intent_resource.get_nf().unwrap();
     let output_auth = TokenAuthorization::new(output_auth_pk, *COMPRESSED_TOKEN_AUTH_VK);
     let output_npk = NullifierKeyContainer::from_key(input_nk).get_npk();
     let mut output_resource =
         output_token.create_random_output_token_resource(&mut rng, output_npk, &output_auth);
-
-    // padding the zero resources
-    let padding_input_resource = Resource::random_padding_resource(&mut rng);
-    let mut padding_output_resource = Resource::random_padding_resource(&mut rng);
 
     let merkle_path = MerklePath::random(&mut rng, TAIGA_COMMITMENT_TREE_DEPTH);
 
     // Fetch a valid anchor for dummy resources
     let anchor = Anchor::from(pallas::Base::random(&mut rng));
 
-    // Create compliance pairs
-    let compliances = {
-        let compliance_1 = ComplianceInfo::new(
-            intent_resource,
-            merkle_path.clone(),
-            Some(anchor),
-            &mut output_resource.resource,
-            &mut rng,
-        );
+    // Create compliance proof
+    let compliance = ComplianceInfo::new(
+        intent_resource,
+        merkle_path.clone(),
+        Some(anchor),
+        &mut output_resource.resource,
+        &mut rng,
+    );
 
-        let compliance_2 = ComplianceInfo::new(
-            padding_input_resource,
-            merkle_path,
-            Some(anchor),
-            &mut padding_output_resource,
-            &mut rng,
-        );
-        vec![compliance_1, compliance_2]
-    };
+    let input_resource_nf = intent_resource.get_nf().unwrap().inner();
+    let output_resource_cm = output_resource.commitment().inner();
+    let resource_merkle_tree =
+        ResourceMerkleTreeLeaves::new(vec![input_resource_nf, output_resource_cm]);
 
-    // Create resource logics
-    let (input_resource_logics, output_resource_logics) = {
-        let input_resources = [intent_resource, padding_input_resource];
-        let output_resources = [*output_resource.resource(), padding_output_resource];
-        // Create resource_logics for the intent
-        let intent_resource_logics = {
-            let intent_resource_logic = OrRelationIntentResourceLogicCircuit {
-                owned_resource_id: input_resource_nf.inner(),
-                input_resources,
-                output_resources,
-                token_1,
-                token_2,
-                receiver_npk,
-                receiver_value,
-            };
+    let output_merkle_path = resource_merkle_tree
+        .generate_path(output_resource_cm)
+        .unwrap();
 
-            ResourceLogics::new(Box::new(intent_resource_logic), vec![])
+    // Create resource logics for the intent(input) resource
+    let intent_resource_logics = {
+        let merkle_path = resource_merkle_tree
+            .generate_path(input_resource_nf)
+            .unwrap();
+        let intent_resource_logic = OrRelationIntentResourceLogicCircuit {
+            self_resource: ResourceExistenceWitness::new(intent_resource, merkle_path),
+            desired_resource: ResourceExistenceWitness::new(
+                output_resource.resource,
+                output_merkle_path,
+            ),
+            token_1,
+            token_2,
+            receiver_npk,
+            receiver_value,
         };
 
-        // Create resource logics for the output token resource
-        let output_token_resource_logics = output_resource.generate_output_token_resource_logics(
-            &mut rng,
-            output_auth,
-            input_resources,
-            output_resources,
-        );
-
-        // Create resource_logics for the padding input
-        let padding_input_resource_logics =
-            ResourceLogics::create_input_padding_resource_resource_logics(
-                &padding_input_resource,
-                input_resources,
-                output_resources,
-            );
-
-        // Create resource_logics for the padding output
-        let padding_output_resource_logics =
-            ResourceLogics::create_output_padding_resource_resource_logics(
-                &padding_output_resource,
-                input_resources,
-                output_resources,
-            );
-
-        (
-            vec![intent_resource_logics, padding_input_resource_logics],
-            vec![output_token_resource_logics, padding_output_resource_logics],
-        )
+        ResourceLogics::new(Box::new(intent_resource_logic), vec![])
     };
+
+    let output_resource_logics = output_resource.generate_output_token_resource_logics(
+        &mut rng,
+        output_auth,
+        output_merkle_path,
+    );
 
     // Create shielded partial tx
     ShieldedPartialTransaction::build(
-        compliances,
-        input_resource_logics,
-        output_resource_logics,
+        vec![compliance],
+        vec![intent_resource_logics],
+        vec![output_resource_logics],
         vec![],
         &mut rng,
     )

@@ -1,8 +1,7 @@
 use crate::{
     circuit::resource_logic_bytecode::ApplicationByteCode, compliance::ComplianceInfo,
-    constant::NUM_RESOURCE, delta_commitment::DeltaCommitment, error::TransactionError,
-    executable::Executable, merkle_tree::Anchor, nullifier::Nullifier,
-    resource::ResourceCommitment,
+    delta_commitment::DeltaCommitment, error::TransactionError, executable::Executable,
+    merkle_tree::Anchor, nullifier::Nullifier, resource::ResourceCommitment,
 };
 
 use pasta_curves::pallas;
@@ -29,10 +28,6 @@ impl TransparentPartialTransaction {
         output_resource_app: Vec<ApplicationByteCode>,
         hints: Vec<u8>,
     ) -> Self {
-        assert_eq!(compliances.len(), NUM_RESOURCE);
-        assert_eq!(input_resource_app.len(), NUM_RESOURCE);
-        assert_eq!(output_resource_app.len(), NUM_RESOURCE);
-
         Self {
             compliances,
             input_resource_app,
@@ -47,21 +42,22 @@ impl Executable for TransparentPartialTransaction {
         // check resource logics, nullifiers, and resource commitments
         let compliance_nfs = self.get_nullifiers();
         let compliance_cms = self.get_output_cms();
+        let compliance_resource_merkle_root = self.get_resource_merkle_root();
         for (resource_logic, nf) in self.input_resource_app.iter().zip(compliance_nfs.iter()) {
-            let owned_resource_id =
-                resource_logic.verify_transparently(&compliance_nfs, &compliance_cms)?;
+            let self_resource_id =
+                resource_logic.verify_transparently(&compliance_resource_merkle_root)?;
             // Make sure all resource logics are checked
-            if owned_resource_id != nf.inner() {
-                return Err(TransactionError::InconsistentOwnedResourceID);
+            if self_resource_id != nf.inner() {
+                return Err(TransactionError::InconsistentSelfResourceID);
             }
         }
 
         for (resource_logic, cm) in self.output_resource_app.iter().zip(compliance_cms.iter()) {
-            let owned_resource_id =
-                resource_logic.verify_transparently(&compliance_nfs, &compliance_cms)?;
+            let self_resource_id =
+                resource_logic.verify_transparently(&compliance_resource_merkle_root)?;
             // Make sure all resource logics are checked
-            if owned_resource_id != cm.inner() {
-                return Err(TransactionError::InconsistentOwnedResourceID);
+            if self_resource_id != cm.inner() {
+                return Err(TransactionError::InconsistentSelfResourceID);
             }
         }
 
@@ -107,7 +103,8 @@ pub mod testing {
     use crate::{
         circuit::resource_logic_examples::TrivialResourceLogicCircuit,
         constant::TAIGA_COMMITMENT_TREE_DEPTH, merkle_tree::MerklePath,
-        resource::tests::random_resource, transparent_ptx::*,
+        resource::tests::random_resource, resource_tree::ResourceMerkleTreeLeaves,
+        transparent_ptx::*,
     };
     use rand::rngs::OsRng;
 
@@ -146,45 +143,57 @@ pub mod testing {
             &mut rng,
         );
 
+        // Collect resource merkle leaves
+        let input_resource_nf_1 = input_resource_1.get_nf().unwrap().inner();
+        let output_resource_cm_1 = output_resource_1.commitment().inner();
+        let input_resource_nf_2 = input_resource_2.get_nf().unwrap().inner();
+        let output_resource_cm_2 = output_resource_2.commitment().inner();
+        let resource_merkle_tree = ResourceMerkleTreeLeaves::new(vec![
+            input_resource_nf_1,
+            output_resource_cm_1,
+            input_resource_nf_2,
+            output_resource_cm_2,
+        ]);
+
         // construct applications
         let input_resource_1_app = {
-            let app_resource_logic = TrivialResourceLogicCircuit::new(
-                input_resource_1.get_nf().unwrap().inner(),
-                [input_resource_1, input_resource_2],
-                [output_resource_1, output_resource_2],
-            );
+            let input_resource_path_1 = resource_merkle_tree
+                .generate_path(input_resource_nf_1)
+                .unwrap();
+            let input_resource_application_logic_1 =
+                TrivialResourceLogicCircuit::new(input_resource_1, input_resource_path_1);
 
-            ApplicationByteCode::new(app_resource_logic.to_bytecode(), vec![])
+            ApplicationByteCode::new(input_resource_application_logic_1.to_bytecode(), vec![])
         };
 
         let input_resource_2_app = {
-            let app_resource_logic = TrivialResourceLogicCircuit::new(
-                input_resource_2.get_nf().unwrap().inner(),
-                [input_resource_1, input_resource_2],
-                [output_resource_1, output_resource_2],
-            );
+            let input_resource_path_2 = resource_merkle_tree
+                .generate_path(input_resource_nf_2)
+                .unwrap();
+            let input_resource_application_logic_2 =
+                TrivialResourceLogicCircuit::new(input_resource_2, input_resource_path_2);
 
-            ApplicationByteCode::new(app_resource_logic.to_bytecode(), vec![])
+            ApplicationByteCode::new(input_resource_application_logic_2.to_bytecode(), vec![])
         };
 
         let output_resource_1_app = {
-            let app_resource_logic = TrivialResourceLogicCircuit::new(
-                output_resource_1.commitment().inner(),
-                [input_resource_1, input_resource_2],
-                [output_resource_1, output_resource_2],
-            );
+            let output_resource_path_1 = resource_merkle_tree
+                .generate_path(output_resource_cm_1)
+                .unwrap();
+            let output_resource_application_logic_1 =
+                TrivialResourceLogicCircuit::new(output_resource_1, output_resource_path_1);
 
-            ApplicationByteCode::new(app_resource_logic.to_bytecode(), vec![])
+            ApplicationByteCode::new(output_resource_application_logic_1.to_bytecode(), vec![])
         };
 
         let output_resource_2_app = {
-            let app_resource_logic = TrivialResourceLogicCircuit::new(
-                output_resource_2.commitment().inner(),
-                [input_resource_1, input_resource_2],
-                [output_resource_1, output_resource_2],
-            );
+            let output_resource_path_2 = resource_merkle_tree
+                .generate_path(output_resource_cm_2)
+                .unwrap();
+            let output_resource_application_logic_2 =
+                TrivialResourceLogicCircuit::new(output_resource_2, output_resource_path_2);
 
-            ApplicationByteCode::new(app_resource_logic.to_bytecode(), vec![])
+            ApplicationByteCode::new(output_resource_application_logic_2.to_bytecode(), vec![])
         };
 
         TransparentPartialTransaction::new(

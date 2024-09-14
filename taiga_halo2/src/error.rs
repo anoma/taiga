@@ -15,7 +15,7 @@ pub enum TransactionError {
     /// Output resource commitment is inconsistent between the compliance and the resource logic.
     InconsistentOutputResourceCommitment,
     /// Owned resource id is inconsistent between the compliance and the resource logic.
-    InconsistentOwnedResourceID,
+    InconsistentSelfResourceID,
     /// IO error
     IoError(std::io::Error),
     /// Transparent resource nullifier key is missing
@@ -26,6 +26,8 @@ pub enum TransactionError {
     MissingPartialTxBindingSignatureR,
     /// ResourceLogicRepresentation is not valid
     InvalidResourceLogicRepresentation,
+    /// Resource merkle root is inconsistent between the compliance and the resource logic.
+    InconsistentResourceMerkleRoot,
 }
 
 impl Display for TransactionError {
@@ -41,7 +43,7 @@ impl Display for TransactionError {
             InconsistentOutputResourceCommitment => f.write_str(
                 "Output resource commitment is not consistent between the compliance and the resource logic",
             ),
-            InconsistentOwnedResourceID => {
+            InconsistentSelfResourceID => {
                 f.write_str("Owned resource id is not consistent between the compliance and the resource logic")
             }
             IoError(e) => f.write_str(&format!("IoError error: {e}")),
@@ -56,6 +58,9 @@ impl Display for TransactionError {
             }
             InvalidResourceLogicRepresentation => {
                 f.write_str("ResourceLogicRepresentation is not valid, add borsh feature if using native resource logic examples ")
+            }
+            InconsistentResourceMerkleRoot => {
+                f.write_str("Resource merkle root is not consistent between the compliance and the resource logic")
             }
         }
     }

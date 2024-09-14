@@ -15,6 +15,7 @@ pub mod resource;
 pub mod resource_encryption;
 pub mod resource_logic_commitment;
 pub mod resource_logic_vk;
+pub mod resource_tree;
 pub mod shielded_ptx;
 pub mod taiga_api;
 pub mod transaction;

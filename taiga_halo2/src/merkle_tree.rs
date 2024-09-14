@@ -3,7 +3,10 @@ use std::hash::{Hash, Hasher};
 use crate::merkle_tree::LR::{L, R};
 use crate::resource::ResourceCommitment;
 use crate::utils::poseidon_hash;
-use crate::{constant::TAIGA_COMMITMENT_TREE_DEPTH, resource::Resource};
+use crate::{
+    constant::{TAIGA_COMMITMENT_TREE_DEPTH, TAIGA_RESOURCE_TREE_DEPTH},
+    resource::Resource,
+};
 use ff::PrimeField;
 use halo2_proofs::arithmetic::Field;
 use pasta_curves::pallas;
@@ -82,17 +85,22 @@ pub enum LR {
     L,
 }
 
-pub fn is_right(p: LR) -> bool {
-    match p {
-        R => true,
-        L => false,
+impl LR {
+    pub fn is_left(&self) -> bool {
+        match self {
+            R => false,
+            L => true,
+        }
     }
 }
 
-pub fn is_left(p: LR) -> bool {
-    match p {
-        R => false,
-        L => true,
+impl From<bool> for LR {
+    fn from(b: bool) -> Self {
+        if b {
+            LR::L
+        } else {
+            LR::R
+        }
     }
 }
 
@@ -139,7 +147,7 @@ impl MerklePath {
     }
 
     /// Returns the input parameters for merkle tree gadget.
-    pub fn get_path(&self) -> Vec<(pallas::Base, LR)> {
+    pub fn inner(&self) -> Vec<(pallas::Base, LR)> {
         self.merkle_path
             .iter()
             .map(|(node, b)| (node.inner(), *b))
@@ -153,6 +161,16 @@ impl Default for MerklePath {
             .map(|_| (Node::from(pallas::Base::one()), L))
             .collect();
         Self::from_path(merkle_path)
+    }
+}
+
+impl From<[(pallas::Base, LR); TAIGA_RESOURCE_TREE_DEPTH]> for MerklePath {
+    fn from(path: [(pallas::Base, LR); TAIGA_RESOURCE_TREE_DEPTH]) -> Self {
+        let merkle_path = path
+            .into_iter()
+            .map(|(value, b)| (Node::from(value), b))
+            .collect();
+        MerklePath { merkle_path }
     }
 }
 

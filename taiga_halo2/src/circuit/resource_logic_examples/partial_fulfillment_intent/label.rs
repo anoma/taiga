@@ -1,16 +1,17 @@
 use crate::circuit::{
     gadgets::{
+        assign_free_constant,
         conditional_equal::ConditionalEqualConfig,
         mul::{MulChip, MulInstructions},
         poseidon_hash::poseidon_hash_gadget,
         sub::{SubChip, SubInstructions},
     },
-    resource_logic_circuit::BasicResourceLogicVariables,
+    resource_logic_circuit::ResourceStatus,
 };
 use halo2_gadgets::poseidon::Pow5Config as PoseidonConfig;
 use halo2_proofs::{
     circuit::{AssignedCell, Layouter},
-    plonk::Error,
+    plonk::{Advice, Column, Error},
 };
 use pasta_curves::pallas;
 
@@ -47,11 +48,11 @@ impl PartialFulfillmentIntentLabel {
         )
     }
 
-    /// Checks to be enforced if `is_input_resource == 1`
-    pub fn is_input_resource_checks(
+    /// constraints on intent resource consumption
+    pub fn intent_resource_consumption_check(
         &self,
         is_input_resource: &AssignedCell<pallas::Base, pallas::Base>,
-        basic_variables: &BasicResourceLogicVariables,
+        offer_resource: &ResourceStatus,
         config: &ConditionalEqualConfig,
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<(), Error> {
@@ -61,9 +62,7 @@ impl PartialFulfillmentIntentLabel {
                 config.assign_region(
                     is_input_resource,
                     &self.token_resource_logic_vk,
-                    &basic_variables.output_resource_variables[0]
-                        .resource_variables
-                        .logic,
+                    &offer_resource.resource.logic,
                     0,
                     &mut region,
                 )
@@ -76,9 +75,7 @@ impl PartialFulfillmentIntentLabel {
                 config.assign_region(
                     is_input_resource,
                     &self.bought_token,
-                    &basic_variables.output_resource_variables[0]
-                        .resource_variables
-                        .label,
+                    &offer_resource.resource.label,
                     0,
                     &mut region,
                 )
@@ -92,9 +89,7 @@ impl PartialFulfillmentIntentLabel {
                 config.assign_region(
                     is_input_resource,
                     &self.receiver_npk,
-                    &basic_variables.output_resource_variables[0]
-                        .resource_variables
-                        .npk,
+                    &offer_resource.resource.npk,
                     0,
                     &mut region,
                 )
@@ -108,9 +103,7 @@ impl PartialFulfillmentIntentLabel {
                 config.assign_region(
                     is_input_resource,
                     &self.receiver_value,
-                    &basic_variables.output_resource_variables[0]
-                        .resource_variables
-                        .value,
+                    &offer_resource.resource.value,
                     0,
                     &mut region,
                 )
@@ -120,23 +113,38 @@ impl PartialFulfillmentIntentLabel {
         Ok(())
     }
 
-    /// Checks to be enforced if `is_output_resource == 1`
-    pub fn is_output_resource_checks(
+    /// constraints on intent resource creation
+    pub fn intent_resource_creation_check(
         &self,
-        is_output_resource: &AssignedCell<pallas::Base, pallas::Base>,
-        basic_variables: &BasicResourceLogicVariables,
+        intent_resource: &ResourceStatus,
+        sell_resource: &ResourceStatus,
+        advices: &[Column<Advice>; 10],
         config: &ConditionalEqualConfig,
+        sub_chip: &SubChip<pallas::Base>,
         mut layouter: impl Layouter<pallas::Base>,
     ) -> Result<(), Error> {
+        let is_output_resource = {
+            let constant_one = assign_free_constant(
+                layouter.namespace(|| "one"),
+                advices[0],
+                pallas::Base::one(),
+            )?;
+            // TODO: use a nor gate to replace the sub gate.
+            SubInstructions::sub(
+                sub_chip,
+                layouter.namespace(|| "is_output"),
+                &intent_resource.is_input,
+                &constant_one,
+            )?
+        };
+
         layouter.assign_region(
-            || "conditional equal: check sold token resource_logic_vk",
+            || "conditional equal: check sell token resource_logic_vk",
             |mut region| {
                 config.assign_region(
-                    is_output_resource,
+                    &is_output_resource,
                     &self.token_resource_logic_vk,
-                    &basic_variables.input_resource_variables[0]
-                        .resource_variables
-                        .logic,
+                    &sell_resource.resource.logic,
                     0,
                     &mut region,
                 )
@@ -144,14 +152,12 @@ impl PartialFulfillmentIntentLabel {
         )?;
 
         layouter.assign_region(
-            || "conditional equal: check sold token label",
+            || "conditional equal: check sell token label",
             |mut region| {
                 config.assign_region(
-                    is_output_resource,
+                    &is_output_resource,
                     &self.sold_token,
-                    &basic_variables.input_resource_variables[0]
-                        .resource_variables
-                        .label,
+                    &sell_resource.resource.label,
                     0,
                     &mut region,
                 )
@@ -159,14 +165,12 @@ impl PartialFulfillmentIntentLabel {
         )?;
 
         layouter.assign_region(
-            || "conditional equal: check sold token quantity",
+            || "conditional equal: check sell token quantity",
             |mut region| {
                 config.assign_region(
-                    is_output_resource,
+                    &is_output_resource,
                     &self.sold_token_quantity,
-                    &basic_variables.input_resource_variables[0]
-                        .resource_variables
-                        .quantity,
+                    &sell_resource.resource.quantity,
                     0,
                     &mut region,
                 )
@@ -176,11 +180,15 @@ impl PartialFulfillmentIntentLabel {
         Ok(())
     }
 
-    /// Checks to be enforced if `is_partial_fulfillment == 1`
-    pub fn is_partial_fulfillment_checks(
+    /// partial fulfillment check:
+    /// validity of the returned resource
+    /// partial fulfillment equation
+    #[allow(clippy::too_many_arguments)]
+    pub fn partial_fulfillment_check(
         &self,
-        is_input_resource: &AssignedCell<pallas::Base, pallas::Base>,
-        basic_variables: &BasicResourceLogicVariables,
+        intent_resource: &ResourceStatus,
+        offer_resource: &ResourceStatus,
+        returned_resource: &ResourceStatus,
         config: &ConditionalEqualConfig,
         sub_chip: &SubChip<pallas::Base>,
         mul_chip: &MulChip<pallas::Base>,
@@ -192,44 +200,52 @@ impl PartialFulfillmentIntentLabel {
                 layouter
                     .namespace(|| "expected_bought_token_quantity - actual_bought_token_quantity"),
                 &self.bought_token_quantity,
-                &basic_variables.output_resource_variables[0]
-                    .resource_variables
-                    .quantity,
+                &offer_resource.resource.quantity,
             )?;
             MulInstructions::mul(
                 mul_chip,
                 layouter.namespace(|| "is_input * is_partial_fulfillment"),
-                is_input_resource,
+                &intent_resource.is_input,
                 &is_partial_fulfillment,
             )?
         };
 
-        // check returned token vk if it's partially fulfilled
+        // check: self_resource and returned_resource are on the same tree
         layouter.assign_region(
-            || "conditional equal: check returned token vk",
+            || "conditional equal: check returned_resource root",
             |mut region| {
                 config.assign_region(
                     &is_partial_fulfillment,
-                    &self.token_resource_logic_vk,
-                    &basic_variables.output_resource_variables[1]
-                        .resource_variables
-                        .logic,
+                    &intent_resource.resource_merkle_root,
+                    &returned_resource.resource_merkle_root,
                     0,
                     &mut region,
                 )
             },
         )?;
 
-        // check return token label if it's partially fulfilled
+        // check the returned resource vk if it's partially fulfilled
+        layouter.assign_region(
+            || "conditional equal: check returned token vk",
+            |mut region| {
+                config.assign_region(
+                    &is_partial_fulfillment,
+                    &self.token_resource_logic_vk,
+                    &returned_resource.resource.logic,
+                    0,
+                    &mut region,
+                )
+            },
+        )?;
+
+        // check the returned resource label if it's partially fulfilled
         layouter.assign_region(
             || "conditional equal: check returned token label",
             |mut region| {
                 config.assign_region(
                     &is_partial_fulfillment,
                     &self.sold_token,
-                    &basic_variables.output_resource_variables[1]
-                        .resource_variables
-                        .label,
+                    &returned_resource.resource.label,
                     0,
                     &mut region,
                 )
@@ -242,9 +258,7 @@ impl PartialFulfillmentIntentLabel {
                 config.assign_region(
                     &is_partial_fulfillment,
                     &self.receiver_npk,
-                    &basic_variables.output_resource_variables[1]
-                        .resource_variables
-                        .npk,
+                    &returned_resource.resource.npk,
                     0,
                     &mut region,
                 )
@@ -257,9 +271,7 @@ impl PartialFulfillmentIntentLabel {
                 config.assign_region(
                     &is_partial_fulfillment,
                     &self.receiver_value,
-                    &basic_variables.output_resource_variables[1]
-                        .resource_variables
-                        .value,
+                    &returned_resource.resource.value,
                     0,
                     &mut region,
                 )
@@ -272,9 +284,7 @@ impl PartialFulfillmentIntentLabel {
                 sub_chip,
                 layouter.namespace(|| "expected_sold_quantity - returned_quantity"),
                 &self.sold_token_quantity,
-                &basic_variables.output_resource_variables[1]
-                    .resource_variables
-                    .quantity,
+                &returned_resource.resource.quantity,
             )?;
 
             // check (expected_bought_quantity * actual_sold_quantity) == (expected_sold_quantity * actual_bought_quantity)
@@ -289,9 +299,7 @@ impl PartialFulfillmentIntentLabel {
                 mul_chip,
                 layouter.namespace(|| "expected_sold_quantity * actual_bought_quantity"),
                 &self.sold_token_quantity,
-                &basic_variables.output_resource_variables[0]
-                    .resource_variables
-                    .quantity,
+                &offer_resource.resource.quantity,
             )?;
 
             layouter.assign_region(
