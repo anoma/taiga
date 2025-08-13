@@ -23,7 +23,7 @@ jobs:
         os: [ubuntu-latest]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -50,7 +50,7 @@ jobs:
   #         - wasm32-wasi
 
   #   steps:
-  #     - uses: actions/checkout@v3
+  #     - uses: actions/checkout@v5
   #     - uses: actions-rs/toolchain@v1
   #       with:
   #         toolchain: stable
@@ -67,7 +67,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -86,7 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: beta
@@ -105,7 +105,7 @@ jobs:
   #   runs-on: ubuntu-latest
 
   #   steps:
-  #     - uses: actions/checkout@v3
+  #     - uses: actions/checkout@v5
   #     - uses: actions-rs/toolchain@v1
   #       with:
   #         toolchain: stable
@@ -128,7 +128,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -156,7 +156,7 @@ jobs:
   #   container:
   #     image: rustlang/rust:nightly
   #   steps:
-  #   - uses: actions/checkout@v3
+  #   - uses: actions/checkout@v5
   #   - name: Install cargo-audit
   #     run: cargo install cargo-audit
   #   - name: Cargo Audit
